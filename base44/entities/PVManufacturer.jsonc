@@ -1,0 +1,13 @@
+{
+  "name": "PVManufacturer",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Manufacturer name"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

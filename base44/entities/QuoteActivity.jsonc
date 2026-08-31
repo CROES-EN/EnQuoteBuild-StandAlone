@@ -1,0 +1,62 @@
+{
+  "name": "QuoteActivity",
+  "type": "object",
+  "properties": {
+    "quote_id": {
+      "type": "string",
+      "description": "ID of the quote that changed"
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "created",
+        "updated"
+      ],
+      "description": "Type of quote activity"
+    },
+    "changed_fields": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Quote fields changed by this action"
+    },
+    "field_changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "previous_value": {
+            "type": "string"
+          },
+          "new_value": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Before and after values for changed fields"
+    },
+    "performed_by": {
+      "type": "string",
+      "description": "Email of the person who made the change when available"
+    },
+    "action_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Exact UTC timestamp of the action"
+    },
+    "mountain_time": {
+      "type": "string",
+      "description": "Human-readable action time in Mountain Time"
+    }
+  },
+  "required": [
+    "quote_id",
+    "action",
+    "action_at",
+    "mountain_time"
+  ]
+}

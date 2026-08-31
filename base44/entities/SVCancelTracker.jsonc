@@ -1,0 +1,36 @@
+{
+  "name": "SVCancelTracker",
+  "type": "object",
+  "properties": {
+    "site_id": {
+      "type": "string",
+      "description": "Site ID associated with the canceled site visit"
+    },
+    "case_id": {
+      "type": "string",
+      "description": "Case ID associated with the escalation"
+    },
+    "cancel_count": {
+      "type": "number",
+      "description": "Number of cancellations or reschedules"
+    },
+    "ho_contacted": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the homeowner was contacted about the reschedule"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Additional notes about the escalation"
+    },
+    "submitted_by": {
+      "type": "string",
+      "description": "Email of the agent who submitted the record"
+    }
+  },
+  "required": [
+    "site_id",
+    "case_id",
+    "cancel_count"
+  ]
+}

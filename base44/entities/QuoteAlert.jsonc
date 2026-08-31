@@ -1,0 +1,55 @@
+{
+  "name": "QuoteAlert",
+  "type": "object",
+  "properties": {
+    "quote_id": {
+      "type": "string",
+      "description": "ID of the quote this mention is associated with"
+    },
+    "site_id": {
+      "type": "string",
+      "description": "Site ID for quick reference"
+    },
+    "mentioned_email": {
+      "type": "string",
+      "description": "Email of the user who was @mentioned"
+    },
+    "mentioned_by": {
+      "type": "string",
+      "description": "Email of the user who created the mention"
+    },
+    "message": {
+      "type": "string",
+      "description": "The mention message text"
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "yellow",
+        "orange",
+        "red"
+      ],
+      "default": "yellow",
+      "description": "Priority/urgency level of the mention"
+    },
+    "is_resolved": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this mention has been resolved/dismissed"
+    },
+    "resolved_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the mention was resolved"
+    },
+    "resolved_by": {
+      "type": "string",
+      "description": "Email of user who resolved the mention"
+    }
+  },
+  "required": [
+    "quote_id",
+    "message",
+    "mentioned_email"
+  ]
+}

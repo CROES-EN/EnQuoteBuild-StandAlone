@@ -1,0 +1,42 @@
+{
+  "name": "PDFTemplate",
+  "type": "object",
+  "properties": {
+    "company_name": {
+      "type": "string",
+      "default": "QuotePro",
+      "description": "Company name to display on PDF"
+    },
+    "company_address": {
+      "type": "string",
+      "description": "Company address for PDF header"
+    },
+    "company_phone": {
+      "type": "string",
+      "description": "Company phone number"
+    },
+    "company_email": {
+      "type": "string",
+      "description": "Company email address"
+    },
+    "logo_url": {
+      "type": "string",
+      "description": "URL to company logo image"
+    },
+    "primary_color": {
+      "type": "string",
+      "default": "#4f46e5",
+      "description": "Primary color for PDF branding (hex)"
+    },
+    "include_version_history": {
+      "type": "boolean",
+      "default": true,
+      "description": "Include version history in PDF"
+    },
+    "footer_text": {
+      "type": "string",
+      "description": "Custom footer text"
+    }
+  },
+  "required": []
+}

@@ -1,0 +1,4 @@
+import { Link } from "react-router-dom";
+import { Card } from "@/components/ui/card";
+const money = amount => `$${amount.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+export default function OverviewMetrics({ metrics }) { return <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">{metrics.map(metric => <Link key={metric.label} to={metric.to} className="group"><Card className="h-full border-slate-200 p-4 transition-colors group-hover:border-indigo-300 group-hover:bg-indigo-50"><p className="text-xs font-medium uppercase tracking-wide text-slate-500">{metric.label}</p><p className="mt-1 text-2xl font-bold text-slate-900">{metric.count}</p>{metric.value !== undefined && <p className="mt-1 text-xs text-amber-700">{money(metric.value)} inactive revenue</p>}</Card></Link>)}</div>; }

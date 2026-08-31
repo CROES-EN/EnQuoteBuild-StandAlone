@@ -1,0 +1,80 @@
+{
+  "name": "SiteFlag",
+  "type": "object",
+  "properties": {
+    "site_id": {
+      "type": "string",
+      "description": "The Site ID being flagged"
+    },
+    "flag_level": {
+      "type": "string",
+      "enum": [
+        "yellow",
+        "orange",
+        "red"
+      ],
+      "description": "Severity level of the flag"
+    },
+    "flag_source": {
+      "type": "string",
+      "enum": [
+        "truckroll",
+        "support_contacts",
+        "both"
+      ],
+      "description": "What triggered the flag"
+    },
+    "truckroll_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of cancellations/reschedules from SVCancelTracker"
+    },
+    "support_contact_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of support interactions in the rolling window"
+    },
+    "support_window_days": {
+      "type": "number",
+      "default": 10,
+      "description": "Rolling window in days used for support contact evaluation"
+    },
+    "last_truckroll_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date of most recent truckroll cancellation entry"
+    },
+    "last_support_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date of most recent support interaction"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Manual notes about this flag"
+    },
+    "is_resolved": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this flag has been cleared/resolved"
+    },
+    "resolved_by": {
+      "type": "string",
+      "description": "Email of user who resolved the flag"
+    },
+    "resolved_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the flag was resolved"
+    },
+    "resolved_notes": {
+      "type": "string",
+      "description": "Notes explaining resolution"
+    }
+  },
+  "required": [
+    "site_id",
+    "flag_level",
+    "flag_source"
+  ]
+}

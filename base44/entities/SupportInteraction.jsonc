@@ -1,0 +1,43 @@
+{
+  "name": "SupportInteraction",
+  "type": "object",
+  "properties": {
+    "site_id": {
+      "type": "string",
+      "description": "Site ID the interaction is associated with"
+    },
+    "interaction_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date and time of the support interaction"
+    },
+    "interaction_type": {
+      "type": "string",
+      "description": "Type of interaction (call, ticket, escalation, etc.)"
+    },
+    "case_number": {
+      "type": "string",
+      "description": "Case or ticket number if available"
+    },
+    "salesforce_case_id": {
+      "type": "string",
+      "description": "Salesforce internal Case ID (e.g. 500Ps00001QxAf0IAF) used to build direct case URL"
+    },
+    "description": {
+      "type": "string",
+      "description": "Summary of the support interaction"
+    },
+    "upload_batch": {
+      "type": "string",
+      "description": "Identifier for the upload batch this came from"
+    },
+    "uploaded_by": {
+      "type": "string",
+      "description": "Email of user who uploaded this record"
+    }
+  },
+  "required": [
+    "site_id",
+    "interaction_date"
+  ]
+}

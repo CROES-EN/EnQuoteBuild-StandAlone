@@ -1,0 +1,77 @@
+{
+  "name": "PVPanelRMA",
+  "type": "object",
+  "properties": {
+    "case_owner": {
+      "type": "string",
+      "description": "Email of the case owner (application user)"
+    },
+    "site_id": {
+      "type": "string",
+      "description": "Site ID associated with the RMA"
+    },
+    "case_id": {
+      "type": "string",
+      "description": "Case ID - should be unique"
+    },
+    "panel_manufacturer": {
+      "type": "string",
+      "description": "Panel manufacturer name"
+    },
+    "current_status": {
+      "type": "string",
+      "enum": [
+        "New",
+        "Waiting for Customer",
+        "Reviewing Documentation",
+        "RMA Submitted",
+        "Manufacturer Reviewing",
+        "Approved",
+        "Rejected",
+        "Deadend",
+        "Replacement Pending Shipment",
+        "Replacement Shipped",
+        "Replacement Installed",
+        "Closed",
+        "On Hold"
+      ],
+      "default": "New",
+      "description": "Current status of the RMA"
+    },
+    "rma_url": {
+      "type": "string",
+      "description": "URL to the manufacturer's RMA page"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notes and ongoing details about the RMA"
+    },
+    "status_history": {
+      "type": "array",
+      "description": "Chronological log of all status changes - never overwritten",
+      "items": {
+        "type": "object",
+        "properties": {
+          "previous_status": {
+            "type": "string"
+          },
+          "new_status": {
+            "type": "string"
+          },
+          "changed_by": {
+            "type": "string"
+          },
+          "changed_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "site_id",
+    "case_id",
+    "panel_manufacturer"
+  ]
+}

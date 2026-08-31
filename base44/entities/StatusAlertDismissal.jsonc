@@ -1,0 +1,13 @@
+{
+  "name": "StatusAlertDismissal",
+  "type": "object",
+  "properties": {
+    "quote_id": {
+      "type": "string",
+      "description": "ID of the quote whose status alert was dismissed by this user"
+    }
+  },
+  "required": [
+    "quote_id"
+  ]
+}

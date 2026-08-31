@@ -1,0 +1,72 @@
+{
+  "name": "PriceReview",
+  "type": "object",
+  "properties": {
+    "product_id": {
+      "type": "string"
+    },
+    "product_name": {
+      "type": "string"
+    },
+    "catalog_price": {
+      "type": "number"
+    },
+    "retailer_price": {
+      "type": "number"
+    },
+    "retailer_name": {
+      "type": "string"
+    },
+    "source_url": {
+      "type": "string"
+    },
+    "availability": {
+      "type": "string"
+    },
+    "detected_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "confirmed",
+        "dismissed"
+      ],
+      "default": "pending"
+    },
+    "reviewed_by": {
+      "type": "string"
+    },
+    "reviewed_date": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "product_id",
+    "catalog_price",
+    "retailer_price",
+    "source_url",
+    "status"
+  ],
+  "rls": {
+    "read": {},
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

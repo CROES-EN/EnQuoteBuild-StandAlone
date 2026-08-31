@@ -1,0 +1,57 @@
+{
+  "name": "User",
+  "type": "object",
+  "properties": {
+    "app_role": {
+      "type": "string",
+      "enum": [
+        "submitter",
+        "approver",
+        "invoicer",
+        "admin"
+      ],
+      "description": "User's primary role in the quote management system"
+    },
+    "additional_roles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "submitter",
+          "approver",
+          "invoicer",
+          "admin"
+        ]
+      },
+      "description": "Additional roles granted to the user"
+    },
+    "department": {
+      "type": "string",
+      "description": "User's department or team"
+    },
+    "invited_role": {
+      "type": "string",
+      "enum": [
+        "submitter",
+        "approver",
+        "invoicer",
+        "admin"
+      ],
+      "description": "The role assigned when user was invited"
+    },
+    "account_setup_completed": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the user has completed account setup"
+    },
+    "display_name": {
+      "type": "string",
+      "description": "Custom display name set by an administrator"
+    }
+  },
+  "required": [
+    "app_role",
+    "department",
+    "invited_role"
+  ]
+}

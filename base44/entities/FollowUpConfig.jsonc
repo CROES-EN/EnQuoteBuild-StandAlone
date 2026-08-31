@@ -1,0 +1,57 @@
+{
+  "name": "FollowUpConfig",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the follow-up rule"
+    },
+    "trigger_type": {
+      "type": "string",
+      "enum": [
+        "expiration_approaching",
+        "status_duration"
+      ],
+      "description": "What triggers this follow-up"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "submitted",
+        "quote_sent_to_ho"
+      ],
+      "description": "Quote status to monitor (for status_duration trigger)"
+    },
+    "days_threshold": {
+      "type": "number",
+      "description": "Days before expiration or days in status before sending follow-up"
+    },
+    "email_subject": {
+      "type": "string",
+      "description": "Subject line for the follow-up email"
+    },
+    "email_body": {
+      "type": "string",
+      "description": "Body template for the follow-up email"
+    },
+    "recipient_emails": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of email addresses to send follow-ups to"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this rule is active"
+    }
+  },
+  "required": [
+    "name",
+    "trigger_type",
+    "days_threshold",
+    "email_subject",
+    "email_body"
+  ]
+}

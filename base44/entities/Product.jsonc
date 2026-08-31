@@ -1,0 +1,48 @@
+{
+  "name": "Product",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Product or service name"
+    },
+    "description": {
+      "type": "string",
+      "description": "Detailed description"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "product",
+        "service"
+      ],
+      "description": "Whether this is a product or service"
+    },
+    "product_link": {
+      "type": "string",
+      "description": "URL to the product webpage for ordering/reference"
+    },
+    "unit_price": {
+      "type": "number",
+      "description": "Price per unit"
+    },
+    "unit": {
+      "type": "string",
+      "description": "Unit of measurement (e.g., each, hour, day, piece)"
+    },
+    "category": {
+      "type": "string",
+      "description": "Category for organization"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this item is available for quotes"
+    }
+  },
+  "required": [
+    "name",
+    "type",
+    "unit_price"
+  ]
+}
