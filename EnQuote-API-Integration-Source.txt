@@ -1,0 +1,2777 @@
+
+
+===== FILE: .\src\api\dataClient.js =====
+
+import {
+  base44DualAdapter
+} from "./adapters/base44DualAdapter";
+import {
+  base44Adapter
+} from "./adapters/base44Adapter";
+
+import {
+  mockAdapter
+} from "./adapters/mockAdapter";
+
+import {
+  localAdapter
+} from "./adapters/localAdapter";
+
+import {
+  salesforceAdapter
+} from "./adapters/salesforceAdapter";
+
+import {
+  salesforceMockAdapter
+} from "./adapters/salesforceMockAdapter";
+
+const DATA_SOURCE =
+  import.meta.env.VITE_DATA_SOURCE ||
+  "base44";
+
+const adapters = {
+  base44: base44Adapter,
+  "base44-dual": base44DualAdapter,
+  mock: mockAdapter,
+  local: localAdapter,
+  salesforce: salesforceAdapter,
+  "salesforce-mock": salesforceMockAdapter
+};
+
+const adapter = adapters[DATA_SOURCE];
+
+if (!adapter) {
+  throw new Error(
+    `Unsupported VITE_DATA_SOURCE: ${DATA_SOURCE}`
+  );
+}
+
+const call = (methodName, args) => {
+  const method = adapter[methodName];
+
+  if (typeof method !== "function") {
+    throw new Error(
+      `${methodName} is not implemented by the ${DATA_SOURCE} adapter.`
+    );
+  }
+
+  return method(...args);
+};
+
+export const getDataSource = () => DATA_SOURCE;
+
+export const isBase44DataSource =
+  DATA_SOURCE === "base44" ||
+  DATA_SOURCE === "base44-dual";
+
+export const isBase44DualDataSource =
+  DATA_SOURCE === "base44-dual";
+
+export const isMockDataSource =
+  DATA_SOURCE === "mock";
+
+export const isLocalDataSource =
+  DATA_SOURCE === "local";
+
+export const isSalesforceDataSource =
+  DATA_SOURCE === "salesforce";
+
+export const isSalesforceMockDataSource =
+  DATA_SOURCE === "salesforce-mock";
+
+export const getCurrentUser =
+  (...args) => call("getCurrentUser", args);
+
+export const getQuotes =
+  (...args) => call("getQuotes", args);
+
+export const getQuoteById =
+  (...args) => call("getQuoteById", args);
+
+export const listRecentQuotes =
+  (...args) => call("listRecentQuotes", args);
+
+export const filterQuotes =
+  (...args) => call("filterQuotes", args);
+
+export const createQuote =
+  (...args) => call("createQuote", args);
+
+export const updateQuote =
+  (...args) => call("updateQuote", args);
+
+export const deleteQuote =
+  (...args) => call("deleteQuote", args);
+
+export const bulkUpdateQuotes =
+  (...args) => call("bulkUpdateQuotes", args);
+
+export const getProducts =
+  (...args) => call("getProducts", args);
+
+export const listProducts =
+  (...args) => call("listProducts", args);
+
+export const filterProducts =
+  (...args) => call("filterProducts", args);
+
+export const createProduct =
+  (...args) => call("createProduct", args);
+
+export const updateProduct =
+  (...args) => call("updateProduct", args);
+
+export const deleteProduct =
+  (...args) => call("deleteProduct", args);
+
+export const getReviews =
+  (...args) => call("getReviews", args);
+
+export const getReviewsForQuote =
+  (...args) => call("getReviewsForQuote", args);
+
+export const createReview =
+  (...args) => call("createReview", args);
+
+export const updateReview =
+  (...args) => call("updateReview", args);
+
+export const getQuoteActivities =
+  (...args) => call("getQuoteActivities", args);
+
+export const createQuoteActivity =
+  (...args) => call("createQuoteActivity", args);
+
+export const getFollowUps =
+  (...args) => call("getFollowUps", args);
+
+export const createFollowUp =
+  (...args) => call("createFollowUp", args);
+
+export const getUsers =
+  (...args) => call("getUsers", args);
+
+export const listLocalCollection =
+  (...args) => call("listLocalCollection", args);
+
+export const createLocalRecord =
+  (...args) => call("createLocalRecord", args);
+
+export const updateLocalRecord =
+  (...args) => call("updateLocalRecord", args);
+
+export const deleteLocalRecord =
+  (...args) => call("deleteLocalRecord", args);
+
+export const exportLocalData =
+  (...args) => call("exportLocalData", args);
+
+export const importLocalData =
+  (...args) => call("importLocalData", args);
+
+export const resetLocalData =
+  (...args) => call("resetLocalData", args);
+
+export const getSalesforceMockSyncLog =
+  (...args) =>
+    call(
+      "getSalesforceMockSyncLog",
+      args
+    );
+
+
+
+===== FILE: .\src\api\base44Client.js =====
+
+import { createClient } from "@base44/sdk";
+import { appParams } from "@/lib/app-params";
+
+const isBase44Runtime =
+  ["base44", "base44-dual"].includes(import.meta.env.VITE_DATA_SOURCE);
+
+const {
+  appId,
+  token,
+  functionsVersion,
+  appBaseUrl,
+  serverUrl
+} = appParams;
+
+const isValidBase44ClientConfig =
+  Boolean(
+    appId &&
+    serverUrl &&
+    !/^file:/i.test(String(serverUrl))
+  );
+
+const noop = () =>
+  Promise.resolve(undefined);
+
+const noopObject = {
+  me: noop,
+  logout: noop,
+  redirectToLogin: noop,
+  getToken: noop,
+  setToken: noop,
+  clearToken: noop
+};
+
+const emptyAppLogs = {
+  logUserInApp: noop,
+  logEvent: noop,
+  track: noop
+};
+
+const base44Client =
+  isBase44Runtime &&
+  isValidBase44ClientConfig
+    ? createClient({
+        appId,
+        token,
+        functionsVersion,
+        serverUrl,
+        appBaseUrl,
+        requiresAuth: false
+      })
+    : {
+        auth: noopObject,
+        appLogs: emptyAppLogs,
+        functions: {
+          invoke: noop
+        }
+      };
+
+export const base44 = base44Client;
+
+
+
+
+===== FILE: .\src\api\adapters\base44Adapter.js =====
+
+import { base44 } from "../base44Client";
+
+const ENTITY_ALIASES = {
+  quotes: "Quote",
+  quote: "Quote",
+  products: "Product",
+  product: "Product",
+  reviews: "QuoteReview",
+  quoteReviews: "QuoteReview",
+  activities: "QuoteActivity",
+  quoteActivities: "QuoteActivity",
+  followUps: "FollowUpLog",
+  followUpLogs: "FollowUpLog",
+  users: "User",
+  siteFlags: "SiteFlag",
+  quoteDeletionRequests: "QuoteDeletionRequest",
+  materialOrders: "MaterialOrder",
+  pvPanelRMAs: "PVPanelRMA",
+  pdfTemplates: "PDFTemplate",
+  emailDistributions: "EmailDistribution",
+  statusAlertDismissals: "StatusAlertDismissal",
+  priceReviews: "PriceReview",
+  svcCancelTracker: "SVCancelTracker"
+};
+
+function resolveEntity(collectionName) {
+  const name = ENTITY_ALIASES[collectionName] || collectionName;
+  const entity = base44.entities?.[name];
+
+  if (!entity) {
+    throw new Error(`Base44 entity is not configured for collection: ${collectionName}`);
+  }
+
+  return entity;
+}
+
+export const base44Adapter = {
+  getCurrentUser: () => base44.auth.me(),
+
+  getQuotes: async () => {
+  const response = await base44.functions.invoke("getAllQuotes");
+  const data = response?.data;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.quotes)) return data.quotes;
+  return [];
+},
+
+  getQuoteById: async (quoteId) => {
+    const response = await base44.functions.invoke("getQuoteById", {
+      quote_id: quoteId
+    });
+    return response?.data?.quote || response?.data || null;
+  },
+
+  listRecentQuotes: (limit = 100) =>
+    base44.entities.Quote.list("-created_date", limit),
+
+  filterQuotes: (filters = {}) =>
+    base44.entities.Quote.filter(filters),
+
+  createQuote: (data) => base44.entities.Quote.create(data),
+  updateQuote: (id, data) => base44.entities.Quote.update(id, data),
+  deleteQuote: (id) => base44.entities.Quote.delete(id),
+  bulkUpdateQuotes: (updates) => base44.entities.Quote.bulkUpdate(updates),
+
+  getProducts: async () => {
+  const response = await base44.functions.invoke("getAllProducts");
+  const data = response?.data;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.products)) return data.products;
+  return [];
+},
+
+  listProducts: (sort = "name", limit = 2000) =>
+    base44.entities.Product.list(sort, limit),
+
+  filterProducts: (filters = {}) =>
+    base44.entities.Product.filter(filters),
+
+  createProduct: (data) => base44.entities.Product.create(data),
+  updateProduct: (id, data) => base44.entities.Product.update(id, data),
+  deleteProduct: (id) => base44.entities.Product.delete(id),
+
+  getReviews: (sort = "-created_date", limit = 2000) =>
+    base44.entities.QuoteReview.list(sort, limit),
+
+  getReviewsForQuote: (quoteId) =>
+    base44.entities.QuoteReview.filter({ quote_id: quoteId }),
+
+  createReview: (data) => base44.entities.QuoteReview.create(data),
+  updateReview: (id, data) => base44.entities.QuoteReview.update(id, data),
+
+  getQuoteActivities: (quoteId) =>
+    base44.entities.QuoteActivity.filter(
+      { quote_id: quoteId },
+      "-action_at",
+      100
+    ),
+
+  createQuoteActivity: (data) =>
+    base44.entities.QuoteActivity.create(data),
+
+  getFollowUps: (quoteId) =>
+    quoteId
+      ? base44.entities.FollowUpLog.filter(
+          { quote_id: quoteId },
+          "-created_date",
+          200
+        )
+      : base44.entities.FollowUpLog.list("-created_date", 200),
+
+  createFollowUp: (data) => base44.entities.FollowUpLog.create(data),
+
+  getUsers: async () => {
+    const response = await base44.functions.invoke("getAllUsers");
+    return response?.data || [];
+  },
+
+  listLocalCollection: (collectionName, sort = "-created_date", limit = 2000) =>
+    resolveEntity(collectionName).list(sort, limit),
+
+  createLocalRecord: (collectionName, data) =>
+    resolveEntity(collectionName).create(data),
+
+  updateLocalRecord: (collectionName, id, data) =>
+    resolveEntity(collectionName).update(id, data),
+
+  deleteLocalRecord: (collectionName, id) =>
+    resolveEntity(collectionName).delete(id),
+
+  exportLocalData: async () => {
+    throw new Error("Local Only");
+  },
+
+  importLocalData: async () => {
+    throw new Error("Local Only");
+  },
+  resetLocalData: async () => {
+    throw new Error("Local Only");
+  }
+};
+
+
+
+===== FILE: .\src\lib\app-params.js =====
+
+const isNode =
+  typeof window === "undefined";
+
+const windowObj = isNode
+  ? { localStorage: new Map() }
+  : window;
+
+const storage = windowObj.localStorage;
+
+const toSnakeCase = (value) =>
+  value
+    .replace(/([A-Z])/g, "_$1")
+    .toLowerCase();
+
+const getAppParamValue = (
+  paramName,
+  {
+    defaultValue = undefined,
+    removeFromUrl = false
+  } = {}
+) => {
+  if (isNode) {
+    return defaultValue;
+  }
+
+  const storageKey =
+    `base44_${toSnakeCase(paramName)}`;
+
+  const urlParams =
+    new URLSearchParams(
+      window.location.search
+    );
+
+  const searchParam =
+    urlParams.get(paramName);
+
+  if (removeFromUrl) {
+    urlParams.delete(paramName);
+
+    const newUrl =
+      `${window.location.pathname}` +
+      `${urlParams.toString()
+        ? `?${urlParams.toString()}`
+        : ""}` +
+      `${window.location.hash}`;
+
+    window.history.replaceState(
+      {},
+      document.title,
+      newUrl
+    );
+  }
+
+  if (searchParam) {
+    storage.setItem(
+      storageKey,
+      searchParam
+    );
+
+    return searchParam;
+  }
+
+  if (
+    defaultValue !== undefined &&
+    defaultValue !== null &&
+    defaultValue !== ""
+  ) {
+    storage.setItem(
+      storageKey,
+      defaultValue
+    );
+
+    return defaultValue;
+  }
+
+  return storage.getItem(storageKey);
+};
+
+const cleanWebUrl = (value) => {
+  if (!value) {
+    return null;
+  }
+
+  const cleaned =
+    String(value)
+      .trim()
+      .replace(/\/+$/, "");
+
+  if (
+    !cleaned ||
+    cleaned === "null" ||
+    /^file:/i.test(cleaned)
+  ) {
+    return null;
+  }
+
+  return cleaned;
+};
+
+const getAppBaseUrl = () =>
+  cleanWebUrl(
+    getAppParamValue("app_base_url")
+  ) ||
+  cleanWebUrl(
+    import.meta.env
+      .VITE_BASE44_APP_BASE_URL
+  ) ||
+  "https://enquote.base44.app";
+
+const getServerUrl = () =>
+  cleanWebUrl(
+    import.meta.env
+      .VITE_BASE44_SERVER_URL
+  ) ||
+  "https://base44.app";
+
+const getAppParams = () => {
+  if (
+    getAppParamValue(
+      "clear_access_token"
+    ) === "true"
+  ) {
+    storage.removeItem(
+      "base44_access_token"
+    );
+
+    storage.removeItem("token");
+  }
+
+  return {
+    appId: getAppParamValue("app_id", {
+      defaultValue: import.meta.env.VITE_BASE44_APP_ID || "6979390a3f44099ffca06859"
+    }),
+
+    token: getAppParamValue(
+      "access_token",
+      {
+        removeFromUrl: true
+      }
+    ),
+
+    fromUrl: getAppParamValue(
+      "from_url",
+      {
+        defaultValue:
+          isNode
+            ? ""
+            : window.location.href
+      }
+    ),
+
+    functionsVersion:
+      getAppParamValue(
+        "functions_version",
+        {
+          defaultValue:
+            import.meta.env
+              .VITE_BASE44_FUNCTIONS_VERSION ||
+            "prod"
+        }
+      ),
+
+    appBaseUrl: getAppBaseUrl(),
+
+    serverUrl: getServerUrl()
+  };
+};
+
+export const appParams = {
+  ...getAppParams()
+};
+
+
+===== FILE: .\base44\.app.jsonc =====
+
+// Base44 App Configuration
+// This file links your local project to your Base44 app.
+// Do not commit this file to version control.
+{
+  "id": "6a91e7bce36dd777fa88cf04"
+}
+
+
+
+===== FILE: .\base44\config.jsonc =====
+
+{
+  "name": "ENquote",
+  "site": {
+    "installCommand": "npm install",
+    "buildCommand": "npm run build",
+    "serveCommand": "npm run dev",
+    "outputDirectory": "./dist"
+  }
+}
+
+
+===== ENTITY SCHEMAS (base44\entities\*.jsonc) =====
+
+
+----- EmailDistribution.jsonc -----
+
+{
+  "name": "EmailDistribution",
+  "type": "object",
+  "properties": {
+    "email_type": {
+      "type": "string",
+      "enum": [
+        "quote_submitted",
+        "quote_approved",
+        "quote_rejected",
+        "quote_sent_to_ho",
+        "ho_approved_invoice_required",
+        "ho_rejected",
+        "invoiced",
+        "invoice_paid"
+      ],
+      "description": "Type of email notification"
+    },
+    "recipient_email": {
+      "type": "string",
+      "description": "Email address to receive notifications"
+    },
+    "recipient_name": {
+      "type": "string",
+      "description": "Name of the recipient"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this recipient is active"
+    }
+  },
+  "required": [
+    "email_type",
+    "recipient_email"
+  ]
+}
+
+----- FollowUpConfig.jsonc -----
+
+{
+  "name": "FollowUpConfig",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the follow-up rule"
+    },
+    "trigger_type": {
+      "type": "string",
+      "enum": [
+        "expiration_approaching",
+        "status_duration"
+      ],
+      "description": "What triggers this follow-up"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "submitted",
+        "quote_sent_to_ho"
+      ],
+      "description": "Quote status to monitor (for status_duration trigger)"
+    },
+    "days_threshold": {
+      "type": "number",
+      "description": "Days before expiration or days in status before sending follow-up"
+    },
+    "email_subject": {
+      "type": "string",
+      "description": "Subject line for the follow-up email"
+    },
+    "email_body": {
+      "type": "string",
+      "description": "Body template for the follow-up email"
+    },
+    "recipient_emails": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of email addresses to send follow-ups to"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this rule is active"
+    }
+  },
+  "required": [
+    "name",
+    "trigger_type",
+    "days_threshold",
+    "email_subject",
+    "email_body"
+  ]
+}
+
+----- FollowUpLog.jsonc -----
+
+{
+  "name": "FollowUpLog",
+  "type": "object",
+  "properties": {
+    "quote_id": {
+      "type": "string",
+      "description": "ID of the quote this follow-up is for"
+    },
+    "config_id": {
+      "type": "string",
+      "description": "ID of the follow-up config that triggered this"
+    },
+    "sent_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the follow-up was sent"
+    },
+    "trigger_reason": {
+      "type": "string",
+      "description": "Why the follow-up was sent"
+    },
+    "recipients": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Email addresses that received the follow-up"
+    },
+    "was_manual": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this was manually triggered"
+    },
+    "triggered_by": {
+      "type": "string",
+      "description": "Email of user who manually triggered (if applicable)"
+    }
+  },
+  "required": [
+    "quote_id",
+    "sent_date",
+    "trigger_reason",
+    "recipients"
+  ]
+}
+
+----- FST.jsonc -----
+
+{
+  "name": "FST",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Full name of the FST"
+    },
+    "employee_id": {
+      "type": "string",
+      "description": "Employee ID or identifier"
+    },
+    "city": {
+      "type": "string",
+      "description": "City"
+    },
+    "state": {
+      "type": "string",
+      "description": "State abbreviation"
+    },
+    "zip": {
+      "type": "string",
+      "description": "ZIP code"
+    },
+    "phone": {
+      "type": "string",
+      "description": "Contact phone number"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this FST is currently active"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Any additional notes about this FST"
+    }
+  },
+  "required": [
+    "name",
+    "city",
+    "state"
+  ]
+}
+
+----- Invitation.jsonc -----
+
+{
+  "name": "Invitation",
+  "type": "object",
+  "properties": {
+    "email": {
+      "type": "string",
+      "description": "Email address of the invited user"
+    },
+    "invited_role": {
+      "type": "string",
+      "enum": [
+        "submitter",
+        "approver",
+        "invoicer",
+        "admin"
+      ],
+      "description": "Role the user will be assigned"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "accepted",
+        "cancelled"
+      ],
+      "default": "pending",
+      "description": "Status of the invitation"
+    },
+    "invited_by": {
+      "type": "string",
+      "description": "Email of admin who sent the invite"
+    },
+    "accepted_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the invitation was accepted"
+    }
+  },
+  "required": [
+    "email",
+    "invited_role"
+  ]
+}
+
+----- MaterialOrder.jsonc -----
+
+{
+  "name": "MaterialOrder",
+  "type": "object",
+  "properties": {
+    "site_id": {
+      "type": "string",
+      "description": "Site ID this order is for"
+    },
+    "item_name": {
+      "type": "string",
+      "description": "Name of the item to order"
+    },
+    "sku": {
+      "type": "string",
+      "description": "SKU or part number if available"
+    },
+    "item_link": {
+      "type": "string",
+      "description": "URL link to the item"
+    },
+    "cost": {
+      "type": "number",
+      "description": "Estimated cost of the item"
+    },
+    "quantity": {
+      "type": "number",
+      "default": 1,
+      "description": "Quantity needed"
+    },
+    "shipping_address": {
+      "type": "string",
+      "description": "Shipping address for delivery"
+    },
+    "notes": {
+      "type": "string",
+      "description": "What this item is for / additional context"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "submitted",
+        "approved",
+        "ordered",
+        "complete",
+        "rejected"
+      ],
+      "default": "draft",
+      "description": "Current status of the material order"
+    },
+    "status_history": {
+      "type": "array",
+      "description": "Log of all status changes",
+      "items": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "changed_by": {
+            "type": "string"
+          },
+          "changed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "submitted_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "approved_by": {
+      "type": "string"
+    },
+    "approved_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "ordered_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "completed_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "admin_notes": {
+      "type": "string",
+      "description": "Notes added by admin during processing"
+    }
+  },
+  "required": [
+    "site_id",
+    "item_name"
+  ]
+}
+
+----- PDFTemplate.jsonc -----
+
+{
+  "name": "PDFTemplate",
+  "type": "object",
+  "properties": {
+    "company_name": {
+      "type": "string",
+      "default": "QuotePro",
+      "description": "Company name to display on PDF"
+    },
+    "company_address": {
+      "type": "string",
+      "description": "Company address for PDF header"
+    },
+    "company_phone": {
+      "type": "string",
+      "description": "Company phone number"
+    },
+    "company_email": {
+      "type": "string",
+      "description": "Company email address"
+    },
+    "logo_url": {
+      "type": "string",
+      "description": "URL to company logo image"
+    },
+    "primary_color": {
+      "type": "string",
+      "default": "#4f46e5",
+      "description": "Primary color for PDF branding (hex)"
+    },
+    "include_version_history": {
+      "type": "boolean",
+      "default": true,
+      "description": "Include version history in PDF"
+    },
+    "footer_text": {
+      "type": "string",
+      "description": "Custom footer text"
+    }
+  },
+  "required": []
+}
+
+----- PriceReview.jsonc -----
+
+{
+  "name": "PriceReview",
+  "type": "object",
+  "properties": {
+    "product_id": {
+      "type": "string"
+    },
+    "product_name": {
+      "type": "string"
+    },
+    "catalog_price": {
+      "type": "number"
+    },
+    "retailer_price": {
+      "type": "number"
+    },
+    "retailer_name": {
+      "type": "string"
+    },
+    "source_url": {
+      "type": "string"
+    },
+    "availability": {
+      "type": "string"
+    },
+    "detected_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "confirmed",
+        "dismissed"
+      ],
+      "default": "pending"
+    },
+    "reviewed_by": {
+      "type": "string"
+    },
+    "reviewed_date": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "product_id",
+    "catalog_price",
+    "retailer_price",
+    "source_url",
+    "status"
+  ],
+  "rls": {
+    "read": {},
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
+
+----- Product.jsonc -----
+
+{
+  "name": "Product",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Product or service name"
+    },
+    "description": {
+      "type": "string",
+      "description": "Detailed description"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "product",
+        "service"
+      ],
+      "description": "Whether this is a product or service"
+    },
+    "product_link": {
+      "type": "string",
+      "description": "URL to the product webpage for ordering/reference"
+    },
+    "unit_price": {
+      "type": "number",
+      "description": "Price per unit"
+    },
+    "unit": {
+      "type": "string",
+      "description": "Unit of measurement (e.g., each, hour, day, piece)"
+    },
+    "category": {
+      "type": "string",
+      "description": "Category for organization"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this item is available for quotes"
+    }
+  },
+  "required": [
+    "name",
+    "type",
+    "unit_price"
+  ]
+}
+
+----- PVManufacturer.jsonc -----
+
+{
+  "name": "PVManufacturer",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Manufacturer name"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}
+
+----- PVPanelRMA.jsonc -----
+
+{
+  "name": "PVPanelRMA",
+  "type": "object",
+  "properties": {
+    "case_owner": {
+      "type": "string",
+      "description": "Email of the case owner (application user)"
+    },
+    "site_id": {
+      "type": "string",
+      "description": "Site ID associated with the RMA"
+    },
+    "case_id": {
+      "type": "string",
+      "description": "Case ID - should be unique"
+    },
+    "panel_manufacturer": {
+      "type": "string",
+      "description": "Panel manufacturer name"
+    },
+    "current_status": {
+      "type": "string",
+      "enum": [
+        "New",
+        "Waiting for Customer",
+        "Reviewing Documentation",
+        "RMA Submitted",
+        "Manufacturer Reviewing",
+        "Approved",
+        "Rejected",
+        "Deadend",
+        "Replacement Pending Shipment",
+        "Replacement Shipped",
+        "Replacement Installed",
+        "Closed",
+        "On Hold"
+      ],
+      "default": "New",
+      "description": "Current status of the RMA"
+    },
+    "rma_url": {
+      "type": "string",
+      "description": "URL to the manufacturer's RMA page"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notes and ongoing details about the RMA"
+    },
+    "status_history": {
+      "type": "array",
+      "description": "Chronological log of all status changes - never overwritten",
+      "items": {
+        "type": "object",
+        "properties": {
+          "previous_status": {
+            "type": "string"
+          },
+          "new_status": {
+            "type": "string"
+          },
+          "changed_by": {
+            "type": "string"
+          },
+          "changed_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "site_id",
+    "case_id",
+    "panel_manufacturer"
+  ]
+}
+
+----- Quote.jsonc -----
+
+{
+  "name": "Quote",
+  "type": "object",
+  "properties": {
+    "version_number": {
+      "type": "number",
+      "default": 1
+    },
+    "parent_quote_id": {
+      "type": "string"
+    },
+    "is_current_version": {
+      "type": "boolean",
+      "default": true
+    },
+    "quote_number": {
+      "type": "string"
+    },
+    "site_id": {
+      "type": "string"
+    },
+    "quote_requester": {
+      "type": "string"
+    },
+    "case_number": {
+      "type": "string"
+    },
+    "picklist": {
+      "type": "string"
+    },
+    "om_status": {
+      "type": "string"
+    },
+    "scope_of_work": {
+      "type": "string"
+    },
+    "fst_count": {
+      "type": "number"
+    },
+    "labor_hours": {
+      "type": "number"
+    },
+    "labor_rate": {
+      "type": "number",
+      "default": 125
+    },
+    "flat_labor_fee": {
+      "type": "number",
+      "default": 0
+    },
+    "labor_mode": {
+      "type": "string",
+      "enum": [
+        "hourly",
+        "flat"
+      ],
+      "default": "hourly"
+    },
+    "travel_hours": {
+      "type": "number",
+      "default": 0
+    },
+    "travel_rate": {
+      "type": "number",
+      "default": 65
+    },
+    "miles_traveled": {
+      "type": "number",
+      "default": 0
+    },
+    "mileage_rate": {
+      "type": "number",
+      "default": 0.73
+    },
+    "owner_email": {
+      "type": "string"
+    },
+    "exclude_from_reporting": {
+      "type": "boolean",
+      "default": false
+    },
+    "pre_approved": {
+      "type": "boolean",
+      "default": false
+    },
+    "pre_approved_by": {
+      "type": "string"
+    },
+    "pre_approved_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft_without_internal",
+        "draft_without_fst",
+        "submitted",
+        "approved",
+        "rejected",
+        "quote_sent_to_ho",
+        "ho_approved_invoice_required",
+        "ho_rejected",
+        "invoiced",
+        "invoice_paid",
+        "scheduled",
+        "pending_materials",
+        "on_hold"
+      ],
+      "default": "draft_without_internal"
+    },
+    "pre_hold_status": {
+      "type": "string"
+    },
+    "hold_reason": {
+      "type": "string"
+    },
+    "hold_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status_history": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "changed_by": {
+            "type": "string"
+          },
+          "changed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "entry_type": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "last_follow_up_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "product_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "unit_price": {
+            "type": "number"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "total": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "subtotal": {
+      "type": "number"
+    },
+    "discount_type": {
+      "type": "string",
+      "enum": [
+        "percent",
+        "flat"
+      ],
+      "default": "percent"
+    },
+    "discount_percent": {
+      "type": "number",
+      "default": 0
+    },
+    "discount_flat_amount": {
+      "type": "number",
+      "default": 0
+    },
+    "federal_tax_percent": {
+      "type": "number",
+      "default": 0
+    },
+    "state_tax_percent": {
+      "type": "number",
+      "default": 0
+    },
+    "local_tax_percent": {
+      "type": "number",
+      "default": 0
+    },
+    "total": {
+      "type": "number"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "valid_until": {
+      "type": "string",
+      "format": "date"
+    },
+    "submitted_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "approved_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "approved_by": {
+      "type": "string"
+    },
+    "rejection_reason": {
+      "type": "string",
+      "maxLength": 5000
+    },
+    "quote_sent_to_ho_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "ho_approved_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "ho_rejection_reason": {
+      "type": "string",
+      "maxLength": 5000
+    },
+    "ho_rejected_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "invoiced_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "invoice_paid_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "stripe_transaction_id": {
+      "type": "string",
+      "description": "Stripe transaction ID recorded when the quote is paid"
+    },
+    "stripe_invoice_id": {
+      "type": "string",
+      "description": "Stripe invoice ID recorded when the quote is paid"
+    },
+    "paid_at_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date payment was received"
+    },
+    "scheduled_date": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "site_id"
+  ]
+}
+
+----- QuoteActivity.jsonc -----
+
+{
+  "name": "QuoteActivity",
+  "type": "object",
+  "properties": {
+    "quote_id": {
+      "type": "string",
+      "description": "ID of the quote that changed"
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "created",
+        "updated"
+      ],
+      "description": "Type of quote activity"
+    },
+    "changed_fields": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Quote fields changed by this action"
+    },
+    "field_changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "previous_value": {
+            "type": "string"
+          },
+          "new_value": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Before and after values for changed fields"
+    },
+    "performed_by": {
+      "type": "string",
+      "description": "Email of the person who made the change when available"
+    },
+    "action_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Exact UTC timestamp of the action"
+    },
+    "mountain_time": {
+      "type": "string",
+      "description": "Human-readable action time in Mountain Time"
+    }
+  },
+  "required": [
+    "quote_id",
+    "action",
+    "action_at",
+    "mountain_time"
+  ]
+}
+
+----- QuoteAlert.jsonc -----
+
+{
+  "name": "QuoteAlert",
+  "type": "object",
+  "properties": {
+    "quote_id": {
+      "type": "string",
+      "description": "ID of the quote this mention is associated with"
+    },
+    "site_id": {
+      "type": "string",
+      "description": "Site ID for quick reference"
+    },
+    "mentioned_email": {
+      "type": "string",
+      "description": "Email of the user who was @mentioned"
+    },
+    "mentioned_by": {
+      "type": "string",
+      "description": "Email of the user who created the mention"
+    },
+    "message": {
+      "type": "string",
+      "description": "The mention message text"
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "yellow",
+        "orange",
+        "red"
+      ],
+      "default": "yellow",
+      "description": "Priority/urgency level of the mention"
+    },
+    "is_resolved": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this mention has been resolved/dismissed"
+    },
+    "resolved_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the mention was resolved"
+    },
+    "resolved_by": {
+      "type": "string",
+      "description": "Email of user who resolved the mention"
+    }
+  },
+  "required": [
+    "quote_id",
+    "message",
+    "mentioned_email"
+  ]
+}
+
+----- QuoteDeletionRequest.jsonc -----
+
+{
+  "name": "QuoteDeletionRequest",
+  "type": "object",
+  "properties": {
+    "quote_id": {
+      "type": "string",
+      "description": "ID of the quote to be deleted"
+    },
+    "quote_number": {
+      "type": "string",
+      "description": "Quote number for reference"
+    },
+    "requested_by": {
+      "type": "string",
+      "description": "Email of the user requesting deletion"
+    },
+    "reason": {
+      "type": "string",
+      "description": "Reason for deletion request"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "approved",
+        "rejected"
+      ],
+      "default": "pending",
+      "description": "Status of the deletion request"
+    },
+    "reviewed_by": {
+      "type": "string",
+      "description": "Email of admin who reviewed the request"
+    },
+    "reviewed_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the request was reviewed"
+    },
+    "admin_notes": {
+      "type": "string",
+      "description": "Notes from admin about the decision"
+    }
+  },
+  "required": [
+    "quote_id",
+    "reason"
+  ]
+}
+
+----- QuoteReview.jsonc -----
+
+{
+  "name": "QuoteReview",
+  "type": "object",
+  "properties": {
+    "quote_id": {
+      "type": "string",
+      "description": "ID of the rejected quote being reviewed"
+    },
+    "quote_number": {
+      "type": "string",
+      "description": "Quote number for quick reference"
+    },
+    "site_id": {
+      "type": "string",
+      "description": "Site ID from the quote"
+    },
+    "reviewer_email": {
+      "type": "string",
+      "description": "Email of the reviewer (tmeyer or dankenman)"
+    },
+    "rejection_reason_snapshot": {
+      "type": "string",
+      "description": "Copy of the rejection reason at time of review"
+    },
+    "coaching_notes": {
+      "type": "string",
+      "description": "Coaching feedback and guidance for the submitter"
+    },
+    "recommended_edits": {
+      "type": "string",
+      "description": "Specific recommended changes to meet approval requirements"
+    },
+    "review_status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "in_progress",
+        "completed"
+      ],
+      "default": "pending",
+      "description": "Status of this review"
+    },
+    "rejection_driver": {
+      "type": "string",
+      "description": "Manually assigned rejection theme/category (overrides AI detection)"
+    },
+    "completed_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the review was marked complete"
+    },
+    "cleared_by_submitter": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the submitter has cleared/dismissed this review from their dashboard"
+    },
+    "cleared_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the submitter cleared this notification. If the review is updated after this date (new coaching content), the alert re-surfaces."
+    }
+  },
+  "required": [
+    "quote_id"
+  ]
+}
+
+----- SiteFlag.jsonc -----
+
+{
+  "name": "SiteFlag",
+  "type": "object",
+  "properties": {
+    "site_id": {
+      "type": "string",
+      "description": "The Site ID being flagged"
+    },
+    "flag_level": {
+      "type": "string",
+      "enum": [
+        "yellow",
+        "orange",
+        "red"
+      ],
+      "description": "Severity level of the flag"
+    },
+    "flag_source": {
+      "type": "string",
+      "enum": [
+        "truckroll",
+        "support_contacts",
+        "both"
+      ],
+      "description": "What triggered the flag"
+    },
+    "truckroll_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of cancellations/reschedules from SVCancelTracker"
+    },
+    "support_contact_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of support interactions in the rolling window"
+    },
+    "support_window_days": {
+      "type": "number",
+      "default": 10,
+      "description": "Rolling window in days used for support contact evaluation"
+    },
+    "last_truckroll_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date of most recent truckroll cancellation entry"
+    },
+    "last_support_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date of most recent support interaction"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Manual notes about this flag"
+    },
+    "is_resolved": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this flag has been cleared/resolved"
+    },
+    "resolved_by": {
+      "type": "string",
+      "description": "Email of user who resolved the flag"
+    },
+    "resolved_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the flag was resolved"
+    },
+    "resolved_notes": {
+      "type": "string",
+      "description": "Notes explaining resolution"
+    }
+  },
+  "required": [
+    "site_id",
+    "flag_level",
+    "flag_source"
+  ]
+}
+
+----- StatusAlertDismissal.jsonc -----
+
+{
+  "name": "StatusAlertDismissal",
+  "type": "object",
+  "properties": {
+    "quote_id": {
+      "type": "string",
+      "description": "ID of the quote whose status alert was dismissed by this user"
+    }
+  },
+  "required": [
+    "quote_id"
+  ]
+}
+
+----- SupportInteraction.jsonc -----
+
+{
+  "name": "SupportInteraction",
+  "type": "object",
+  "properties": {
+    "site_id": {
+      "type": "string",
+      "description": "Site ID the interaction is associated with"
+    },
+    "interaction_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date and time of the support interaction"
+    },
+    "interaction_type": {
+      "type": "string",
+      "description": "Type of interaction (call, ticket, escalation, etc.)"
+    },
+    "case_number": {
+      "type": "string",
+      "description": "Case or ticket number if available"
+    },
+    "salesforce_case_id": {
+      "type": "string",
+      "description": "Salesforce internal Case ID (e.g. 500Ps00001QxAf0IAF) used to build direct case URL"
+    },
+    "description": {
+      "type": "string",
+      "description": "Summary of the support interaction"
+    },
+    "upload_batch": {
+      "type": "string",
+      "description": "Identifier for the upload batch this came from"
+    },
+    "uploaded_by": {
+      "type": "string",
+      "description": "Email of user who uploaded this record"
+    }
+  },
+  "required": [
+    "site_id",
+    "interaction_date"
+  ]
+}
+
+----- SVCancelTracker.jsonc -----
+
+{
+  "name": "SVCancelTracker",
+  "type": "object",
+  "properties": {
+    "site_id": {
+      "type": "string",
+      "description": "Site ID associated with the canceled site visit"
+    },
+    "case_id": {
+      "type": "string",
+      "description": "Case ID associated with the escalation"
+    },
+    "cancel_count": {
+      "type": "number",
+      "description": "Number of cancellations or reschedules"
+    },
+    "ho_contacted": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the homeowner was contacted about the reschedule"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Additional notes about the escalation"
+    },
+    "submitted_by": {
+      "type": "string",
+      "description": "Email of the agent who submitted the record"
+    }
+  },
+  "required": [
+    "site_id",
+    "case_id",
+    "cancel_count"
+  ]
+}
+
+----- User.jsonc -----
+
+{
+  "name": "User",
+  "type": "object",
+  "properties": {
+    "app_role": {
+      "type": "string",
+      "enum": [
+        "submitter",
+        "approver",
+        "invoicer",
+        "admin"
+      ],
+      "description": "User's primary role in the quote management system"
+    },
+    "additional_roles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "submitter",
+          "approver",
+          "invoicer",
+          "admin"
+        ]
+      },
+      "description": "Additional roles granted to the user"
+    },
+    "department": {
+      "type": "string",
+      "description": "User's department or team"
+    },
+    "invited_role": {
+      "type": "string",
+      "enum": [
+        "submitter",
+        "approver",
+        "invoicer",
+        "admin"
+      ],
+      "description": "The role assigned when user was invited"
+    },
+    "account_setup_completed": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the user has completed account setup"
+    },
+    "display_name": {
+      "type": "string",
+      "description": "Custom display name set by an administrator"
+    }
+  },
+  "required": [
+    "app_role",
+    "department",
+    "invited_role"
+  ]
+}
+
+
+===== BACKEND FUNCTIONS (base44\functions\*\entry.ts) =====
+
+
+----- analyzeRejections\entry.ts -----
+
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+
+Deno.serve(async (req) => {
+  try {
+    const base44 = createClientFromRequest(req);
+    const user = await base44.auth.me();
+    if (!user) {
+      return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { quoteSummaries } = await req.json();
+
+    if (!quoteSummaries || quoteSummaries.length === 0) {
+      return Response.json({
+        summary: "No rejected quotes found to analyze.",
+        total_analyzed: 0,
+        top_categories: [],
+        insights: []
+      });
+    }
+
+    const prompt = `
+You are an expert analyst specializing in residential solar maintenance quoting for Enphase Energy systems (PV and PV+Storage). 
+
+You are reviewing rejected service quotes from field coordinators at Enphase Energy. These quotes are for on-site maintenance, repair, and troubleshooting work on residential solar and battery storage systems using Enphase microinverters, IQ batteries, and Envoy/IQ Gateway equipment.
+
+Here is the data from ${quoteSummaries.length} currently-rejected quotes, including rejection reasons, scope of work, line items, and any completed coaching reviews:
+
+${JSON.stringify(quoteSummaries, null, 2)}
+
+---
+
+Your job is to deeply analyze these rejections and identify the root causes and patterns of why quotes are being rejected. Consider:
+
+1. **Scope of Work quality** - Is the scope vague, missing key details, or not clearly tied to the site issue?
+2. **Pricing issues** - Are quotes under/over-priced for residential solar maintenance? Are labor hours unrealistic? Are travel costs missing or excessive?
+3. **Line item problems** - Missing items, wrong quantities, incorrect part naming for Enphase equipment (microinverters, IQ8 series, IQ batteries, Envoy/IQ Gateway, trunk cable, Q-cable, etc.)
+4. **Justification gaps** - Lacking technical justification for the work being proposed
+5. **Process/compliance issues** - Missing required fields, wrong formats, SLA violations
+6. **Common coordinator knowledge gaps** - Patterns by coordinator suggesting training needs
+7. **Enphase-specific nuances** - Technical accuracy in describing Enphase component replacements, firmware issues, commissioning steps, etc.
+
+Use your domain knowledge of Enphase Energy's residential solar and storage product lines to supplement your analysis where the data suggests technical knowledge gaps.
+
+Provide a structured, actionable analysis with specific categories, estimated impact percentages (how much of total rejections this category accounts for), severity levels, and concrete recommendations.
+`;
+
+    const result = await base44.asServiceRole.integrations.Core.InvokeLLM({
+      prompt,
+      model: "gpt_5_4",
+      response_json_schema: {
+        type: "object",
+        properties: {
+          summary: { type: "string" },
+          total_analyzed: { type: "number" },
+          top_categories: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                category: { type: "string" },
+                percent: { type: "number" },
+                color: { type: "string", enum: ["red", "orange", "yellow", "blue", "purple"] }
+              }
+            }
+          },
+          insights: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                title: { type: "string" },
+                category: { type: "string" },
+                severity: { type: "string", enum: ["critical", "high", "medium", "low"] },
+                estimated_impact_percent: { type: "number" },
+                description: { type: "string" },
+                evidence: { type: "array", items: { type: "string" } },
+                recommendation: { type: "string" },
+                enphase_context: { type: "string" }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    // InvokeLLM returns { response: {...} } or the object directly
+    const data = result?.response || result;
+    return Response.json(data);
+  } catch (error) {
+    console.error("analyzeRejections error:", error.message);
+    return Response.json({ error: error.message }, { status: 500 });
+  }
+});
+
+----- checkFollowUps\entry.ts -----
+
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+
+Deno.serve(async (req) => {
+  try {
+    const base44 = createClientFromRequest(req);
+    const user = await base44.auth.me();
+    
+    if (user?.app_role !== 'admin') {
+      return Response.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
+    }
+
+    // Get all active follow-up configs
+    const configs = await base44.asServiceRole.entities.FollowUpConfig.filter({
+      is_active: true
+    });
+
+    // Get all current version quotes
+    const quotes = await base44.asServiceRole.entities.Quote.filter({
+      is_current_version: true
+    });
+
+    const now = new Date();
+    const followUpsSent = [];
+
+    for (const config of configs) {
+      for (const quote of quotes) {
+        let shouldSendFollowUp = false;
+        let reason = '';
+
+        // Check if follow-up already sent recently (within last 24 hours)
+        const recentLogs = await base44.asServiceRole.entities.FollowUpLog.filter({
+          quote_id: quote.id,
+          config_id: config.id
+        });
+        
+        const lastSent = recentLogs
+          .map(log => new Date(log.sent_date))
+          .sort((a, b) => b - a)[0];
+        
+        if (lastSent && (now - lastSent) < 24 * 60 * 60 * 1000) {
+          continue; // Skip if sent in last 24 hours
+        }
+
+        // Check expiration approaching
+        if (config.trigger_type === 'expiration_approaching' && quote.valid_until) {
+          const expirationDate = new Date(quote.valid_until);
+          const daysUntilExpiration = Math.ceil((expirationDate - now) / (1000 * 60 * 60 * 24));
+          
+          if (daysUntilExpiration > 0 && daysUntilExpiration <= config.days_threshold) {
+            shouldSendFollowUp = true;
+            reason = `Quote expiring in ${daysUntilExpiration} days`;
+          }
+        }
+
+        // Check status duration
+        if (config.trigger_type === 'status_duration' && quote.status === config.status) {
+          let statusDate;
+          if (config.status === 'submitted' && quote.submitted_date) {
+            statusDate = new Date(quote.submitted_date);
+          } else if (config.status === 'quote_sent_to_ho' && quote.quote_sent_to_ho_date) {
+            statusDate = new Date(quote.quote_sent_to_ho_date);
+          }
+
+          if (statusDate) {
+            const daysInStatus = Math.floor((now - statusDate) / (1000 * 60 * 60 * 24));
+            if (daysInStatus >= config.days_threshold) {
+              shouldSendFollowUp = true;
+              reason = `Quote in ${config.status} status for ${daysInStatus} days`;
+            }
+          }
+        }
+
+        if (shouldSendFollowUp) {
+          // Prepare email recipients
+          const recipients = config.recipient_emails || [];
+          if (quote.created_by && !recipients.includes(quote.created_by)) {
+            recipients.push(quote.created_by);
+          }
+
+          // Replace placeholders in email body
+          const emailBody = config.email_body
+            .replace('{quote_number}', quote.quote_number || quote.id)
+            .replace('{site_id}', quote.site_id || '')
+            .replace('{total}', `$${(quote.total || 0).toFixed(2)}`)
+            .replace('{status}', quote.status)
+            .replace('{reason}', reason);
+
+          // Send emails
+          for (const recipient of recipients) {
+            await base44.asServiceRole.integrations.Core.SendEmail({
+              to: recipient,
+              subject: config.email_subject,
+              body: emailBody
+            });
+          }
+
+          // Log the follow-up
+          await base44.asServiceRole.entities.FollowUpLog.create({
+            quote_id: quote.id,
+            config_id: config.id,
+            sent_date: now.toISOString(),
+            trigger_reason: reason,
+            recipients,
+            was_manual: false
+          });
+
+          followUpsSent.push({
+            quote_id: quote.id,
+            site_id: quote.site_id,
+            reason
+          });
+        }
+      }
+    }
+
+    return Response.json({
+      success: true,
+      follow_ups_sent: followUpsSent.length,
+      details: followUpsSent
+    });
+  } catch (error) {
+    return Response.json({ error: error.message }, { status: 500 });
+  }
+});
+
+----- getAllMaterialOrders\entry.ts -----
+
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+
+Deno.serve(async (req) => {
+  try {
+    const base44 = createClientFromRequest(req);
+    // Auth check is non-blocking — frontend enforces auth, and we use asServiceRole for data
+    try { await base44.auth.me(); } catch (e) { /* proceed with service role */ }
+
+    const orders = await base44.asServiceRole.entities.MaterialOrder.list("-created_date", 2000);
+    return Response.json(orders);
+  } catch (error) {
+    return Response.json({ error: error.message }, { status: 500 });
+  }
+});
+
+----- getAllProducts\entry.ts -----
+
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+
+Deno.serve(async (req) => {
+  try {
+    const base44 = createClientFromRequest(req);
+    // Auth check is non-blocking — frontend enforces auth, and we use asServiceRole for data
+    try { await base44.auth.me(); } catch (e) { /* proceed with service role */ }
+
+    // Use service role so all users can see all active products regardless of who created them
+    const products = await base44.asServiceRole.entities.Product.list();
+
+    return Response.json({ products });
+  } catch (error) {
+    return Response.json({ error: error.message }, { status: 500 });
+  }
+});
+
+----- getAllPVPanelRMAs\entry.ts -----
+
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+
+Deno.serve(async (req) => {
+  try {
+    const base44 = createClientFromRequest(req);
+    // Auth check is non-blocking — frontend enforces auth, and we use asServiceRole for data
+    try { await base44.auth.me(); } catch (e) { /* proceed with service role */ }
+
+    const rmas = await base44.asServiceRole.entities.PVPanelRMA.list("-created_date", 2000);
+    return Response.json(rmas);
+  } catch (error) {
+    return Response.json({ error: error.message }, { status: 500 });
+  }
+});
+
+----- getAllQuotes\entry.ts -----
+
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+
+Deno.serve(async (req) => {
+  try {
+    const base44 = createClientFromRequest(req);
+    // Auth check is non-blocking — the frontend enforces authentication via RoleGuard,
+    // and we use asServiceRole for data access which doesn't depend on the user token
+    try { await base44.auth.me(); } catch (e) { /* proceed with service role */ }
+
+    const quotes = await base44.asServiceRole.entities.Quote.list("-created_date", 2000);
+    return Response.json(quotes);
+  } catch (error) {
+    return Response.json({ error: error.message }, { status: 500 });
+  }
+});
+
+----- getAllUsers\entry.ts -----
+
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+
+Deno.serve(async (req) => {
+  try {
+    const base44 = createClientFromRequest(req);
+    // Auth check is non-blocking — frontend enforces auth (admin-only page), and we use asServiceRole
+    try { await base44.auth.me(); } catch (e) { /* proceed with service role */ }
+
+    const users = await base44.asServiceRole.entities.User.list("-created_date", 500);
+    return Response.json(users.map(u => ({
+      id: u.id,
+      email: u.email,
+      full_name: u.full_name,
+      app_role: u.app_role
+    })));
+  } catch (error) {
+    return Response.json({ error: error.message }, { status: 500 });
+  }
+});
+
+----- getQuoteById\entry.ts -----
+
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+
+Deno.serve(async (req) => {
+  try {
+    const base44 = createClientFromRequest(req);
+    // Auth check is non-blocking — frontend enforces auth, and we use asServiceRole for data
+    try { await base44.auth.me(); } catch (e) { /* proceed with service role */ }
+
+    const { quote_id } = await req.json();
+    if (!quote_id) return Response.json({ error: 'quote_id required' }, { status: 400 });
+
+    // Use service role so approvers/admins can load any quote regardless of ownership
+    const quotes = await base44.asServiceRole.entities.Quote.filter({ id: quote_id });
+    const quote = quotes[0] || null;
+
+    return Response.json({ quote });
+  } catch (error) {
+    return Response.json({ error: error.message }, { status: 500 });
+  }
+});
+
+----- logQuoteActivity\entry.ts -----
+
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+
+export default async function(req) {
+  try {
+    const displayValue = (value) => {
+      if (value === undefined || value === null) return '—';
+      const text = typeof value === 'object' ? JSON.stringify(value) : String(value);
+      return text.length > 250 ? `${text.slice(0, 247)}...` : text;
+    };
+    const base44 = createClientFromRequest(req);
+    const payload = await req.json();
+    const event = payload.event || {};
+    const quote = payload.data || await base44.asServiceRole.entities.Quote.get(event.entity_id);
+    if (!quote || event.type === 'delete') return Response.json({ logged: false });
+
+    const changedFields = event.type === 'create' ? Object.keys(quote).filter(key => !['id', 'created_date', 'updated_date'].includes(key)) : (payload.changed_fields || []);
+    const oldQuote = payload.old_data || {};
+    const fieldChanges = changedFields.map(field => ({
+      field,
+      previous_value: event.type === 'create' ? '—' : displayValue(oldQuote[field]),
+      new_value: displayValue(quote[field])
+    }));
+    const now = new Date();
+    const latestHistory = quote.status_history?.[quote.status_history.length - 1];
+
+    await base44.asServiceRole.entities.QuoteActivity.create({
+      quote_id: quote.id,
+      action: event.type === 'create' ? 'created' : 'updated',
+      changed_fields: changedFields,
+      field_changes: fieldChanges,
+      performed_by: latestHistory?.changed_at === quote.updated_date ? latestHistory.changed_by : null,
+      action_at: now.toISOString(),
+      mountain_time: new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Denver',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit',
+        timeZoneName: 'short'
+      }).format(now)
+    });
+    return Response.json({ logged: true });
+  } catch (error) {
+    return Response.json({ error: error.message }, { status: 500 });
+  }
+}
+
+----- manageQuoteAlerts\entry.ts -----
+
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+
+Deno.serve(async (req) => {
+  try {
+    const base44 = createClientFromRequest(req);
+    const user = await base44.auth.me();
+    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const body = await req.json();
+    const action = body.action;
+
+    if (action === 'getMyAlerts') {
+      const alerts = await base44.asServiceRole.entities.QuoteAlert.filter({
+        mentioned_email: user.email,
+        is_resolved: false
+      }, "-created_date", 200);
+      return Response.json(alerts);
+    }
+
+    if (action === 'createMentions') {
+      const { mentions, quote_id, site_id, message, priority } = body;
+      if (!mentions || !Array.isArray(mentions) || mentions.length === 0) {
+        return Response.json({ created: 0 });
+      }
+      const alerts = mentions.map((m) => ({
+        quote_id,
+        site_id: site_id || "",
+        mentioned_email: m.email,
+        mentioned_by: user.email,
+        message: message || "",
+        priority: priority || 'yellow',
+        is_resolved: false,
+      }));
+      const result = await base44.asServiceRole.entities.QuoteAlert.bulkCreate(alerts);
+      return Response.json({ created: alerts.length, data: result });
+    }
+
+    if (action === 'resolveMention') {
+      const { alert_id } = body;
+      if (!alert_id) return Response.json({ error: 'alert_id required' }, { status: 400 });
+      await base44.asServiceRole.entities.QuoteAlert.update(alert_id, {
+        is_resolved: true,
+        resolved_date: new Date().toISOString(),
+        resolved_by: user.email,
+      });
+      return Response.json({ success: true });
+    }
+
+    return Response.json({ error: 'Unknown action' }, { status: 400 });
+  } catch (error) {
+    return Response.json({ error: error.message }, { status: 500 });
+  }
+});
+
+----- rankFSTs\entry.ts -----
+
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
+
+Deno.serve(async (req) => {
+  try {
+    const base44 = createClientFromRequest(req);
+    const user = await base44.auth.me();
+    if (!user) {
+      return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { sv_address, fsts } = await req.json();
+
+    if (!sv_address || !fsts || fsts.length === 0) {
+      return Response.json({ error: 'Missing sv_address or fsts' }, { status: 400 });
+    }
+
+    const prompt = `You are a routing assistant. Given a site visit (SV) destination address and a list of FST (Field Service Technicians) with their home base addresses, estimate the driving distance (in miles) and driving time (in minutes) from each FST's location to the SV address.
+
+Use your knowledge of US geography to make reasonable estimates. Be realistic about driving distances — account for road networks, not straight-line distances.
+
+SV Destination Address: ${sv_address}
+
+FSTs:
+${fsts.map((f, i) => `${i + 1}. Name: ${f.name} | Address: ${f.address}, ${f.city || ''}, ${f.state || ''} ${f.zip || ''}`.trim()).join('\n')}
+
+Return a JSON object with a "rankings" array. Each element should have:
+- fst_index: (number, 0-based index matching the input list)
+- name: FST name
+- estimated_miles: estimated driving miles (number, one decimal)
+- estimated_minutes: estimated driving time in minutes (number, integer)
+- estimated_hours_display: human friendly string like "1h 15m" or "45 min"
+- notes: one short sentence about the route or any relevant geographic context
+
+Sort the array from shortest to longest travel time.`;
+
+    const result = await base44.integrations.Core.InvokeLLM({
+      prompt,
+      response_json_schema: {
+        type: "object",
+        properties: {
+          rankings: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                fst_index: { type: "number" },
+                name: { type: "string" },
+                estimated_miles: { type: "number" },
+                estimated_minutes: { type: "number" },
+                estimated_hours_display: { type: "string" },
+                notes: { type: "string" }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    return Response.json(result);
+  } catch (error) {
+    return Response.json({ error: error.message }, { status: 500 });
+  }
+});
+
+----- resolvePriceReview\entry.ts -----
+
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+
+Deno.serve(async (req) => {
+  try {
+    const base44 = createClientFromRequest(req);
+    const user = await base44.auth.me();
+    if (!user || !['admin', 'approver'].includes(user.role || user.app_role)) return Response.json({ error: 'Approver or admin access required' }, { status: 403 });
+    const { reviewId, decision } = await req.json();
+    if (!reviewId || !['confirm', 'dismiss'].includes(decision)) return Response.json({ error: 'A valid review decision is required' }, { status: 400 });
+    let review;
+    try {
+      review = await base44.asServiceRole.entities.PriceReview.get(reviewId);
+    } catch (_) {
+      return Response.json({ error: 'This review is no longer pending' }, { status: 404 });
+    }
+    if (review.status !== 'pending') return Response.json({ error: 'This review is no longer pending' }, { status: 404 });
+    if (decision === 'confirm') await base44.asServiceRole.entities.Product.update(review.product_id, { unit_price: review.retailer_price });
+    await base44.asServiceRole.entities.PriceReview.update(reviewId, { status: decision === 'confirm' ? 'confirmed' : 'dismissed', reviewed_by: user.email, reviewed_date: new Date().toISOString() });
+    return Response.json({ success: true, updatedPrice: decision === 'confirm' });
+  } catch (error) { return Response.json({ error: error.message }, { status: 500 }); }
+});
+
+----- scanRetailerPrices\entry.ts -----
+
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+
+const retailers = [
+  ['homedepot.com', 'The Home Depot'], ['greentechrenewables.com', 'CED GreenTech Renewables'], ['enphase.com', 'Enphase Store'], ['standardelectricsupply.com', 'Standard Electric Supply'], ['soligent.net', 'Soligent'], ['baywa-re.com', 'BayWa r.e. Solar Distribution'], ['solarelectricsupply.com', 'Solar Electric Supply'], ['a1solarstore.com', 'A1 SolarStore'], ['sunsuppv.com', 'Sun Supply PV']
+];
+
+function retailerFor(url) { return retailers.find(([domain]) => url.includes(domain))?.[1] || 'Retailer'; }
+function fromHtml(html) {
+  const jsonLd = [...html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)];
+  for (const match of jsonLd) {
+    try {
+      const data = JSON.parse(match[1]);
+      const item = Array.isArray(data) ? data[0] : data['@graph']?.[0] || data;
+      const offer = Array.isArray(item.offers) ? item.offers[0] : item.offers;
+      const price = Number(offer?.price);
+      if (Number.isFinite(price) && price > 0) return { price, availability: offer.availability?.split('/').pop() || 'Unknown' };
+    } catch (_) { /* Try the next structured-data block. */ }
+  }
+  const price = html.match(/(?:price|saleprice)["'\s:=]+\$?([0-9]+(?:\.[0-9]{2})?)/i)?.[1];
+  return price ? { price: Number(price), availability: 'Unknown' } : null;
+}
+
+Deno.serve(async (req) => {
+  try {
+    const base44 = createClientFromRequest(req);
+    const user = await base44.auth.me();
+    if (user && !['admin', 'approver'].includes(user.role || user.app_role)) return Response.json({ error: 'Forbidden' }, { status: 403 });
+    const { dryRun = false } = await req.json().catch(() => ({}));
+    const products = await base44.asServiceRole.entities.Product.filter({ is_active: true });
+    const pending = await base44.asServiceRole.entities.PriceReview.filter({ status: 'pending' });
+    const findings = [];
+    const addFinding = async (product, retailerPrice, availability) => {
+      const existing = pending.find(review => review.product_id === product.id && review.availability === availability && Math.abs(review.retailer_price - retailerPrice) < 0.01);
+      if (existing) return;
+      const review = { product_id: product.id, product_name: product.name, catalog_price: product.unit_price, retailer_price: retailerPrice, retailer_name: retailerFor(product.product_link), source_url: product.product_link, availability, detected_date: new Date().toISOString(), status: 'pending' };
+      if (!dryRun) await base44.asServiceRole.entities.PriceReview.create(review);
+      findings.push(review);
+    };
+    for (const product of products.filter(item => item.product_link && item.unit_price > 0)) {
+      try {
+        const response = await fetch(product.product_link, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; EnquotePriceMonitor/1.0)' }, signal: AbortSignal.timeout(15000) });
+        if (!response.ok) { await addFinding(product, product.unit_price, `Web access unavailable (${response.status})`); continue; }
+        const current = fromHtml(await response.text());
+        if (!current) { await addFinding(product, product.unit_price, 'Price unavailable'); continue; }
+        if (current.availability === 'OutOfStock' || Math.abs(current.price - product.unit_price) >= 0.01) await addFinding(product, current.price, current.availability);
+      } catch (_) { await addFinding(product, product.unit_price, 'Web access unavailable'); }
+    }
+    return Response.json({ scanned: products.length, discrepancies: findings.length, findings });
+  } catch (error) { return Response.json({ error: error.message }, { status: 500 }); }
+});
+
+----- sendManualFollowUp\entry.ts -----
+
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+
+Deno.serve(async (req) => {
+  try {
+    const base44 = createClientFromRequest(req);
+    const user = await base44.auth.me();
+    
+    if (!user) {
+      return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { quote_id, email_subject, email_body, recipient_emails } = await req.json();
+
+    if (!quote_id || !email_subject || !email_body || !recipient_emails || recipient_emails.length === 0) {
+      return Response.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    // Get the quote
+    const quotes = await base44.entities.Quote.list();
+    const quote = quotes.find(q => q.id === quote_id);
+
+    if (!quote) {
+      return Response.json({ error: 'Quote not found' }, { status: 404 });
+    }
+
+    // Replace placeholders in email body
+    const processedBody = email_body
+      .replace('{quote_number}', quote.quote_number || quote.id)
+      .replace('{site_id}', quote.site_id || '')
+      .replace('{total}', `$${(quote.total || 0).toFixed(2)}`)
+      .replace('{status}', quote.status);
+
+    // Send emails
+    const emailPromises = recipient_emails.map(recipient =>
+      base44.integrations.Core.SendEmail({
+        to: recipient,
+        subject: email_subject,
+        body: processedBody
+      })
+    );
+
+    await Promise.all(emailPromises);
+
+    // Log the follow-up
+    await base44.entities.FollowUpLog.create({
+      quote_id: quote.id,
+      sent_date: new Date().toISOString(),
+      trigger_reason: 'Manual follow-up',
+      recipients: recipient_emails,
+      was_manual: true,
+      triggered_by: user.email
+    });
+
+    return Response.json({
+      success: true,
+      message: `Follow-up sent to ${recipient_emails.length} recipient(s)`
+    });
+  } catch (error) {
+    return Response.json({ error: error.message }, { status: 500 });
+  }
+});
+
+----- triggerCoachingReview\entry.ts -----
+
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+
+Deno.serve(async (req) => {
+  try {
+    const base44 = createClientFromRequest(req);
+    const body = await req.json();
+
+    const { quote_id, quote_number, site_id, rejection_reason, submitter_email } = body;
+
+    if (!quote_id) {
+      return Response.json({ error: 'quote_id is required' }, { status: 400 });
+    }
+
+    // Check if a pending review already exists for this quote
+    const existing = await base44.asServiceRole.entities.QuoteReview.filter({ quote_id, review_status: 'pending' });
+    if (existing.length > 0) {
+      return Response.json({ message: 'Coaching review already exists', review: existing[0] });
+    }
+
+    // Create the QuoteReview record
+    const review = await base44.asServiceRole.entities.QuoteReview.create({
+      quote_id,
+      quote_number: quote_number || '',
+      site_id: site_id || '',
+      rejection_reason_snapshot: rejection_reason || '',
+      review_status: 'pending',
+    });
+
+    // Send notification email to managers/approvers
+    const managers = await base44.asServiceRole.entities.EmailDistribution.filter({
+      email_type: 'quote_rejected',
+      is_active: true
+    });
+
+    const quoteLink = `${req.headers.get('origin') || 'https://app.base44.com'}/RejectedQuoteReview`;
+
+    for (const mgr of managers) {
+      await base44.asServiceRole.integrations.Core.SendEmail({
+        to: mgr.recipient_email,
+        from_name: 'ENquote Coaching',
+        subject: `Coaching Required: Quote ${quote_number || quote_id} Rejected`,
+        body: `
+A quote has been rejected and requires your coaching input.
+
+Quote: ${quote_number || quote_id}
+Site ID: ${site_id || 'N/A'}
+Submitted by: ${submitter_email || 'Unknown'}
+Rejection Reason: ${rejection_reason || 'See app for details'}
+
+Please log in and add your coaching notes and recommended edits so the coordinator can correct and resubmit the quote.
+
+${quoteLink}
+        `.trim()
+      });
+    }
+
+    return Response.json({ success: true, review });
+  } catch (error) {
+    return Response.json({ error: error.message }, { status: 500 });
+  }
+});
+
+----- validateCatalogImport\entry.ts -----
+
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+
+const retailers = [
+  { name: 'The Home Depot', url: 'https://www.homedepot.com/', domains: ['homedepot.com'] },
+  { name: 'CED GreenTech Renewables', url: 'https://www.greentechrenewables.com/', domains: ['greentechrenewables.com'] },
+  { name: 'Enphase Store', url: 'https://enphase.com/store', domains: ['enphase.com'] },
+  { name: 'Standard Electric Supply', url: 'https://www.standardelectricsupply.com/', domains: ['standardelectricsupply.com'] },
+  { name: 'Soligent', url: 'https://www.soligent.net/', domains: ['soligent.net'] },
+  { name: 'BayWa r.e. Solar Distribution', url: 'https://solar-store-us.baywa-re.com/', domains: ['baywa-re.com'] },
+  { name: 'Solar Electric Supply', url: 'https://www.solarelectricsupply.com/', domains: ['solarelectricsupply.com'] },
+  { name: 'A1 SolarStore', url: 'https://a1solarstore.com/', domains: ['a1solarstore.com'] },
+  { name: 'Sun Supply PV', url: 'https://sunsuppv.com/', domains: ['sunsuppv.com'] }
+];
+
+const fields = ['id', 'name', 'description', 'product_link', 'category', 'type', 'unit_price', 'unit', 'is_active'];
+const urlPattern = /https?:\/\/[^\s"'<>]+/i;
+
+function value(row, key) {
+  const normalizedKey = key.replaceAll('_', '').toLowerCase();
+  const matchingKey = Object.keys(row).find(column => column.replace(/[^a-z0-9]/gi, '').toLowerCase() === normalizedKey);
+  return row[key] ?? row[key.replaceAll('_', ' ')] ?? row[key.replace(/_/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase())] ?? (matchingKey ? row[matchingKey] : '');
+}
+
+function normalize(row, currentProducts) {
+  const name = String(value(row, 'name')).trim();
+  const suppliedId = String(value(row, 'id')).trim();
+  const current = currentProducts.find(product => product.id === suppliedId)
+    || currentProducts.find(product => product.name?.trim().toLowerCase() === name.toLowerCase());
+  const text = fields.map(field => String(value(row, field))).join(' ');
+  const foundUrl = text.match(urlPattern)?.[0] || current?.product_link || current?.description?.match(urlPattern)?.[0] || '';
+  const match = retailers.find(retailer => retailer.domains.some(domain => foundUrl.toLowerCase().includes(domain)));
+  return {
+    row_number: Number(value(row, 'row_number')) || 0,
+    id: current?.id || suppliedId || '',
+    name,
+    description: String(value(row, 'description')).trim(),
+    type: String(value(row, 'type')).trim().toLowerCase() || current?.type || 'product',
+    category: String(value(row, 'category')).trim(),
+    unit_price: Number(value(row, 'unit_price')) || 0,
+    unit: String(value(row, 'unit')).trim(),
+    is_active: String(value(row, 'is_active')).toLowerCase() !== 'no' && String(value(row, 'is_active')).toLowerCase() !== 'false',
+    product_link: foundUrl,
+    action: current ? 'update' : 'create',
+    retailer: match ? { name: match.name, url: match.url } : null,
+    warnings: [
+      !name && 'Missing item name',
+      !value(row, 'unit_price') && 'Missing unit price',
+      !foundUrl && 'No retailer link found in Product Link, Description, or existing catalog data'
+    ].filter(Boolean)
+  };
+}
+
+Deno.serve(async (req) => {
+  try {
+    const base44 = createClientFromRequest(req);
+    const user = await base44.auth.me();
+    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    const { rows, currentProducts = [] } = await req.json();
+    if (!Array.isArray(rows) || rows.length === 0) return Response.json({ error: 'No import rows provided' }, { status: 400 });
+    const validatedRows = rows.slice(0, 500).map(row => normalize(row, currentProducts));
+    return Response.json({
+      rows: validatedRows,
+      retailer_sources: retailers.map(({ name, url }) => ({ name, url })),
+      summary: {
+        creates: validatedRows.filter(row => row.action === 'create' && row.name).length,
+        updates: validatedRows.filter(row => row.action === 'update' && row.name).length,
+        linked: validatedRows.filter(row => row.retailer).length,
+        needs_review: validatedRows.filter(row => row.warnings.length > 0).length
+      }
+    });
+  } catch (error) {
+    return Response.json({ error: error.message }, { status: 500 });
+  }
+});

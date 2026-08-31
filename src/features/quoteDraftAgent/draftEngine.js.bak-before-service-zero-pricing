@@ -47,11 +47,6 @@ const CATEGORY_TO_SECTION = {
 // confident enough -- mirrors the team's own documented fallback rule:
 // "if the tech puts in a product that isn't found on the product list, the
 // agent would select the miscellaneous product... with the average price."
-// NOTE: this fallback is only used for PRODUCTS/MATERIALS. Unmatched
-// SERVICES are handled separately -- see the isService branch inside
-// matchLineItem() -- because installation/service labor is already
-// captured by the FST's hourly on-site labor charge, not by a second
-// dollar-priced line item.
 function computeCategoryAverages(catalog) {
   const sums = {};
   const counts = {};
@@ -356,18 +351,8 @@ function guessCategoryFromText(text) {
 // material) against the catalog, returning a fully-priced, tax-coded line
 // item ready for EnQuote's `items` array. Falls back to a labeled
 // "Miscellaneous <category>" placeholder with the category's average price
-// when no confident match exists for a PRODUCT/MATERIAL -- never
-// fabricates a specific product or price outside catalog data.
-//
-// For SERVICES specifically, an unmatched request is NOT priced with a
-// fabricated placeholder dollar amount at all. Installation/service labor
-// for something like "Critter Guard Installation" or "IQ Battery
-// Installation" is already captured by the FST's hourly on-site labor
-// charge (Number of FSTs Needed x Number of Labor Hours on Site), so
-// adding a second dollar amount for the same labor would double-bill it.
-// Instead, the requested service's own name is shown as a $0.00 line item
-// (rebranded, not "Miscellaneous Services (unmatched: ...)"), so the
-// scope of work is still visible on the quote without an inflated total.
+// when no confident match exists -- never fabricates a specific product or
+// price outside catalog data.
 function matchLineItem(requestedName, requestedQuantity, requestedUnit, notes, categoryHint, isService) {
   const coreTokens = tokenize(requestedName);
   const candidates = PRODUCT_CATALOG.filter((item) =>
@@ -435,45 +420,16 @@ function matchLineItem(requestedName, requestedQuantity, requestedUnit, notes, c
     };
   }
 
-  // --- No confident catalog match ---
-
-  if (isService) {
-    // Installation/service line items with no catalog match are treated
-    // as labor already included in the FST's on-site hours -- shown as a
-    // rebranded $0.00 line using the requested service's own name (e.g.
-    // "Critter Guard Installation", "IQ Load Controller Installation",
-    // "IQ Battery Installation") rather than a fabricated
-    // "Miscellaneous Services" placeholder charge.
-    const displayName = requestedName && requestedName.trim().length > 0
-      ? requestedName.trim()
-      : "Installation Service";
-    return {
-      requested_name: requestedName,
-      name: displayName,
-      quantity: 1,
-      unit_price: 0,
-      unit: "each",
-      total: 0,
-      taxable: false,
-      tax_code: TAX_CODES.SERVICES,
-      section: null,
-      matched: false,
-      match_confidence: score,
-      conversion_note: null,
-      needs_review: false,
-      zero_priced_service: true
-    };
-  }
-
-  // Products/materials still need a real placeholder price -- use the
-  // category-average fallback as before.
+  // No confident catalog match -- use the category-average fallback.
   // IMPORTANT: if the request expressed quantity in a linear unit (e.g.
   // "ft") we have no per-foot rate to fall back to -- multiplying a large
   // linear quantity by a flat "per each" average price would produce a
   // wildly inflated total, so quantity is capped to 1 and the item is
   // flagged for manual review instead.
   const searchText = `${requestedName} ${notes || ""}`;
-  const guessedCategory = guessCategoryFromText(searchText) || categoryHint || "Wiring & Cable Management";
+  const guessedCategory = isService
+    ? SERVICE_CATEGORY
+    : (guessCategoryFromText(searchText) || categoryHint || "Wiring & Cable Management");
   const averagePrice = CATEGORY_AVERAGES[guessedCategory] || 25;
   const fallbackTaxCategory = PRODUCT_CATALOG.find((i) => i.category === guessedCategory)?.tax_category
     || "GENERAL_ELECTRICAL_EQUIPMENT";
@@ -556,7 +512,7 @@ function generateScopeOfWork(request) {
 }
 
 // --- Assumption / notes generation ----------------------------------------
-function generateAssumptions(request, { fstCount, laborHours, usedWorstCase, unmatchedItems, conversionNotes, zeroPricedServiceNames }) {
+function generateAssumptions(request, { fstCount, laborHours, usedWorstCase, unmatchedItems, conversionNotes }) {
   const notes = [];
 
   if (usedWorstCase) {
@@ -566,12 +522,6 @@ function generateAssumptions(request, { fstCount, laborHours, usedWorstCase, unm
   notes.push(`Estimated onsite labor hours: ${laborHours} hour${laborHours === 1 ? "" : "s"}.`);
   notes.push(`Labor rate assumed at $${DEFAULT_LABOR_RATE.toFixed(2)}/hour (organization default -- no rate was specified in the request).`);
   notes.push(`Travel billed at $${TRAVEL_HOUR_RATE.toFixed(2)}/hour and $${MILEAGE_RATE.toFixed(2)}/mile per standard rates.`);
-
-  if (zeroPricedServiceNames.length > 0) {
-    notes.push(
-      `The following installation/service item(s) are included at no additional charge, covered by the FST's on-site labor hours above: ${zeroPricedServiceNames.join(", ")}.`
-    );
-  }
 
   if (conversionNotes.length > 0) {
     notes.push(`Quantity conversions applied: ${conversionNotes.join(" ")}`);
@@ -645,7 +595,6 @@ export function generateQuoteDraft(request) {
   let items = [];
   const unmatchedItems = [];
   const conversionNotes = [];
-  const zeroPricedServiceNames = [];
 
   const allRequestedLines = [
     ...(request.products || []).map((p) => ({ ...p, kind: "product" })),
@@ -655,50 +604,28 @@ export function generateQuoteDraft(request) {
   ];
 
   for (const line of allRequestedLines) {
-    // Services without an explicit name fall back to a scope-of-work-based
-    // label instead of being skipped -- installation labor tied to the
-    // overall job should still show as a $0 line rather than silently
-    // disappearing.
-    if (!line.name) {
-      if (line.kind === "service") {
-        line.name = request.scopeDescription
-          ? `Installation Service: ${request.scopeDescription}`
-          : "Installation Service";
-      } else {
-        continue;
-      }
-    }
-
+    if (!line.name) continue;
     const isService = line.kind === "service";
     const categoryHint = isService ? "Services" : guessCategoryFromText(`${line.name} ${line.notes || ""}`);
     const lineItem = matchLineItem(line.name, line.quantity, line.unit, line.notes, categoryHint, isService);
 
-    // Services priced at $0 in the catalog (a CONFIDENT match to a real
-    // catalog service that happens to be $0) represent labor already
-    // covered by the FST's hourly on-site labor charge -- skip adding a
-    // duplicate $0 line for those specifically, to avoid clutter. This is
-    // distinct from the zero_priced_service fallback below, which we DO
-    // want to show (it carries the requested service's own descriptive
-    // name, e.g. "Critter Guard Installation", not a generic catalog name).
+    // Services priced at $0 in the catalog represent labor already covered
+    // by the FST's hourly on-site labor charge -- skip adding a duplicate
+    // $0 line, but DO add any service with a genuine flat fee (e.g.
+    // Comprehensive Diagnostic, AHJ Permitting).
     if (line.kind === "service" && lineItem.matched && lineItem.unit_price === 0) {
       continue;
     }
 
     items.push(lineItem);
-    if (lineItem.zero_priced_service) {
-      zeroPricedServiceNames.push(lineItem.name);
-    } else if (!lineItem.matched) {
-      unmatchedItems.push(line.name);
-    }
+    if (!lineItem.matched) unmatchedItems.push(line.name);
     if (lineItem.conversion_note) conversionNotes.push(lineItem.conversion_note);
   }
 
   items = deduplicateItems(items);
 
   const scopeOfWork = generateScopeOfWork(request);
-  const notes = generateAssumptions(request, {
-    fstCount, laborHours, usedWorstCase, unmatchedItems, conversionNotes, zeroPricedServiceNames
-  });
+  const notes = generateAssumptions(request, { fstCount, laborHours, usedWorstCase, unmatchedItems, conversionNotes });
   const riskStatement = generateRiskStatement(request, {
     hasUnknowns: Boolean(request.hasUnknownFields),
     unmatchedItems

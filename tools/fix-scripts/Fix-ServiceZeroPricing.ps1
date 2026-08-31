@@ -1,4 +1,65 @@
-﻿// draftEngine.js
+# Fix-ServiceZeroPricing.ps1
+#
+# Run from your project root (e.g. C:\EnQuoteBuild):
+#   powershell -ExecutionPolicy Bypass -File .\Fix-ServiceZeroPricing.ps1
+#   powershell -ExecutionPolicy Bypass -File .\Fix-ServiceZeroPricing.ps1 -Target sandbox
+#   powershell -ExecutionPolicy Bypass -File .\Fix-ServiceZeroPricing.ps1 -PatchOnly
+#
+# THE CHANGE:
+#   Previously, any requested SERVICE line item with no confident catalog
+#   match (e.g. "Critter Guard Installation", "IQ Load Controller
+#   Installation", "IQ Battery Installation") fell back to a fabricated
+#   "Miscellaneous Services (unmatched: '<name>')" line priced at the
+#   average of ALL catalog Services prices (e.g. $265.00) -- effectively
+#   double-billing, since installation/service labor for these items is
+#   already captured by the FST's hourly on-site labor charge
+#   (Number of FSTs Needed x Number of Labor Hours on Site).
+#
+#   Now, an unmatched SERVICE is shown as a REBRANDED $0.00 line using the
+#   requested service's own descriptive name (e.g. "Critter Guard
+#   Installation") instead of the generic "Miscellaneous Services
+#   (unmatched: ...)" label and instead of a fabricated dollar amount. If a
+#   service line has no name at all, it falls back to
+#   "Installation Service: <Scope of Work>" (still $0.00).
+#
+#   Products/materials are UNCHANGED -- they still fall back to the
+#   category-average placeholder price when unmatched, since a physical
+#   part genuinely needs some price rather than $0.
+#
+# This script backs up the current file, replaces it with the corrected
+# version, verifies the replacement landed, then builds + verifies +
+# deploys using the same safe pattern used throughout this session.
+
+param(
+    [ValidateSet("production", "sandbox")]
+    [string]$Target = "production",
+    [switch]$PatchOnly
+)
+
+$ErrorActionPreference = "Stop"
+
+$targets = @{
+    production = @{ AppId = "6979390a3f44099ffca06859"; BaseUrl = "https://enquote.base44.app" }
+    sandbox    = @{ AppId = "6a91e7bce36dd777fa88cf04"; BaseUrl = "https://en-quote-stand-alone-fa88cf04.base44.app" }
+}
+$appId   = $targets[$Target].AppId
+$baseUrl = $targets[$Target].BaseUrl
+
+$targetFile = ".\src\features\quoteDraftAgent\draftEngine.js"
+if (-not (Test-Path $targetFile)) {
+    Write-Host "ERROR: Could not find $targetFile" -ForegroundColor Red
+    Write-Host "Make sure you're running this from the project root." -ForegroundColor Yellow
+    exit 1
+}
+
+# --- Step 1: Backup ---
+$backupPath = "$targetFile.bak-before-service-zero-pricing"
+Copy-Item -Path $targetFile -Destination $backupPath -Force
+Write-Host "Backed up existing draftEngine.js to $backupPath" -ForegroundColor Cyan
+
+# --- Step 2: Write the corrected file ---
+$content = @'
+// draftEngine.js
 //
 // Replicates the Quote Draft Agent (Step 2) logic LOCALLY, in the browser,
 // with no LLM/API calls of any kind. Takes the structured output of the
@@ -734,3 +795,114 @@ export function generateQuoteDraft(request) {
 }
 
 export { findBestCatalogMatch, matchLineItem, CATEGORY_AVERAGES, TAX_CODES };
+
+'@
+
+Set-Content -Path $targetFile -Value $content -Encoding UTF8 -NoNewline
+Write-Host "draftEngine.js has been replaced with the service-zero-pricing version." -ForegroundColor Green
+
+# --- Step 3: Sanity check ---
+$hasZeroPriceFlag = Select-String -Path $targetFile -Pattern "zero_priced_service" -Quiet
+$hasInstallFallback = Select-String -Path $targetFile -Pattern "Installation Service" -Quiet
+$hasCoverageFn = Select-String -Path $targetFile -Pattern "extractCoveragePerUnit" -Quiet
+
+if (-not ($hasZeroPriceFlag -and $hasInstallFallback -and $hasCoverageFn)) {
+    Write-Host "WARNING: One or more expected pieces were not found in the written file. Please review manually." -ForegroundColor Red
+    Write-Host "  zero_priced_service flag present: $hasZeroPriceFlag" -ForegroundColor Yellow
+    Write-Host "  Installation Service fallback present: $hasInstallFallback" -ForegroundColor Yellow
+    Write-Host "  extractCoveragePerUnit (critter guard fix) present: $hasCoverageFn" -ForegroundColor Yellow
+    exit 1
+}
+Write-Host "Sanity check passed: service zero-pricing change + prior critter guard fix both present." -ForegroundColor Green
+
+if ($PatchOnly) {
+    Write-Host ""
+    Write-Host "PatchOnly mode: skipping build/deploy. File is patched; test locally when ready." -ForegroundColor Yellow
+    exit 0
+}
+
+# --- Step 4: Check for the rogue shell-level env var ---
+$shellOverride = [Environment]::GetEnvironmentVariable("VITE_DATA_SOURCE", "Process")
+if ($shellOverride) {
+    Write-Host "WARNING: A shell-level VITE_DATA_SOURCE='$shellOverride' is set in this terminal session. Clearing it." -ForegroundColor Yellow
+    Remove-Item Env:VITE_DATA_SOURCE -ErrorAction SilentlyContinue
+}
+
+# --- Step 5: Build + deploy using the same safe, verified pattern ---
+$envPath = ".\.env.local"
+if (-not (Test-Path $envPath)) {
+    Write-Host "ERROR: .env.local not found." -ForegroundColor Red
+    exit 1
+}
+
+$envBackupPath = ".\.env.local.before-service-zero-pricing.bak"
+Copy-Item -Path $envPath -Destination $envBackupPath -Force
+
+$envContent = @"
+VITE_DATA_SOURCE=base44
+VITE_BASE44_FUNCTIONS_VERSION=prod
+VITE_BASE44_APP_BASE_URL=$baseUrl
+VITE_BASE44_SERVER_URL=https://base44.app
+VITE_BASE44_APP_ID=$appId
+"@
+Set-Content -Path $envPath -Value $envContent -Encoding UTF8
+
+Write-Host ""
+Write-Host "=== Building for target: $Target ($appId) ===" -ForegroundColor Cyan
+Remove-Item -Recurse -Force ".\node_modules\.vite" -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force ".\dist" -ErrorAction SilentlyContinue
+
+$npmCmd = Get-Command npm -ErrorAction SilentlyContinue
+if ($npmCmd) {
+    npm run build
+} else {
+    $NodePath = "C:\Users\croeschberger\OneDrive - Enphase Energy\Documents\node-v24.19.0-win-x64"
+    if (-not (Test-Path "$NodePath\npm.cmd")) {
+        Write-Host "ERROR: npm not found on PATH and not found at $NodePath\npm.cmd" -ForegroundColor Red
+        Copy-Item -Path $envBackupPath -Destination $envPath -Force
+        exit 1
+    }
+    & "$NodePath\npm.cmd" run build
+}
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Build failed (likely a syntax error). Restoring .env.local." -ForegroundColor Red
+    Write-Host "The original draftEngine.js is still backed up at $backupPath if you need to roll back." -ForegroundColor Yellow
+    Copy-Item -Path $envBackupPath -Destination $envPath -Force
+    exit 1
+}
+
+$dataSourceOk = $false
+$appIdOk = $false
+$builtFiles = Get-ChildItem .\dist\assets\*.js -ErrorAction SilentlyContinue
+foreach ($f in $builtFiles) {
+    $c = Get-Content $f.FullName -Raw
+    if ($c -match '\["mock","local","salesforce-mock"\]\.includes\(([^)]*)\)') {
+        Write-Host "  Data source check ($($f.Name)): $($Matches[0])"
+        if ($Matches[0] -match '"base44"') { $dataSourceOk = $true }
+    }
+    if ($c -match [regex]::Escape($appId)) { $appIdOk = $true }
+}
+
+if (-not $dataSourceOk -or -not $appIdOk) {
+    Write-Host ""
+    Write-Host "ABORTING: Build verification failed (data source or app id not correctly baked in)." -ForegroundColor Red
+    Copy-Item -Path $envBackupPath -Destination $envPath -Force
+    exit 1
+}
+
+Write-Host ""
+Write-Host "Build verified clean: base44 data source + $Target app id confirmed." -ForegroundColor Green
+
+Write-Host ""
+Write-Host "=== Deploying to $Target ($appId) with --no-build ===" -ForegroundColor Cyan
+base44 deploy --app-id $appId --no-build --yes
+
+Write-Host ""
+Write-Host "Restoring your original .env.local..." -ForegroundColor Cyan
+Copy-Item -Path $envBackupPath -Destination $envPath -Force
+
+Write-Host ""
+Write-Host "Done. Re-test the critter guard request on $baseUrl" -ForegroundColor Green
+Write-Host "Expect: the 'Critter Guard Installation' line now shows at `$0.00 (not `$265.00)," -ForegroundColor Green
+Write-Host "and the subtotal should be ~`$207 (4 rolls `$167 + fastener clips `$40), not `$472." -ForegroundColor Green
