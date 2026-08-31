@@ -1,4 +1,16 @@
-﻿import { useState } from "react";
+$ErrorActionPreference = "Stop"
+
+$path = ".\src\features\quoteDraftAgent\QuoteDraftButton.jsx"
+if (-not (Test-Path $path)) {
+  Write-Error "Could not find $path. Run this from your EnQuote project root."
+  exit 1
+}
+
+Write-Host "Adding a link to the Quote Draft Agent (Step 2) Copilot Studio chat inside the dialog."
+Write-Host ""
+
+@'
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -222,3 +234,11 @@ export default function QuoteDraftButton({ quote, products, onApply }) {
     </>
   );
 }
+'@ | Set-Content -Encoding utf8 $path
+
+Write-Host "Patched: $path"
+Write-Host ""
+Write-Host "=== Done ==="
+Write-Host "Restart your dev server (Ctrl+C, then npm.cmd run dev) and hard-refresh (Ctrl+Shift+R)."
+Write-Host "Open the Quote Draft Agent button -- you should now see a link right under the"
+Write-Host "description that opens the Step 2 Copilot Studio chat in a new tab."
