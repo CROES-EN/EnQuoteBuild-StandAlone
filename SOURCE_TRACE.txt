@@ -1,0 +1,708 @@
+﻿===== DIRECT BASE44 IMPORTS =====
+
+src\api\adapters\base44Adapter.js:1:import { base44 } from "../base44Client";
+src\api\base44Client.js:15:const isValidBase44ClientConfig =
+src\api\base44Client.js:40:const base44Client =
+src\api\base44Client.js:42:  isValidBase44ClientConfig
+src\api\base44Client.js:59:export const base44 = base44Client;
+src\components\auth\AutoAssignRole.jsx:2:import { base44 } from "@/api/base44Client";
+src\components\auth\RoleGuard.jsx:1:import { base44 } from "@/api/base44Client";
+src\components\dashboard\CoachingFeedback.jsx:3:import { base44 } from "@/api/base44Client";
+src\components\dashboard\EditMyName.jsx:3:import { base44 } from "@/api/base44Client";
+src\components\dashboard\StatusAlerts.jsx:3:import { base44 } from "@/api/base44Client";
+src\components\flags\SiteQuoteTracker.jsx:3:import { base44 } from "@/api/base44Client";
+src\components\manager\FeedbackThemes.jsx:3:import { base44 } from "@/api/base44Client";
+src\components\products\ImportValidateDialog.jsx:2:import { base44 } from "@/api/base44Client";
+src\components\quotes\FollowUpHistory.jsx:2:import { base44 } from "@/api/base44Client";
+src\components\quotes\LogFollowUpDialog.jsx:3:import { base44 } from "@/api/base44Client";
+src\components\quotes\QuickAddItemDialog.jsx:2:import { base44 } from "@/api/base44Client";
+src\components\quotes\QuoteActivityLog.jsx:2:import { base44 } from "@/api/base44Client";
+src\components\quotes\QuoteAIAssistant.jsx:2:import { base44 } from "@/api/base44Client";
+src\components\quotes\QuotePDFGenerator.jsx:3:import { base44 } from "@/api/base44Client";
+src\components\quotes\QuoteReviewPanel.jsx:3:import { base44 } from "@/api/base44Client";
+src\components\quotes\QuoteVersionComparison.jsx:2:import { base44 } from "@/api/base44Client";
+src\components\quotes\QuoteVersionHistory.jsx:1:import { base44 } from "@/api/base44Client";
+src\components\rejection\RejectionInterpretations.jsx:2:import { base44 } from "@/api/base44Client";
+src\components\rejection\SiteRejectionProgressPanel.jsx:2:import { base44 } from "@/api/base44Client";
+src\lib\AuthContext.jsx:2:import { base44 } from '@/api/base44Client';
+src\lib\NavigationTracker.jsx:4:import { base44 } from '@/api/base44Client';
+src\lib\PageNotFound.jsx:2:import { base44 } from '@/api/base44Client';
+src\pages\Boneyard.jsx:2:import { base44 } from "@/api/base44Client";
+src\pages\CreateQuote.jsx:2:import { base44 } from "@/api/base44Client";
+src\pages\Dashboard.jsx:2:import { base44 } from "@/api/base44Client";
+src\pages\EditQuote.jsx:1:import { base44 } from "@/api/base44Client";
+src\pages\EmailNotifications.jsx:2:import { base44 } from "@/api/base44Client";
+src\pages\FollowUpSettings.jsx:2:import { base44 } from "@/api/base44Client";
+src\pages\InactiveCollections.jsx:3:import { base44 } from "@/api/base44Client";
+src\pages\InactiveRevenueDashboard.jsx:3:import { base44 } from "@/api/base44Client";
+src\pages\ManagerDashboard.jsx:3:import { base44 } from "@/api/base44Client";
+src\pages\MaterialOrders.jsx:2:import { base44 } from "@/api/base44Client";
+src\pages\PDFTemplateSettings.jsx:2:import { base44 } from "@/api/base44Client";
+src\pages\Products.jsx:2:import { base44 } from "@/api/base44Client";
+src\pages\PVPanelRMAs.jsx:2:import { base44 } from "@/api/base44Client";
+src\pages\QuoteDeletionRequests.jsx:2:import { base44 } from "@/api/base44Client";
+src\pages\QuoteDetails.jsx:2:import { base44 } from "@/api/base44Client";
+src\pages\QuoteOverview.jsx:2:import { base44 } from "@/api/base44Client";
+src\pages\Quotes.jsx:13:import { base44 } from "@/api/base44Client";
+src\pages\RejectedQuoteReview.jsx:3:import { base44 } from "@/api/base44Client";
+src\pages\ResourcePlanner.jsx:3:import { base44 } from "@/api/base44Client";
+src\pages\RevenueAnalytics.jsx:2:import { base44 } from "@/api/base44Client";
+src\pages\SiteFlagManager.jsx:2:import { base44 } from "@/api/base44Client";
+src\pages\SLAReporting.jsx:2:import { base44 } from "@/api/base44Client";
+src\pages\SVCancelTracker.jsx:3:import { base44 } from "@/api/base44Client";
+src\pages\Users.jsx:2:import { base44 } from "@/api/base44Client";
+
+
+
+
+===== DIRECT BASE44 CALLS =====
+
+src\api\adapters\base44Adapter.js:28:  const entity = base44.entities?.[name];
+src\api\adapters\base44Adapter.js:38:  getCurrentUser: () => base44.auth.me(),
+src\api\adapters\base44Adapter.js:41:    const response = await base44.functions.invoke("getAllQuotes");
+src\api\adapters\base44Adapter.js:46:    const response = await base44.functions.invoke("getQuoteById", {
+src\api\adapters\base44Adapter.js:53:    base44.entities.Quote.list("-created_date", limit),
+src\api\adapters\base44Adapter.js:56:    base44.entities.Quote.filter(filters),
+src\api\adapters\base44Adapter.js:58:  createQuote: (data) => base44.entities.Quote.create(data),
+src\api\adapters\base44Adapter.js:59:  updateQuote: (id, data) => base44.entities.Quote.update(id, data),
+src\api\adapters\base44Adapter.js:60:  deleteQuote: (id) => base44.entities.Quote.delete(id),
+src\api\adapters\base44Adapter.js:61:  bulkUpdateQuotes: (updates) => base44.entities.Quote.bulkUpdate(updates),
+src\api\adapters\base44Adapter.js:64:    const response = await base44.functions.invoke("getAllProducts");
+src\api\adapters\base44Adapter.js:69:    base44.entities.Product.list(sort, limit),
+src\api\adapters\base44Adapter.js:72:    base44.entities.Product.filter(filters),
+src\api\adapters\base44Adapter.js:74:  createProduct: (data) => base44.entities.Product.create(data),
+src\api\adapters\base44Adapter.js:75:  updateProduct: (id, data) => base44.entities.Product.update(id, data),
+src\api\adapters\base44Adapter.js:76:  deleteProduct: (id) => base44.entities.Product.delete(id),
+src\api\adapters\base44Adapter.js:79:    base44.entities.QuoteReview.list(sort, limit),
+src\api\adapters\base44Adapter.js:82:    base44.entities.QuoteReview.filter({ quote_id: quoteId }),
+src\api\adapters\base44Adapter.js:84:  createReview: (data) => base44.entities.QuoteReview.create(data),
+src\api\adapters\base44Adapter.js:85:  updateReview: (id, data) => base44.entities.QuoteReview.update(id, data),
+src\api\adapters\base44Adapter.js:88:    base44.entities.QuoteActivity.filter(
+src\api\adapters\base44Adapter.js:95:    base44.entities.QuoteActivity.create(data),
+src\api\adapters\base44Adapter.js:99:      ? base44.entities.FollowUpLog.filter(
+src\api\adapters\base44Adapter.js:104:      : base44.entities.FollowUpLog.list("-created_date", 200),
+src\api\adapters\base44Adapter.js:106:  createFollowUp: (data) => base44.entities.FollowUpLog.create(data),
+src\api\adapters\base44Adapter.js:109:    const response = await base44.functions.invoke("getAllUsers");
+src\components\auth\AutoAssignRole.jsx:16:    queryFn: () => base44.auth.me(),
+src\components\auth\AutoAssignRole.jsx:23:      const invites = await base44.entities.Invitation.filter({ 
+src\components\auth\AutoAssignRole.jsx:37:      await base44.auth.updateMe({ 
+src\components\auth\AutoAssignRole.jsx:43:        await base44.entities.Invitation.update(invitation.id, { 
+src\components\auth\AutoAssignRole.jsx:67:        base44.auth.updateMe({ app_role: "admin" }).then(() => {
+src\components\auth\AutoAssignRole.jsx:102:            onClick={() => base44.auth.logout()}
+src\components\auth\RoleGuard.jsx:13:    queryFn: () => isAuthenticated && authUser ? authUser : base44.auth.me(),
+src\components\auth\RoleGuard.jsx:73:    queryFn: () => isAuthenticated && authUser ? authUser : base44.auth.me(),
+src\components\dashboard\EditMyName.jsx:19:    mutationFn: () => base44.auth.updateMe({ full_name: [firstName, lastName].filter(Boolean).join(" ") }),
+src\components\dashboard\StatusAlerts.jsx:56:    queryFn: () => base44.auth.me(),
+src\components\dashboard\StatusAlerts.jsx:68:      return await base44.entities.StatusAlertDismissal.list("-created_date", 500);
+src\components\dashboard\StatusAlerts.jsx:76:      await base44.entities.StatusAlertDismissal.create({ quote_id: quoteId });
+src\components\dashboard\StatusAlerts.jsx:85:      await base44.entities.StatusAlertDismissal.bulkCreate(
+src\components\products\ImportValidateDialog.jsx:57:      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+src\components\products\ImportValidateDialog.jsx:58:      const extracted = await base44.integrations.Core.ExtractDataFromUploadedFile({ file_url, json_schema: schema });
+src\components\products\ImportValidateDialog.jsx:61:      const response = await base44.functions.invoke("validateCatalogImport", { rows: rawRows.map((row, index) => ({ ...row, row_number: index + 2 })), 
+currentProducts: products });
+src\components\products\ImportValidateDialog.jsx:76:      if (updates.length) await base44.entities.Product.bulkUpdate(updates);
+src\components\products\ImportValidateDialog.jsx:77:      if (creates.length) await base44.entities.Product.bulkCreate(creates);
+src\components\quotes\FollowUpHistory.jsx:30:    mutationFn: (data) => isLocalDataSource ? createFollowUp({ ...data, quote_id: quoteId, sent_date: new Date().toISOString(), delivery_status: "demo_recorded" }) : 
+base44.functions.invoke('sendManualFollowUp', data),
+src\components\quotes\LogFollowUpDialog.jsx:46:        await base44.functions.invoke("manageQuoteAlerts", {
+src\components\quotes\QuoteAIAssistant.jsx:29:      const result = await base44.integrations.Core.InvokeLLM({
+src\components\quotes\QuoteAIAssistant.jsx:70:      const result = await base44.integrations.Core.InvokeLLM({
+src\components\quotes\QuoteAIAssistant.jsx:130:      const result = await base44.integrations.Core.InvokeLLM({
+src\components\quotes\QuotePDFGenerator.jsx:355:  const logoUrl = "https://media.base44.com/images/public/6979390a3f44099ffca06859/b5a55d7e6_image.png";
+src\components\quotes\QuotePDFGenerator.jsx:409:      const llmResponse = await base44.integrations.Core.InvokeLLM({
+src\components\rejection\RejectionInterpretations.jsx:173:      const response = await base44.functions.invoke("analyzeRejections", { quoteSummaries: truncated });
+src\lib\app-params.js:108:  "https://enquote.base44.app";
+src\lib\app-params.js:115:  "https://base44.app";
+src\lib\AuthContext.jsx:123:      const currentUser = await Promise.race([base44.auth.me(), timeoutPromise]);
+src\lib\AuthContext.jsx:150:      base44.auth.logout(window.location.href);
+src\lib\AuthContext.jsx:153:      base44.auth.logout();
+src\lib\AuthContext.jsx:159:    base44.auth.redirectToLogin(window.location.href);
+src\lib\NavigationTracker.jsx:36:            base44.appLogs.logUserInApp(pageName).catch(() => {
+src\lib\PageNotFound.jsx:14:                const user = await base44.auth.me();
+src\pages\CreateQuote.jsx:83:        const distributions = await base44.entities.EmailDistribution.filter({
+src\pages\CreateQuote.jsx:93:            base44.integrations.Core.SendEmail({
+src\pages\CreateQuote.jsx:101:            base44.integrations.Core.SendEmail({
+src\pages\EditQuote.jsx:89:          const distributions = await base44.entities.EmailDistribution.filter({
+src\pages\EditQuote.jsx:96:              base44.integrations.Core.SendEmail({
+src\pages\EditQuote.jsx:104:              base44.integrations.Core.SendEmail({
+src\pages\EmailNotifications.jsx:81:    queryFn: () => base44.entities.EmailDistribution.list(),
+src\pages\EmailNotifications.jsx:90:    mutationFn: (data) => base44.entities.EmailDistribution.create(data),
+src\pages\EmailNotifications.jsx:100:    mutationFn: ({ id, data }) => base44.entities.EmailDistribution.update(id, data),
+src\pages\EmailNotifications.jsx:107:    mutationFn: (id) => base44.entities.EmailDistribution.delete(id),
+src\pages\FollowUpSettings.jsx:33:    queryFn: () => base44.entities.FollowUpConfig.list()
+src\pages\FollowUpSettings.jsx:37:    mutationFn: (data) => base44.entities.FollowUpConfig.create(data),
+src\pages\FollowUpSettings.jsx:46:    mutationFn: ({ id, data }) => base44.entities.FollowUpConfig.update(id, data),
+src\pages\FollowUpSettings.jsx:55:    mutationFn: (id) => base44.entities.FollowUpConfig.delete(id),
+src\pages\Products.jsx:60:    queryFn: () => base44.entities.PriceReview.filter({ status: "pending" }),
+src\pages\Products.jsx:64:    mutationFn: (decision) => base44.functions.invoke("resolvePriceReview", { reviewId: selectedReview.id, decision }),
+src\pages\QuoteDeletionRequests.jsx:108:    const user = await base44.auth.me();
+src\pages\QuoteDeletionRequests.jsx:128:    const user = await base44.auth.me();
+src\pages\QuoteDeletionRequests.jsx:134:    const user = await base44.auth.me();
+src\pages\QuoteDetails.jsx:180:    const user = await base44.auth.me();
+src\pages\QuoteDetails.jsx:193:    const me = await base44.auth.me();
+src\pages\QuoteDetails.jsx:209:    const user = await base44.auth.me();
+src\pages\QuoteDetails.jsx:232:    const distributions = await base44.entities.EmailDistribution.filter({
+src\pages\QuoteDetails.jsx:249:        base44.integrations.Core.SendEmail({
+src\pages\QuoteDetails.jsx:262:        base44.integrations.Core.SendEmail({
+src\pages\QuoteDetails.jsx:300:    const user = await base44.auth.me();
+src\pages\QuoteDetails.jsx:325:      const { file_url } = await base44.integrations.Core.UploadFile({ file: pdfFile });
+src\pages\QuoteDetails.jsx:332:      const distributions = await base44.entities.EmailDistribution.filter({
+src\pages\QuoteDetails.jsx:341:          base44.integrations.Core.SendEmail({
+src\pages\QuoteDetails.jsx:349:          base44.integrations.Core.SendEmail({
+src\pages\QuoteDetails.jsx:375:    const user = await base44.auth.me();
+src\pages\QuoteDetails.jsx:394:      const distributions = await base44.entities.EmailDistribution.filter({
+src\pages\QuoteDetails.jsx:401:          base44.integrations.Core.SendEmail({
+src\pages\QuoteDetails.jsx:409:          base44.integrations.Core.SendEmail({
+src\pages\QuoteDetails.jsx:435:    const user = await base44.auth.me();
+src\pages\QuoteDetails.jsx:455:      const distributions = await base44.entities.EmailDistribution.filter({
+src\pages\QuoteDetails.jsx:462:          base44.integrations.Core.SendEmail({
+src\pages\QuoteDetails.jsx:470:          base44.integrations.Core.SendEmail({
+src\pages\QuoteDetails.jsx:494:    const user = await base44.auth.me();
+src\pages\QuoteDetails.jsx:514:      const distributions = await base44.entities.EmailDistribution.filter({
+src\pages\QuoteDetails.jsx:521:          base44.integrations.Core.SendEmail({
+src\pages\QuoteDetails.jsx:529:          base44.integrations.Core.SendEmail({
+src\pages\QuoteDetails.jsx:553:    const user = await base44.auth.me();
+src\pages\QuoteDetails.jsx:573:      const distributions = await base44.entities.EmailDistribution.filter({
+src\pages\QuoteDetails.jsx:580:          base44.integrations.Core.SendEmail({
+src\pages\QuoteDetails.jsx:588:          base44.integrations.Core.SendEmail({
+src\pages\QuoteDetails.jsx:612:    const user = await base44.auth.me();
+src\pages\QuoteDetails.jsx:632:      const distributions = await base44.entities.EmailDistribution.filter({
+src\pages\QuoteDetails.jsx:639:          base44.integrations.Core.SendEmail({
+src\pages\QuoteDetails.jsx:647:          base44.integrations.Core.SendEmail({
+src\pages\QuoteDetails.jsx:683:    const currentUser = await base44.auth.me();
+src\pages\QuoteDetails.jsx:703:    const currentUser = await base44.auth.me();
+src\pages\QuoteDetails.jsx:739:    const currentUser = await base44.auth.me();
+src\pages\QuoteDetails.jsx:759:    const user = await base44.auth.me();
+src\pages\QuoteDetails.jsx:783:      const distributions = await base44.entities.EmailDistribution.filter({
+src\pages\QuoteDetails.jsx:790:          base44.integrations.Core.SendEmail({
+src\pages\QuoteDetails.jsx:798:          base44.integrations.Core.SendEmail({
+src\pages\QuoteDetails.jsx:853:    const currentUser = await base44.auth.me();
+src\pages\QuoteDetails.jsx:881:    const currentUser = await base44.auth.me();
+src\pages\QuoteDetails.jsx:910:    const currentUser = await base44.auth.me();
+src\pages\Quotes.jsx:115:      const res = await base44.functions.invoke("manageQuoteAlerts", { action: "getMyAlerts" });
+src\pages\Quotes.jsx:134:      return await base44.entities.StatusAlertDismissal.list("-created_date", 500);
+src\pages\Quotes.jsx:142:      await base44.entities.StatusAlertDismissal.create({ quote_id: quoteId });
+src\pages\ResourcePlanner.jsx:53:    queryFn: () => base44.entities.FST.list("name", 200)
+src\pages\ResourcePlanner.jsx:59:    mutationFn: (data) => base44.entities.FST.create(data),
+src\pages\ResourcePlanner.jsx:64:    mutationFn: ({ id, data }) => base44.entities.FST.update(id, data),
+src\pages\ResourcePlanner.jsx:69:    mutationFn: (id) => base44.entities.FST.delete(id),
+src\pages\ResourcePlanner.jsx:104:      const response = await base44.functions.invoke("rankFSTs", {
+src\pages\Users.jsx:56:    queryFn: () => base44.entities.Invitation.filter({ status: "pending" }, "-created_date"),
+src\pages\Users.jsx:62:        return base44.auth.updateMe(data);
+src\pages\Users.jsx:77:      await base44.entities.Invitation.create({
+src\pages\Users.jsx:85:      await base44.users.inviteUser(email, "user");
+src\pages\Users.jsx:102:      await base44.entities.Invitation.update(invitationId, { status: "cancelled" });
+src\pages\Users.jsx:116:      await base44.entities.Invitation.update(invitation.id, { status: "cancelled" });
+src\pages\Users.jsx:119:      await base44.entities.Invitation.create({
+src\pages\Users.jsx:127:      await base44.users.inviteUser(invitation.email, "user");
+src\pages\Users.jsx:140:      await base44.auth.resetPasswordRequest(email);
+
+
+
+
+===== QUOTE REFERENCES =====
+
+src\components\flags\SiteQuoteTracker.jsx:3:import { base44 } from "@/api/base44Client";
+src\components\flags\SiteQuoteTracker.jsx:4:import { getQuotes } from "@/api/dataClient";
+src\components\flags\SiteQuoteTracker.jsx:105:function getQuoteSubmitter(q) {
+src\components\flags\SiteQuoteTracker.jsx:160:                    {getQuoteSubmitter(q) && (
+src\components\flags\SiteQuoteTracker.jsx:162:                        👤 {getQuoteSubmitter(q)}
+src\components\flags\SiteQuoteTracker.jsx:207:    queryFn: async () => (await getQuotes()).sort((a, b) => String(b.updated_date || "").localeCompare(String(a.updated_date || ""))).slice(0, 500),
+src\components\quotes\QuoteActivityLog.jsx:2:import { base44 } from "@/api/base44Client";
+src\components\quotes\QuoteActivityLog.jsx:3:import { getQuoteActivities } from "@/api/dataClient";
+src\components\quotes\QuoteAIAssistant.jsx:2:import { base44 } from "@/api/base44Client";
+src\components\quotes\QuoteAIAssistant.jsx:29:      const result = await base44.integrations.Core.InvokeLLM({
+src\components\quotes\QuoteAIAssistant.jsx:70:      const result = await base44.integrations.Core.InvokeLLM({
+src\components\quotes\QuoteAIAssistant.jsx:130:      const result = await base44.integrations.Core.InvokeLLM({
+src\components\quotes\QuoteCard.jsx:30:      <Link to={createPageUrl(`QuoteDetails?id=${quote.id}`)}>
+src\components\quotes\QuoteCard.jsx:37:                  onCheckedChange={() => onToggleSelect?.(quote.id)}
+src\components\quotes\QuoteCard.jsx:47:                  {quote.site_id || "No Site ID"}
+src\components\quotes\QuoteCard.jsx:49:                <p className="text-sm text-slate-500">{quote.quote_number || "No reference"}</p>
+src\components\quotes\QuoteCard.jsx:53:              <StatusBadge status={quote.status} size="small" />
+src\components\quotes\QuoteCard.jsx:54:              {quote.status_history?.length > 0 && (
+src\components\quotes\QuoteCard.jsx:56:                  {format(new Date(quote.status_history[quote.status_history.length - 1].changed_at), "MMM d, yyyy")}
+src\components\quotes\QuoteCard.jsx:59:              {alert && <SLAAlertBadge alert={alert} onClear={() => onClearAlert?.(quote.id)} />}
+src\components\quotes\QuoteCard.jsx:69:              {format(new Date(quote.created_date), "MMM d, yyyy")}
+src\components\quotes\QuoteCard.jsx:76:                {quote.items?.length || 0} item{quote.items?.length !== 1 ? "s" : ""}
+src\components\quotes\QuoteCard.jsx:78:              {(quote.owner_email || quote.created_by) && (
+src\components\quotes\QuoteCard.jsx:81:                  {(quote.owner_email || quote.created_by).split("@")[0]}
+src\components\quotes\QuoteForm.jsx:47:        site_id: quote.site_id || "",
+src\components\quotes\QuoteForm.jsx:48:        quote_requester: quote.quote_requester || "",
+src\components\quotes\QuoteForm.jsx:49:        case_number: quote.case_number || "",
+src\components\quotes\QuoteForm.jsx:50:        picklist: quote.picklist || "",
+src\components\quotes\QuoteForm.jsx:51:        om_status: quote.om_status || "",
+src\components\quotes\QuoteForm.jsx:52:        scope_of_work: quote.scope_of_work || "",
+src\components\quotes\QuoteForm.jsx:53:        fst_count: quote.fst_count || "",
+src\components\quotes\QuoteForm.jsx:54:        labor_hours: quote.labor_hours || "",
+src\components\quotes\QuoteForm.jsx:55:        labor_mode: quote.labor_mode || "hourly",
+src\components\quotes\QuoteForm.jsx:56:        flat_labor_fee: quote.flat_labor_fee || "",
+src\components\quotes\QuoteForm.jsx:57:        travel_hours: quote.travel_hours || "",
+src\components\quotes\QuoteForm.jsx:58:        miles_traveled: quote.miles_traveled || "",
+src\components\quotes\QuoteForm.jsx:59:        items: quote.items || [],
+src\components\quotes\QuoteForm.jsx:60:        discount_type: quote.discount_type || "percent",
+src\components\quotes\QuoteForm.jsx:61:        discount_percent: quote.discount_percent || 0,
+src\components\quotes\QuoteForm.jsx:62:        discount_flat_amount: quote.discount_flat_amount || 0,
+src\components\quotes\QuoteForm.jsx:63:        federal_tax_percent: quote.federal_tax_percent || 0,
+src\components\quotes\QuoteForm.jsx:64:        state_tax_percent: quote.state_tax_percent || 0,
+src\components\quotes\QuoteForm.jsx:65:        local_tax_percent: quote.local_tax_percent || 0,
+src\components\quotes\QuoteForm.jsx:66:        notes: quote.notes || "",
+src\components\quotes\QuoteForm.jsx:67:        valid_until: quote.valid_until || ""
+src\components\quotes\QuotePDFGenerator.jsx:3:import { base44 } from "@/api/base44Client";
+src\components\quotes\QuotePDFGenerator.jsx:4:import { listLocalCollection } from "@/api/dataClient";
+src\components\quotes\QuotePDFGenerator.jsx:81:  doc.text(`Quote #: ${quote.quote_number || 'N/A'}`, 20, yPos);
+src\components\quotes\QuotePDFGenerator.jsx:83:  doc.text(`Date: ${format(new Date(quote.created_date), "MMM d, yyyy")}`, 20, yPos);
+src\components\quotes\QuotePDFGenerator.jsx:85:  if (quote.valid_until) {
+src\components\quotes\QuotePDFGenerator.jsx:86:    doc.text(`Valid Until: ${format(new Date(quote.valid_until), "MMM d, yyyy")}`, 20, yPos);
+src\components\quotes\QuotePDFGenerator.jsx:98:  doc.text(`Site ID: ${quote.site_id}`, 20, yPos);
+src\components\quotes\QuotePDFGenerator.jsx:100:  if (quote.case_number) {
+src\components\quotes\QuotePDFGenerator.jsx:101:    doc.text(`Case Number: ${quote.case_number}`, 20, yPos);
+src\components\quotes\QuotePDFGenerator.jsx:104:  if (quote.fst_count > 0) {
+src\components\quotes\QuotePDFGenerator.jsx:105:    doc.text(`FSTs Needed: ${quote.fst_count}`, 20, yPos);
+src\components\quotes\QuotePDFGenerator.jsx:108:  if (quote.labor_hours > 0) {
+src\components\quotes\QuotePDFGenerator.jsx:109:    doc.text(`Labor Hours: ${quote.labor_hours}`, 20, yPos);
+src\components\quotes\QuotePDFGenerator.jsx:116:  if (quote.scope_of_work) {
+src\components\quotes\QuotePDFGenerator.jsx:127:    const scopeLines = doc.splitTextToSize(normalizeText(quote.scope_of_work), 170);
+src\components\quotes\QuotePDFGenerator.jsx:156:  for (const item of quote.items || []) {
+src\components\quotes\QuotePDFGenerator.jsx:191:  const laborCharge = quote.labor_mode === "flat"
+src\components\quotes\QuotePDFGenerator.jsx:192:    ? (quote.flat_labor_fee || 0)
+src\components\quotes\QuotePDFGenerator.jsx:193:    : (quote.fst_count || 0) * (quote.labor_hours || 0) * (quote.labor_rate || 125);
+src\components\quotes\QuotePDFGenerator.jsx:194:  const travelCharge = (quote.travel_hours || 0) * (quote.travel_rate || 65);
+src\components\quotes\QuotePDFGenerator.jsx:195:  const mileageCharge = (quote.miles_traveled || 0) * (quote.mileage_rate || 0.73);
+src\components\quotes\QuotePDFGenerator.jsx:197:  const materialsTotal = (quote.items || []).reduce((sum, item) => sum + (item.total || 0), 0);
+src\components\quotes\QuotePDFGenerator.jsx:200:  const taxableAmount = (quote.items || [])
+src\components\quotes\QuotePDFGenerator.jsx:203:  const discountAmount = subtotal * ((quote.discount_percent || 0) / 100);
+src\components\quotes\QuotePDFGenerator.jsx:206:  const federalTax = quote.federal_tax_percent || 0;
+src\components\quotes\QuotePDFGenerator.jsx:207:  const stateTax = quote.state_tax_percent || 0;
+src\components\quotes\QuotePDFGenerator.jsx:208:  const localTax = quote.local_tax_percent || 0;
+src\components\quotes\QuotePDFGenerator.jsx:237:  if ((quote.discount_percent || 0) > 0) {
+src\components\quotes\QuotePDFGenerator.jsx:238:    doc.text(`Discount (${quote.discount_percent}%):`, 20, yPos);
+src\components\quotes\QuotePDFGenerator.jsx:263:  doc.text(formatCurrency(quote.total), 180, yPos, { align: "right" });
+src\components\quotes\QuotePDFGenerator.jsx:266:  if (quote.notes) {
+src\components\quotes\QuotePDFGenerator.jsx:280:    const notesParagraphs = normalizeText(quote.notes).split('\n');
+src\components\quotes\QuotePDFGenerator.jsx:355:  const logoUrl = "https://media.base44.com/images/public/6979390a3f44099ffca06859/b5a55d7e6_image.png";
+src\components\quotes\QuotePDFGenerator.jsx:391:  doc.text(`Quote #: ${quote.quote_number || 'N/A'}`, 20, yPos);
+src\components\quotes\QuotePDFGenerator.jsx:402:  doc.text(`Site ID: ${quote.site_id || 'N/A'}`, 20, yPos);
+src\components\quotes\QuotePDFGenerator.jsx:406:  if (quote.scope_of_work) {
+src\components\quotes\QuotePDFGenerator.jsx:409:      const llmResponse = await base44.integrations.Core.InvokeLLM({
+src\components\quotes\QuotePDFGenerator.jsx:410:        prompt: `You are writing a brief, plain-English summary of solar service work for a homeowner. Rewrite the following scope of work into 2-3 short sentences that 
+a non-technical customer can easily understand. Remove all internal jargon, part numbers, technician notes, internal process references, or anything that could cause confusion or concern. Keep it reassuring and 
+professional. Do not include pricing — just describe what work will be done.\n\nScope of work:\n${quote.scope_of_work}`,
+src\components\quotes\QuotePDFGenerator.jsx:491:    const discountLabel = quote.discount_type === "flat"
+src\components\quotes\QuotePDFGenerator.jsx:493:      : `Discount (${quote.discount_percent || 0}%)`;
+src\components\quotes\QuoteReviewPanel.jsx:3:import { base44 } from "@/api/base44Client";
+src\components\quotes\QuoteReviewPanel.jsx:4:import { createReview, getReviews, updateReview } from "@/api/dataClient";
+src\components\quotes\QuoteReviewPanel.jsx:46:    queryKey: ["quote-reviews", quote.id],
+src\components\quotes\QuoteReviewPanel.jsx:47:    queryFn: () => getReviews(quote.id),
+src\components\quotes\QuoteReviewPanel.jsx:58:        quote_id: quote.id,
+src\components\quotes\QuoteReviewPanel.jsx:59:        quote_number: quote.quote_number,
+src\components\quotes\QuoteReviewPanel.jsx:60:        site_id: quote.site_id,
+src\components\quotes\QuoteReviewPanel.jsx:62:        rejection_reason_snapshot: quote.rejection_reason,
+src\components\quotes\QuoteReviewPanel.jsx:75:      queryClient.invalidateQueries({ queryKey: ["quote-reviews", quote.id] });
+src\components\quotes\QuoteReviewPanel.jsx:82:  const followUpEntries = (quote.status_history || []).filter(h => h.entry_type === "follow_up");
+src\components\quotes\QuoteReviewPanel.jsx:84:  const rejectedBy = quote.status_history
+src\components\quotes\QuoteReviewPanel.jsx:104:            Quote #{quote.quote_number || "—"}
+src\components\quotes\QuoteReviewPanel.jsx:106:          <p className="text-sm text-slate-500">Site ID: {quote.site_id}</p>
+src\components\quotes\QuoteReviewPanel.jsx:135:              <p className="font-medium text-slate-800">{formatCurrency(quote.total)}</p>
+src\components\quotes\QuoteReviewPanel.jsx:141:              {quote.rejection_reason || "No reason provided."}
+src\components\quotes\QuoteReviewPanel.jsx:164:                <p className="font-medium">{quote.case_number || "—"}</p>
+src\components\quotes\QuoteReviewPanel.jsx:168:                <p className="font-medium">{formatDate(quote.valid_until)}</p>
+src\components\quotes\QuoteReviewPanel.jsx:172:                <p className="font-medium">{quote.fst_count ?? "—"}</p>
+src\components\quotes\QuoteReviewPanel.jsx:176:                <p className="font-medium">{quote.labor_hours ?? "—"}</p>
+src\components\quotes\QuoteReviewPanel.jsx:180:                <p className="font-medium">{formatCurrency(quote.labor_rate)}/hr</p>
+src\components\quotes\QuoteReviewPanel.jsx:184:                <p className="font-medium">{formatCurrency(quote.subtotal)}</p>
+src\components\quotes\QuoteReviewPanel.jsx:187:            {quote.scope_of_work && (
+src\components\quotes\QuoteReviewPanel.jsx:190:                <p className="bg-slate-50 rounded-md px-3 py-2 text-slate-700 whitespace-pre-wrap">{quote.scope_of_work}</p>
+src\components\quotes\QuoteReviewPanel.jsx:193:            {quote.items?.length > 0 && (
+src\components\quotes\QuoteReviewPanel.jsx:217:                      {quote.items.map((item, i) => (
+src\components\quotes\QuoteVersionComparison.jsx:2:import { base44 } from "@/api/base44Client";
+src\components\quotes\QuoteVersionComparison.jsx:3:import { getQuotes } from "@/api/dataClient";
+src\components\quotes\QuoteVersionComparison.jsx:84:  const parentQuoteId = quote.parent_quote_id || quote.id;
+src\components\quotes\QuoteVersionComparison.jsx:89:      const allQuotes = await getQuotes();
+src\components\quotes\QuoteVersionComparison.jsx:164:                    {versions.filter(v => v.id !== quote.id).map((v) => (
+src\components\quotes\QuoteVersionComparison.jsx:180:                      Version {compareVersion.version_number} → Version {quote.version_number}
+src\components\quotes\QuoteVersionComparison.jsx:186:                    <Badge variant="outline">{quote.status}</Badge>
+src\components\quotes\QuoteVersionComparison.jsx:221:                    newValue={quote.site_id}
+src\components\quotes\QuoteVersionComparison.jsx:227:                    newValue={quote.case_number}
+src\components\quotes\QuoteVersionComparison.jsx:233:                    newValue={quote.fst_count}
+src\components\quotes\QuoteVersionComparison.jsx:239:                    newValue={quote.labor_hours}
+src\components\quotes\QuoteVersionComparison.jsx:245:                    newValue={`$${quote.labor_rate || 125}`}
+src\components\quotes\QuoteVersionComparison.jsx:251:                    newValue={quote.travel_hours}
+src\components\quotes\QuoteVersionComparison.jsx:257:                    newValue={quote.miles_traveled}
+src\components\quotes\QuoteVersionComparison.jsx:263:                    newValue={quote.scope_of_work}
+src\components\quotes\QuoteVersionComparison.jsx:268:                    newItems={quote.items}
+src\components\quotes\QuoteVersionComparison.jsx:274:                    newValue={`${quote.discount_percent || 0}%`}
+src\components\quotes\QuoteVersionComparison.jsx:280:                    newValue={`${quote.federal_tax_percent || 0}%`}
+src\components\quotes\QuoteVersionComparison.jsx:286:                    newValue={`${quote.state_tax_percent || 0}%`}
+src\components\quotes\QuoteVersionComparison.jsx:292:                    newValue={`${quote.local_tax_percent || 0}%`}
+src\components\quotes\QuoteVersionComparison.jsx:298:                    newValue={`$${quote.total?.toFixed(2)}`}
+src\components\quotes\QuoteVersionComparison.jsx:304:                    newValue={quote.notes}
+src\components\quotes\QuoteVersionHistory.jsx:1:import { base44 } from "@/api/base44Client";
+src\components\quotes\QuoteVersionHistory.jsx:2:import { getQuotes } from "@/api/dataClient";
+src\components\quotes\QuoteVersionHistory.jsx:19:      const allQuotes = await getQuotes();
+src\components\sla\StuckQuotes.jsx:20:  if (!quote.status_history || quote.status_history.length === 0) {
+src\components\sla\StuckQuotes.jsx:21:    return differenceInHours(new Date(), parseISO(quote.created_date));
+src\components\sla\StuckQuotes.jsx:23:  const sorted = [...quote.status_history].sort((a, b) =>
+src\pages\CreateQuote.jsx:2:import { base44 } from "@/api/base44Client";
+src\pages\CreateQuote.jsx:3:import { createQuote, getCurrentUser, getProducts, getQuotes, isLocalDataSource } from "@/api/dataClient";
+src\pages\CreateQuote.jsx:37:      const quotes = await getQuotes();
+src\pages\CreateQuote.jsx:59:      navigate(createPageUrl(`QuoteDetails?id=${newQuote.id}`));
+src\pages\CreateQuote.jsx:83:        const distributions = await base44.entities.EmailDistribution.filter({
+src\pages\CreateQuote.jsx:89:        console.log('📧 Quote creator:', newQuote.created_by);
+src\pages\CreateQuote.jsx:93:            base44.integrations.Core.SendEmail({
+src\pages\CreateQuote.jsx:95:              subject: `New Quote Submitted: ${newQuote.site_id || newQuote.quote_number}`,
+src\pages\CreateQuote.jsx:96:              body: `A new quote has been submitted for approval.\n\nSite ID: ${newQuote.site_id}\nTotal: $${newQuote.total.toFixed(2)}\n\nPlease review and approve/reject in the system.`
+src\pages\CreateQuote.jsx:100:          ...(newQuote.created_by ? [
+src\pages\CreateQuote.jsx:101:            base44.integrations.Core.SendEmail({
+src\pages\CreateQuote.jsx:102:              to: newQuote.created_by,
+src\pages\CreateQuote.jsx:103:              subject: `Quote Submitted Successfully: ${newQuote.site_id || newQuote.quote_number}`,
+src\pages\CreateQuote.jsx:104:              body: `Your quote has been submitted for approval.\n\nSite ID: ${newQuote.site_id}\nTotal: $${newQuote.total.toFixed(2)}\n\nYou will be notified once it's reviewed.`
+src\pages\CreateQuote.jsx:105:            }).then(() => ({ email: newQuote.created_by, success: true }))
+src\pages\CreateQuote.jsx:106:              .catch(err => ({ email: newQuote.created_by, success: false, error: err }))
+src\pages\CreateQuote.jsx:140:      navigate(createPageUrl(`QuoteDetails?id=${newQuote.id}`));
+src\pages\EditQuote.jsx:1:import { base44 } from "@/api/base44Client";
+src\pages\EditQuote.jsx:2:import { createQuote, getCurrentUser, getProducts, getQuoteById, getQuotes, isLocalDataSource, updateQuote } from "@/api/dataClient";
+src\pages\EditQuote.jsx:41:    const quotes = await getQuotes();
+src\pages\EditQuote.jsx:58:        const parentQuoteId = quote.parent_quote_id || quoteId;
+src\pages\EditQuote.jsx:61:        const allVersions = (await getQuotes()).filter(q => q.id === parentQuoteId || q.parent_quote_id === parentQuoteId);
+src\pages\EditQuote.jsx:80:              reason: `New version (v${newVersionNumber}) created from v${quote.version_number || 1}`
+src\pages\EditQuote.jsx:89:          const distributions = await base44.entities.EmailDistribution.filter({
+src\pages\EditQuote.jsx:96:              base44.integrations.Core.SendEmail({
+src\pages\EditQuote.jsx:98:                subject: `Quote Updated (v${newVersionNumber}): ${newQuote.site_id || newQuote.quote_number}`,
+src\pages\EditQuote.jsx:99:                body: `A new version of a quote has been submitted for approval.\n\nSite ID: ${newQuote.site_id}\nVersion: ${newVersionNumber}\nTotal: $${newQuote.total.toFixed(2)}\n\nPlease 
+review and approve/reject in the system.`
+src\pages\EditQuote.jsx:103:            ...(newQuote.created_by ? [
+src\pages\EditQuote.jsx:104:              base44.integrations.Core.SendEmail({
+src\pages\EditQuote.jsx:105:                to: newQuote.created_by,
+src\pages\EditQuote.jsx:106:                subject: `Quote Updated (v${newVersionNumber}): ${newQuote.site_id || newQuote.quote_number}`,
+src\pages\EditQuote.jsx:107:                body: `A new version of your quote has been submitted for approval.\n\nSite ID: ${newQuote.site_id}\nVersion: ${newVersionNumber}\nTotal: 
+$${newQuote.total.toFixed(2)}\n\nYou will be notified once it's reviewed.`
+src\pages\EditQuote.jsx:108:              }).then(() => ({ email: newQuote.created_by, success: true }))
+src\pages\EditQuote.jsx:109:                .catch(err => ({ email: newQuote.created_by, success: false }))
+src\pages\EditQuote.jsx:164:      navigate(createPageUrl(`EditQuote?id=${copiedQuote.id}`));
+src\pages\EditQuote.jsx:185:          <p className="text-slate-600">Only the original quote creator, an approver, or an admin can edit this quote.</p>
+src\pages\EditQuote.jsx:227:                <p className="text-rose-700 text-sm">{quote.rejection_reason}</p>
+src\pages\EditQuote.jsx:238:                <p className="text-rose-700 text-sm">{quote.ho_rejection_reason}</p>
+src\pages\QuoteDeletionRequests.jsx:2:import { base44 } from "@/api/base44Client";
+src\pages\QuoteDeletionRequests.jsx:19:import { getQuoteById, getQuotes, listLocalCollection, updateLocalRecord, updateQuote } from "@/api/dataClient";
+src\pages\QuoteDeletionRequests.jsx:48:      return getQuotes();
+src\pages\QuoteDeletionRequests.jsx:59:        pre_hold_status: quote.status,
+src\pages\QuoteDeletionRequests.jsx:63:          ...(quote.status_history || []),
+src\pages\QuoteDeletionRequests.jsx:84:        status: quote.pre_hold_status || "draft_without_internal",
+src\pages\QuoteDeletionRequests.jsx:90:          ...(quote.status_history || []),
+src\pages\QuoteDeletionRequests.jsx:93:            status: quote.pre_hold_status || "draft_without_internal",
+src\pages\QuoteDeletionRequests.jsx:108:    const user = await base44.auth.me();
+src\pages\QuoteDeletionRequests.jsx:128:    const user = await base44.auth.me();
+src\pages\QuoteDeletionRequests.jsx:134:    const user = await base44.auth.me();
+src\pages\QuoteDeletionRequests.jsx:154:  const quoteById = Object.fromEntries(quotes.map((quote) => [quote.id, quote]));
+src\pages\QuoteDeletionRequests.jsx:247:                const isArchived = request.status === "approved" && quote?.status === "on_hold" && quote.hold_reason === "Archived through an approved deletion request";
+src\pages\QuoteDetails.jsx:2:import { base44 } from "@/api/base44Client";
+src\pages\QuoteDetails.jsx:3:import { bulkUpdateQuotes, createLocalRecord, createQuote, createReview, deleteQuote, getCurrentUser, getQuoteById, getQuotes, getReviews, getUsers, listLocalCollection, updateQuote, 
+updateReview } from "@/api/dataClient";
+src\pages\QuoteDetails.jsx:142:          reason: `Saved as a pricing option from ${quote.quote_number || quote.site_id}`
+src\pages\QuoteDetails.jsx:149:      navigate(createPageUrl(`EditQuote?id=${copiedQuote.id}`));
+src\pages\QuoteDetails.jsx:180:    const user = await base44.auth.me();
+src\pages\QuoteDetails.jsx:183:      quote_number: quote.quote_number || quote.site_id,
+src\pages\QuoteDetails.jsx:193:    const me = await base44.auth.me();
+src\pages\QuoteDetails.jsx:207:    console.log('📋 Quote data:', { id: quoteId, site_id: quote.site_id, created_by: quote.created_by });
+src\pages\QuoteDetails.jsx:209:    const user = await base44.auth.me();
+src\pages\QuoteDetails.jsx:218:          ...(quote.status_history || []),
+src\pages\QuoteDetails.jsx:232:    const distributions = await base44.entities.EmailDistribution.filter({
+src\pages\QuoteDetails.jsx:239:    console.log('📧 Quote creator:', quote.created_by);
+src\pages\QuoteDetails.jsx:243:      ...(quote.created_by ? [quote.created_by] : [])
+src\pages\QuoteDetails.jsx:249:        base44.integrations.Core.SendEmail({
+src\pages\QuoteDetails.jsx:251:          subject: `New Quote Submitted: ${quote.site_id || quote.quote_number}`,
+src\pages\QuoteDetails.jsx:252:          body: `A new quote has been submitted for approval.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}\n\nPlease review and approve/reject in the system.`
+src\pages\QuoteDetails.jsx:261:      ...(quote.created_by ? [
+src\pages\QuoteDetails.jsx:262:        base44.integrations.Core.SendEmail({
+src\pages\QuoteDetails.jsx:263:          to: quote.created_by,
+src\pages\QuoteDetails.jsx:264:          subject: `Quote Submitted Successfully: ${quote.site_id || quote.quote_number}`,
+src\pages\QuoteDetails.jsx:265:          body: `Your quote has been submitted for approval.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}\n\nYou will be notified once it's reviewed.`
+src\pages\QuoteDetails.jsx:267:          console.log('✅ Email sent successfully to creator:', quote.created_by);
+src\pages\QuoteDetails.jsx:268:          return { email: quote.created_by, success: true };
+src\pages\QuoteDetails.jsx:270:          console.error('❌ Email failed to creator:', quote.created_by, err);
+src\pages\QuoteDetails.jsx:271:          return { email: quote.created_by, success: false, error: err };
+src\pages\QuoteDetails.jsx:300:    const user = await base44.auth.me();
+src\pages\QuoteDetails.jsx:308:          ...(quote.status_history || []),
+src\pages\QuoteDetails.jsx:324:      const pdfFile = new File([pdfBlob], `quote-${quote.site_id || quote.quote_number}.pdf`, { type: 'application/pdf' });
+src\pages\QuoteDetails.jsx:325:      const { file_url } = await base44.integrations.Core.UploadFile({ file: pdfFile });
+src\pages\QuoteDetails.jsx:332:      const distributions = await base44.entities.EmailDistribution.filter({
+src\pages\QuoteDetails.jsx:341:          base44.integrations.Core.SendEmail({
+src\pages\QuoteDetails.jsx:343:            subject: `Quote Approved: ${quote.site_id || quote.quote_number}`,
+src\pages\QuoteDetails.jsx:344:            body: `A quote has been approved.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}\n\nThe quote is now ready for invoicing.${pdfLine}`
+src\pages\QuoteDetails.jsx:348:        ...(quote.created_by ? [
+src\pages\QuoteDetails.jsx:349:          base44.integrations.Core.SendEmail({
+src\pages\QuoteDetails.jsx:350:            to: quote.created_by,
+src\pages\QuoteDetails.jsx:351:            subject: `Your Quote Was Approved: ${quote.site_id || quote.quote_number}`,
+src\pages\QuoteDetails.jsx:352:            body: `Good news! Your quote has been approved.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}\n\nThe quote is now ready for invoicing.${pdfLine}`
+src\pages\QuoteDetails.jsx:353:          }).then(() => ({ email: quote.created_by, success: true }))
+src\pages\QuoteDetails.jsx:354:            .catch(() => ({ email: quote.created_by, success: false }))
+src\pages\QuoteDetails.jsx:375:    const user = await base44.auth.me();
+src\pages\QuoteDetails.jsx:382:          ...(quote.status_history || []),
+src\pages\QuoteDetails.jsx:394:      const distributions = await base44.entities.EmailDistribution.filter({
+src\pages\QuoteDetails.jsx:401:          base44.integrations.Core.SendEmail({
+src\pages\QuoteDetails.jsx:403:            subject: `Quote Rejected: ${quote.site_id || quote.quote_number}`,
+src\pages\QuoteDetails.jsx:404:            body: `A quote has been rejected.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}\n\nReason: ${rejectionReason}`
+src\pages\QuoteDetails.jsx:408:        ...(quote.created_by ? [
+src\pages\QuoteDetails.jsx:409:          base44.integrations.Core.SendEmail({
+src\pages\QuoteDetails.jsx:410:            to: quote.created_by,
+src\pages\QuoteDetails.jsx:411:            subject: `Your Quote Was Rejected: ${quote.site_id || quote.quote_number}`,
+src\pages\QuoteDetails.jsx:412:            body: `Your quote has been rejected.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}\n\nReason: ${rejectionReason}`
+src\pages\QuoteDetails.jsx:413:          }).then(() => ({ email: quote.created_by, success: true }))
+src\pages\QuoteDetails.jsx:414:            .catch(err => ({ email: quote.created_by, success: false }))
+src\pages\QuoteDetails.jsx:435:    const user = await base44.auth.me();
+src\pages\QuoteDetails.jsx:442:          ...(quote.status_history || []),
+src\pages\QuoteDetails.jsx:455:      const distributions = await base44.entities.EmailDistribution.filter({
+src\pages\QuoteDetails.jsx:462:          base44.integrations.Core.SendEmail({
+src\pages\QuoteDetails.jsx:464:            subject: `Quote Sent to HO: ${quote.site_id || quote.quote_number}`,
+src\pages\QuoteDetails.jsx:465:            body: `A quote has been sent to HO.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}`
+src\pages\QuoteDetails.jsx:469:        ...(quote.created_by ? [
+src\pages\QuoteDetails.jsx:470:          base44.integrations.Core.SendEmail({
+src\pages\QuoteDetails.jsx:471:            to: quote.created_by,
+src\pages\QuoteDetails.jsx:472:            subject: `Your Quote Sent to HO: ${quote.site_id || quote.quote_number}`,
+src\pages\QuoteDetails.jsx:473:            body: `Your quote has been sent to HO.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}`
+src\pages\QuoteDetails.jsx:474:          }).then(() => ({ email: quote.created_by, success: true }))
+src\pages\QuoteDetails.jsx:475:            .catch(err => ({ email: quote.created_by, success: false }))
+src\pages\QuoteDetails.jsx:494:    const user = await base44.auth.me();
+src\pages\QuoteDetails.jsx:501:          ...(quote.status_history || []),
+src\pages\QuoteDetails.jsx:514:      const distributions = await base44.entities.EmailDistribution.filter({
+src\pages\QuoteDetails.jsx:521:          base44.integrations.Core.SendEmail({
+src\pages\QuoteDetails.jsx:523:            subject: `HO Approved, Invoice Required: ${quote.site_id || quote.quote_number}`,
+src\pages\QuoteDetails.jsx:524:            body: `HO has approved the quote and an invoice is required.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}`
+src\pages\QuoteDetails.jsx:528:        ...(quote.created_by ? [
+src\pages\QuoteDetails.jsx:529:          base44.integrations.Core.SendEmail({
+src\pages\QuoteDetails.jsx:530:            to: quote.created_by,
+src\pages\QuoteDetails.jsx:531:            subject: `Your Quote HO Approved: ${quote.site_id || quote.quote_number}`,
+src\pages\QuoteDetails.jsx:532:            body: `HO has approved your quote and an invoice is required.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}`
+src\pages\QuoteDetails.jsx:533:          }).then(() => ({ email: quote.created_by, success: true }))
+src\pages\QuoteDetails.jsx:534:            .catch(err => ({ email: quote.created_by, success: false }))
+src\pages\QuoteDetails.jsx:553:    const user = await base44.auth.me();
+src\pages\QuoteDetails.jsx:560:          ...(quote.status_history || []),
+src\pages\QuoteDetails.jsx:573:      const distributions = await base44.entities.EmailDistribution.filter({
+src\pages\QuoteDetails.jsx:580:          base44.integrations.Core.SendEmail({
+src\pages\QuoteDetails.jsx:582:            subject: `Quote Invoiced: ${quote.site_id || quote.quote_number}`,
+src\pages\QuoteDetails.jsx:583:            body: `A quote has been marked as invoiced.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}`
+src\pages\QuoteDetails.jsx:587:        ...(quote.created_by ? [
+src\pages\QuoteDetails.jsx:588:          base44.integrations.Core.SendEmail({
+src\pages\QuoteDetails.jsx:589:            to: quote.created_by,
+src\pages\QuoteDetails.jsx:590:            subject: `Your Quote Invoiced: ${quote.site_id || quote.quote_number}`,
+src\pages\QuoteDetails.jsx:591:            body: `Your quote has been marked as invoiced.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}`
+src\pages\QuoteDetails.jsx:592:          }).then(() => ({ email: quote.created_by, success: true }))
+src\pages\QuoteDetails.jsx:593:            .catch(err => ({ email: quote.created_by, success: false }))
+src\pages\QuoteDetails.jsx:612:    const user = await base44.auth.me();
+src\pages\QuoteDetails.jsx:620:          ...(quote.status_history || []),
+src\pages\QuoteDetails.jsx:632:      const distributions = await base44.entities.EmailDistribution.filter({
+src\pages\QuoteDetails.jsx:639:          base44.integrations.Core.SendEmail({
+src\pages\QuoteDetails.jsx:641:            subject: `HO Rejected Quote: ${quote.site_id || quote.quote_number}`,
+src\pages\QuoteDetails.jsx:642:            body: `HO has rejected a quote.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}\n\nReason: ${hoRejectionReason}`
+src\pages\QuoteDetails.jsx:646:        ...(quote.created_by ? [
+src\pages\QuoteDetails.jsx:647:          base44.integrations.Core.SendEmail({
+src\pages\QuoteDetails.jsx:648:            to: quote.created_by,
+src\pages\QuoteDetails.jsx:649:            subject: `HO Rejected Your Quote: ${quote.site_id || quote.quote_number}`,
+src\pages\QuoteDetails.jsx:650:            body: `HO has rejected your quote.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}\n\nReason: ${hoRejectionReason}`
+src\pages\QuoteDetails.jsx:651:          }).then(() => ({ email: quote.created_by, success: true }))
+src\pages\QuoteDetails.jsx:652:            .catch(err => ({ email: quote.created_by, success: false }))
+src\pages\QuoteDetails.jsx:673:    if (newStatus === quote.status) return;
+src\pages\QuoteDetails.jsx:683:    const currentUser = await base44.auth.me();
+src\pages\QuoteDetails.jsx:689:          ...(quote.status_history || []),
+src\pages\QuoteDetails.jsx:694:            reason: `Status manually corrected from "${quote.status}" to "${newStatus}"`
+src\pages\QuoteDetails.jsx:703:    const currentUser = await base44.auth.me();
+src\pages\QuoteDetails.jsx:710:          ...(quote.status_history || []),
+src\pages\QuoteDetails.jsx:724:    const items = quote.items || [];
+src\pages\QuoteDetails.jsx:739:    const currentUser = await base44.auth.me();
+src\pages\QuoteDetails.jsx:745:          ...(quote.status_history || []),
+src\pages\QuoteDetails.jsx:759:    const user = await base44.auth.me();
+src\pages\QuoteDetails.jsx:770:          ...(quote.status_history || []),
+src\pages\QuoteDetails.jsx:783:      const distributions = await base44.entities.EmailDistribution.filter({
+src\pages\QuoteDetails.jsx:790:          base44.integrations.Core.SendEmail({
+src\pages\QuoteDetails.jsx:792:            subject: `Invoice Paid: ${quote.site_id || quote.quote_number}`,
+src\pages\QuoteDetails.jsx:793:            body: `An invoice has been marked as paid.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}`
+src\pages\QuoteDetails.jsx:797:        ...(quote.created_by ? [
+src\pages\QuoteDetails.jsx:798:          base44.integrations.Core.SendEmail({
+src\pages\QuoteDetails.jsx:799:            to: quote.created_by,
+src\pages\QuoteDetails.jsx:800:            subject: `Your Invoice Paid: ${quote.site_id || quote.quote_number}`,
+src\pages\QuoteDetails.jsx:801:            body: `Your invoice has been marked as paid.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}`
+src\pages\QuoteDetails.jsx:802:          }).then(() => ({ email: quote.created_by, success: true }))
+src\pages\QuoteDetails.jsx:803:            .catch(err => ({ email: quote.created_by, success: false }))
+src\pages\QuoteDetails.jsx:836:          ...(quote.status_history || []),
+src\pages\QuoteDetails.jsx:839:            status: quote.status,
+src\pages\QuoteDetails.jsx:853:    const currentUser = await base44.auth.me();
+src\pages\QuoteDetails.jsx:860:        pre_hold_status: quote.status,
+src\pages\QuoteDetails.jsx:864:          ...(quote.status_history || []),
+src\pages\QuoteDetails.jsx:881:    const currentUser = await base44.auth.me();
+src\pages\QuoteDetails.jsx:883:    const restoredStatus = quote.pre_hold_status || "quote_sent_to_ho";
+src\pages\QuoteDetails.jsx:893:          ...(quote.status_history || []),
+src\pages\QuoteDetails.jsx:910:    const currentUser = await base44.auth.me();
+src\pages\QuoteDetails.jsx:911:    const siteId = successfulQuote.site_id;
+src\pages\QuoteDetails.jsx:914:    const allVersions = (await getQuotes()).filter(q => q.site_id === siteId);
+src\pages\QuoteDetails.jsx:916:    const rejectedSiblings = allVersions.filter(q => q.status === "rejected" && q.id !== successfulQuote.id);
+src\pages\QuoteDetails.jsx:920:    if (successfulQuote.scope_of_work) changesNotes.push(`Scope of work: "${successfulQuote.scope_of_work.slice(0, 120)}${successfulQuote.scope_of_work.length > 120 ? "…" : ""}"`);
+src\pages\QuoteDetails.jsx:921:    if (successfulQuote.total) changesNotes.push(`Final total: $${successfulQuote.total.toLocaleString("en-US", { minimumFractionDigits: 2 })}`);
+src\pages\QuoteDetails.jsx:922:    if (successfulQuote.version_number) changesNotes.push(`Approved version: v${successfulQuote.version_number}`);
+src\pages\QuoteDetails.jsx:944:          recommended_edits: `No further edits needed — a later version (v${successfulQuote.version_number || "?"}) was ${successLabel}.`,
+src\pages\QuoteDetails.jsx:980:      const parentId = quote.parent_quote_id || quote.id;
+src\pages\QuoteDetails.jsx:981:      const allQuotes = await getQuotes();
+src\pages\QuoteDetails.jsx:1008:      link.download = `quote-${quote.site_id || quote.quote_number}-v${quote.version_number || 1}.pdf`;
+src\pages\QuoteDetails.jsx:1026:      link.download = `customer-copy-${quote.site_id || quote.quote_number}-v${quote.version_number || 1}.pdf`;
+src\pages\QuoteDetails.jsx:1040:      quote_number: quote.quote_number,
+src\pages\QuoteDetails.jsx:1041:      site_id: quote.site_id,
+src\pages\QuoteDetails.jsx:1042:      client_name: quote.client_name,
+src\pages\QuoteDetails.jsx:1043:      client_email: quote.client_email,
+src\pages\QuoteDetails.jsx:1044:      address: quote.address,
+src\pages\QuoteDetails.jsx:1045:      scope_of_work: quote.scope_of_work,
+src\pages\QuoteDetails.jsx:1046:      fst_count: quote.fst_count,
+src\pages\QuoteDetails.jsx:1047:      status: quote.status,
+src\pages\QuoteDetails.jsx:1048:      items: quote.items,
+src\pages\QuoteDetails.jsx:1049:      subtotal: quote.subtotal,
+src\pages\QuoteDetails.jsx:1050:      discount_percent: quote.discount_percent,
+src\pages\QuoteDetails.jsx:1051:      tax_percent: quote.tax_percent,
+src\pages\QuoteDetails.jsx:1052:      total: quote.total,
+src\pages\QuoteDetails.jsx:1053:      notes: quote.notes,
+src\pages\QuoteDetails.jsx:1054:      valid_until: quote.valid_until,
+src\pages\QuoteDetails.jsx:1055:      created_date: quote.created_date,
+src\pages\QuoteDetails.jsx:1056:      approved_date: quote.approved_date
+src\pages\QuoteDetails.jsx:1064:    link.download = `quote-${quote.site_id || quote.quote_number}-${new Date().toISOString().split('T')[0]}.json`;
+src\pages\QuoteDetails.jsx:1106:                <h1 className="text-3xl font-bold text-slate-900">{quote.site_id || "No Site ID"}</h1>
+src\pages\QuoteDetails.jsx:1107:                <StatusBadge status={quote.status} size="large" />
+src\pages\QuoteDetails.jsx:1125:                  v{quote.version_number || 1}
+src\pages\QuoteDetails.jsx:1128:              <p className="text-slate-600 mt-1">{quote.quote_number}</p>
+src\pages\QuoteDetails.jsx:1135:              <Select value={quote.status} onValueChange={handleStatusChange} disabled={updateMutation.isPending}>
+src\pages\QuoteDetails.jsx:1155:            {quote.status === "approved" && canEditQuote && (
+src\pages\QuoteDetails.jsx:1185:            {quote.status === "quote_sent_to_ho" && canEditQuote && (
+src\pages\QuoteDetails.jsx:1188:                  <Link to={createPageUrl(`EditQuote?id=${quote.id}`)}>
+src\pages\QuoteDetails.jsx:1223:            {quote.status === "ho_approved_invoice_required" && (isAdmin || isApprover) && (
+src\pages\QuoteDetails.jsx:1235:            {quote.status === "invoiced" && isSubmitter && canEditQuote && (
+src\pages\QuoteDetails.jsx:1247:            {quote.status === "invoice_paid" && canEditQuote && (
+src\pages\QuoteDetails.jsx:1268:            {(quote.status === "draft_without_internal" || quote.status === "draft_without_fst" || quote.status === "draft") && canEditQuote && (
+src\pages\QuoteDetails.jsx:1270:                <Link to={createPageUrl(`EditQuote?id=${quote.id}`)}>
+src\pages\QuoteDetails.jsx:1286:            {quote.status === "rejected" && canEditQuote && (
+src\pages\QuoteDetails.jsx:1287:              <Link to={createPageUrl(`EditQuote?id=${quote.id}`)}>
+src\pages\QuoteDetails.jsx:1294:            {(quote.status === "submitted" || quote.status === "approved") && canEditQuote && (
+src\pages\QuoteDetails.jsx:1305:            {quote.status === "submitted" && isApprover && (
+src\pages\QuoteDetails.jsx:1325:            {quote.status === "on_hold" ? (
+src\pages\QuoteDetails.jsx:1394:        {quote.status === "on_hold" && (
+src\pages\QuoteDetails.jsx:1404:                  {quote.hold_reason && (
+src\pages\QuoteDetails.jsx:1405:                    <p className="text-amber-600 text-sm mt-1 italic">Reason: {quote.hold_reason}</p>
+src\pages\QuoteDetails.jsx:1407:                  {quote.hold_date && (
+src\pages\QuoteDetails.jsx:1409:                      Held since {format(new Date(quote.hold_date), "MMM d, yyyy")}
+src\pages\QuoteDetails.jsx:1410:                      {quote.pre_hold_status && ` · was "${quote.pre_hold_status.replace(/_/g, " ")}"`}
+src\pages\QuoteDetails.jsx:1420:        {quote.status === "rejected" && quote.rejection_reason && (
+src\pages\QuoteDetails.jsx:1430:                  <p className="text-rose-700 mt-1">{quote.rejection_reason}</p>
+src\pages\QuoteDetails.jsx:1438:        {quote.status === "ho_rejected" && quote.ho_rejection_reason && (
+src\pages\QuoteDetails.jsx:1448:                  <p className="text-red-700 mt-1">{quote.ho_rejection_reason}</p>
+src\pages\QuoteDetails.jsx:1481:              {quote.site_id && (
+src\pages\QuoteDetails.jsx:1488:                    <p className="font-medium text-slate-900">{quote.site_id}</p>
+src\pages\QuoteDetails.jsx:1492:              {quote.case_number && (
+src\pages\QuoteDetails.jsx:1499:                    <p className="font-medium text-slate-900">{quote.case_number}</p>
+src\pages\QuoteDetails.jsx:1503:              {quote.picklist && (
+src\pages\QuoteDetails.jsx:1510:                    <p className="font-medium text-slate-900">{quote.picklist}</p>
+src\pages\QuoteDetails.jsx:1514:              {quote.fst_count > 0 && (
+src\pages\QuoteDetails.jsx:1521:                    <p className="font-medium text-slate-900">{quote.fst_count}</p>
+src\pages\QuoteDetails.jsx:1525:              {quote.miles_traveled > 0 && (
+src\pages\QuoteDetails.jsx:1532:                    <p className="font-medium text-slate-900">{quote.miles_traveled} mi @ ${quote.mileage_rate || 0.73}/mi</p>
+src\pages\QuoteDetails.jsx:1543:                    {format(new Date(quote.created_date), "MMM d, yyyy")}
+src\pages\QuoteDetails.jsx:1547:              {quote.valid_until && (
+src\pages\QuoteDetails.jsx:1555:                      {format(new Date(quote.valid_until), "MMM d, yyyy")}
+src\pages\QuoteDetails.jsx:1560:              {quote.paid_at_date && (
+src\pages\QuoteDetails.jsx:1567:                    <p className="font-medium text-slate-900">{format(new Date(quote.paid_at_date), "MMM d, yyyy")}</p>
+src\pages\QuoteDetails.jsx:1568:                    <p className="text-xs text-slate-500">Stripe transaction: {quote.stripe_transaction_id || "Not recorded"}</p>
+src\pages\QuoteDetails.jsx:1569:                    <p className="text-xs text-slate-500">Stripe invoice: {quote.stripe_invoice_id || "Not recorded"}</p>
+src\pages\QuoteDetails.jsx:1573:              {quote.quote_requester && (
+src\pages\QuoteDetails.jsx:1580:                    <p className="font-medium text-slate-900 break-words">{quote.quote_requester}</p>
+src\pages\QuoteDetails.jsx:1584:              {(quote.owner_email || quote.created_by) && (
+src\pages\QuoteDetails.jsx:1590:                    <p className="text-sm text-slate-500">{quote.owner_email ? "Owner" : "Created By"}</p>
+src\pages\QuoteDetails.jsx:1592:                    {quote.owner_email && quote.created_by && quote.owner_email !== quote.created_by && (
+src\pages\QuoteDetails.jsx:1593:                      <p className="text-xs text-slate-400">Originally by {quote.created_by}</p>
+src\pages\QuoteDetails.jsx:1598:              {quote.last_follow_up_date && (
+src\pages\QuoteDetails.jsx:1606:                      {format(new Date(quote.last_follow_up_date), "MMM d, yyyy")}
+src\pages\QuoteDetails.jsx:1621:                    checked={!!quote.exclude_from_reporting}
+src\pages\QuoteDetails.jsx:1631:              <div className={`flex items-center gap-3 pt-2 border-t border-slate-100 rounded-lg px-2 py-1 ${quote.pre_approved ? "bg-emerald-50" : "bg-rose-50"}`}>
+src\pages\QuoteDetails.jsx:1632:                <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${quote.pre_approved ? "bg-emerald-100" : "bg-rose-100"}`}>
+src\pages\QuoteDetails.jsx:1633:                  <CheckCircle className={`w-4 h-4 ${quote.pre_approved ? "text-emerald-600" : "text-rose-400"}`} />
+src\pages\QuoteDetails.jsx:1636:                  <p className={`text-sm font-medium ${quote.pre_approved ? "text-emerald-700" : "text-rose-600"}`}>
+src\pages\QuoteDetails.jsx:1637:                    {quote.pre_approved ? "Pre-Approved" : "Not Pre-Approved"}
+src\pages\QuoteDetails.jsx:1639:                  {quote.pre_approved && quote.pre_approved_by ? (
+src\pages\QuoteDetails.jsx:1640:                    <p className="text-xs text-emerald-600 truncate">by {quote.pre_approved_by}</p>
+src\pages\QuoteDetails.jsx:1647:                    checked={!!quote.pre_approved}
+src\pages\QuoteDetails.jsx:1681:                  {quote.items?.map((item, index) => (
+src\pages\QuoteDetails.jsx:1732:                      {quote.labor_mode === "flat"
+src\pages\QuoteDetails.jsx:1734:                        : `Labor (${quote.fst_count || 0} FST${(quote.fst_count || 0) > 1 ? "s" : ""} × ${quote.labor_hours || 0} hrs @ $${quote.labor_rate || 125}/hr)`}
+src\pages\QuoteDetails.jsx:1739:                    <span>Travel ({quote.travel_hours || 0} hrs @ ${quote.travel_rate || 65}/hr)</span>
+src\pages\QuoteDetails.jsx:1743:                    <span>Mileage ({quote.miles_traveled || 0} mi @ ${quote.mileage_rate || 0.73}/mi)</span>
+src\pages\QuoteDetails.jsx:1753:                        {quote.discount_type === "flat"
+src\pages\QuoteDetails.jsx:1755:                          : `Discount (${quote.discount_percent}%)`}
+src\pages\QuoteDetails.jsx:1785:        {quote.scope_of_work && (
+src\pages\QuoteDetails.jsx:1788:            <p className="text-slate-600 whitespace-pre-wrap">{quote.scope_of_work}</p>
+src\pages\QuoteDetails.jsx:1793:        {quote.notes && (
+src\pages\QuoteDetails.jsx:1796:            <p className="text-slate-600 whitespace-pre-wrap">{quote.notes}</p>
+src\pages\QuoteDetails.jsx:1820:        {quote.status_history && quote.status_history.length > 0 && (
+src\pages\QuoteDetails.jsx:1824:              {quote.status_history.map((entry, index) => {
+src\pages\QuoteDetails.jsx:1894:              Please provide a reason for rejecting this quote.
+src\pages\QuoteDetails.jsx:1928:              Please provide a reason for HO rejecting this quote.
+src\pages\QuoteDetails.jsx:2038:              Record that you've followed up on this quote. This updates the last-touched date and adds an entry to the history.
+src\pages\QuoteDetails.jsx:2067:              Select a new owner for this quote. The current owner is <strong>{effectiveOwner}</strong>.
+src\pages\QuoteDetails.jsx:2147:              Submit a request to delete this quote. An admin will review and approve/reject your request.
+src\pages\QuoteOverview.jsx:2:import { base44 } from "@/api/base44Client";
+src\pages\QuoteOverview.jsx:3:import { getQuotes } from "@/api/dataClient";
+src\pages\QuoteOverview.jsx:42:    const allQuotes = await getQuotes();
+src\pages\QuoteOverview.jsx:156:                      <Link key={quote.id} to={createPageUrl(`QuoteDetails?id=${quote.id}`)}>
+src\pages\QuoteOverview.jsx:162:                                <span className="font-semibold text-slate-900">{quote.site_id || "—"}</span>
+src\pages\QuoteOverview.jsx:163:                                {quote.quote_number && (
+src\pages\QuoteOverview.jsx:164:                                  <span className="text-sm text-slate-500 ml-2">{quote.quote_number}</span>
+src\pages\QuoteOverview.jsx:166:                                {quote.case_number && (
+src\pages\QuoteOverview.jsx:167:                                  <span className="text-xs text-slate-400 ml-2">Case: {quote.case_number}</span>
+src\pages\QuoteOverview.jsx:172:                              <span>{format(new Date(quote.created_date), "MMM d, yyyy")}</span>
+src\pages\QuoteOverview.jsx:173:                              <span className="font-semibold text-slate-800">${(quote.total || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+src\pages\Quotes.jsx:13:import { base44 } from "@/api/base44Client";
+src\pages\Quotes.jsx:14:import { bulkUpdateQuotes } from "@/api/dataClient";
+src\pages\Quotes.jsx:101:    const allQuotes = await getQuotes();
+src\pages\Quotes.jsx:115:      const res = await base44.functions.invoke("manageQuoteAlerts", { action: "getMyAlerts" });
+src\pages\Quotes.jsx:134:      return await base44.entities.StatusAlertDismissal.list("-created_date", 500);
+src\pages\Quotes.jsx:142:      await base44.entities.StatusAlertDismissal.create({ quote_id: quoteId });
+src\pages\Quotes.jsx:153:    const effectiveOwner = quote.owner_email || quote.created_by;
+src\pages\Quotes.jsx:155:      quote.site_id?.toLowerCase().includes(search.toLowerCase()) ||
+src\pages\Quotes.jsx:156:      quote.case_number?.toLowerCase().includes(search.toLowerCase()) ||
+src\pages\Quotes.jsx:157:      quote.client_name?.toLowerCase().includes(search.toLowerCase()) ||
+src\pages\Quotes.jsx:158:      quote.quote_number?.toLowerCase().includes(search.toLowerCase());
+src\pages\Quotes.jsx:159:    const matchesStatus = statusFilter === "all" || quote.status === statusFilter;
+src\pages\Quotes.jsx:473:              const isDismissed = dismissedQuoteIds.has(quote.id);
+src\pages\Quotes.jsx:474:              const mention = mentionMap.get(quote.id);
+src\pages\Quotes.jsx:477:                  key={quote.id}
+src\pages\Quotes.jsx:481:                  isSelected={selectedIds.has(quote.id)}
+src\pages\RejectedQuoteReview.jsx:3:import { base44 } from "@/api/base44Client";
+src\pages\RejectedQuoteReview.jsx:4:import { createReview, getCurrentUser, getQuotes, getReviews, getUsers, updateReview } from "@/api/dataClient";
+src\pages\RejectedQuoteReview.jsx:20:  if (quote.status !== "rejected") return false;
+src\pages\RejectedQuoteReview.jsx:21:  if (!quote.status_history?.length) return false;
+src\pages\RejectedQuoteReview.jsx:22:  const rejectionEntry = [...quote.status_history]
+src\pages\RejectedQuoteReview.jsx:55:      return getQuotes();
+src\utils\quoteCalculations.js:8:  const items = quote.items || [];
+src\utils\quoteCalculations.js:11:  const laborCost = quote.labor_mode === "flat"
+src\utils\quoteCalculations.js:12:    ? (quote.flat_labor_fee || 0)
+src\utils\quoteCalculations.js:13:    : (quote.fst_count || 0) * (quote.labor_hours || 0) * (quote.labor_rate || 125);
+src\utils\quoteCalculations.js:14:  const travelCost = (quote.travel_hours || 0) * (quote.travel_rate || 65);
+src\utils\quoteCalculations.js:15:  const mileageCost = (quote.miles_traveled || 0) * (quote.mileage_rate || 0.73);
+src\utils\quoteCalculations.js:17:  const subtotal = quote.subtotal || (itemsSubtotal + laborCost + travelCost + mileageCost);
+src\utils\quoteCalculations.js:19:  const discountAmount = quote.discount_type === "flat"
+src\utils\quoteCalculations.js:20:    ? (quote.discount_flat_amount || 0)
+src\utils\quoteCalculations.js:21:    : (subtotal * (quote.discount_percent || 0) / 100);
+src\utils\quoteCalculations.js:23:  const combinedTaxRate = (quote.federal_tax_percent || 0) + (quote.state_tax_percent || 0) + (quote.local_tax_percent || 0);
+src\utils\quoteSLA.js:33:  if (quote.status_history?.length > 0) {
+src\utils\quoteSLA.js:34:    return parseISO(quote.status_history[quote.status_history.length - 1].changed_at);
+src\utils\quoteSLA.js:36:  if (quote.created_date) {
+src\utils\quoteSLA.js:37:    return parseISO(quote.created_date);
+src\utils\quoteSLA.js:93:  if (!quote || !quote.status) return null;
+src\utils\quoteSLA.js:94:  if (quote.status === "on_hold") return null;
+src\utils\quoteSLA.js:95:  if (quote.exclude_from_reporting) return null;
+src\utils\quoteSLA.js:97:  const wasSubmitted = (quote.status_history || []).some(
+src\utils\quoteSLA.js:101:  switch (quote.status) {
+src\utils\quoteSLA.js:165:      if (quote.ho_rejection_reason && quote.ho_rejection_reason.trim()) {
+src\utils\quoteSLA.js:199:      const paidDate = quote.invoice_paid_date
+src\utils\quoteSLA.js:200:        ? parseISO(quote.invoice_paid_date)
+src\utils\quoteSLA.js:224:  const submitter = quote.owner_email || quote.created_by;
+src\utils\quoteSLAExport.js:21:  return quote[directField] || quote.status_history?.find((entry) => entry.status === status)?.changed_at || "";
+src\utils\quoteSLAExport.js:33:    quote.id, quote.quote_number, quote.site_id, quote.case_number, quote.quote_requester, quote.owner_email, quote.status,
+src\utils\quoteSLAExport.js:34:    formatTimestamp(quote.created_date),
+src\utils\quoteSLAExport.js:44:    formatTimestamp(quote.updated_date),
+src\utils\quoteSLAExport.js:45:    (quote.status_history || []).map((entry) => `${formatTimestamp(entry.changed_at)} — ${entry.status}${entry.reason ? `: ${entry.reason}` : ""}`).join(" | ")
+
+
+

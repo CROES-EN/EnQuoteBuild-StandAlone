@@ -1,0 +1,280 @@
+{
+  "name": "Quote",
+  "type": "object",
+  "properties": {
+    "version_number": {
+      "type": "number",
+      "default": 1
+    },
+    "parent_quote_id": {
+      "type": "string"
+    },
+    "is_current_version": {
+      "type": "boolean",
+      "default": true
+    },
+    "quote_number": {
+      "type": "string"
+    },
+    "site_id": {
+      "type": "string"
+    },
+    "quote_requester": {
+      "type": "string"
+    },
+    "case_number": {
+      "type": "string"
+    },
+    "picklist": {
+      "type": "string"
+    },
+    "om_status": {
+      "type": "string"
+    },
+    "scope_of_work": {
+      "type": "string"
+    },
+    "fst_count": {
+      "type": "number"
+    },
+    "labor_hours": {
+      "type": "number"
+    },
+    "labor_rate": {
+      "type": "number",
+      "default": 125
+    },
+    "flat_labor_fee": {
+      "type": "number",
+      "default": 0
+    },
+    "labor_mode": {
+      "type": "string",
+      "enum": [
+        "hourly",
+        "flat"
+      ],
+      "default": "hourly"
+    },
+    "travel_hours": {
+      "type": "number",
+      "default": 0
+    },
+    "travel_rate": {
+      "type": "number",
+      "default": 65
+    },
+    "miles_traveled": {
+      "type": "number",
+      "default": 0
+    },
+    "mileage_rate": {
+      "type": "number",
+      "default": 0.73
+    },
+    "owner_email": {
+      "type": "string"
+    },
+    "exclude_from_reporting": {
+      "type": "boolean",
+      "default": false
+    },
+    "pre_approved": {
+      "type": "boolean",
+      "default": false
+    },
+    "pre_approved_by": {
+      "type": "string"
+    },
+    "pre_approved_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft_without_internal",
+        "draft_without_fst",
+        "submitted",
+        "approved",
+        "rejected",
+        "quote_sent_to_ho",
+        "ho_approved_invoice_required",
+        "ho_rejected",
+        "invoiced",
+        "invoice_paid",
+        "scheduled",
+        "pending_materials",
+        "on_hold"
+      ],
+      "default": "draft_without_internal"
+    },
+    "pre_hold_status": {
+      "type": "string"
+    },
+    "hold_reason": {
+      "type": "string"
+    },
+    "hold_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status_history": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "changed_by": {
+            "type": "string"
+          },
+          "changed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "entry_type": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "last_follow_up_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "product_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "unit_price": {
+            "type": "number"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "total": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "subtotal": {
+      "type": "number"
+    },
+    "discount_type": {
+      "type": "string",
+      "enum": [
+        "percent",
+        "flat"
+      ],
+      "default": "percent"
+    },
+    "discount_percent": {
+      "type": "number",
+      "default": 0
+    },
+    "discount_flat_amount": {
+      "type": "number",
+      "default": 0
+    },
+    "federal_tax_percent": {
+      "type": "number",
+      "default": 0
+    },
+    "state_tax_percent": {
+      "type": "number",
+      "default": 0
+    },
+    "local_tax_percent": {
+      "type": "number",
+      "default": 0
+    },
+    "total": {
+      "type": "number"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "valid_until": {
+      "type": "string",
+      "format": "date"
+    },
+    "submitted_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "approved_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "approved_by": {
+      "type": "string"
+    },
+    "rejection_reason": {
+      "type": "string",
+      "maxLength": 5000
+    },
+    "quote_sent_to_ho_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "ho_approved_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "ho_rejection_reason": {
+      "type": "string",
+      "maxLength": 5000
+    },
+    "ho_rejected_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "invoiced_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "invoice_paid_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "stripe_transaction_id": {
+      "type": "string",
+      "description": "Stripe transaction ID recorded when the quote is paid"
+    },
+    "stripe_invoice_id": {
+      "type": "string",
+      "description": "Stripe invoice ID recorded when the quote is paid"
+    },
+    "paid_at_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date payment was received"
+    },
+    "scheduled_date": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "site_id"
+  ]
+}

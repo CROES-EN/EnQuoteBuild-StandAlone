@@ -1,0 +1,101 @@
+{
+  "name": "MaterialOrder",
+  "type": "object",
+  "properties": {
+    "site_id": {
+      "type": "string",
+      "description": "Site ID this order is for"
+    },
+    "item_name": {
+      "type": "string",
+      "description": "Name of the item to order"
+    },
+    "sku": {
+      "type": "string",
+      "description": "SKU or part number if available"
+    },
+    "item_link": {
+      "type": "string",
+      "description": "URL link to the item"
+    },
+    "cost": {
+      "type": "number",
+      "description": "Estimated cost of the item"
+    },
+    "quantity": {
+      "type": "number",
+      "default": 1,
+      "description": "Quantity needed"
+    },
+    "shipping_address": {
+      "type": "string",
+      "description": "Shipping address for delivery"
+    },
+    "notes": {
+      "type": "string",
+      "description": "What this item is for / additional context"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "submitted",
+        "approved",
+        "ordered",
+        "complete",
+        "rejected"
+      ],
+      "default": "draft",
+      "description": "Current status of the material order"
+    },
+    "status_history": {
+      "type": "array",
+      "description": "Log of all status changes",
+      "items": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "changed_by": {
+            "type": "string"
+          },
+          "changed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "submitted_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "approved_by": {
+      "type": "string"
+    },
+    "approved_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "ordered_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "completed_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "admin_notes": {
+      "type": "string",
+      "description": "Notes added by admin during processing"
+    }
+  },
+  "required": [
+    "site_id",
+    "item_name"
+  ]
+}

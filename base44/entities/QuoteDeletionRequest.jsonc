@@ -1,0 +1,49 @@
+{
+  "name": "QuoteDeletionRequest",
+  "type": "object",
+  "properties": {
+    "quote_id": {
+      "type": "string",
+      "description": "ID of the quote to be deleted"
+    },
+    "quote_number": {
+      "type": "string",
+      "description": "Quote number for reference"
+    },
+    "requested_by": {
+      "type": "string",
+      "description": "Email of the user requesting deletion"
+    },
+    "reason": {
+      "type": "string",
+      "description": "Reason for deletion request"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "approved",
+        "rejected"
+      ],
+      "default": "pending",
+      "description": "Status of the deletion request"
+    },
+    "reviewed_by": {
+      "type": "string",
+      "description": "Email of admin who reviewed the request"
+    },
+    "reviewed_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the request was reviewed"
+    },
+    "admin_notes": {
+      "type": "string",
+      "description": "Notes from admin about the decision"
+    }
+  },
+  "required": [
+    "quote_id",
+    "reason"
+  ]
+}

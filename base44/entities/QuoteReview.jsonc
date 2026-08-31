@@ -1,0 +1,66 @@
+{
+  "name": "QuoteReview",
+  "type": "object",
+  "properties": {
+    "quote_id": {
+      "type": "string",
+      "description": "ID of the rejected quote being reviewed"
+    },
+    "quote_number": {
+      "type": "string",
+      "description": "Quote number for quick reference"
+    },
+    "site_id": {
+      "type": "string",
+      "description": "Site ID from the quote"
+    },
+    "reviewer_email": {
+      "type": "string",
+      "description": "Email of the reviewer (tmeyer or dankenman)"
+    },
+    "rejection_reason_snapshot": {
+      "type": "string",
+      "description": "Copy of the rejection reason at time of review"
+    },
+    "coaching_notes": {
+      "type": "string",
+      "description": "Coaching feedback and guidance for the submitter"
+    },
+    "recommended_edits": {
+      "type": "string",
+      "description": "Specific recommended changes to meet approval requirements"
+    },
+    "review_status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "in_progress",
+        "completed"
+      ],
+      "default": "pending",
+      "description": "Status of this review"
+    },
+    "rejection_driver": {
+      "type": "string",
+      "description": "Manually assigned rejection theme/category (overrides AI detection)"
+    },
+    "completed_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the review was marked complete"
+    },
+    "cleared_by_submitter": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the submitter has cleared/dismissed this review from their dashboard"
+    },
+    "cleared_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the submitter cleared this notification. If the review is updated after this date (new coaching content), the alert re-surfaces."
+    }
+  },
+  "required": [
+    "quote_id"
+  ]
+}

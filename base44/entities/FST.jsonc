@@ -1,0 +1,44 @@
+{
+  "name": "FST",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Full name of the FST"
+    },
+    "employee_id": {
+      "type": "string",
+      "description": "Employee ID or identifier"
+    },
+    "city": {
+      "type": "string",
+      "description": "City"
+    },
+    "state": {
+      "type": "string",
+      "description": "State abbreviation"
+    },
+    "zip": {
+      "type": "string",
+      "description": "ZIP code"
+    },
+    "phone": {
+      "type": "string",
+      "description": "Contact phone number"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this FST is currently active"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Any additional notes about this FST"
+    }
+  },
+  "required": [
+    "name",
+    "city",
+    "state"
+  ]
+}

@@ -1,0 +1,9 @@
+
+> base44-app@0.1.0 build
+> vite build
+
+[base44] Proxy enabled: /api -> https://enquote.base44.app
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+Browserslist: browsers data (caniuse-lite) is 11 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme

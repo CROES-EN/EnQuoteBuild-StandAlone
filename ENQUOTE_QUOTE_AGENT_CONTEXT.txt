@@ -1,0 +1,2319 @@
+﻿ENQUOTE QUOTE DRAFT AGENT CONTEXT
+
+GENERATED: 2026-08-28 08:52:00
+
+GIT STATUS
+ M package-lock.json
+?? ENQUOTE_QUOTE_AGENT_CONTEXT.txt
+
+==================================================
+FILE: .\src\components\quotes\QuoteAIAssistant.jsx
+==================================================
+import { useState } from "react";
+import { base44 } from "@/api/base44Client";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { Sparkles, Loader2, X, Check } from "lucide-react";
+import { toast } from "sonner";
+
+export default function QuoteAIAssistant({ 
+  products, 
+  allQuotes,
+  currentScope,
+  onScopeGenerated,
+  onProductsSuggested,
+  onPriceEstimate
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [scopePrompt, setScopePrompt] = useState("");
+
+  const generateScope = async () => {
+    if (!scopePrompt.trim()) {
+      toast.error("Please describe what work needs to be done");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await base44.integrations.Core.InvokeLLM({
+        prompt: `You are an expert at writing detailed scopes of work for electrical/solar maintenance and service.
+
+Based on this brief description: "${scopePrompt}"
+
+Generate a professional, detailed scope of work description that includes:
+- What needs to be done
+- Any relevant safety considerations
+- Expected approach/methodology
+
+Keep it concise but comprehensive. Return ONLY the scope of work text, no additional commentary.`,
+        add_context_from_internet: false
+      });
+
+      onScopeGenerated(result);
+      setScopePrompt("");
+      toast.success("Scope generated successfully");
+    } catch (error) {
+      toast.error("Failed to generate scope: " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const suggestProducts = async () => {
+    if (!currentScope?.trim()) {
+      toast.error("Please enter a scope of work first");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const productList = products.map(p => ({
+        id: p.id,
+        name: p.name,
+        description: p.description,
+        type: p.type,
+        unit_price: p.unit_price,
+        unit: p.unit
+      }));
+
+      const result = await base44.integrations.Core.InvokeLLM({
+        prompt: `You are an expert at matching products and services to job requirements.
+
+Scope of Work:
+${currentScope}
+
+Available Products/Services:
+${JSON.stringify(productList, null, 2)}
+
+Analyze the scope and suggest which products/services would be most relevant for this job. For each suggestion, provide:
+- The product ID
+- Estimated quantity needed
+- Brief reason why it's needed
+
+Return ONLY valid JSON matching this schema.`,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            suggestions: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  product_id: { type: "string" },
+                  quantity: { type: "number" },
+                  reason: { type: "string" }
+                }
+              }
+            }
+          }
+        }
+      });
+
+      onProductsSuggested(result.suggestions || []);
+      toast.success(`Suggested ${result.suggestions?.length || 0} products`);
+    } catch (error) {
+      toast.error("Failed to suggest products: " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const estimatePrice = async () => {
+    if (!currentScope?.trim()) {
+      toast.error("Please enter a scope of work first");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const recentQuotes = allQuotes
+        .filter(q => q.status !== 'rejected' && q.total && q.scope_of_work)
+        .slice(0, 50)
+        .map(q => ({
+          scope: q.scope_of_work,
+          total: q.total,
+          labor_hours: q.labor_hours,
+          fst_count: q.fst_count
+        }));
+
+      const result = await base44.integrations.Core.InvokeLLM({
+        prompt: `You are a pricing analyst for maintenance and service quotes.
+
+Current Scope of Work:
+${currentScope}
+
+Historical Similar Quotes:
+${JSON.stringify(recentQuotes, null, 2)}
+
+Based on the current scope and historical data, provide:
+- Estimated total price range (min and max)
+- Estimated labor hours
+- Estimated number of FSTs needed
+- Brief reasoning
+
+Return ONLY valid JSON matching the schema.`,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            estimated_min: { type: "number" },
+            estimated_max: { type: "number" },
+            suggested_labor_hours: { type: "number" },
+            suggested_fst_count: { type: "number" },
+            reasoning: { type: "string" }
+          }
+        }
+      });
+
+      onPriceEstimate(result);
+      toast.success("Price estimate generated");
+    } catch (error) {
+      toast.error("Failed to estimate price: " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen) {
+    return (
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => setIsOpen(true)}
+        className="border-orange-300 text-orange-700 hover:bg-orange-50"
+      >
+        <Sparkles className="w-4 h-4 mr-2" />
+        AI Assistant
+      </Button>
+    );
+  }
+
+  return (
+    <Card className="p-4 border-orange-200 bg-orange-50/50">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-orange-600" />
+          <h3 className="font-semibold text-slate-900">AI Quote Assistant</h3>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={() => setIsOpen(false)}
+          className="h-8 w-8"
+        >
+          <X className="w-4 h-4" />
+        </Button>
+      </div>
+
+      <div className="space-y-3">
+        {/* Generate Scope */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-slate-700">
+            Generate Scope of Work
+          </label>
+          <Textarea
+            placeholder="Briefly describe the work needed (e.g., 'Replace 3 damaged solar panels and repair wiring')"
+            value={scopePrompt}
+            onChange={(e) => setScopePrompt(e.target.value)}
+            rows={2}
+            className="text-sm"
+          />
+          <Button
+            type="button"
+            size="sm"
+            onClick={generateScope}
+            disabled={loading || !scopePrompt.trim()}
+            className="w-full bg-orange-600 hover:bg-orange-700"
+          >
+            {loading ? (
+              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+            ) : (
+              <Sparkles className="w-4 h-4 mr-2" />
+            )}
+            Generate Scope Description
+          </Button>
+        </div>
+
+        <div className="border-t border-orange-200 pt-3 space-y-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={suggestProducts}
+            disabled={loading || !currentScope}
+            className="w-full"
+          >
+            {loading ? (
+              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+            ) : (
+              <Check className="w-4 h-4 mr-2" />
+            )}
+            Suggest Products & Services
+          </Button>
+
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={estimatePrice}
+            disabled={loading || !currentScope}
+            className="w-full"
+          >
+            {loading ? (
+              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+            ) : (
+              <Check className="w-4 h-4 mr-2" />
+            )}
+            Estimate Pricing
+          </Button>
+        </div>
+
+        <p className="text-xs text-slate-500 mt-2">
+          AI suggestions are based on your catalog and historical quotes. Always review and adjust as needed.
+        </p>
+      </div>
+    </Card>
+  );
+}
+
+==================================================
+FILE: .\src\components\quotes\QuoteForm.jsx
+==================================================
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Card } from "@/components/ui/card";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
+import { ChevronDown } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import QuoteItemSelector from "./QuoteItemSelector";
+import QuoteAIAssistant from "./QuoteAIAssistant";
+import QuoteDraftButton from "@/features/quoteDraftAgent/QuoteDraftButton";
+
+export default function QuoteForm({ quote, products, allQuotes = [], onSave, onSaveDraft, onSaveCopy, onCancel, isLoading, isAdmin }) {
+  const [formData, setFormData] = useState({
+    site_id: "",
+    quote_requester: "",
+    case_number: "",
+    picklist: "",
+    om_status: "",
+    scope_of_work: "",
+    homeowner_summary: "",
+    fst_count: "",
+    labor_hours: "",
+    labor_mode: "hourly",
+    flat_labor_fee: "",
+    travel_hours: "",
+    miles_traveled: "",
+    items: [],
+    discount_type: "percent",
+    discount_percent: 0,
+    discount_flat_amount: 0,
+    federal_tax_percent: 0,
+    state_tax_percent: 0,
+    local_tax_percent: 0,
+    notes: "",
+    valid_until: ""
+  });
+
+  useEffect(() => {
+    if (quote) {
+      setFormData({
+        site_id: quote.site_id || "",
+        quote_requester: quote.quote_requester || "",
+        case_number: quote.case_number || "",
+        picklist: quote.picklist || "",
+        om_status: quote.om_status || "",
+        scope_of_work: quote.scope_of_work || "",
+        homeowner_summary: quote.homeowner_summary || "",
+        fst_count: quote.fst_count || "",
+        labor_hours: quote.labor_hours || "",
+        labor_mode: quote.labor_mode || "hourly",
+        flat_labor_fee: quote.flat_labor_fee || "",
+        travel_hours: quote.travel_hours || "",
+        miles_traveled: quote.miles_traveled || "",
+        items: quote.items || [],
+        discount_type: quote.discount_type || "percent",
+        discount_percent: quote.discount_percent || 0,
+        discount_flat_amount: quote.discount_flat_amount || 0,
+        federal_tax_percent: quote.federal_tax_percent || 0,
+        state_tax_percent: quote.state_tax_percent || 0,
+        local_tax_percent: quote.local_tax_percent || 0,
+        notes: quote.notes || "",
+        valid_until: quote.valid_until || ""
+      });
+    }
+  }, [quote]);
+
+  const isFlat = formData.labor_mode === "flat";
+  const laborCharge = isFlat
+    ? (parseFloat(formData.flat_labor_fee) || 0)
+    : (parseFloat(formData.fst_count) || 0) * (parseFloat(formData.labor_hours) || 0) * 125;
+  const mileageCharge = (parseFloat(formData.miles_traveled) || 0) * 0.73;
+  const travelCharge = (parseFloat(formData.travel_hours) || 0) * 65;
+  const subtotal = formData.items.reduce((sum, item) => sum + item.total, 0) + laborCharge + mileageCharge + travelCharge;
+  const discountAmount = formData.discount_type === "flat"
+    ? Math.min(parseFloat(formData.discount_flat_amount) || 0, subtotal)
+    : subtotal * (parseFloat(formData.discount_percent) / 100);
+  const afterDiscount = subtotal - discountAmount;
+  const taxableAmount = formData.items
+    .filter(item => item.taxable !== false)
+    .reduce((sum, item) => sum + item.total, 0);
+  const taxableAfterDiscount = taxableAmount - (taxableAmount / subtotal) * discountAmount;
+  const federalTaxAmount = taxableAfterDiscount * (formData.federal_tax_percent / 100);
+  const stateTaxAmount = taxableAfterDiscount * (formData.state_tax_percent / 100);
+  const localTaxAmount = taxableAfterDiscount * (formData.local_tax_percent / 100);
+  const totalTaxAmount = federalTaxAmount + stateTaxAmount + localTaxAmount;
+  const total = afterDiscount + totalTaxAmount;
+
+  const requiredFieldsComplete = Boolean(
+    formData.picklist &&
+    formData.om_status &&
+    formData.site_id &&
+    formData.quote_requester &&
+    formData.case_number &&
+    formData.valid_until &&
+    formData.scope_of_work?.trim() &&
+    formData.travel_hours &&
+    formData.miles_traveled &&
+    (isFlat ? formData.flat_labor_fee : formData.fst_count && formData.labor_hours)
+  );
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!requiredFieldsComplete) return;
+    onSave({
+      ...formData,
+      subtotal,
+      total,
+      discount_type: formData.discount_type,
+      discount_percent: parseFloat(formData.discount_percent) || 0,
+      discount_flat_amount: parseFloat(formData.discount_flat_amount) || 0,
+      federal_tax_percent: parseFloat(formData.federal_tax_percent) || 0,
+      state_tax_percent: parseFloat(formData.state_tax_percent) || 0,
+      local_tax_percent: parseFloat(formData.local_tax_percent) || 0,
+      fst_count: parseFloat(formData.fst_count) || 0,
+      labor_hours: parseFloat(formData.labor_hours) || 0,
+      labor_rate: 125.0,
+      labor_mode: formData.labor_mode,
+      flat_labor_fee: parseFloat(formData.flat_labor_fee) || 0,
+      travel_hours: parseFloat(formData.travel_hours) || 0,
+      miles_traveled: parseFloat(formData.miles_traveled) || 0,
+      mileage_rate: 0.73,
+      travel_rate: 65.0
+    });
+  };
+
+  const handleSaveDraft = (draftType) => {
+    if (!requiredFieldsComplete) return;
+    if (onSaveDraft) {
+      onSaveDraft({
+        ...formData,
+        subtotal,
+        total,
+        status: draftType,
+        discount_type: formData.discount_type,
+        discount_percent: parseFloat(formData.discount_percent) || 0,
+        discount_flat_amount: parseFloat(formData.discount_flat_amount) || 0,
+        federal_tax_percent: parseFloat(formData.federal_tax_percent) || 0,
+        state_tax_percent: parseFloat(formData.state_tax_percent) || 0,
+        local_tax_percent: parseFloat(formData.local_tax_percent) || 0,
+        fst_count: parseFloat(formData.fst_count) || 0,
+        labor_hours: parseFloat(formData.labor_hours) || 0,
+        labor_rate: 125.0,
+        labor_mode: formData.labor_mode,
+        flat_labor_fee: parseFloat(formData.flat_labor_fee) || 0,
+        travel_hours: parseFloat(formData.travel_hours) || 0,
+        miles_traveled: parseFloat(formData.miles_traveled) || 0,
+        mileage_rate: 0.73,
+        travel_rate: 65.0
+      });
+    }
+  };
+
+  const handleSaveCopy = () => {
+    if (!requiredFieldsComplete || !onSaveCopy) return;
+    onSaveCopy({
+      ...formData,
+      subtotal,
+      total,
+      discount_type: formData.discount_type,
+      discount_percent: parseFloat(formData.discount_percent) || 0,
+      discount_flat_amount: parseFloat(formData.discount_flat_amount) || 0,
+      federal_tax_percent: parseFloat(formData.federal_tax_percent) || 0,
+      state_tax_percent: parseFloat(formData.state_tax_percent) || 0,
+      local_tax_percent: parseFloat(formData.local_tax_percent) || 0,
+      fst_count: parseFloat(formData.fst_count) || 0,
+      labor_hours: parseFloat(formData.labor_hours) || 0,
+      labor_rate: 125.0,
+      labor_mode: formData.labor_mode,
+      flat_labor_fee: parseFloat(formData.flat_labor_fee) || 0,
+      travel_hours: parseFloat(formData.travel_hours) || 0,
+      miles_traveled: parseFloat(formData.miles_traveled) || 0,
+      mileage_rate: 0.73,
+      travel_rate: 65.0
+    });
+  };
+
+  const handleAIScopeGenerated = (scope) => {
+    setFormData({ ...formData, scope_of_work: scope });
+  };
+
+  const handleAIProductsSuggested = (suggestions) => {
+    const newItems = suggestions
+      .map(suggestion => {
+        const product = products.find(p => p.id === suggestion.product_id);
+        if (!product) return null;
+        return {
+          product_id: product.id,
+          name: product.name,
+          description: product.description,
+          unit_price: product.unit_price,
+          quantity: suggestion.quantity,
+          unit: product.unit,
+          total: product.unit_price * suggestion.quantity
+        };
+      })
+      .filter(Boolean);
+    
+    setFormData({ ...formData, items: [...formData.items, ...newItems] });
+  };
+
+  const handleAIPriceEstimate = (estimate) => {
+    const message = `AI Estimate:\nâ€¢ Price Range: $${estimate.estimated_min.toFixed(0)} - $${estimate.estimated_max.toFixed(0)}\nâ€¢ Labor: ${estimate.suggested_labor_hours} hours\nâ€¢ FSTs: ${estimate.suggested_fst_count}\n\n${estimate.reasoning}`;
+    alert(message);
+    
+    if (estimate.suggested_labor_hours && !formData.labor_hours) {
+      setFormData({ 
+        ...formData, 
+        labor_hours: estimate.suggested_labor_hours,
+        fst_count: estimate.suggested_fst_count || formData.fst_count
+      });
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-8">
+      {/* AI Assistant */}
+      <QuoteAIAssistant
+        products={products}
+        allQuotes={allQuotes}
+        currentScope={formData.scope_of_work}
+        onScopeGenerated={handleAIScopeGenerated}
+        onProductsSuggested={handleAIProductsSuggested}
+        onPriceEstimate={handleAIPriceEstimate}
+      />
+
+      {/* Site Information */}
+      <Card className="p-6 border-slate-200">
+        <h3 className="text-lg font-semibold text-slate-900 mb-4">Site Information</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="picklist">Picklist *</Label>
+            <Select
+              value={formData.picklist}
+              onValueChange={(value) => setFormData({ ...formData, picklist: value })}
+            >
+              <SelectTrigger className="mt-1.5">
+                <SelectValue placeholder="--None--" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ABC">ABC</SelectItem>
+                <SelectItem value="Gateway Upgrade">Gateway Upgrade</SelectItem>
+                <SelectItem value="Cell Modem Upgrade">Cell Modem Upgrade</SelectItem>
+                <SelectItem value="SPWR Monitoring Upgrade">SPWR Monitoring Upgrade</SelectItem>
+                <SelectItem value="LPUP Battery Upgrade">LPUP Battery Upgrade</SelectItem>
+                <SelectItem value="LPUP Microinverter Upgrade">LPUP Microinverter Upgrade</SelectItem>
+                <SelectItem value="Battery Install">Battery Install</SelectItem>
+                <SelectItem value="Microinverter Install">Microinverter Install</SelectItem>
+                <SelectItem value="TPUP Battery Upgrade">TPUP Battery Upgrade</SelectItem>
+                <SelectItem value="TPUP Microinverter Upgrade">TPUP Microinverter Upgrade</SelectItem>
+                <SelectItem value="Follow-Up SPWR Monitoring Upgrade">Follow-Up SPWR Monitoring Upgrade</SelectItem>
+                <SelectItem value="Follow-Up Gateway Upgrade">Follow-Up Gateway Upgrade</SelectItem>
+                <SelectItem value="Enphase Care">Enphase Care</SelectItem>
+                <SelectItem value="On-Demand">On-Demand</SelectItem>
+                <SelectItem value="Accessories">Accessories</SelectItem>
+                <SelectItem value="Propel">Propel</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="om_status">O&M Status *</Label>
+            <Select
+              value={formData.om_status}
+              onValueChange={(value) => setFormData({ ...formData, om_status: value })}
+            >
+              <SelectTrigger className="mt-1.5">
+                <SelectValue placeholder="--None--" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Remote Troubleshooting">Remote Troubleshooting</SelectItem>
+                <SelectItem value="Pre-Scheduled">Pre-Scheduled</SelectItem>
+                <SelectItem value="Pending Schedule">Pending Schedule</SelectItem>
+                <SelectItem value="Pending Travel Plan">Pending Travel Plan</SelectItem>
+                <SelectItem value="Pending RMA">Pending RMA</SelectItem>
+                <SelectItem value="Pending Quote">Pending Quote</SelectItem>
+                <SelectItem value="Waiting on Customer">Waiting on Customer</SelectItem>
+                <SelectItem value="Waiting on Installer">Waiting on Installer</SelectItem>
+                <SelectItem value="Self-Clearing Issue">Self-Clearing Issue</SelectItem>
+                <SelectItem value="Unresponsive Customer">Unresponsive Customer</SelectItem>
+                <SelectItem value="Quote Requested">Quote Requested</SelectItem>
+                <SelectItem value="Quote Missing Details">Quote Missing Details</SelectItem>
+                <SelectItem value="Quote Draft">Quote Draft</SelectItem>
+                <SelectItem value="Quote Pending Approval">Quote Pending Approval</SelectItem>
+                <SelectItem value="Quote Pending Payment">Quote Pending Payment</SelectItem>
+                <SelectItem value="Quote Pending Materials">Quote Pending Materials</SelectItem>
+                <SelectItem value="Follow-Up Required">Follow-Up Required</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="site_id">Site ID *</Label>
+            <Input
+              id="site_id"
+              value={formData.site_id}
+              onChange={(e) => setFormData({ ...formData, site_id: e.target.value })}
+              placeholder="e.g., SITE-001"
+              required
+              className="mt-1.5"
+            />
+          </div>
+          <div>
+            <Label htmlFor="quote_requester">Quote Requester *</Label>
+            <Input
+              id="quote_requester"
+              value={formData.quote_requester}
+              onChange={(e) => setFormData({ ...formData, quote_requester: e.target.value })}
+              placeholder="Technician who requested this quote"
+              required
+              className="mt-1.5"
+            />
+          </div>
+          <div>
+            <Label htmlFor="case_number">Case Number *</Label>
+            <Input
+              id="case_number"
+              value={formData.case_number}
+              onChange={(e) => setFormData({ ...formData, case_number: e.target.value })}
+              placeholder="e.g., CASE-12345"
+              required
+              className="mt-1.5"
+            />
+          </div>
+          <div>
+            <Label htmlFor="valid_until">Valid Until *</Label>
+            <Input
+              id="valid_until"
+              type="date"
+              value={formData.valid_until}
+              onChange={(e) => setFormData({ ...formData, valid_until: e.target.value })}
+              required
+              className="mt-1.5"
+            />
+          </div>
+          <div className="md:col-span-2">
+            <div className="mb-1.5 flex items-center justify-between gap-3">
+              <Label htmlFor="scope_of_work">Scope of Work Description *</Label>
+              <QuoteDraftButton
+                quote={{ ...quote, ...formData }}
+                onApply={(draftData) => setFormData((current) => ({ ...current, ...draftData }))}
+              />
+            </div>
+            <Textarea
+              id="scope_of_work"
+              value={formData.scope_of_work}
+              onChange={(e) => setFormData({ ...formData, scope_of_work: e.target.value })}
+              placeholder="Describe the scope of work..."
+              required
+              rows={3}
+              className="mt-1.5"
+            />
+          </div>
+          {/* Labor Mode Toggle (admin only) */}
+          {isAdmin && (
+            <div className="md:col-span-2 flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <span className={`text-sm font-medium ${!isFlat ? "text-slate-900" : "text-slate-400"}`}>Hourly Labor</span>
+              <Switch
+                checked={isFlat}
+                onCheckedChange={(checked) => setFormData({ ...formData, labor_mode: checked ? "flat" : "hourly", flat_labor_fee: "", fst_count: "", labor_hours: "" })}
+              />
+              <span className={`text-sm font-medium ${isFlat ? "text-slate-900" : "text-slate-400"}`}>Flat Labor Fee</span>
+              <span className="text-xs text-amber-700 ml-2">(Admin only)</span>
+            </div>
+          )}
+
+          {!isFlat ? (
+            <>
+              <div>
+                <Label htmlFor="fst_count">Number of FSTs Needed *</Label>
+                <Input
+                  id="fst_count"
+                  type="number"
+                  min="0"
+                  value={formData.fst_count}
+                  onChange={(e) => setFormData({ ...formData, fst_count: e.target.value })}
+                  placeholder="e.g., 2"
+                                required
+                                className="mt-1.5"
+                />
+              </div>
+              <div>
+                <Label htmlFor="labor_hours">Number of Labor Hours on Site *</Label>
+                <Input
+                  id="labor_hours"
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={formData.labor_hours}
+                  onChange={(e) => setFormData({ ...formData, labor_hours: e.target.value })}
+                  placeholder="e.g., 8"
+                                required
+                                className="mt-1.5"
+                />
+              </div>
+            </>
+          ) : (
+            <div className="md:col-span-2">
+              <Label htmlFor="flat_labor_fee">Flat Labor Fee ($) *</Label>
+              <Input
+                id="flat_labor_fee"
+                type="number"
+                min="0"
+                step="0.01"
+                value={formData.flat_labor_fee}
+                onChange={(e) => setFormData({ ...formData, flat_labor_fee: e.target.value })}
+                placeholder="e.g., 1500.00"
+                              required
+                              className="mt-1.5"
+              />
+              <p className="text-xs text-slate-500 mt-1">Fixed labor cost â€” no hourly calculation applied</p>
+            </div>
+          )}
+          <div>
+            <Label htmlFor="travel_hours">Total Travel Hours (combined) *</Label>
+            <Input
+              id="travel_hours"
+              type="number"
+              min="0"
+              step="0.5"
+              value={formData.travel_hours}
+              onChange={(e) => setFormData({ ...formData, travel_hours: e.target.value })}
+              placeholder="e.g., 1.5"
+              required
+              className="mt-1.5"
+            />
+            <p className="text-xs text-slate-500 mt-1">$65 per hour</p>
+          </div>
+          <div>
+            <Label htmlFor="miles_traveled">Miles Traveled (combined) *</Label>
+            <Input
+              id="miles_traveled"
+              type="number"
+              min="0"
+              step="0.1"
+              value={formData.miles_traveled}
+              onChange={(e) => setFormData({ ...formData, miles_traveled: e.target.value })}
+              placeholder="e.g., 45"
+              required
+              className="mt-1.5"
+            />
+            <p className="text-xs text-slate-500 mt-1">$0.73 per mile</p>
+          </div>
+        </div>
+      </Card>
+
+      {/* Item Selection */}
+      <Card className="p-6 border-slate-200">
+        <QuoteItemSelector
+          products={products}
+          selectedItems={formData.items}
+          onItemsChange={(items) => setFormData({ ...formData, items })}
+        />
+      </Card>
+
+      {/* Totals & Notes */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="p-6 border-slate-200">
+          <h3 className="text-lg font-semibold text-slate-900 mb-4">Notes & Terms</h3>
+          <Textarea
+            value={formData.notes}
+            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+            placeholder="Add any notes, terms, or conditions..."
+            rows={6}
+          />
+        </Card>
+
+        <Card className="p-6 border-slate-200">
+          <h3 className="text-lg font-semibold text-slate-900 mb-4">Summary</h3>
+          <div className="space-y-4">
+            <div className="flex justify-between text-slate-600">
+              <span>Items Subtotal</span>
+              <span>${(subtotal - laborCharge - mileageCharge - travelCharge).toFixed(2)}</span>
+            </div>
+            {laborCharge > 0 && (
+              <div className="flex justify-between text-slate-600">
+                <span>{isFlat ? "Labor (Flat Fee)" : `Labor (${formData.fst_count} FSTs Ã— ${formData.labor_hours} hrs @ $125)`}</span>
+                <span>${laborCharge.toFixed(2)}</span>
+              </div>
+            )}
+            {travelCharge > 0 && (
+              <div className="flex justify-between text-slate-600">
+                <span>Travel ({formData.travel_hours} hrs @ $65)</span>
+                <span>${travelCharge.toFixed(2)}</span>
+              </div>
+            )}
+            {mileageCharge > 0 && (
+              <div className="flex justify-between text-slate-600">
+                <span>Mileage ({formData.miles_traveled} mi @ $0.73)</span>
+                <span>${mileageCharge.toFixed(2)}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-slate-700 font-medium pt-2 border-t border-slate-200">
+              <span>Subtotal</span>
+              <span>${subtotal.toFixed(2)}</span>
+            </div>
+            
+            <div className="flex items-center justify-between gap-4">
+              <Label className="text-slate-600 shrink-0">Discount</Label>
+              <div className="flex items-center gap-2">
+                <Select
+                  value={formData.discount_type}
+                  onValueChange={(value) => setFormData({ ...formData, discount_type: value })}
+                >
+                  <SelectTrigger className="w-28 h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="percent">Percent %</SelectItem>
+                    <SelectItem value="flat">Flat $</SelectItem>
+                  </SelectContent>
+                </Select>
+                {formData.discount_type === "flat" ? (
+                  <>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={formData.discount_flat_amount}
+                      onChange={(e) => setFormData({ ...formData, discount_flat_amount: e.target.value })}
+                      className="w-24 h-8 text-right"
+                    />
+                    <span className="text-slate-500">$</span>
+                  </>
+                ) : (
+                  <>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      value={formData.discount_percent}
+                      onChange={(e) => setFormData({ ...formData, discount_percent: e.target.value })}
+                      className="w-20 h-8 text-right"
+                    />
+                    <span className="text-slate-500">%</span>
+                  </>
+                )}
+                <span className="text-slate-600 w-24 text-right">-${discountAmount.toFixed(2)}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <Label htmlFor="federal_tax" className="text-slate-600 shrink-0">Federal Tax</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="federal_tax"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={formData.federal_tax_percent}
+                  onChange={(e) => setFormData({ ...formData, federal_tax_percent: e.target.value })}
+                  className="w-20 h-8 text-right"
+                />
+                <span className="text-slate-500">%</span>
+                <span className="text-slate-600 w-24 text-right">+${federalTaxAmount.toFixed(2)}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <Label htmlFor="state_tax" className="text-slate-600 shrink-0">State Tax</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="state_tax"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={formData.state_tax_percent}
+                  onChange={(e) => setFormData({ ...formData, state_tax_percent: e.target.value })}
+                  className="w-20 h-8 text-right"
+                />
+                <span className="text-slate-500">%</span>
+                <span className="text-slate-600 w-24 text-right">+${stateTaxAmount.toFixed(2)}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <Label htmlFor="local_tax" className="text-slate-600 shrink-0">Local Tax</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="local_tax"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={formData.local_tax_percent}
+                  onChange={(e) => setFormData({ ...formData, local_tax_percent: e.target.value })}
+                  className="w-20 h-8 text-right"
+                />
+                <span className="text-slate-500">%</span>
+                <span className="text-slate-600 w-24 text-right">+${localTaxAmount.toFixed(2)}</span>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-200 flex justify-between items-center">
+              <span className="text-lg font-semibold text-slate-900">Total</span>
+              <span className="text-2xl font-bold text-orange-600">${total.toFixed(2)}</span>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-4 pt-4">
+        <Button type="button" variant="outline" onClick={onCancel} className="flex-1 md:flex-none">
+          Cancel
+        </Button>
+        {onSaveDraft && !quote && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                type="button" 
+                variant="outline" 
+                disabled={isLoading || !requiredFieldsComplete}
+                className="flex-1 md:flex-none"
+              >
+                Save as Draft
+                <ChevronDown className="w-4 h-4 ml-2" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleSaveDraft("draft_without_internal")}>
+                Draft w/o Internal
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleSaveDraft("draft_without_fst")}>
+                Draft w/o FST
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+        {quote && onSaveCopy && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleSaveCopy}
+            disabled={isLoading || formData.items.length === 0 || !requiredFieldsComplete}
+            className="flex-1 md:flex-none border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+          >
+            Save Copy as Option
+          </Button>
+        )}
+        <Button type="submit" disabled={isLoading || formData.items.length === 0 || !requiredFieldsComplete} className="flex-1 md:flex-none bg-orange-600 hover:bg-orange-700">
+          {isLoading ? "Saving..." : quote ? "Update Quote" : "Preview & Submit"}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+==================================================
+FILE: .\src\features\quoteDraftAgent\QuoteDraftButton.jsx
+==================================================
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Sparkles } from "lucide-react";
+import QuoteDraftModal from "./QuoteDraftModal";
+
+export default function QuoteDraftButton({ quote, onApply }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button type="button" variant="outline" onClick={() => setOpen(true)} className="border-indigo-300 text-indigo-700 hover:bg-indigo-50">
+        <Sparkles className="mr-2 h-4 w-4" /> Draft with AI
+      </Button>
+      <QuoteDraftModal quote={quote} open={open} onOpenChange={setOpen} onApply={onApply} />
+    </>
+  );
+}
+
+
+
+==================================================
+FILE: .\src\features\quoteDraftAgent\QuoteDraftModal.jsx
+==================================================
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Loader2, Sparkles } from "lucide-react";
+import { toast } from "sonner";
+import { generateQuoteDraft } from "./quoteDraftService";
+import { mapDraftToQuoteUpdate } from "./quoteDraftMapper";
+
+const sections = [
+  ["Scope of Work", "scopeOfWork"],
+  ["Homeowner Summary", "homeownerSummary"],
+  ["Internal Notes", "internalNotes"],
+  ["Risk Adjustment Statement", "riskStatement"]
+];
+
+export default function QuoteDraftModal({ quote, open, onOpenChange, onApply }) {
+  const [loading, setLoading] = useState(false);
+  const [draft, setDraft] = useState(null);
+
+  const handleOpenChange = (nextOpen) => {
+    if (!nextOpen) setDraft(null);
+    onOpenChange(nextOpen);
+  };
+
+  const generate = async () => {
+    setLoading(true);
+    try {
+      setDraft(await generateQuoteDraft(quote));
+    } catch (error) {
+      toast.error(`Failed to generate quote draft: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const apply = () => {
+    if (!draft) return;
+    onApply(mapDraftToQuoteUpdate(draft, quote), draft);
+    handleOpenChange(false);
+    toast.success("Quote draft applied. Review the fields before saving.");
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-indigo-600" />Quote Draft Agent</DialogTitle>
+          <DialogDescription>Generate a draft, review the proposed content, then apply it to this quote.</DialogDescription>
+        </DialogHeader>
+        {!draft ? (
+          <div className="py-8 text-center">
+            <p className="mb-4 text-sm text-slate-600">The agent will use the current quote record and return structured quote data.</p>
+            <Button onClick={generate} disabled={loading}>
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {loading ? "Generating..." : "Generate Draft"}
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {sections.map(([label, key]) => (
+              <section key={key} className="rounded-lg border border-slate-200 p-3">
+                <h3 className="mb-1 font-semibold text-slate-900">{label}</h3>
+                <p className="whitespace-pre-wrap text-sm text-slate-700">{draft[key] || "No content provided."}</p>
+              </section>
+            ))}
+            <section className="rounded-lg border border-slate-200 p-3">
+              <h3 className="mb-1 font-semibold text-slate-900">Quote Details</h3>
+              <pre className="max-h-48 overflow-auto whitespace-pre-wrap text-xs text-slate-600">{JSON.stringify({ materials: draft.materials || [], labor: draft.labor || [], travel: draft.travel || [], quoteSummary: draft.quoteSummary || {} }, null, 2)}</pre>
+            </section>
+          </div>
+        )}
+        <DialogFooter>
+          {draft && <Button variant="outline" onClick={generate} disabled={loading}>{loading ? "Generating..." : "Regenerate"}</Button>}
+          <Button variant="outline" onClick={() => handleOpenChange(false)}>Cancel</Button>
+          {draft && <Button onClick={apply}>Apply to Quote</Button>}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+
+==================================================
+FILE: .\src\features\quoteDraftAgent\quoteDraftMapper.js
+==================================================
+const firstValue = (record, keys, fallback = null) => {
+  for (const key of keys) {
+    if (record?.[key] !== undefined && record[key] !== null && record[key] !== "") {
+      return record[key];
+    }
+  }
+  return fallback;
+};
+
+export function buildQuotePayload(quote = {}) {
+  return {
+    quote: {
+      id: quote.id,
+      quote_number: quote.quote_number,
+      site_id: quote.site_id,
+      case_number: quote.case_number,
+      quote_requester: quote.quote_requester,
+      status: quote.status,
+      valid_until: quote.valid_until,
+      scope_of_work: quote.scope_of_work,
+      notes: quote.notes,
+      homeowner_summary: quote.homeowner_summary,
+      internal_notes: quote.internal_notes,
+      fst_count: quote.fst_count,
+      labor_hours: quote.labor_hours,
+      labor_rate: quote.labor_rate,
+      labor_mode: quote.labor_mode,
+      flat_labor_fee: quote.flat_labor_fee,
+      travel_hours: quote.travel_hours,
+      travel_rate: quote.travel_rate,
+      miles_traveled: quote.miles_traveled,
+      mileage_rate: quote.mileage_rate,
+      tax_rates: {
+        federal: quote.federal_tax_percent,
+        state: quote.state_tax_percent,
+        local: quote.local_tax_percent
+      },
+      items: Array.isArray(quote.items) ? quote.items : [],
+      totals: {
+        subtotal: quote.subtotal,
+        total: quote.total,
+        materials_total: quote.materials_total,
+        labor_total: quote.labor_total,
+        travel_total: quote.travel_total,
+        sales_tax: quote.sales_tax
+      }
+    }
+  };
+}
+
+function mapMaterials(materials, existingItems = []) {
+  if (!Array.isArray(materials)) return existingItems;
+  return materials.map((item) => {
+    const productId = firstValue(item, ["product_id", "productId", "id"]);
+    const existing = existingItems.find((candidate) => candidate.product_id === productId);
+    const quantity = Number(firstValue(item, ["quantity", "qty"], 1)) || 1;
+    const unitPrice = Number(firstValue(item, ["unit_price", "unitPrice", "price"], 0)) || 0;
+    return {
+      ...(existing || {}),
+      product_id: productId || existing?.product_id || null,
+      name: firstValue(item, ["name", "description"], existing?.name || "Material"),
+      description: firstValue(item, ["description", "name"], existing?.description || ""),
+      unit: firstValue(item, ["unit", "unit_of_measure"], existing?.unit || "each"),
+      quantity,
+      unit_price: unitPrice,
+      total: Number(firstValue(item, ["total", "amount"], quantity * unitPrice)) || 0,
+      taxable: item.taxable !== false,
+      tax_code: firstValue(item, ["tax_code", "taxCode"], existing?.tax_code || null)
+    };
+  });
+}
+
+export function mapDraftToQuoteUpdate(draft = {}, quote = {}) {
+  const labor = Array.isArray(draft.labor) ? draft.labor : [];
+  const travel = Array.isArray(draft.travel) ? draft.travel : [];
+  const laborHours = labor.reduce((sum, line) =>
+    sum + (Number(firstValue(line, ["hours", "quantity", "qty"], 0)) || 0), 0);
+  const travelHours = travel
+    .filter((line) => !String(firstValue(line, ["description", "name"], "")).toLowerCase().includes("mile"))
+    .reduce((sum, line) => sum + (Number(firstValue(line, ["hours", "quantity", "qty"], 0)) || 0), 0);
+  const miles = travel
+    .filter((line) => String(firstValue(line, ["description", "name"], "")).toLowerCase().includes("mile"))
+    .reduce((sum, line) => sum + (Number(firstValue(line, ["miles", "quantity", "qty"], 0)) || 0), 0);
+  const summary = firstValue(draft, ["homeownerSummary", "homeowner_summary"]);
+  const internalNotes = firstValue(draft, ["internalNotes", "internal_notes"]);
+  const riskStatement = firstValue(draft, ["riskStatement", "riskAdjustmentStatement", "risk_adjustment_statement"]);
+
+  return {
+    ...(draft.scopeOfWork || draft.scope_of_work ? {
+      scope_of_work: firstValue(draft, ["scopeOfWork", "scope_of_work"])
+    } : {}),
+    ...(summary ? { homeowner_summary: summary } : {}),
+    ...(internalNotes || riskStatement ? {
+      notes: [internalNotes, riskStatement].filter(Boolean).join("\n\n")
+    } : {}),
+    ...(draft.materials ? { items: mapMaterials(draft.materials, quote.items || []) } : {}),
+    ...(laborHours ? { labor_hours: laborHours } : {}),
+    ...(draft.fst_count !== undefined ? { fst_count: Number(draft.fst_count) || 0 } : {}),
+    ...(travelHours ? { travel_hours: travelHours } : {}),
+    ...(miles ? { miles_traveled: miles } : {}),
+    ...(draft.labor_rate !== undefined ? { labor_rate: Number(draft.labor_rate) || 0 } : {}),
+    ...(draft.travel_rate !== undefined ? { travel_rate: Number(draft.travel_rate) || 0 } : {}),
+    ...(draft.mileage_rate !== undefined ? { mileage_rate: Number(draft.mileage_rate) || 0 } : {})
+  };
+}
+
+
+
+==================================================
+FILE: .\src\features\quoteDraftAgent\quoteDraftPrompt.js
+==================================================
+export const QUOTE_DRAFT_PROMPT = `
+Quote Draft Agent Prompt (Step 2) 
+
+ 
+
+You are the Quote Draft Agent. 
+
+ 
+
+Your purpose is to create an Enphase Quote Package from a standardized Quote Request input. 
+
+ 
+
+You have access to the following knowledge sources: 
+
+ 
+
+1. Product Catalog 
+
+   - Approved materials and services 
+
+   - Standard pricing 
+
+   - Units of measure 
+
+ 
+
+2. Avalara Tax Code Catalog 
+
+   - Tax category mappings 
+
+   - Tax code mappings 
+
+   - Service tax codes 
+
+   - Product tax codes 
+
+ 
+
+Your responsibility is to analyze the quote request, identify required labor, travel, materials, applicable tax codes, and generate a complete draft quote. 
+
+ 
+
+GENERAL RULES 
+
+ 
+
+- Always produce a quote. 
+
+- Never ask follow-up questions. 
+
+- If information is missing, make reasonable assumptions based on the scope provided. 
+
+- Clearly state assumptions. 
+
+- Use the Product Catalog whenever possible. 
+
+- Use the Avalara Tax Code Catalog whenever a product or service line item is selected. 
+
+- Include tax codes on all material and service line items. 
+
+- When multiple catalog items could satisfy a requirement, choose the most appropriate item based on the scope. 
+
+- For wiring repairs, include reasonable quantities of connectors, clips, weatherproofing materials, and wire-management hardware. 
+
+- For critter guard requests, include critter guard materials and installation accessories. 
+
+- For trunk cable replacement requests, include cable assemblies, connectors, couplers, terminators, and necessary accessories. 
+
+- Use worst-case labor estimates when a range is provided. 
+
+- Use the stated labor, travel, and mileage rates if present. 
+
+- If labor rates are not provided, use the default labor rate specified by the organization. 
+
+- Calculate totals. 
+
+- Calculate material subtotal. 
+
+- Calculate labor subtotal. 
+
+- Calculate travel subtotal. 
+
+- Calculate grand subtotal. 
+
+- Estimate sales tax on taxable materials only unless otherwise specified. 
+
+- Include a risk statement when scope uncertainty exists. 
+
+- Do not use emojis. 
+
+- Do not use icons. 
+
+- Bold all section titles. 
+
+- Bold all major headers. 
+
+- Maintain the exact output format. 
+
+ 
+
+QUOTE GENERATION LOGIC 
+
+ 
+
+Service Type Mapping 
+
+ 
+
+Gateway Upgrade 
+
+Cell Modem Upgrade 
+
+SPWR Monitoring Upgrade 
+
+LPUP Battery Upgrade 
+
+LPUP Microinverter Upgrade 
+
+Battery Install 
+
+Microinverter Install 
+
+TPUP Battery Upgrade 
+
+TPUP Microinverter Upgrade 
+
+Follow-Up SPWR Monitoring Upgrade 
+
+Follow-Up Gateway Upgrade 
+
+Enphase Care 
+
+On-Demand 
+
+Accessories 
+
+Propel 
+
+ 
+
+O&M Status Values 
+
+ 
+
+Remote Troubleshooting 
+
+Pre-Scheduled 
+
+Pending Schedule 
+
+Pending Travel Plan 
+
+Pending RMA 
+
+Pending Quote 
+
+Waiting on Customer 
+
+Waiting on Installer 
+
+Self-Clearing Issue 
+
+Unresponsive Customer 
+
+Quote Requested 
+
+Quote Missing Details 
+
+Quote Draft 
+
+Quote Pending Approval 
+
+Quote Pending Payment 
+
+Quote Pending Materials 
+
+Follow-Up Required 
+
+ 
+
+LABOR ASSUMPTIONS 
+
+ 
+
+If technician count is provided: 
+
+ 
+
+Total Labor Hours = 
+
+Technician Count Ã— Estimated Labor Hours 
+
+ 
+
+Example: 
+
+2 technicians Ã— 8 hours = 16 labor hours 
+
+ 
+
+Travel Calculation 
+
+ 
+
+Use: 
+
+ 
+
+Travel Hour Rate = $65/hour 
+
+ 
+
+Mileage Rate = $0.73/mile 
+
+ 
+
+If travel distance is not explicitly provided: 
+
+ 
+
+Estimate reasonable local travel based on information supplied. 
+
+ 
+
+TAX CODE ASSIGNMENT 
+
+ 
+
+Use the knowledge base tax code mappings. 
+
+ 
+
+Examples: 
+
+ 
+
+Services 
+
+Tax Code = SS300220 
+
+ 
+
+Microinverters 
+
+Tax Code = TTR146714 
+
+ 
+
+Solar Accessories 
+
+Tax Code = TTR146718 
+
+ 
+
+Solar Wiring and Connectors 
+
+Tax Code = TTR146716 
+
+ 
+
+Communication Accessories 
+
+Tax Code = TTR146719 
+
+ 
+
+General Electrical Equipment 
+
+Tax Code = TTR152589 
+
+ 
+
+OUTPUT FORMAT 
+
+ 
+
+**QUOTE BUILD PACKAGE** 
+
+ 
+
+**Quote Information** 
+
+ 
+
+Site ID: 
+
+Case Number: 
+
+Customer: 
+
+Site Address: 
+
+Service Type: 
+
+Valid Until: 
+
+Technician Name: 
+
+ 
+
+**Scope of Work** 
+
+ 
+
+Generate a concise professional scope-of-work summary using the information supplied. 
+
+ 
+
+**Labor & Travel** 
+
+ 
+
+Provide assumptions used. 
+
+ 
+
+Labor Table 
+
+ 
+
+Description 
+
+Quantity 
+
+Rate 
+
+Total 
+
+ 
+
+Travel Table 
+
+ 
+
+Description 
+
+Quantity 
+
+Rate 
+
+Total 
+
+ 
+
+Display: 
+
+ 
+
+Labor & Travel Subtotal 
+
+ 
+
+**Materials** 
+
+ 
+
+Group materials into logical sections such as: 
+
+ 
+
+Trunk Cable Repair Materials 
+
+ 
+
+Electrical Materials 
+
+ 
+
+Critter Guard Materials 
+
+ 
+
+Communications Materials 
+
+ 
+
+Battery Materials 
+
+ 
+
+Monitoring Materials 
+
+ 
+
+Weatherproofing Materials 
+
+ 
+
+Use only sections that apply. 
+
+ 
+
+For each section provide: 
+
+ 
+
+Item 
+
+Qty 
+
+Unit Price 
+
+Tax Code 
+
+ 
+
+Display subtotal after each section. 
+
+ 
+
+**Materials Total** 
+
+ 
+
+Display total material cost. 
+
+ 
+
+**Tax Code Summary** 
+
+ 
+
+Category 
+
+Tax Code 
+
+ 
+
+List all categories used. 
+
+ 
+
+**Quote Summary** 
+
+ 
+
+Description 
+
+Amount 
+
+ 
+
+Labor 
+
+Travel 
+
+Mileage 
+
+Materials 
+
+Subtotal 
+
+ 
+
+**Estimated Sales Tax** 
+
+ 
+
+Display estimated tax amount. 
+
+ 
+
+Include assumption used. 
+
+ 
+
+**Estimated Quote Total** 
+
+ 
+
+Display final amount. 
+
+ 
+
+**Internal Notes** 
+
+ 
+
+Provide a concise internal summary. 
+
+ 
+
+Include: 
+
+ 
+
+Root cause summary 
+
+ 
+
+Key assumptions 
+
+ 
+
+Customer-impact statements 
+
+ 
+
+**Risk Adjustment Statement** 
+
+ 
+
+If scope uncertainty exists, include language similar to: 
+
+ 
+
+"This quote assumes replacement of the identified damaged components and materials described above. If additional hidden damage is discovered after module removal, branch circuit exposure, or system inspection, additional labor and/or materials may be required and would be communicated through a change order requiring customer approval." 
+
+ 
+
+END OF OUTPUT 
+
+ 
+
+Exhibit A: AI Output of Enphase Quote Package 
+
+QUOTE BUILD PACKAGE 
+
+Quote Information 
+
+Site ID: 277776 
+Case Number: 20093467 
+Customer: Jeff Bogard 
+Site Address: 14 Sherwyn Ln, St. Louis, MO 63141 
+Service Type: Gateway Upgrade / Gateway Replacement 
+Valid Until: 30 Days from Quote Date 
+Technician Name: Assigned at Scheduling 
+
+Scope of Work 
+
+Remove the existing Enphase Envoy R gateway and install a new Envoy S gateway. Configure and commission the replacement gateway, verify system communications, and confirm monitoring functionality and reporting in Enlighten. Final testing will be performed to ensure reliable communication between the PV system and monitoring platform. 
+
+Labor & Travel 
+
+Assumptions 
+
+Worst-case labor estimate used per request guidance. 
+
+1 technician assigned. 
+
+Estimated total labor hours: 6 hours. 
+
+Labor rate assumed at $125.00/hour. 
+
+Travel billed per standard rates:  
+
+Travel Time: $65.00/hour 
+
+Mileage: $0.73/mile 
+
+Labor Table 
+
+Description 
+
+Quantity 
+
+Rate 
+
+Total 
+
+Gateway Replacement, Configuration & Commissioning 
+
+6 Hours 
+
+$125.00 
+
+$750.00 
+
+Travel Table 
+
+Description 
+
+Quantity 
+
+Rate 
+
+Total 
+
+Travel Time 
+
+4 Hours 
+
+$65.00 
+
+$260.00 
+
+Mileage Reimbursement 
+
+250 Miles 
+
+$0.73 
+
+$182.50 
+
+Labor & Travel Subtotal 
+
+$1,192.50 
+
+ 
+
+Materials 
+
+Monitoring Materials 
+
+Item 
+
+Qty 
+
+Unit Price 
+
+Tax Code 
+
+Envoy S Gateway 
+
+1 
+
+$650.00 
+
+TTR146719 
+
+Monitoring Materials Subtotal: $650.00 
+
+ 
+
+Materials Total 
+
+$650.00 
+
+ 
+
+Tax Code Summary 
+
+Category 
+
+Tax Code 
+
+Communication Accessories 
+
+TTR146719 
+
+Installation Services 
+
+SS300220 
+
+ 
+
+Quote Summary 
+
+Description 
+
+Amount 
+
+Labor 
+
+$750.00 
+
+Travel 
+
+$260.00 
+
+Mileage 
+
+$182.50 
+
+Materials 
+
+$650.00 
+
+Subtotal 
+
+$1,842.50 
+
+ 
+
+Estimated Sales Tax 
+
+Estimated taxable materials only. 
+
+Assumption: 8.0% sales tax applied to taxable materials. 
+
+Estimated Sales Tax: $52.00 
+
+ 
+
+Estimated Quote Total 
+
+$1,894.50 
+
+ 
+
+Internal Notes 
+
+Root Cause Summary: Existing Envoy R gateway is experiencing communication degradation and unreliable reporting. Unit is out of warranty and replacement is recommended. 
+
+Recommended Corrective Action: Replace Envoy R (S/N 121325026037) with new Envoy S gateway and recommission monitoring. 
+
+Key Assumptions:  
+
+No ladder, lift, or specialty access equipment required. 
+
+Existing wiring and communications infrastructure remain serviceable. 
+
+Replacement gateway installation can be completed during a single site visit. 
+
+Standard commissioning and Enlighten setup only. 
+
+Customer Impact:  
+
+Monitoring and reporting reliability should be restored. 
+
+Improved communication stability and system visibility after replacement. 
+
+ 
+
+Risk Adjustment Statement 
+
+This quote assumes replacement of the identified damaged components and materials described above. If additional hidden damage, site communication issues, electrical deficiencies, networking complications, or system configuration issues are discovered during installation or inspection, additional labor and/or materials may be required and would be communicated through a change order requiring customer approval. 
+`;
+
+==================================================
+FILE: .\src\features\quoteDraftAgent\quoteDraftService.js
+==================================================
+import { base44 } from "@/api/base44Client";
+import { QUOTE_DRAFT_PROMPT } from "./quoteDraftPrompt";
+import { buildQuotePayload } from "./quoteDraftMapper";
+
+export const quoteDraftResponseSchema = {
+  type: "object",
+  properties: {
+    scopeOfWork: { type: "string" },
+    homeownerSummary: { type: "string" },
+    internalNotes: { type: "string" },
+    riskStatement: { type: "string" },
+    materials: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          product_id: { type: "string" },
+          name: { type: "string" },
+          quantity: { type: "number" },
+          unit_price: { type: "number" },
+          total: { type: "number" },
+          taxable: { type: "boolean" },
+          tax_code: { type: "string" }
+        }
+      }
+    },
+    labor: { type: "array", items: { type: "object" } },
+    travel: { type: "array", items: { type: "object" } },
+    taxSummary: { type: "array", items: { type: "object" } },
+    quoteSummary: { type: "object" }
+  },
+  required: ["scopeOfWork", "homeownerSummary", "internalNotes", "riskStatement", "materials", "labor", "travel"]
+};
+
+export async function generateQuoteDraft(quote) {
+  if (!quote || typeof quote !== "object") {
+    throw new Error("A quote record is required to generate a draft.");
+  }
+
+  const prompt = `${QUOTE_DRAFT_PROMPT}
+
+QUOTE REQUEST DATA
+${JSON.stringify(buildQuotePayload(quote), null, 2)}
+
+Return ONLY valid JSON matching the supplied response schema.`;
+
+  const response = await base44.integrations.Core.InvokeLLM({
+    prompt,
+    response_json_schema: quoteDraftResponseSchema,
+    add_context_from_internet: false
+  });
+
+  if (typeof response === "string") {
+    try {
+      return JSON.parse(response);
+    } catch {
+      throw new Error("Quote Draft Agent returned invalid JSON.");
+    }
+  }
+  if (!response || typeof response !== "object") {
+    throw new Error("Quote Draft Agent returned an empty response.");
+  }
+  return response;
+}
+
+
+==================================================
+FILE: .\src\api\base44Client.js
+==================================================
+import { createClient } from "@base44/sdk";
+import { appParams } from "@/lib/app-params";
+
+const isBase44Runtime =
+  ["base44", "base44-dual"].includes(import.meta.env.VITE_DATA_SOURCE);
+
+const {
+  appId,
+  token,
+  functionsVersion,
+  appBaseUrl,
+  serverUrl
+} = appParams;
+
+const isValidBase44ClientConfig =
+  Boolean(
+    appId &&
+    serverUrl &&
+    !/^file:/i.test(String(serverUrl))
+  );
+
+const noop = () =>
+  Promise.resolve(undefined);
+
+const noopObject = {
+  me: noop,
+  logout: noop,
+  redirectToLogin: noop,
+  getToken: noop,
+  setToken: noop,
+  clearToken: noop
+};
+
+const emptyAppLogs = {
+  logUserInApp: noop,
+  logEvent: noop,
+  track: noop
+};
+
+const base44Client =
+  isBase44Runtime &&
+  isValidBase44ClientConfig
+    ? createClient({
+        appId,
+        token,
+        functionsVersion,
+        serverUrl,
+        appBaseUrl,
+        requiresAuth: false
+      })
+    : {
+        auth: noopObject,
+        appLogs: emptyAppLogs,
+        functions: {
+          invoke: noop
+        }
+      };
+
+export const base44 = base44Client;
+
+
+
+==================================================
+FILE: .\src\api\dataClient.js
+==================================================
+import {
+  base44DualAdapter
+} from "./adapters/base44DualAdapter";
+import {
+  base44Adapter
+} from "./adapters/base44Adapter";
+
+import {
+  mockAdapter
+} from "./adapters/mockAdapter";
+
+import {
+  localAdapter
+} from "./adapters/localAdapter";
+
+import {
+  salesforceAdapter
+} from "./adapters/salesforceAdapter";
+
+import {
+  salesforceMockAdapter
+} from "./adapters/salesforceMockAdapter";
+
+const DATA_SOURCE =
+  import.meta.env.VITE_DATA_SOURCE ||
+  "base44";
+
+const adapters = {
+  base44: base44Adapter,
+  "base44-dual": base44DualAdapter,
+  mock: mockAdapter,
+  local: localAdapter,
+  salesforce: salesforceAdapter,
+  "salesforce-mock": salesforceMockAdapter
+};
+
+const adapter = adapters[DATA_SOURCE];
+
+if (!adapter) {
+  throw new Error(
+    `Unsupported VITE_DATA_SOURCE: ${DATA_SOURCE}`
+  );
+}
+
+const call = (methodName, args) => {
+  const method = adapter[methodName];
+
+  if (typeof method !== "function") {
+    throw new Error(
+      `${methodName} is not implemented by the ${DATA_SOURCE} adapter.`
+    );
+  }
+
+  return method(...args);
+};
+
+export const getDataSource = () => DATA_SOURCE;
+
+export const isBase44DataSource =
+  DATA_SOURCE === "base44" ||
+  DATA_SOURCE === "base44-dual";
+
+export const isBase44DualDataSource =
+  DATA_SOURCE === "base44-dual";
+
+export const isMockDataSource =
+  DATA_SOURCE === "mock";
+
+export const isLocalDataSource =
+  DATA_SOURCE === "local";
+
+export const isSalesforceDataSource =
+  DATA_SOURCE === "salesforce";
+
+export const isSalesforceMockDataSource =
+  DATA_SOURCE === "salesforce-mock";
+
+export const getCurrentUser =
+  (...args) => call("getCurrentUser", args);
+
+export const getQuotes =
+  (...args) => call("getQuotes", args);
+
+export const getQuoteById =
+  (...args) => call("getQuoteById", args);
+
+export const listRecentQuotes =
+  (...args) => call("listRecentQuotes", args);
+
+export const filterQuotes =
+  (...args) => call("filterQuotes", args);
+
+export const createQuote =
+  (...args) => call("createQuote", args);
+
+export const updateQuote =
+  (...args) => call("updateQuote", args);
+
+export const deleteQuote =
+  (...args) => call("deleteQuote", args);
+
+export const bulkUpdateQuotes =
+  (...args) => call("bulkUpdateQuotes", args);
+
+export const getProducts =
+  (...args) => call("getProducts", args);
+
+export const listProducts =
+  (...args) => call("listProducts", args);
+
+export const filterProducts =
+  (...args) => call("filterProducts", args);
+
+export const createProduct =
+  (...args) => call("createProduct", args);
+
+export const updateProduct =
+  (...args) => call("updateProduct", args);
+
+export const deleteProduct =
+  (...args) => call("deleteProduct", args);
+
+export const getReviews =
+  (...args) => call("getReviews", args);
+
+export const getReviewsForQuote =
+  (...args) => call("getReviewsForQuote", args);
+
+export const createReview =
+  (...args) => call("createReview", args);
+
+export const updateReview =
+  (...args) => call("updateReview", args);
+
+export const getQuoteActivities =
+  (...args) => call("getQuoteActivities", args);
+
+export const createQuoteActivity =
+  (...args) => call("createQuoteActivity", args);
+
+export const getFollowUps =
+  (...args) => call("getFollowUps", args);
+
+export const createFollowUp =
+  (...args) => call("createFollowUp", args);
+
+export const getUsers =
+  (...args) => call("getUsers", args);
+
+export const listLocalCollection =
+  (...args) => call("listLocalCollection", args);
+
+export const createLocalRecord =
+  (...args) => call("createLocalRecord", args);
+
+export const updateLocalRecord =
+  (...args) => call("updateLocalRecord", args);
+
+export const deleteLocalRecord =
+  (...args) => call("deleteLocalRecord", args);
+
+export const exportLocalData =
+  (...args) => call("exportLocalData", args);
+
+export const importLocalData =
+  (...args) => call("importLocalData", args);
+
+export const resetLocalData =
+  (...args) => call("resetLocalData", args);
+
+export const getSalesforceMockSyncLog =
+  (...args) =>
+    call(
+      "getSalesforceMockSyncLog",
+      args
+    );
+
+
+==================================================
+FILE: .\src\utils\quoteCalculations.js
+==================================================
+/**
+ * Shared quote calculation logic â€” matches the PDF generator.
+ * Tax is applied ONLY to line items marked taxable (item.taxable !== false).
+ * Labor, travel, and mileage are never taxed.
+ * Discounts are proportionally allocated to the taxable portion.
+ */
+export function calculateQuoteTotals(quote) {
+  const items = quote.items || [];
+  const itemsSubtotal = items.reduce((sum, item) => sum + (item.total || 0), 0);
+
+  const laborCost = quote.labor_mode === "flat"
+    ? (quote.flat_labor_fee || 0)
+    : (quote.fst_count || 0) * (quote.labor_hours || 0) * (quote.labor_rate || 125);
+  const travelCost = (quote.travel_hours || 0) * (quote.travel_rate || 65);
+  const mileageCost = (quote.miles_traveled || 0) * (quote.mileage_rate || 0.73);
+
+  const subtotal = quote.subtotal || (itemsSubtotal + laborCost + travelCost + mileageCost);
+
+  const discountAmount = quote.discount_type === "flat"
+    ? (quote.discount_flat_amount || 0)
+    : (subtotal * (quote.discount_percent || 0) / 100);
+
+  const combinedTaxRate = (quote.federal_tax_percent || 0) + (quote.state_tax_percent || 0) + (quote.local_tax_percent || 0);
+
+  // Only taxable items are subject to tax
+  const taxableItemsAmount = items
+    .filter(item => item.taxable !== false)
+    .reduce((sum, item) => sum + (item.total || 0), 0);
+
+  // Proportionally allocate discount to the taxable portion
+  const taxableShare = subtotal > 0 ? taxableItemsAmount / subtotal : 0;
+  const taxableAfterDiscount = Math.max(0, taxableItemsAmount - taxableShare * discountAmount);
+
+  const taxAmount = taxableAfterDiscount * combinedTaxRate / 100;
+  const afterDiscount = subtotal - discountAmount;
+  const total = afterDiscount + taxAmount;
+
+  return {
+    itemsSubtotal,
+    laborCost,
+    travelCost,
+    mileageCost,
+    subtotal,
+    discountAmount,
+    combinedTaxRate,
+    taxableItemsAmount,
+    taxableAfterDiscount,
+    taxAmount,
+    afterDiscount,
+    total
+  };
+}
+
+==================================================
+LEGACY AI ASSISTANT SEARCH
+==================================================
+
+
+Path       : C:\Users\croeschberger\OneDrive - Enphase Energy\Documents\EnQuote\src\components\quotes\QuoteAIAssistant.jsx
+LineNumber : 9
+Line       : export default function QuoteAIAssistant({ 
+
+Path       : C:\Users\croeschberger\OneDrive - Enphase Energy\Documents\EnQuote\src\components\quotes\QuoteAIAssistant.jsx
+LineNumber : 47
+Line       :       toast.error("Failed to generate scope: " + error.message);
+
+Path       : C:\Users\croeschberger\OneDrive - Enphase Energy\Documents\EnQuote\src\components\quotes\QuoteAIAssistant.jsx
+LineNumber : 106
+Line       :       toast.error("Failed to suggest products: " + error.message);
+
+Path       : C:\Users\croeschberger\OneDrive - Enphase Energy\Documents\EnQuote\src\components\quotes\QuoteAIAssistant.jsx
+LineNumber : 186
+Line       :           <h3 className="font-semibold text-slate-900">AI Quote Assistant</h3>
+
+Path       : C:\Users\croeschberger\OneDrive - Enphase Energy\Documents\EnQuote\src\components\quotes\QuoteAIAssistant.jsx
+LineNumber : 200
+Line       :         {/* Generate Scope */}
+
+Path       : C:\Users\croeschberger\OneDrive - Enphase Energy\Documents\EnQuote\src\components\quotes\QuoteAIAssistant.jsx
+LineNumber : 203
+Line       :             Generate Scope of Work
+
+Path       : C:\Users\croeschberger\OneDrive - Enphase Energy\Documents\EnQuote\src\components\quotes\QuoteAIAssistant.jsx
+LineNumber : 224
+Line       :             Generate Scope Description
+
+Path       : C:\Users\croeschberger\OneDrive - Enphase Energy\Documents\EnQuote\src\components\quotes\QuoteAIAssistant.jsx
+LineNumber : 242
+Line       :             Suggest Products & Services
+
+Path       : C:\Users\croeschberger\OneDrive - Enphase Energy\Documents\EnQuote\src\components\quotes\QuoteAIAssistant.jsx
+LineNumber : 258
+Line       :             Estimate Pricing
+
+Path       : C:\Users\croeschberger\OneDrive - Enphase Energy\Documents\EnQuote\src\components\quotes\QuoteForm.jsx
+LineNumber : 17
+Line       : import QuoteAIAssistant from "./QuoteAIAssistant";
+
+Path       : C:\Users\croeschberger\OneDrive - Enphase Energy\Documents\EnQuote\src\components\quotes\QuoteForm.jsx
+LineNumber : 18
+Line       : import QuoteDraftButton from "@/features/quoteDraftAgent/QuoteDraftButton";
+
+Path       : C:\Users\croeschberger\OneDrive - Enphase Energy\Documents\EnQuote\src\components\quotes\QuoteForm.jsx
+LineNumber : 225
+Line       :       <QuoteAIAssistant
+
+Path       : C:\Users\croeschberger\OneDrive - Enphase Energy\Documents\EnQuote\src\components\quotes\QuoteForm.jsx
+LineNumber : 344
+Line       :               <QuoteDraftButton
+
+Path       : C:\Users\croeschberger\OneDrive - Enphase Energy\Documents\EnQuote\src\features\quoteDraftAgent\QuoteDraftButton.jsx
+LineNumber : 6
+Line       : export default function QuoteDraftButton({ quote, onApply }) {
+
+
+
+
+
+==================================================
+GIT DIFF
+==================================================

@@ -1,0 +1,8 @@
+import { addDays, endOfMonth, endOfQuarter, format, startOfMonth, startOfQuarter, subMonths, subQuarters } from "date-fns";
+
+const presets = ["Past Week", "Past 2 Weeks", "Past 4 Weeks", "Prior Month", "Last 30 Days", "Current Month", "Current Quarter", "Past Quarter", "Custom"];
+const dateValue = value => format(value, "yyyy-MM-dd");
+export default function DateRangeFilters({ range, setRange, preset, setPreset }) {
+  const applyPreset = name => { const now = new Date(); const ranges = { "Past Week": [addDays(now, -7), now], "Past 2 Weeks": [addDays(now, -14), now], "Past 4 Weeks": [addDays(now, -28), now], "Prior Month": [startOfMonth(subMonths(now, 1)), endOfMonth(subMonths(now, 1))], "Last 30 Days": [addDays(now, -30), now], "Current Month": [startOfMonth(now), now], "Current Quarter": [startOfQuarter(now), now], "Past Quarter": [startOfQuarter(subQuarters(now, 1)), endOfQuarter(subQuarters(now, 1))] }; setPreset(name); if (ranges[name]) setRange({ start: dateValue(ranges[name][0]), end: dateValue(ranges[name][1]) }); };
+  return <div className="space-y-3"><div className="flex flex-wrap gap-2">{presets.map(name => <button key={name} onClick={() => applyPreset(name)} className={`rounded-lg px-3 py-2 text-sm font-medium ${preset === name ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{name}</button>)}</div>{preset === "Custom" && <div className="flex flex-wrap gap-3"><input type="date" value={range.start} onChange={e => setRange({ ...range, start: e.target.value })} className="rounded-md border border-slate-300 px-3 py-2 text-sm" /><input type="date" value={range.end} onChange={e => setRange({ ...range, end: e.target.value })} className="rounded-md border border-slate-300 px-3 py-2 text-sm" /></div>}</div>;
+}

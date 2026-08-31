@@ -1,0 +1,43 @@
+{
+  "name": "Invitation",
+  "type": "object",
+  "properties": {
+    "email": {
+      "type": "string",
+      "description": "Email address of the invited user"
+    },
+    "invited_role": {
+      "type": "string",
+      "enum": [
+        "submitter",
+        "approver",
+        "invoicer",
+        "admin"
+      ],
+      "description": "Role the user will be assigned"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "accepted",
+        "cancelled"
+      ],
+      "default": "pending",
+      "description": "Status of the invitation"
+    },
+    "invited_by": {
+      "type": "string",
+      "description": "Email of admin who sent the invite"
+    },
+    "accepted_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the invitation was accepted"
+    }
+  },
+  "required": [
+    "email",
+    "invited_role"
+  ]
+}

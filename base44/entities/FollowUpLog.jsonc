@@ -1,0 +1,45 @@
+{
+  "name": "FollowUpLog",
+  "type": "object",
+  "properties": {
+    "quote_id": {
+      "type": "string",
+      "description": "ID of the quote this follow-up is for"
+    },
+    "config_id": {
+      "type": "string",
+      "description": "ID of the follow-up config that triggered this"
+    },
+    "sent_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the follow-up was sent"
+    },
+    "trigger_reason": {
+      "type": "string",
+      "description": "Why the follow-up was sent"
+    },
+    "recipients": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Email addresses that received the follow-up"
+    },
+    "was_manual": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this was manually triggered"
+    },
+    "triggered_by": {
+      "type": "string",
+      "description": "Email of user who manually triggered (if applicable)"
+    }
+  },
+  "required": [
+    "quote_id",
+    "sent_date",
+    "trigger_reason",
+    "recipients"
+  ]
+}
