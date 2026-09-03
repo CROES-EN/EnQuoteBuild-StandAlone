@@ -1,0 +1,516 @@
+[2026-09-02 13:21:49] OK: relay healthy, no sync attempt recorded yet on this run.
+[2026-09-02 13:23:29] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-02 13:24:04] OK: relay healthy, last successful sync 2 minute(s) ago.
+[2026-09-02 13:24:48] webhook-receiver.cjs is NOT running - restarting via Scheduled Task...
+[2026-09-02 13:25:02] OK: relay healthy, last successful sync 3 minute(s) ago.
+[2026-09-02 13:25:02] OK: relay healthy, last successful sync 3 minute(s) ago.
+[2026-09-02 13:25:47] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-02 13:27:50] OK: relay healthy, last successful sync 6 minute(s) ago.
+[2026-09-02 13:30:48] OK: relay healthy, last successful sync 9 minute(s) ago.
+[2026-09-02 13:33:49] OK: relay healthy, last successful sync 12 minute(s) ago.
+[2026-09-02 13:36:49] OK: relay healthy, last successful sync 15 minute(s) ago.
+[2026-09-02 13:39:51] OK: relay healthy, last successful sync 18 minute(s) ago.
+[2026-09-02 13:42:49] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-02 13:46:43] OK: relay healthy, last successful sync 5 minute(s) ago.
+[2026-09-02 13:49:35] Could not reach webhook-receiver /health or /status: The operation has timed out.
+[2026-09-02 13:49:46] Toast shown: EnQuote Sync Problem - Could not reach the local sync relay at all - check sync-watchdog.log.
+[2026-09-02 13:52:14] Could not reach webhook-receiver /health or /status: The operation has timed out.
+[2026-09-02 13:52:15] Toast suppressed (cooldown active): EnQuote Sync Problem - Could not reach the local sync relay at all - check sync-watchdog.log.
+[2026-09-02 13:56:11] OK: relay healthy, last successful sync 14 minute(s) ago.
+[2026-09-02 13:58:15] OK: relay healthy, last successful sync 0 minute(s) ago.
+[2026-09-02 14:00:51] Could not reach webhook-receiver /health or /status: Unable to connect to the remote server
+[2026-09-02 14:00:51] Toast suppressed (cooldown active): EnQuote Sync Problem - Could not reach the local sync relay at all - check sync-watchdog.log.
+[2026-09-02 14:01:18] OK: relay healthy, last successful sync 3 minute(s) ago.
+[2026-09-02 14:02:18] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-02 14:03:22] webhook-receiver.cjs is NOT running - restarting via Scheduled Task...
+[2026-09-02 14:03:32] OK: relay healthy, last successful sync 5 minute(s) ago.
+[2026-09-02 14:04:19] OK: relay healthy, last successful sync 6 minute(s) ago.
+[2026-09-02 14:07:25] OK: relay healthy, last successful sync 9 minute(s) ago.
+[2026-09-02 14:10:17] OK: relay healthy, last successful sync 12 minute(s) ago.
+[2026-09-02 14:13:41] OK: relay healthy, last successful sync 16 minute(s) ago.
+[2026-09-02 14:16:50] OK: relay healthy, last successful sync 19 minute(s) ago.
+[2026-09-02 14:19:31] OK: relay healthy, last successful sync 21 minute(s) ago.
+[2026-09-02 14:22:17] OK: relay healthy, last successful sync 2 minute(s) ago.
+[2026-09-02 14:25:17] OK: relay healthy, last successful sync 5 minute(s) ago.
+[2026-09-02 14:28:19] OK: relay healthy, last successful sync 8 minute(s) ago.
+[2026-09-02 14:31:17] OK: relay healthy, last successful sync 11 minute(s) ago.
+[2026-09-02 14:34:17] OK: relay healthy, last successful sync 14 minute(s) ago.
+[2026-09-02 14:37:17] OK: relay healthy, last successful sync 17 minute(s) ago.
+[2026-09-02 14:40:18] OK: relay healthy, last successful sync 20 minute(s) ago.
+[2026-09-02 14:43:18] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-02 14:46:17] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-02 14:49:17] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-02 14:52:17] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-02 14:55:18] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-02 14:58:17] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-02 15:01:21] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-02 15:04:15] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-02 15:07:17] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-02 15:10:15] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-02 15:13:15] OK: relay healthy, last successful sync 16 minute(s) ago.
+[2026-09-02 15:16:20] OK: relay healthy, last successful sync 19 minute(s) ago.
+[2026-09-02 15:19:15] OK: relay healthy, last successful sync 22 minute(s) ago.
+[2026-09-02 15:22:15] OK: relay healthy, last successful sync 25 minute(s) ago.
+[2026-09-02 15:25:15] OK: relay healthy, last successful sync 28 minute(s) ago.
+[2026-09-02 15:28:19] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-02 15:31:15] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-02 15:34:22] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-02 15:37:16] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-02 15:40:18] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-02 15:43:17] OK: relay healthy, last successful sync 16 minute(s) ago.
+[2026-09-02 15:46:20] OK: relay healthy, last successful sync 19 minute(s) ago.
+[2026-09-02 15:49:16] OK: relay healthy, last successful sync 22 minute(s) ago.
+[2026-09-02 15:52:15] OK: relay healthy, last successful sync 25 minute(s) ago.
+[2026-09-02 15:55:18] OK: relay healthy, last successful sync 28 minute(s) ago.
+[2026-09-02 15:58:15] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-02 16:01:18] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-02 16:04:23] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-02 16:07:23] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-02 16:10:21] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-02 16:14:30] OK: relay healthy, last successful sync 18 minute(s) ago.
+[2026-09-02 16:16:27] OK: relay healthy, last successful sync 19 minute(s) ago.
+[2026-09-02 16:19:56] OK: relay healthy, last successful sync 23 minute(s) ago.
+[2026-09-02 16:22:17] OK: relay healthy, last successful sync 25 minute(s) ago.
+[2026-09-02 16:25:16] OK: relay healthy, last successful sync 28 minute(s) ago.
+[2026-09-02 16:28:17] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-02 16:31:17] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-02 16:34:19] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-02 16:38:06] OK: relay healthy, last successful sync 11 minute(s) ago.
+[2026-09-02 16:40:19] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-02 16:43:20] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-02 16:46:20] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-02 16:49:19] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-02 16:52:27] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-02 16:55:16] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-02 16:58:26] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-02 17:01:21] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-02 17:04:17] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-02 17:07:22] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-02 17:10:17] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-02 17:13:17] OK: relay healthy, last successful sync 16 minute(s) ago.
+[2026-09-02 17:18:19] OK: relay healthy, last successful sync 21 minute(s) ago.
+[2026-09-02 17:19:32] OK: relay healthy, last successful sync 23 minute(s) ago.
+[2026-09-02 17:22:16] OK: relay healthy, last successful sync 25 minute(s) ago.
+[2026-09-02 17:25:15] OK: relay healthy, last successful sync 28 minute(s) ago.
+[2026-09-02 17:28:15] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-02 17:31:15] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-02 17:34:17] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-02 17:37:15] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-02 17:40:15] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-02 17:43:15] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-02 17:46:15] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-02 17:49:14] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-02 17:52:15] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-02 17:55:15] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-02 17:58:15] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-02 18:01:15] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-02 18:04:16] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-02 18:07:15] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-02 18:10:16] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-02 18:13:16] OK: relay healthy, last successful sync 16 minute(s) ago.
+[2026-09-02 18:16:16] OK: relay healthy, last successful sync 19 minute(s) ago.
+[2026-09-02 18:19:18] OK: relay healthy, last successful sync 22 minute(s) ago.
+[2026-09-02 18:22:17] OK: relay healthy, last successful sync 25 minute(s) ago.
+[2026-09-02 18:25:16] OK: relay healthy, last successful sync 28 minute(s) ago.
+[2026-09-02 18:33:55] OK: relay healthy, last successful sync 2 minute(s) ago.
+[2026-09-02 18:45:53] OK: relay healthy, last successful sync 14 minute(s) ago.
+[2026-09-02 18:46:27] Could not reach webhook-receiver /health or /status: The operation has timed out.
+[2026-09-02 18:46:52] Toast shown: EnQuote Sync Problem - Could not reach the local sync relay at all - check sync-watchdog.log.
+[2026-09-02 18:53:22] OK: relay healthy, last successful sync 21 minute(s) ago.
+[2026-09-02 18:55:36] OK: relay healthy, last successful sync 24 minute(s) ago.
+[2026-09-02 18:56:27] OK: relay healthy, last successful sync 24 minute(s) ago.
+[2026-09-02 18:59:22] OK: relay healthy, last successful sync 27 minute(s) ago.
+[2026-09-02 19:01:26] OK: relay healthy, last successful sync 29 minute(s) ago.
+[2026-09-02 19:04:37] OK: relay healthy, last successful sync 33 minute(s) ago.
+[2026-09-02 19:07:21] OK: relay healthy, last successful sync 35 minute(s) ago.
+[2026-09-02 19:10:16] OK: relay healthy, last successful sync 38 minute(s) ago.
+[2026-09-02 19:13:15] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-02 19:16:16] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-02 19:19:16] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-02 19:22:17] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-02 19:25:16] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-02 19:28:16] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-02 19:31:15] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-02 19:34:16] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-02 19:37:15] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-02 19:40:15] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-02 19:43:15] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-02 19:46:15] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-02 19:49:15] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-02 19:52:15] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-02 19:55:15] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-02 19:58:15] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-02 20:01:15] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-02 20:04:16] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-02 20:07:16] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-02 20:10:15] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-02 20:13:15] OK: relay healthy, last successful sync 16 minute(s) ago.
+[2026-09-02 20:16:15] OK: relay healthy, last successful sync 19 minute(s) ago.
+[2026-09-02 20:19:16] OK: relay healthy, last successful sync 22 minute(s) ago.
+[2026-09-02 20:22:15] OK: relay healthy, last successful sync 25 minute(s) ago.
+[2026-09-02 20:25:17] OK: relay healthy, last successful sync 28 minute(s) ago.
+[2026-09-02 20:28:15] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-02 20:31:15] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-02 20:34:16] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-02 20:37:16] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-02 20:40:15] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-02 20:43:15] OK: relay healthy, last successful sync 16 minute(s) ago.
+[2026-09-02 20:46:16] OK: relay healthy, last successful sync 19 minute(s) ago.
+[2026-09-02 20:49:15] OK: relay healthy, last successful sync 22 minute(s) ago.
+[2026-09-02 20:52:15] OK: relay healthy, last successful sync 25 minute(s) ago.
+[2026-09-02 20:55:15] OK: relay healthy, last successful sync 28 minute(s) ago.
+[2026-09-02 20:58:15] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-02 21:01:16] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-02 21:04:16] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-02 21:07:15] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-02 21:10:15] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-02 21:13:15] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-02 21:16:16] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-02 21:19:15] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-02 21:22:16] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-02 21:25:16] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-02 21:28:16] OK: relay healthy, last successful sync 16 minute(s) ago.
+[2026-09-02 21:31:16] OK: relay healthy, last successful sync 19 minute(s) ago.
+[2026-09-02 21:34:17] OK: relay healthy, last successful sync 22 minute(s) ago.
+[2026-09-02 21:37:14] OK: relay healthy, last successful sync 25 minute(s) ago.
+[2026-09-02 21:40:14] OK: relay healthy, last successful sync 28 minute(s) ago.
+[2026-09-02 21:43:15] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-02 21:46:15] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-02 21:49:14] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-02 21:52:15] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-02 21:55:15] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-02 21:58:15] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-02 22:01:14] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-02 22:04:16] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-02 22:07:15] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-02 22:10:15] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-02 22:13:14] OK: relay healthy, last successful sync 16 minute(s) ago.
+[2026-09-02 22:16:15] OK: relay healthy, last successful sync 19 minute(s) ago.
+[2026-09-02 22:19:15] OK: relay healthy, last successful sync 22 minute(s) ago.
+[2026-09-02 22:22:14] OK: relay healthy, last successful sync 25 minute(s) ago.
+[2026-09-02 22:25:15] OK: relay healthy, last successful sync 28 minute(s) ago.
+[2026-09-02 22:28:15] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-02 22:31:16] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-02 22:34:16] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-02 22:37:14] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-02 22:40:15] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-02 22:43:14] OK: relay healthy, last successful sync 16 minute(s) ago.
+[2026-09-02 22:46:15] OK: relay healthy, last successful sync 19 minute(s) ago.
+[2026-09-02 22:49:15] OK: relay healthy, last successful sync 22 minute(s) ago.
+[2026-09-02 22:52:15] OK: relay healthy, last successful sync 25 minute(s) ago.
+[2026-09-02 22:55:15] OK: relay healthy, last successful sync 28 minute(s) ago.
+[2026-09-02 22:58:14] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-02 23:01:15] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-02 23:04:16] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-02 23:07:14] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-02 23:10:15] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-02 23:13:15] OK: relay healthy, last successful sync 16 minute(s) ago.
+[2026-09-02 23:16:15] OK: relay healthy, last successful sync 19 minute(s) ago.
+[2026-09-02 23:19:15] OK: relay healthy, last successful sync 22 minute(s) ago.
+[2026-09-02 23:22:15] OK: relay healthy, last successful sync 25 minute(s) ago.
+[2026-09-02 23:25:15] OK: relay healthy, last successful sync 28 minute(s) ago.
+[2026-09-02 23:28:15] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-02 23:31:15] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-02 23:34:16] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-02 23:37:15] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-02 23:40:15] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-02 23:43:15] OK: relay healthy, last successful sync 16 minute(s) ago.
+[2026-09-02 23:46:15] OK: relay healthy, last successful sync 19 minute(s) ago.
+[2026-09-02 23:49:14] OK: relay healthy, last successful sync 22 minute(s) ago.
+[2026-09-02 23:52:15] OK: relay healthy, last successful sync 25 minute(s) ago.
+[2026-09-02 23:55:15] OK: relay healthy, last successful sync 28 minute(s) ago.
+[2026-09-02 23:58:15] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-03 00:01:16] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-03 00:04:17] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-03 00:07:15] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-03 00:10:15] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-03 00:13:15] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-03 00:16:16] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-03 00:19:15] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-03 00:22:15] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-03 00:25:15] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-03 00:28:15] OK: relay healthy, last successful sync 16 minute(s) ago.
+[2026-09-03 00:31:16] OK: relay healthy, last successful sync 19 minute(s) ago.
+[2026-09-03 00:34:16] OK: relay healthy, last successful sync 22 minute(s) ago.
+[2026-09-03 00:37:15] OK: relay healthy, last successful sync 25 minute(s) ago.
+[2026-09-03 00:40:15] OK: relay healthy, last successful sync 28 minute(s) ago.
+[2026-09-03 00:43:15] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-03 00:46:15] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-03 00:49:15] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-03 00:52:15] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-03 00:55:15] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-03 00:58:15] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-03 01:01:15] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-03 01:04:17] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-03 01:07:15] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-03 01:10:15] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-03 01:13:15] OK: relay healthy, last successful sync 16 minute(s) ago.
+[2026-09-03 01:16:15] OK: relay healthy, last successful sync 19 minute(s) ago.
+[2026-09-03 01:19:15] OK: relay healthy, last successful sync 22 minute(s) ago.
+[2026-09-03 01:22:15] OK: relay healthy, last successful sync 25 minute(s) ago.
+[2026-09-03 01:25:15] OK: relay healthy, last successful sync 28 minute(s) ago.
+[2026-09-03 01:28:16] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-03 01:31:15] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-03 01:34:20] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-03 01:37:15] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-03 01:40:15] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-03 01:43:15] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-03 01:46:16] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-03 01:49:15] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-03 01:52:16] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-03 01:55:15] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-03 01:58:21] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-03 02:01:15] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-03 02:04:16] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-03 02:07:15] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-03 02:10:15] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-03 02:13:16] OK: relay healthy, last successful sync 16 minute(s) ago.
+[2026-09-03 02:16:16] OK: relay healthy, last successful sync 19 minute(s) ago.
+[2026-09-03 02:19:15] OK: relay healthy, last successful sync 22 minute(s) ago.
+[2026-09-03 02:22:15] OK: relay healthy, last successful sync 25 minute(s) ago.
+[2026-09-03 02:25:16] OK: relay healthy, last successful sync 28 minute(s) ago.
+[2026-09-03 02:28:16] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-03 02:31:15] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-03 02:34:17] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-03 02:37:16] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-03 02:40:15] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-03 02:43:16] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-03 02:46:15] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-03 02:49:15] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-03 02:52:17] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-03 02:55:16] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-03 02:58:16] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-03 03:01:16] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-03 03:04:17] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-03 03:07:15] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-03 03:10:16] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-03 03:13:16] OK: relay healthy, last successful sync 16 minute(s) ago.
+[2026-09-03 03:16:17] OK: relay healthy, last successful sync 19 minute(s) ago.
+[2026-09-03 03:19:15] OK: relay healthy, last successful sync 22 minute(s) ago.
+[2026-09-03 03:22:16] OK: relay healthy, last successful sync 25 minute(s) ago.
+[2026-09-03 03:25:15] OK: relay healthy, last successful sync 28 minute(s) ago.
+[2026-09-03 03:28:15] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-03 03:31:16] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-03 03:34:16] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-03 03:37:16] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-03 03:40:15] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-03 03:43:15] OK: relay healthy, last successful sync 16 minute(s) ago.
+[2026-09-03 03:46:16] OK: relay healthy, last successful sync 19 minute(s) ago.
+[2026-09-03 03:49:15] OK: relay healthy, last successful sync 22 minute(s) ago.
+[2026-09-03 03:52:16] OK: relay healthy, last successful sync 25 minute(s) ago.
+[2026-09-03 03:55:15] OK: relay healthy, last successful sync 28 minute(s) ago.
+[2026-09-03 03:58:16] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-03 04:01:15] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-03 04:04:17] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-03 04:07:15] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-03 04:10:16] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-03 04:13:15] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-03 04:16:16] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-03 04:19:16] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-03 04:22:14] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-03 04:25:15] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-03 04:28:15] OK: relay healthy, last successful sync 16 minute(s) ago.
+[2026-09-03 04:31:15] OK: relay healthy, last successful sync 19 minute(s) ago.
+[2026-09-03 04:34:16] OK: relay healthy, last successful sync 22 minute(s) ago.
+[2026-09-03 04:37:14] OK: relay healthy, last successful sync 25 minute(s) ago.
+[2026-09-03 04:40:15] OK: relay healthy, last successful sync 28 minute(s) ago.
+[2026-09-03 04:43:15] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-03 04:46:16] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-03 04:49:15] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-03 04:52:14] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-03 04:55:15] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-03 04:58:14] OK: relay healthy, last successful sync 16 minute(s) ago.
+[2026-09-03 05:01:15] OK: relay healthy, last successful sync 19 minute(s) ago.
+[2026-09-03 05:04:16] OK: relay healthy, last successful sync 22 minute(s) ago.
+[2026-09-03 05:07:15] OK: relay healthy, last successful sync 25 minute(s) ago.
+[2026-09-03 05:10:14] OK: relay healthy, last successful sync 28 minute(s) ago.
+[2026-09-03 05:13:15] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-03 05:16:15] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-03 05:19:14] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-03 05:22:15] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-03 05:25:15] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-03 05:28:15] OK: relay healthy, last successful sync 16 minute(s) ago.
+[2026-09-03 05:31:15] OK: relay healthy, last successful sync 19 minute(s) ago.
+[2026-09-03 05:34:16] OK: relay healthy, last successful sync 22 minute(s) ago.
+[2026-09-03 05:37:14] OK: relay healthy, last successful sync 25 minute(s) ago.
+[2026-09-03 05:40:15] OK: relay healthy, last successful sync 28 minute(s) ago.
+[2026-09-03 05:43:15] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-03 05:46:15] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-03 05:49:15] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-03 05:52:15] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-03 05:55:15] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-03 05:58:17] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-03 06:01:15] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-03 06:04:16] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-03 06:07:15] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-03 06:10:15] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-03 06:13:15] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-03 06:16:16] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-03 06:19:15] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-03 06:22:15] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-03 06:25:16] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-03 06:28:15] OK: relay healthy, last successful sync 16 minute(s) ago.
+[2026-09-03 06:31:15] OK: relay healthy, last successful sync 19 minute(s) ago.
+[2026-09-03 06:34:16] OK: relay healthy, last successful sync 22 minute(s) ago.
+[2026-09-03 06:37:15] OK: relay healthy, last successful sync 25 minute(s) ago.
+[2026-09-03 06:40:16] OK: relay healthy, last successful sync 28 minute(s) ago.
+[2026-09-03 06:43:15] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-03 06:46:15] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-03 06:49:15] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-03 06:52:14] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-03 06:55:15] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-03 06:58:15] OK: relay healthy, last successful sync 16 minute(s) ago.
+[2026-09-03 07:01:15] OK: relay healthy, last successful sync 19 minute(s) ago.
+[2026-09-03 07:04:16] OK: relay healthy, last successful sync 22 minute(s) ago.
+[2026-09-03 07:07:15] OK: relay healthy, last successful sync 25 minute(s) ago.
+[2026-09-03 07:10:15] OK: relay healthy, last successful sync 28 minute(s) ago.
+[2026-09-03 07:13:17] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-03 07:16:15] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-03 07:19:15] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-03 07:22:15] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-03 07:25:15] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-03 07:28:15] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-03 07:31:15] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-03 07:34:16] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-03 07:37:15] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-03 07:40:16] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-03 07:43:16] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-03 07:46:16] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-03 07:49:15] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-03 07:52:15] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-03 07:55:23] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-03 07:58:22] OK: relay healthy, last successful sync 16 minute(s) ago.
+[2026-09-03 08:01:19] OK: relay healthy, last successful sync 19 minute(s) ago.
+[2026-09-03 08:04:20] OK: relay healthy, last successful sync 22 minute(s) ago.
+[2026-09-03 08:07:26] OK: relay healthy, last successful sync 25 minute(s) ago.
+[2026-09-03 08:10:20] OK: relay healthy, last successful sync 28 minute(s) ago.
+[2026-09-03 08:13:29] OK: relay healthy, last successful sync 31 minute(s) ago.
+[2026-09-03 08:16:17] OK: relay healthy, last successful sync 34 minute(s) ago.
+[2026-09-03 08:19:19] OK: relay healthy, last successful sync 37 minute(s) ago.
+[2026-09-03 08:22:19] OK: relay healthy, last successful sync 40 minute(s) ago.
+[2026-09-03 08:25:19] OK: relay healthy, last successful sync 43 minute(s) ago.
+[2026-09-03 08:28:17] STALE: last successful sync was 46 minute(s) ago (threshold 45).
+[2026-09-03 08:28:18] Toast shown: EnQuote Sync Stale - No successful Base44 sync in 46 minutes. Check the app and network.
+[2026-09-03 08:31:22] STALE: last successful sync was 49 minute(s) ago (threshold 45).
+[2026-09-03 08:31:22] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 49 minutes. Check the app and network.
+[2026-09-03 08:34:16] STALE: last successful sync was 52 minute(s) ago (threshold 45).
+[2026-09-03 08:34:16] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 52 minutes. Check the app and network.
+[2026-09-03 08:37:19] STALE: last successful sync was 55 minute(s) ago (threshold 45).
+[2026-09-03 08:37:19] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 55 minutes. Check the app and network.
+[2026-09-03 08:40:19] STALE: last successful sync was 58 minute(s) ago (threshold 45).
+[2026-09-03 08:40:19] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 58 minutes. Check the app and network.
+[2026-09-03 08:43:16] STALE: last successful sync was 61 minute(s) ago (threshold 45).
+[2026-09-03 08:43:17] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 61 minutes. Check the app and network.
+[2026-09-03 08:46:20] STALE: last successful sync was 64 minute(s) ago (threshold 45).
+[2026-09-03 08:46:20] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 64 minutes. Check the app and network.
+[2026-09-03 08:49:20] STALE: last successful sync was 67 minute(s) ago (threshold 45).
+[2026-09-03 08:49:20] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 67 minutes. Check the app and network.
+[2026-09-03 08:52:22] STALE: last successful sync was 70 minute(s) ago (threshold 45).
+[2026-09-03 08:52:22] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 70 minutes. Check the app and network.
+[2026-09-03 08:55:35] STALE: last successful sync was 73 minute(s) ago (threshold 45).
+[2026-09-03 08:55:35] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 73 minutes. Check the app and network.
+[2026-09-03 08:58:17] STALE: last successful sync was 76 minute(s) ago (threshold 45).
+[2026-09-03 08:58:17] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 76 minutes. Check the app and network.
+[2026-09-03 09:01:17] STALE: last successful sync was 79 minute(s) ago (threshold 45).
+[2026-09-03 09:01:17] Toast shown: EnQuote Sync Stale - No successful Base44 sync in 79 minutes. Check the app and network.
+[2026-09-03 09:04:17] STALE: last successful sync was 82 minute(s) ago (threshold 45).
+[2026-09-03 09:04:17] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 82 minutes. Check the app and network.
+[2026-09-03 09:07:16] STALE: last successful sync was 85 minute(s) ago (threshold 45).
+[2026-09-03 09:07:16] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 85 minutes. Check the app and network.
+[2026-09-03 09:10:16] STALE: last successful sync was 88 minute(s) ago (threshold 45).
+[2026-09-03 09:10:16] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 88 minutes. Check the app and network.
+[2026-09-03 09:13:24] STALE: last successful sync was 91 minute(s) ago (threshold 45).
+[2026-09-03 09:13:25] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 91 minutes. Check the app and network.
+[2026-09-03 09:16:20] STALE: last successful sync was 94 minute(s) ago (threshold 45).
+[2026-09-03 09:16:20] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 94 minutes. Check the app and network.
+[2026-09-03 09:19:18] STALE: last successful sync was 97 minute(s) ago (threshold 45).
+[2026-09-03 09:19:19] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 97 minutes. Check the app and network.
+[2026-09-03 09:22:17] STALE: last successful sync was 100 minute(s) ago (threshold 45).
+[2026-09-03 09:22:18] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 100 minutes. Check the app and network.
+[2026-09-03 09:25:16] STALE: last successful sync was 103 minute(s) ago (threshold 45).
+[2026-09-03 09:25:16] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 103 minutes. Check the app and network.
+[2026-09-03 09:28:18] STALE: last successful sync was 106 minute(s) ago (threshold 45).
+[2026-09-03 09:28:18] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 106 minutes. Check the app and network.
+[2026-09-03 09:31:16] STALE: last successful sync was 109 minute(s) ago (threshold 45).
+[2026-09-03 09:31:16] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 109 minutes. Check the app and network.
+[2026-09-03 09:34:16] STALE: last successful sync was 112 minute(s) ago (threshold 45).
+[2026-09-03 09:34:16] Toast shown: EnQuote Sync Stale - No successful Base44 sync in 112 minutes. Check the app and network.
+[2026-09-03 09:37:28] STALE: last successful sync was 115 minute(s) ago (threshold 45).
+[2026-09-03 09:37:28] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 115 minutes. Check the app and network.
+[2026-09-03 09:40:17] STALE: last successful sync was 118 minute(s) ago (threshold 45).
+[2026-09-03 09:40:17] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 118 minutes. Check the app and network.
+[2026-09-03 09:43:20] STALE: last successful sync was 121 minute(s) ago (threshold 45).
+[2026-09-03 09:43:20] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 121 minutes. Check the app and network.
+[2026-09-03 09:46:16] STALE: last successful sync was 124 minute(s) ago (threshold 45).
+[2026-09-03 09:46:17] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 124 minutes. Check the app and network.
+[2026-09-03 09:49:18] STALE: last successful sync was 127 minute(s) ago (threshold 45).
+[2026-09-03 09:49:18] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 127 minutes. Check the app and network.
+[2026-09-03 09:52:19] STALE: last successful sync was 130 minute(s) ago (threshold 45).
+[2026-09-03 09:52:19] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 130 minutes. Check the app and network.
+[2026-09-03 09:55:18] STALE: last successful sync was 133 minute(s) ago (threshold 45).
+[2026-09-03 09:55:18] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 133 minutes. Check the app and network.
+[2026-09-03 09:58:18] STALE: last successful sync was 136 minute(s) ago (threshold 45).
+[2026-09-03 09:58:18] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 136 minutes. Check the app and network.
+[2026-09-03 10:01:19] STALE: last successful sync was 139 minute(s) ago (threshold 45).
+[2026-09-03 10:01:19] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 139 minutes. Check the app and network.
+[2026-09-03 10:04:17] STALE: last successful sync was 142 minute(s) ago (threshold 45).
+[2026-09-03 10:04:18] Toast shown: EnQuote Sync Stale - No successful Base44 sync in 142 minutes. Check the app and network.
+[2026-09-03 10:07:17] STALE: last successful sync was 145 minute(s) ago (threshold 45).
+[2026-09-03 10:07:17] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 145 minutes. Check the app and network.
+[2026-09-03 10:10:18] STALE: last successful sync was 148 minute(s) ago (threshold 45).
+[2026-09-03 10:10:18] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 148 minutes. Check the app and network.
+[2026-09-03 10:13:40] STALE: last successful sync was 152 minute(s) ago (threshold 45).
+[2026-09-03 10:13:40] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 152 minutes. Check the app and network.
+[2026-09-03 10:16:26] STALE: last successful sync was 154 minute(s) ago (threshold 45).
+[2026-09-03 10:16:26] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 154 minutes. Check the app and network.
+[2026-09-03 10:19:18] STALE: last successful sync was 157 minute(s) ago (threshold 45).
+[2026-09-03 10:19:18] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 157 minutes. Check the app and network.
+[2026-09-03 10:22:20] STALE: last successful sync was 160 minute(s) ago (threshold 45).
+[2026-09-03 10:22:20] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 160 minutes. Check the app and network.
+[2026-09-03 10:25:15] STALE: last successful sync was 163 minute(s) ago (threshold 45).
+[2026-09-03 10:25:15] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 163 minutes. Check the app and network.
+[2026-09-03 10:28:15] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-03 10:31:16] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-03 10:34:15] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-03 10:37:15] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-03 10:40:15] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-03 10:43:14] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-03 10:46:15] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-03 10:49:15] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-03 10:52:16] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-03 10:55:18] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-03 10:58:17] OK: relay healthy, last successful sync 16 minute(s) ago.
+[2026-09-03 11:01:20] OK: relay healthy, last successful sync 3 minute(s) ago.
+[2026-09-03 11:04:20] OK: relay healthy, last successful sync 6 minute(s) ago.
+[2026-09-03 11:07:18] OK: relay healthy, last successful sync 9 minute(s) ago.
+[2026-09-03 11:10:32] OK: relay healthy, last successful sync 12 minute(s) ago.
+[2026-09-03 11:14:24] OK: relay healthy, last successful sync 16 minute(s) ago.
+[2026-09-03 11:16:21] OK: relay healthy, last successful sync 18 minute(s) ago.
+[2026-09-03 11:19:19] OK: relay healthy, last successful sync 21 minute(s) ago.
+[2026-09-03 11:22:18] OK: relay healthy, last successful sync 24 minute(s) ago.
+[2026-09-03 11:25:21] OK: relay healthy, last successful sync 0 minute(s) ago.
+[2026-09-03 11:28:17] OK: relay healthy, last successful sync 3 minute(s) ago.
+[2026-09-03 11:31:17] OK: relay healthy, last successful sync 6 minute(s) ago.
+[2026-09-03 11:34:17] OK: relay healthy, last successful sync 9 minute(s) ago.
+[2026-09-03 11:37:16] OK: relay healthy, last successful sync 12 minute(s) ago.
+[2026-09-03 11:40:19] OK: relay healthy, last successful sync 15 minute(s) ago.
+[2026-09-03 11:43:17] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-03 11:46:18] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-03 11:49:17] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-03 11:52:16] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-03 11:55:22] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-03 11:58:14] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-03 12:01:15] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-03 12:04:14] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-03 12:07:33] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-03 12:10:18] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-03 12:13:44] OK: relay healthy, last successful sync 2 minute(s) ago.
+[2026-09-03 12:16:24] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-03 12:19:19] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-03 12:22:18] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-03 12:25:56] OK: relay healthy, last successful sync 14 minute(s) ago.
+[2026-09-03 12:28:17] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-03 12:31:17] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-03 12:34:59] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-03 12:38:52] OK: relay healthy, last successful sync 11 minute(s) ago.
+[2026-09-03 12:41:57] OK: relay healthy, last successful sync 14 minute(s) ago.

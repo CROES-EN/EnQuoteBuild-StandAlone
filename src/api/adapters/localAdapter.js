@@ -26,7 +26,7 @@ export const localAdapter = {
   listRecentQuotes: (limit = 100) => resource("quotes").list({ limit }),
   filterQuotes: (filters = {}) => resource("quotes").filter(filters),
   createQuote: (data) => resource("quotes").create(data),
-  updateQuote: (recordId, data) => resource("quotes").update(recordId, data),
+  updateQuote: (recordId, data, expectedVersion) => resource("quotes").update(recordId, data, expectedVersion),
   deleteQuote: (recordId) => resource("quotes").delete(recordId),
   bulkUpdateQuotes: (updates) => resource("quotes").bulkUpdate(updates),
 
@@ -51,7 +51,10 @@ export const localAdapter = {
       ? resource("followUps").filter({ quote_id: quoteId })
       : resource("followUps").list(),
   createFollowUp: (data) => resource("followUps").create(data),
-  getUsers: () => resource("users").list(),
+  // Unlike quotes/products/reviews/etc., "users" has no dedicated bridge object in
+  // preload.cjs - it only ever existed as one of the generic named collections, so route
+  // through that bridge instead of the (nonexistent) resource("users").
+  getUsers: () => bridge().collections.list("users"),
 
   listLocalCollection: (name, ...args) => bridge().collections.list(name, ...args),
   createLocalRecord: (name, data) => bridge().collections.create(name, data),

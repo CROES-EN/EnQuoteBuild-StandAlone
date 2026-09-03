@@ -1,6 +1,6 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { bulkUpdateQuotes, createLocalRecord, createQuote, createReview, deleteQuote, getCurrentUser, getQuoteById, getQuotes, getReviews, getUsers, listLocalCollection, updateQuote, updateReview } from "@/api/dataClient";
+import { bulkUpdateQuotes, createLocalRecord, createQuote, createReview, deleteQuote, getCurrentUser, getQuoteById, getQuotes, getReviews, getUsers, isLocalDataSource, listLocalCollection, updateQuote, updateReview } from "@/api/dataClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useLocation} from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -60,6 +60,43 @@ const PRE_APPROVAL_USERS = ["smosley@enphaseenergy.com", "REDACTED-USER1@example
 
 // Users who can edit and re-approve quotes that are in "quote_sent_to_ho" status
 const HO_EDIT_USERS = ["smosley@enphaseenergy.com", "vseganos@enphaseenergy.com", "REDACTED-USER1@example.invalid"];
+
+// In local/offline mode the Base44 SDK is replaced by a stub that has no
+// `entities` and whose `auth.me()` resolves to undefined. Calling into it
+// threw out of the click handlers, unmounting the app back to the login
+// screen. These wrappers keep every handler working offline.
+async function safeMe() {
+  if (!isLocalDataSource && base44?.auth?.me) {
+    try {
+      const me = await base44.auth.me();
+      if (me) return me;
+    } catch (error) {
+      console.warn("base44.auth.me() failed, falling back to local user", error);
+    }
+  }
+  const local = await getCurrentUser();
+  return local || {};
+}
+
+async function getEmailDistributions(filter) {
+  if (isLocalDataSource || !base44?.entities?.EmailDistribution) return [];
+  try {
+    return (await base44.entities.EmailDistribution.filter(filter)) || [];
+  } catch (error) {
+    console.warn("EmailDistribution lookup failed", error);
+    return [];
+  }
+}
+
+async function sendEmailSafe(payload) {
+  if (isLocalDataSource || !base44?.integrations?.Core?.SendEmail) return null;
+  return base44.integrations.Core.SendEmail(payload);
+}
+
+async function uploadFileSafe(payload) {
+  if (isLocalDataSource || !base44?.integrations?.Core?.UploadFile) return {};
+  return base44.integrations.Core.UploadFile(payload);
+}
 
 function QuoteDetailsContent() {
   const { isApprover, isAdmin, isSubmitter, roles, user } = useUserRole();
@@ -178,7 +215,7 @@ function QuoteDetailsContent() {
   });
 
   const handleRequestDeletion = async () => {
-    const user = await base44.auth.me();
+    const user = await safeMe();
     await requestDeletionMutation.mutateAsync({
       quote_id: quoteId,
       quote_number: quote.quote_number || quote.site_id,
@@ -191,7 +228,7 @@ function QuoteDetailsContent() {
   const canEditHOQuote = HO_EDIT_USERS.includes(user?.email?.toLowerCase());
 
   const handleTogglePreApproval = async (checked) => {
-    const me = await base44.auth.me();
+    const me = await safeMe();
     await updateMutation.mutateAsync({
       id: quoteId,
       data: {
@@ -204,11 +241,11 @@ function QuoteDetailsContent() {
   };
 
   const handleSubmit = async () => {
-    console.log('ðŸš€ handleSubmit called - Starting quote submission');
-    console.log('ðŸ“‹ Quote data:', { id: quoteId, site_id: quote.site_id, created_by: quote.created_by });
+    console.log('?? handleSubmit called - Starting quote submission');
+    console.log('?? Quote data:', { id: quoteId, site_id: quote.site_id, created_by: quote.created_by });
     
-    const user = await base44.auth.me();
-    console.log('ðŸ‘¤ Current user:', user.email);
+    const user = await safeMe();
+    console.log('?? Current user:', user.email);
     
     await updateMutation.mutateAsync({
       id: quoteId,
@@ -227,54 +264,54 @@ function QuoteDetailsContent() {
       }
     });
     
-    console.log('âœ… Quote status updated to submitted');
-    console.log('ðŸ“§ Starting email notification process...');
+    console.log('? Quote status updated to submitted');
+    console.log('?? Starting email notification process...');
     
-    const distributions = await base44.entities.EmailDistribution.filter({
+    const distributions = await getEmailDistributions({
       email_type: "quote_submitted",
       is_active: true
     });
     
-    console.log('ðŸ“§ Found distributions:', distributions.length);
-    console.log('ðŸ“§ Distribution details:', distributions);
-    console.log('ðŸ“§ Quote creator:', quote.created_by);
+    console.log('?? Found distributions:', distributions.length);
+    console.log('?? Distribution details:', distributions);
+    console.log('?? Quote creator:', quote.created_by);
     
     const emailRecipients = [
       ...distributions.map(d => d.recipient_email),
       ...(quote.created_by ? [quote.created_by] : [])
     ];
-    console.log('ðŸ“§ Will send emails to:', emailRecipients);
+    console.log('?? Will send emails to:', emailRecipients);
     
     const emailResults = await Promise.allSettled([
       ...distributions.map(dist =>
-        base44.integrations.Core.SendEmail({
+        sendEmailSafe({
           to: dist.recipient_email,
           subject: `New Quote Submitted: ${quote.site_id || quote.quote_number}`,
           body: `A new quote has been submitted for approval.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}\n\nPlease review and approve/reject in the system.`
         }).then(() => {
-          console.log('âœ… Email sent successfully to:', dist.recipient_email);
+          console.log('? Email sent successfully to:', dist.recipient_email);
           return { email: dist.recipient_email, success: true };
         }).catch(err => {
-          console.error('âŒ Email failed to:', dist.recipient_email, err);
+          console.error('? Email failed to:', dist.recipient_email, err);
           return { email: dist.recipient_email, success: false, error: err };
         })
       ),
       ...(quote.created_by ? [
-        base44.integrations.Core.SendEmail({
+        sendEmailSafe({
           to: quote.created_by,
           subject: `Quote Submitted Successfully: ${quote.site_id || quote.quote_number}`,
           body: `Your quote has been submitted for approval.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}\n\nYou will be notified once it's reviewed.`
         }).then(() => {
-          console.log('âœ… Email sent successfully to creator:', quote.created_by);
+          console.log('? Email sent successfully to creator:', quote.created_by);
           return { email: quote.created_by, success: true };
         }).catch(err => {
-          console.error('âŒ Email failed to creator:', quote.created_by, err);
+          console.error('? Email failed to creator:', quote.created_by, err);
           return { email: quote.created_by, success: false, error: err };
         })
       ] : [])
     ]);
     
-    console.log('ðŸ“§ Email results:', emailResults);
+    console.log('?? Email results:', emailResults);
     
     const failedEmails = emailResults
       .filter(result => result.status === 'fulfilled' && !result.value.success)
@@ -284,8 +321,8 @@ function QuoteDetailsContent() {
       .filter(result => result.status === 'rejected')
       .map(result => result.reason);
     
-    console.log('âŒ Failed emails:', failedEmails);
-    console.log('âŒ Rejected emails:', rejectedEmails);
+    console.log('? Failed emails:', failedEmails);
+    console.log('? Rejected emails:', rejectedEmails);
     
     if (failedEmails.length > 0) {
       toast.error(`Failed to send notifications to: ${failedEmails.join(', ')}`);
@@ -298,7 +335,7 @@ function QuoteDetailsContent() {
   };
 
   const handleApprove = async () => {
-    const user = await base44.auth.me();
+    const user = await safeMe();
     await updateMutation.mutateAsync({
       id: quoteId,
       data: { 
@@ -323,14 +360,14 @@ function QuoteDetailsContent() {
     try {
       const pdfBlob = await generateQuotePDF(quote);
       const pdfFile = new File([pdfBlob], `quote-${quote.site_id || quote.quote_number}.pdf`, { type: 'application/pdf' });
-      const { file_url } = await base44.integrations.Core.UploadFile({ file: pdfFile });
+      const { file_url } = await uploadFileSafe({ file: pdfFile });
       pdfUrl = file_url;
     } catch (pdfError) {
       console.error('PDF generation failed, sending emails without PDF:', pdfError);
     }
 
     try {
-      const distributions = await base44.entities.EmailDistribution.filter({
+      const distributions = await getEmailDistributions({
         email_type: "quote_approved",
         is_active: true
       });
@@ -339,7 +376,7 @@ function QuoteDetailsContent() {
 
       const emailResults = await Promise.allSettled([
         ...distributions.map(dist =>
-          base44.integrations.Core.SendEmail({
+          sendEmailSafe({
             to: dist.recipient_email,
             subject: `Quote Approved: ${quote.site_id || quote.quote_number}`,
             body: `A quote has been approved.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}\n\nThe quote is now ready for invoicing.${pdfLine}`
@@ -347,7 +384,7 @@ function QuoteDetailsContent() {
             .catch(() => ({ email: dist.recipient_email, success: false }))
         ),
         ...(quote.created_by ? [
-          base44.integrations.Core.SendEmail({
+          sendEmailSafe({
             to: quote.created_by,
             subject: `Your Quote Was Approved: ${quote.site_id || quote.quote_number}`,
             body: `Good news! Your quote has been approved.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}\n\nThe quote is now ready for invoicing.${pdfLine}`
@@ -373,7 +410,7 @@ function QuoteDetailsContent() {
   };
 
   const handleReject = async () => {
-    const user = await base44.auth.me();
+    const user = await safeMe();
     await updateMutation.mutateAsync({
       id: quoteId,
       data: { 
@@ -392,14 +429,14 @@ function QuoteDetailsContent() {
     });
     
     try {
-      const distributions = await base44.entities.EmailDistribution.filter({
+      const distributions = await getEmailDistributions({
         email_type: "quote_rejected",
         is_active: true
       });
       
       const emailResults = await Promise.allSettled([
         ...distributions.map(dist =>
-          base44.integrations.Core.SendEmail({
+          sendEmailSafe({
             to: dist.recipient_email,
             subject: `Quote Rejected: ${quote.site_id || quote.quote_number}`,
             body: `A quote has been rejected.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}\n\nReason: ${rejectionReason}`
@@ -407,7 +444,7 @@ function QuoteDetailsContent() {
             .catch(err => ({ email: dist.recipient_email, success: false }))
         ),
         ...(quote.created_by ? [
-          base44.integrations.Core.SendEmail({
+          sendEmailSafe({
             to: quote.created_by,
             subject: `Your Quote Was Rejected: ${quote.site_id || quote.quote_number}`,
             body: `Your quote has been rejected.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}\n\nReason: ${rejectionReason}`
@@ -433,7 +470,7 @@ function QuoteDetailsContent() {
   };
 
   const handleMarkQuoteSentToHO = async () => {
-    const user = await base44.auth.me();
+    const user = await safeMe();
     await updateMutation.mutateAsync({
       id: quoteId,
       data: { 
@@ -453,14 +490,14 @@ function QuoteDetailsContent() {
     await closeRejectedSiblings(quote, "quote_sent_to_ho");
     
     try {
-      const distributions = await base44.entities.EmailDistribution.filter({
+      const distributions = await getEmailDistributions({
         email_type: "quote_sent_to_ho",
         is_active: true
       });
       
       const emailResults = await Promise.allSettled([
         ...distributions.map(dist =>
-          base44.integrations.Core.SendEmail({
+          sendEmailSafe({
             to: dist.recipient_email,
             subject: `Quote Sent to HO: ${quote.site_id || quote.quote_number}`,
             body: `A quote has been sent to HO.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}`
@@ -468,7 +505,7 @@ function QuoteDetailsContent() {
             .catch(err => ({ email: dist.recipient_email, success: false }))
         ),
         ...(quote.created_by ? [
-          base44.integrations.Core.SendEmail({
+          sendEmailSafe({
             to: quote.created_by,
             subject: `Your Quote Sent to HO: ${quote.site_id || quote.quote_number}`,
             body: `Your quote has been sent to HO.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}`
@@ -492,7 +529,7 @@ function QuoteDetailsContent() {
   };
 
   const handleMarkHOApproved = async () => {
-    const user = await base44.auth.me();
+    const user = await safeMe();
     await updateMutation.mutateAsync({
       id: quoteId,
       data: { 
@@ -512,14 +549,14 @@ function QuoteDetailsContent() {
     await closeRejectedSiblings(quote, "ho_approved_invoice_required");
     
     try {
-      const distributions = await base44.entities.EmailDistribution.filter({
+      const distributions = await getEmailDistributions({
         email_type: "ho_approved_invoice_required",
         is_active: true
       });
       
       const emailResults = await Promise.allSettled([
         ...distributions.map(dist =>
-          base44.integrations.Core.SendEmail({
+          sendEmailSafe({
             to: dist.recipient_email,
             subject: `HO Approved, Invoice Required: ${quote.site_id || quote.quote_number}`,
             body: `HO has approved the quote and an invoice is required.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}`
@@ -527,7 +564,7 @@ function QuoteDetailsContent() {
             .catch(err => ({ email: dist.recipient_email, success: false }))
         ),
         ...(quote.created_by ? [
-          base44.integrations.Core.SendEmail({
+          sendEmailSafe({
             to: quote.created_by,
             subject: `Your Quote HO Approved: ${quote.site_id || quote.quote_number}`,
             body: `HO has approved your quote and an invoice is required.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}`
@@ -551,7 +588,7 @@ function QuoteDetailsContent() {
   };
 
   const handleMarkInvoiced = async () => {
-    const user = await base44.auth.me();
+    const user = await safeMe();
     await updateMutation.mutateAsync({
       id: quoteId,
       data: { 
@@ -571,14 +608,14 @@ function QuoteDetailsContent() {
     await closeRejectedSiblings(quote, "invoiced");
     
     try {
-      const distributions = await base44.entities.EmailDistribution.filter({
+      const distributions = await getEmailDistributions({
         email_type: "invoiced",
         is_active: true
       });
       
       const emailResults = await Promise.allSettled([
         ...distributions.map(dist =>
-          base44.integrations.Core.SendEmail({
+          sendEmailSafe({
             to: dist.recipient_email,
             subject: `Quote Invoiced: ${quote.site_id || quote.quote_number}`,
             body: `A quote has been marked as invoiced.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}`
@@ -586,7 +623,7 @@ function QuoteDetailsContent() {
             .catch(err => ({ email: dist.recipient_email, success: false }))
         ),
         ...(quote.created_by ? [
-          base44.integrations.Core.SendEmail({
+          sendEmailSafe({
             to: quote.created_by,
             subject: `Your Quote Invoiced: ${quote.site_id || quote.quote_number}`,
             body: `Your quote has been marked as invoiced.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}`
@@ -610,13 +647,13 @@ function QuoteDetailsContent() {
   };
 
   const handleHOReject = async () => {
-    const user = await base44.auth.me();
+    const user = await safeMe();
     await updateMutation.mutateAsync({
       id: quoteId,
       data: { 
         status: "ho_rejected",
         ho_rejected_date: new Date().toISOString(),
-        ho_rejection_reason: `${decisionCategory} â€” ${hoRejectionReason}`,
+        ho_rejection_reason: `${decisionCategory} � ${hoRejectionReason}`,
         status_history: [
           ...(quote.status_history || []),
           {
@@ -630,14 +667,14 @@ function QuoteDetailsContent() {
     });
     
     try {
-      const distributions = await base44.entities.EmailDistribution.filter({
+      const distributions = await getEmailDistributions({
         email_type: "ho_rejected",
         is_active: true
       });
       
       const emailResults = await Promise.allSettled([
         ...distributions.map(dist =>
-          base44.integrations.Core.SendEmail({
+          sendEmailSafe({
             to: dist.recipient_email,
             subject: `HO Rejected Quote: ${quote.site_id || quote.quote_number}`,
             body: `HO has rejected a quote.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}\n\nReason: ${hoRejectionReason}`
@@ -645,7 +682,7 @@ function QuoteDetailsContent() {
             .catch(err => ({ email: dist.recipient_email, success: false }))
         ),
         ...(quote.created_by ? [
-          base44.integrations.Core.SendEmail({
+          sendEmailSafe({
             to: quote.created_by,
             subject: `HO Rejected Your Quote: ${quote.site_id || quote.quote_number}`,
             body: `HO has rejected your quote.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}\n\nReason: ${hoRejectionReason}`
@@ -681,7 +718,7 @@ function QuoteDetailsContent() {
       setShowPaidDialog(true);
       return;
     }
-    const currentUser = await base44.auth.me();
+    const currentUser = await safeMe();
     await updateMutation.mutateAsync({
       id: quoteId,
       data: {
@@ -701,7 +738,7 @@ function QuoteDetailsContent() {
   };
 
   const handleMarkScheduled = async () => {
-    const currentUser = await base44.auth.me();
+    const currentUser = await safeMe();
     await updateMutation.mutateAsync({
       id: quoteId,
       data: {
@@ -713,7 +750,7 @@ function QuoteDetailsContent() {
             status: "scheduled",
             changed_by: currentUser.email,
             changed_at: new Date().toISOString(),
-            reason: "Quote scheduled for site visit â€” handed off to Scheduling team"
+            reason: "Quote scheduled for site visit � handed off to Scheduling team"
           }
         ]
       }
@@ -737,7 +774,7 @@ function QuoteDetailsContent() {
   };
 
   const handlePullBackToDraft = async () => {
-    const currentUser = await base44.auth.me();
+    const currentUser = await safeMe();
     await updateMutation.mutateAsync({
       id: quoteId,
       data: {
@@ -757,7 +794,7 @@ function QuoteDetailsContent() {
   };
 
   const handleMarkInvoicePaid = async () => {
-    const user = await base44.auth.me();
+    const user = await safeMe();
     const paidDateISO = new Date(paidDate + "T12:00:00").toISOString();
     await updateMutation.mutateAsync({
       id: quoteId,
@@ -781,14 +818,14 @@ function QuoteDetailsContent() {
     await closeRejectedSiblings(quote, "invoice_paid");
     
     try {
-      const distributions = await base44.entities.EmailDistribution.filter({
+      const distributions = await getEmailDistributions({
         email_type: "invoice_paid",
         is_active: true
       });
       
       const emailResults = await Promise.allSettled([
         ...distributions.map(dist =>
-          base44.integrations.Core.SendEmail({
+          sendEmailSafe({
             to: dist.recipient_email,
             subject: `Invoice Paid: ${quote.site_id || quote.quote_number}`,
             body: `An invoice has been marked as paid.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}`
@@ -796,7 +833,7 @@ function QuoteDetailsContent() {
             .catch(err => ({ email: dist.recipient_email, success: false }))
         ),
         ...(quote.created_by ? [
-          base44.integrations.Core.SendEmail({
+          sendEmailSafe({
             to: quote.created_by,
             subject: `Your Invoice Paid: ${quote.site_id || quote.quote_number}`,
             body: `Your invoice has been marked as paid.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}`
@@ -851,7 +888,7 @@ function QuoteDetailsContent() {
   };
 
   const handleMoveToBoneyard = async () => {
-    const currentUser = await base44.auth.me();
+    const currentUser = await safeMe();
     const now = new Date().toISOString();
     await updateMutation.mutateAsync({
       id: quoteId,
@@ -859,7 +896,7 @@ function QuoteDetailsContent() {
         status: "on_hold",
         exclude_from_reporting: true,
         pre_hold_status: quote.status,
-        hold_reason: `${decisionCategory} â€” ${boneyardReason.trim() || "On hold pending HO decision"}`, 
+        hold_reason: `${decisionCategory} � ${boneyardReason.trim() || "On hold pending HO decision"}`, 
         hold_date: now,
         status_history: [
           ...(quote.status_history || []),
@@ -868,18 +905,18 @@ function QuoteDetailsContent() {
             status: "on_hold",
             changed_by: currentUser.email,
             changed_at: now,
-            reason: boneyardReason.trim() || "Moved to Boneyard â€” on hold pending HO decision"
+            reason: boneyardReason.trim() || "Moved to Boneyard � on hold pending HO decision"
           }
         ]
       }
     });
-    toast.success("Quote moved to Boneyard â€” excluded from SLA & revenue reporting");
+    toast.success("Quote moved to Boneyard � excluded from SLA & revenue reporting");
     setShowBoneyardDialog(false);
     setBoneyardReason("");
   };
 
   const handleRestoreFromBoneyard = async () => {
-    const currentUser = await base44.auth.me();
+    const currentUser = await safeMe();
     const now = new Date().toISOString();
     const restoredStatus = quote.pre_hold_status || "quote_sent_to_ho";
     await updateMutation.mutateAsync({
@@ -897,7 +934,7 @@ function QuoteDetailsContent() {
             status: restoredStatus,
             changed_by: currentUser.email,
             changed_at: now,
-            reason: "Restored from Boneyard â€” re-included in SLA & revenue reporting"
+            reason: "Restored from Boneyard � re-included in SLA & revenue reporting"
           }
         ]
       }
@@ -908,7 +945,7 @@ function QuoteDetailsContent() {
   // When a quote reaches a successful milestone, auto-close any rejected sibling versions
   // and write a "resolved" QuoteReview entry summarizing what fixed things.
   const closeRejectedSiblings = async (successfulQuote, successStatus) => {
-    const currentUser = await base44.auth.me();
+    const currentUser = await safeMe();
     const siteId = successfulQuote.site_id;
 
     // Fetch all versions for this site (site_id is the reliable grouping key)
@@ -918,7 +955,7 @@ function QuoteDetailsContent() {
 
     // Build a summary of what changed between the rejected version and the successful one
     const changesNotes = [];
-    if (successfulQuote.scope_of_work) changesNotes.push(`Scope of work: "${successfulQuote.scope_of_work.slice(0, 120)}${successfulQuote.scope_of_work.length > 120 ? "â€¦" : ""}"`);
+    if (successfulQuote.scope_of_work) changesNotes.push(`Scope of work: "${successfulQuote.scope_of_work.slice(0, 120)}${successfulQuote.scope_of_work.length > 120 ? "�" : ""}"`);
     if (successfulQuote.total) changesNotes.push(`Final total: $${successfulQuote.total.toLocaleString("en-US", { minimumFractionDigits: 2 })}`);
     if (successfulQuote.version_number) changesNotes.push(`Approved version: v${successfulQuote.version_number}`);
 
@@ -929,7 +966,7 @@ function QuoteDetailsContent() {
       invoice_paid: "invoice paid",
     }[successStatus] || successStatus;
 
-    const coachingNote = `This quote was revised and successfully ${successLabel} on ${new Date().toLocaleDateString()}.\n\n${changesNotes.join("\n")}\n\nEarlier rejected version(s) for this site are now closed â€” no further review action needed.`;
+    const coachingNote = `This quote was revised and successfully ${successLabel} on ${new Date().toLocaleDateString()}.\n\n${changesNotes.join("\n")}\n\nEarlier rejected version(s) for this site are now closed � no further review action needed.`;
 
     await Promise.allSettled(
       rejectedSiblings.map(async (rejected) => {
@@ -942,7 +979,7 @@ function QuoteDetailsContent() {
           reviewer_email: currentUser.email,
           rejection_reason_snapshot: rejected.rejection_reason,
           coaching_notes: coachingNote,
-          recommended_edits: `No further edits needed â€” a later version (v${successfulQuote.version_number || "?"}) was ${successLabel}.`,
+          recommended_edits: `No further edits needed � a later version (v${successfulQuote.version_number || "?"}) was ${successLabel}.`,
           review_status: "completed",
           completed_date: new Date().toISOString(),
         };
@@ -1408,7 +1445,7 @@ function QuoteDetailsContent() {
                   {quote.hold_date && (
                     <p className="text-amber-500 text-xs mt-1">
                       Held since {format(new Date(quote.hold_date), "MMM d, yyyy")}
-                      {quote.pre_hold_status && ` Â· was "${quote.pre_hold_status.replace(/_/g, " ")}"`}
+                      {quote.pre_hold_status && ` � was "${quote.pre_hold_status.replace(/_/g, " ")}"`}
                     </p>
                   )}
                 </div>
@@ -1541,7 +1578,9 @@ function QuoteDetailsContent() {
                 <div>
                   <p className="text-sm text-slate-500">Created</p>
                   <p className="font-medium text-slate-900">
-                    {format(new Date(quote.created_date), "MMM d, yyyy")}
+                    {quote.created_date && !Number.isNaN(new Date(quote.created_date).getTime())
+                      ? format(new Date(quote.created_date), "MMM d, yyyy")
+                      : "Unknown"}
                   </p>
                 </div>
               </div>
@@ -1628,7 +1667,7 @@ function QuoteDetailsContent() {
                 </div>
               )}
 
-              {/* Pre-Approval â€” always visible as a status indicator, editable only by authorized users */}
+              {/* Pre-Approval � always visible as a status indicator, editable only by authorized users */}
               <div className={`flex items-center gap-3 pt-2 border-t border-slate-100 rounded-lg px-2 py-1 ${quote.pre_approved ? "bg-emerald-50" : "bg-rose-50"}`}>
                 <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${quote.pre_approved ? "bg-emerald-100" : "bg-rose-100"}`}>
                   <CheckCircle className={`w-4 h-4 ${quote.pre_approved ? "text-emerald-600" : "text-rose-400"}`} />
@@ -1732,7 +1771,7 @@ function QuoteDetailsContent() {
                     <span>
                       {quote.labor_mode === "flat"
                         ? `Labor (Flat fee)`
-                        : `Labor (${quote.fst_count || 0} FST${(quote.fst_count || 0) > 1 ? "s" : ""} — ${quote.labor_hours || 0} hrs @ $${quote.labor_rate || 125}/hr)`}
+                        : `Labor (${quote.fst_count || 0} FST${(quote.fst_count || 0) > 1 ? "s" : ""} � ${quote.labor_hours || 0} hrs @ $${quote.labor_rate || 125}/hr)`}
                     </span>
                     <span>${laborCost.toFixed(2)}</span>
                   </div>
@@ -2013,7 +2052,7 @@ function QuoteDetailsContent() {
           <Textarea
             value={boneyardReason}
             onChange={(e) => setBoneyardReason(e.target.value)}
-            placeholder="Optional reason (e.g. 'HO needs 60+ days to decide â€” financing pending')"
+            placeholder="Optional reason (e.g. 'HO needs 60+ days to decide � financing pending')"
             rows={3}
           />
           <DialogFooter>
@@ -2042,7 +2081,7 @@ function QuoteDetailsContent() {
           <Textarea
             value={followUpNote}
             onChange={(e) => setFollowUpNote(e.target.value)}
-            placeholder="Optional note (e.g. 'Called HO, still deciding â€” check back in 2 weeks')"
+            placeholder="Optional note (e.g. 'Called HO, still deciding � check back in 2 weeks')"
             rows={3}
           />
           <DialogFooter>

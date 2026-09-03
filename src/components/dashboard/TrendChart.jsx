@@ -5,7 +5,16 @@ import { format, parseISO, startOfDay, differenceInDays } from "date-fns";
 export default function TrendChart({ quotes, dateRange }) {
   // Group quotes by date
   const groupedByDate = quotes.reduce((acc, quote) => {
-    const date = format(startOfDay(parseISO(quote.created_date)), 'MMM dd');
+    if (typeof quote.created_date !== "string" || !quote.created_date) {
+      return acc;
+    }
+
+    const createdDate = parseISO(quote.created_date);
+    if (Number.isNaN(createdDate.getTime())) {
+      return acc;
+    }
+
+    const date = format(startOfDay(createdDate), 'MMM dd');
     if (!acc[date]) {
       acc[date] = { date, submitted: 0, approved: 0, rejected: 0 };
     }

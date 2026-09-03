@@ -72,8 +72,9 @@ query string of the real path -- NOT the part after `#` -- so it was always empt
 **CONFIRMED working (quotes create/open correctly).**
 
 ### 5. Mojibake encoding fixes
-Corrupted UTF-8-as-Latin-1 sequences fixed across `AuthContext.jsx`, `Boneyard.jsx`,
-`QuoteDetails.jsx`, `QuoteOverview.jsx`, `Quotes.jsx`: "Ã—" -> "×", "â€"" -> "—", "â€¦" -> "…".
+Corrupted UTF-8-as-Latin-1 sequences (mojibake rendering of the multiplication sign,
+em dash, and ellipsis) fixed across `AuthContext.jsx`, `Boneyard.jsx`,
+`QuoteDetails.jsx`, `QuoteOverview.jsx`, `Quotes.jsx`.
 
 ### 6. Critter guard pricing bug (draftEngine.js) -- STATUS: NEEDS RE-VERIFICATION
 A real quote request for 297 ft of critter guard wire priced at **$91,146.50** instead of

@@ -5,15 +5,34 @@ import { useAuth } from "@/lib/AuthContext";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ShieldAlert, Loader2, LogIn } from "lucide-react";
+import LoginScreen from "@/components/auth/LoginScreen";
+import appPackage from "../../../package.json";
 
 // Users who always get admin role regardless of invitation
-const FORCED_ADMIN_EMAILS = ["vseganos@enphaseenergy.com"];
+const FORCED_ADMIN_EMAILS = [
+  "smosley@enphaseenergy.com",
+  "croeschberger@enphaseenergy.com",
+  "shawkins@enphaseenergy.com",
+  "vseganos@enphaseenergy.com",
+  "REDACTED-USER1@example.invalid",
+  "jwood@enphaseenergy.com",
+  "mjb@enphaseenergy.com"
+];
 
 const isLocalDemo = ["mock", "local", "salesforce-mock"].includes(import.meta.env.VITE_DATA_SOURCE);
+const appVersion = appPackage?.version || "0.0.0";
+
+function AppVersionBadge() {
+  return (
+    <div className="fixed bottom-4 left-4 z-10 rounded-md border border-slate-200 bg-white/90 px-2.5 py-1 text-[10px] font-medium tracking-wide text-slate-500 shadow-sm backdrop-blur-sm">
+      v{appVersion}
+    </div>
+  );
+}
 
 export default function AutoAssignRole({ children }) {
   const queryClient = useQueryClient();
-  const { navigateToLogin } = useAuth();
+  const { navigateToLogin, needsLocalLogin, isLoadingAuth } = useAuth();
   const [isChecking, setIsChecking] = useState(true);
 
   // Base44 remains the required, authenticated source of truth here.
@@ -92,6 +111,22 @@ export default function AutoAssignRole({ children }) {
   }, [user, invitation, userLoading, invitationLoading]);
 
   if (isLocalDemo) {
+    if (isLoadingAuth) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center relative">
+          <AppVersionBadge />
+          <div className="text-center">
+            <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mx-auto mb-4" />
+            <p className="text-slate-600">Setting up your account...</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (needsLocalLogin) {
+      return <LoginScreen />;
+    }
+
     return children;
   }
 
@@ -100,7 +135,8 @@ export default function AutoAssignRole({ children }) {
   // that requirement visible and actionable.
   if (userError) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4 relative">
+        <AppVersionBadge />
         <Card className="max-w-md w-full p-8 text-center">
           <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-indigo-100 flex items-center justify-center">
             <LogIn className="w-8 h-8 text-indigo-600" />
@@ -121,7 +157,8 @@ export default function AutoAssignRole({ children }) {
   // Show loading while checking invitation
   if (userLoading || invitationLoading || (isChecking && assignRoleMutation.isPending)) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center relative">
+        <AppVersionBadge />
         <div className="text-center">
           <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mx-auto mb-4" />
           <p className="text-slate-600">Setting up your account...</p>
@@ -133,7 +170,8 @@ export default function AutoAssignRole({ children }) {
   // If user has no app_role and no invitation, deny access
   if (user && !user.app_role && !invitation) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4 relative">
+        <AppVersionBadge />
         <Card className="max-w-md w-full p-8 text-center">
           <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-rose-100 flex items-center justify-center">
             <ShieldAlert className="w-8 h-8 text-rose-600" />

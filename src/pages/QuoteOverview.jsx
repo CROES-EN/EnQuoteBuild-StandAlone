@@ -160,7 +160,7 @@ function QuoteOverviewContent() {
                             <div className="flex items-center gap-3">
                               <FileText className="w-4 h-4 text-slate-400 flex-shrink-0" />
                               <div>
-                                <span className="font-semibold text-slate-900">{quote.site_id || "â€”"}</span>
+                                <span className="font-semibold text-slate-900">{quote.site_id || "—"}</span>
                                 {quote.quote_number && (
                                   <span className="text-sm text-slate-500 ml-2">{quote.quote_number}</span>
                                 )}

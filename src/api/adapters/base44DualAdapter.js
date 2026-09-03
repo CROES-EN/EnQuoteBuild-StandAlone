@@ -1,4 +1,4 @@
-﻿import {
+import {
   base44Adapter
 } from "./base44Adapter";
 
@@ -94,6 +94,40 @@ const mirrorUpdateOrCreate = async (
   }
 };
 
+// Base44 is the primary source of truth in this mode, but every write is ALSO mirrored,
+// best-effort, into the local Electron JSON file (enquote-demo-data-v1.json) so there's
+// always an on-disk backup copy that survives even if Base44 is unreachable. This mirror
+// must never throw or block the UI - if it's unavailable (e.g. running in a plain browser
+// tab without the Electron bridge) or fails for any reason, we log and move on silently.
+const localBridge = () => globalThis.window?.enquoteLocal || null;
+
+const mirrorToLocalJson = async (operation, callback) => {
+  const bridge = localBridge();
+  if (!bridge) return;
+
+  try {
+    await callback(bridge);
+  } catch (error) {
+    console.warn(
+      `[Local JSON backup] ${operation} failed:`,
+      error?.message || error
+    );
+  }
+};
+
+const mirrorLocalUpdateOrCreate = async (
+  bridge,
+  resourceName,
+  id,
+  data
+) => {
+  try {
+    await bridge[resourceName].update(id, data);
+  } catch {
+    await bridge[resourceName].create({ ...data, id });
+  }
+};
+
 export const base44DualAdapter = {
   getCurrentUser: (...args) =>
     base44Adapter.getCurrentUser(
@@ -139,6 +173,11 @@ export const base44DualAdapter = {
       }
     );
 
+    await mirrorToLocalJson(
+      "createQuote",
+      (bridge) => bridge.quotes.create({ ...data, ...saved, id: saved?.id })
+    );
+
     return saved;
   },
 
@@ -170,6 +209,16 @@ export const base44DualAdapter = {
       }
     );
 
+    await mirrorToLocalJson(
+      "updateQuote",
+      (bridge) =>
+        mirrorLocalUpdateOrCreate(bridge, "quotes", id, {
+          ...data,
+          ...saved,
+          id
+        })
+    );
+
     return saved;
   },
 
@@ -188,6 +237,11 @@ export const base44DualAdapter = {
       {
         base44Id: id
       }
+    );
+
+    await mirrorToLocalJson(
+      "deleteQuote",
+      (bridge) => bridge.quotes.delete(id)
     );
 
     return result;
@@ -221,6 +275,21 @@ export const base44DualAdapter = {
         recordCount:
           updates?.length || 0
       }
+    );
+
+    await mirrorToLocalJson(
+      "bulkUpdateQuotes",
+      (bridge) =>
+        Promise.all(
+          updates.map((item) =>
+            mirrorLocalUpdateOrCreate(
+              bridge,
+              "quotes",
+              item.id,
+              item.data || item.changes || item
+            )
+          )
+        )
     );
 
     return result;
@@ -260,6 +329,11 @@ export const base44DualAdapter = {
       }
     );
 
+    await mirrorToLocalJson(
+      "createProduct",
+      (bridge) => bridge.products.create({ ...data, ...saved, id: saved?.id })
+    );
+
     return saved;
   },
 
@@ -291,6 +365,16 @@ export const base44DualAdapter = {
       }
     );
 
+    await mirrorToLocalJson(
+      "updateProduct",
+      (bridge) =>
+        mirrorLocalUpdateOrCreate(bridge, "products", id, {
+          ...data,
+          ...saved,
+          id
+        })
+    );
+
     return saved;
   },
 
@@ -309,6 +393,11 @@ export const base44DualAdapter = {
       {
         base44Id: id
       }
+    );
+
+    await mirrorToLocalJson(
+      "deleteProduct",
+      (bridge) => bridge.products.delete(id)
     );
 
     return result;
@@ -345,6 +434,11 @@ export const base44DualAdapter = {
       }
     );
 
+    await mirrorToLocalJson(
+      "createReview",
+      (bridge) => bridge.collections.create("reviews", { ...data, ...saved, id: saved?.id })
+    );
+
     return saved;
   },
 
@@ -373,6 +467,17 @@ export const base44DualAdapter = {
         ),
       {
         base44Id: id
+      }
+    );
+
+    await mirrorToLocalJson(
+      "updateReview",
+      async (bridge) => {
+        try {
+          await bridge.collections.update("reviews", id, { ...data, ...saved, id });
+        } catch {
+          await bridge.collections.create("reviews", { ...data, ...saved, id });
+        }
       }
     );
 
@@ -409,6 +514,11 @@ export const base44DualAdapter = {
       }
     );
 
+    await mirrorToLocalJson(
+      "createQuoteActivity",
+      (bridge) => bridge.collections.create("activities", { ...data, ...saved, id: saved?.id })
+    );
+
     return saved;
   },
 
@@ -440,6 +550,11 @@ export const base44DualAdapter = {
         quoteId:
           data?.quote_id
       }
+    );
+
+    await mirrorToLocalJson(
+      "createFollowUp",
+      (bridge) => bridge.collections.create("followUps", { ...data, ...saved, id: saved?.id })
     );
 
     return saved;
@@ -482,6 +597,11 @@ export const base44DualAdapter = {
         collection: name,
         base44Id: saved?.id
       }
+    );
+
+    await mirrorToLocalJson(
+      "createLocalRecord",
+      (bridge) => bridge.collections.create(name, { ...data, ...saved, id: saved?.id })
     );
 
     return saved;
@@ -529,6 +649,17 @@ export const base44DualAdapter = {
       }
     );
 
+    await mirrorToLocalJson(
+      "updateLocalRecord",
+      async (bridge) => {
+        try {
+          await bridge.collections.update(name, id, { ...data, ...saved, id });
+        } catch {
+          await bridge.collections.create(name, { ...data, ...saved, id });
+        }
+      }
+    );
+
     return saved;
   },
 
@@ -555,6 +686,11 @@ export const base44DualAdapter = {
         collection: name,
         base44Id: id
       }
+    );
+
+    await mirrorToLocalJson(
+      "deleteLocalRecord",
+      (bridge) => bridge.collections.delete(name, id)
     );
 
     return result;

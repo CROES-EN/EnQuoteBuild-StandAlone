@@ -23,7 +23,7 @@ import {
 
 const DATA_SOURCE =
   import.meta.env.VITE_DATA_SOURCE ||
-  "base44";
+  "local";
 
 const adapters = {
   base44: base44Adapter,

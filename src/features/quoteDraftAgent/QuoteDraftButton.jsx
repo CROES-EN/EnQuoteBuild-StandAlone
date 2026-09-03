@@ -34,6 +34,8 @@ function toFormUpdates(draft) {
     site_id: draft.site_id || MANUAL_INPUT_PLACEHOLDER,
     quote_requester: MANUAL_INPUT_PLACEHOLDER, // Step 1 output does not include a requester field
     case_number: draft.case_number || MANUAL_INPUT_PLACEHOLDER,
+    picklist: draft.picklist || "On-Demand",
+    om_status: draft.om_status || "Quote Requested",
     valid_until: computeValidUntil(),
     scope_of_work: draft.scope_of_work || MANUAL_INPUT_PLACEHOLDER,
     fst_count: draft.fst_count || undefined,
@@ -222,6 +224,8 @@ export default function QuoteDraftButton({ quote, products, onApply }) {
               <div className="grid grid-cols-2 gap-2">
                 <div><span className="font-semibold">Site ID:</span> {preview.site_id || MANUAL_INPUT_PLACEHOLDER}</div>
                 <div><span className="font-semibold">Case Number:</span> {preview.case_number || MANUAL_INPUT_PLACEHOLDER}</div>
+                <div><span className="font-semibold">Picklist:</span> {preview.picklist || "On-Demand"}</div>
+                <div><span className="font-semibold">O&M Status:</span> {preview.om_status || "Quote Requested"}</div>
                 <div><span className="font-semibold">Valid Until:</span> {computeValidUntil()} (today + 30 days)</div>
                 <div><span className="font-semibold">FSTs Needed:</span> {preview.fst_count || MANUAL_INPUT_PLACEHOLDER}</div>
                 <div><span className="font-semibold">Labor Hours:</span> {preview.labor_hours || MANUAL_INPUT_PLACEHOLDER}</div>

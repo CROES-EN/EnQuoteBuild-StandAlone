@@ -66,7 +66,9 @@ export default function QuoteCard({ quote, index = 0, selectable = false, isSele
           <div className="space-y-2 text-sm">
             <div className="flex items-center gap-2 text-slate-600">
               <Calendar className="w-4 h-4 text-slate-400" />
-              {format(new Date(quote.created_date), "MMM d, yyyy")}
+              {quote.created_date && !Number.isNaN(new Date(quote.created_date).getTime())
+                ? format(new Date(quote.created_date), "MMM d, yyyy")
+                : "Unknown"}
             </div>
           </div>
           

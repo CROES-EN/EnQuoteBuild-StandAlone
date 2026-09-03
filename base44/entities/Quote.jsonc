@@ -276,5 +276,11 @@
   },
   "required": [
     "site_id"
-  ]
+  ],
+  "rls": {
+    "create": true,
+    "read": true,
+    "update": true,
+    "delete": true
+  }
 }

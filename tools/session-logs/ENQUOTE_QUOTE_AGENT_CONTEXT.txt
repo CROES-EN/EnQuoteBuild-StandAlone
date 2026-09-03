@@ -490,7 +490,7 @@ export default function QuoteForm({ quote, products, allQuotes = [], onSave, onS
   };
 
   const handleAIPriceEstimate = (estimate) => {
-    const message = `AI Estimate:\nâ€¢ Price Range: $${estimate.estimated_min.toFixed(0)} - $${estimate.estimated_max.toFixed(0)}\nâ€¢ Labor: ${estimate.suggested_labor_hours} hours\nâ€¢ FSTs: ${estimate.suggested_fst_count}\n\n${estimate.reasoning}`;
+    const message = `AI Estimate:\n• Price Range: $${estimate.estimated_min.toFixed(0)} - $${estimate.estimated_max.toFixed(0)}\n• Labor: ${estimate.suggested_labor_hours} hours\n• FSTs: ${estimate.suggested_fst_count}\n\n${estimate.reasoning}`;
     alert(message);
     
     if (estimate.suggested_labor_hours && !formData.labor_hours) {
@@ -696,7 +696,7 @@ export default function QuoteForm({ quote, products, allQuotes = [], onSave, onS
                               required
                               className="mt-1.5"
               />
-              <p className="text-xs text-slate-500 mt-1">Fixed labor cost â€” no hourly calculation applied</p>
+              <p className="text-xs text-slate-500 mt-1">Fixed labor cost — no hourly calculation applied</p>
             </div>
           )}
           <div>
@@ -762,7 +762,7 @@ export default function QuoteForm({ quote, products, allQuotes = [], onSave, onS
             </div>
             {laborCharge > 0 && (
               <div className="flex justify-between text-slate-600">
-                <span>{isFlat ? "Labor (Flat Fee)" : `Labor (${formData.fst_count} FSTs Ã— ${formData.labor_hours} hrs @ $125)`}</span>
+                <span>{isFlat ? "Labor (Flat Fee)" : `Labor (${formData.fst_count} FSTs × ${formData.labor_hours} hrs @ $125)`}</span>
                 <span>${laborCharge.toFixed(2)}</span>
               </div>
             )}
@@ -1349,13 +1349,13 @@ If technician count is provided:
 
 Total Labor Hours = 
 
-Technician Count Ã— Estimated Labor Hours 
+Technician Count × Estimated Labor Hours 
 
  
 
 Example: 
 
-2 technicians Ã— 8 hours = 16 labor hours 
+2 technicians × 8 hours = 16 labor hours 
 
  
 
@@ -2197,7 +2197,7 @@ export const getSalesforceMockSyncLog =
 FILE: .\src\utils\quoteCalculations.js
 ==================================================
 /**
- * Shared quote calculation logic â€” matches the PDF generator.
+ * Shared quote calculation logic — matches the PDF generator.
  * Tax is applied ONLY to line items marked taxable (item.taxable !== false).
  * Labor, travel, and mileage are never taxed.
  * Discounts are proportionally allocated to the taxable portion.

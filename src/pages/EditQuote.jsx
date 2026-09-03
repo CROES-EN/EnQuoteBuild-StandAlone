@@ -1,4 +1,5 @@
-﻿import { base44 } from "@/api/base44Client";
+﻿import { useState } from "react";
+import { base44 } from "@/api/base44Client";
 import { createQuote, getCurrentUser, getProducts, getQuoteById, getQuotes, isLocalDataSource, updateQuote } from "@/api/dataClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useLocation} from "react-router-dom";
@@ -20,6 +21,11 @@ function EditQuoteContent() {
   const location = useLocation();
   const urlParams = new URLSearchParams(location.search);
   const quoteId = urlParams.get("id");
+  // Set when a save is rejected because the quote changed elsewhere since this form loaded
+  // it (see updateMutation's onError below). Showing a clear "someone/something else
+  // changed this" message and a reload action is much safer than either silently failing
+  // or silently overwriting the newer data.
+  const [conflictError, setConflictError] = useState(null);
 
   const { data: quote, isLoading: loadingQuote } = useQuery({
     queryKey: ["quote", quoteId],
@@ -127,8 +133,11 @@ function EditQuoteContent() {
         return newQuote;
       }
       
-      // If it's a draft, just update it normally
-      return updateQuote(quoteId, data);
+      // If it's a draft, just update it normally. Pass the quote's last-known revision so
+      // the local repository can detect a concurrent change (e.g. a Base44 import landing
+      // while this form was open) and reject instead of silently overwriting it - see
+      // onError below for how that's surfaced. Ignored (harmlessly) by non-local adapters.
+      return updateQuote(quoteId, data, quote?._rev);
     },
     onSuccess: (newQuote) => {
       queryClient.invalidateQueries({ queryKey: ["quote", quoteId] });
@@ -136,6 +145,21 @@ function EditQuoteContent() {
       // Navigate to the new quote if a new version was created
       const targetQuoteId = newQuote?.id || quoteId;
       navigate(createPageUrl(`QuoteDetails?id=${targetQuoteId}`));
+    },
+    onError: (error) => {
+      // Electron's IPC boundary only reliably forwards an Error's `message` (wrapped as
+      // "Error invoking remote method '...': Error: <original message>" - confirmed by
+      // testing against a real running instance), not custom properties - so the conflict
+      // signal is detected via a marker WITHIN the message, not a `.code` property or an
+      // exact prefix match, and the original text is recovered by slicing after the marker.
+      const message = String(error?.message || "");
+      const marker = "CONFLICT:";
+      const markerIndex = message.indexOf(marker);
+      if (markerIndex !== -1) {
+        setConflictError(message.slice(markerIndex + marker.length).trim());
+        return;
+      }
+      toast.error(message || "Failed to save changes.");
     }
   });
 
@@ -207,11 +231,33 @@ function EditQuoteContent() {
           <p className="text-slate-600 mt-1">{quote?.quote_number}</p>
         </div>
 
+        {conflictError && (
+          <Card className="p-5 border-amber-200 bg-amber-50 mb-6">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <p className="font-semibold text-amber-800 mb-1">Your changes weren't saved</p>
+                <p className="text-amber-700 text-sm">{conflictError}</p>
+                <Button
+                  size="sm"
+                  className="mt-3 bg-amber-600 hover:bg-amber-700"
+                  onClick={async () => {
+                    setConflictError(null);
+                    await queryClient.invalidateQueries({ queryKey: ["quote", quoteId] });
+                  }}
+                >
+                  Reload Latest Version
+                </Button>
+              </div>
+            </div>
+          </Card>
+        )}
+
         <QuoteForm
           quote={quote}
           products={products}
           allQuotes={allQuotes}
-          onSave={(data) => updateMutation.mutate(data)}
+          onSave={(data) => { setConflictError(null); updateMutation.mutate(data); }}
           onSaveCopy={(data) => saveCopyMutation.mutate(data)}
           onCancel={() => navigate(createPageUrl(`QuoteDetails?id=${quoteId}`))}
           isLoading={updateMutation.isPending || saveCopyMutation.isPending}

@@ -34,6 +34,21 @@ function extractField(lines, label) {
   return null;
 }
 
+function extractFieldOrSection(lines, labels, nextHeadings = []) {
+  for (const label of labels) {
+    const directValue = extractField(lines, label);
+    if (directValue) return directValue;
+
+    const start = findSectionIndex(lines, label);
+    if (start === -1) continue;
+
+    const sectionLines = sliceSection(lines, label, nextHeadings.length ? nextHeadings : ["Quote Summary", "Materials", "Labor & Travel", "Scope of Work"]);
+    const combined = sectionLines.join(" ").trim();
+    if (combined) return combined;
+  }
+  return null;
+}
+
 function findSectionIndex(lines, heading) {
   return lines.findIndex((l) => l.toLowerCase() === heading.toLowerCase());
 }
@@ -98,7 +113,13 @@ export function parseQuoteRequestOutput(rawText) {
   const problemDescription = extractField(lines, "Problem Description");
   const rootCause = extractField(lines, "Root Cause");
   const diagnosticFindings = extractField(lines, "Diagnostic Findings");
-  const scopeDescription = extractField(lines, "Scope Description");
+  const scopeDescription = extractFieldOrSection(lines, ["Scope Description", "Recommended Scope of Work", "Scope of Work"], [
+    "Labor & Travel",
+    "Materials",
+    "Quote Summary",
+    "Internal Notes",
+    "Risk Adjustment Statement"
+  ]);
 
   const technicianCount = extractField(lines, "Technician Count");
   const onsiteLaborHours = extractField(lines, "Estimated Onsite Labor Hours");

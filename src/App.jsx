@@ -5,16 +5,19 @@ import {
 } from "react-router-dom";
 
 import { Toaster } from "@/components/ui/toaster";
+import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClientInstance } from "@/lib/query-client";
 import NavigationTracker from "@/lib/NavigationTracker";
 import { pagesConfig } from "./pages.config";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 import PageNotFound from "./lib/PageNotFound";
 
 import SVCancelTrackerPage from "./pages/SVCancelTracker";
 import RejectedQuoteReviewPage from "./pages/RejectedQuoteReview";
 import ManagerDashboardPage from "./pages/ManagerDashboard";
+import SupervisorDashboardPage from "./pages/SupervisorDashboard";
 import BoneyardPage from "./pages/Boneyard";
 import ResourcePlannerPage from "./pages/ResourcePlanner";
 import SiteFlagManagerPage from "./pages/SiteFlagManager";
@@ -110,6 +113,11 @@ const AuthenticatedApp = () => {
           <ManagerDashboardPage />
         </LayoutWrapper>
       } />
+      <Route path="/SupervisorDashboard" element={
+        <LayoutWrapper currentPageName="SupervisorDashboard">
+          <SupervisorDashboardPage />
+        </LayoutWrapper>
+      } />
       <Route path="/InactiveRevenueDashboard" element={
         <LayoutWrapper currentPageName="InactiveRevenueDashboard">
           <InactiveRevenueDashboardPage />
@@ -129,15 +137,18 @@ const AuthenticatedApp = () => {
 function App() {
 
   return (
-    <AuthProvider>
-      <QueryClientProvider client={queryClientInstance}>
-        <HashRouter>
-          <NavigationTracker />
-          <AuthenticatedApp />
-        </HashRouter>
-        <Toaster />
-      </QueryClientProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <QueryClientProvider client={queryClientInstance}>
+          <HashRouter>
+            <NavigationTracker />
+            <AuthenticatedApp />
+          </HashRouter>
+          <Toaster />
+          <SonnerToaster position="top-right" richColors />
+        </QueryClientProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   )
 }
 

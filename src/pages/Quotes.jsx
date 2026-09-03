@@ -328,8 +328,8 @@ function QuotesContent() {
                 <SelectContent>
                   <SelectItem value="date_desc">Newest First</SelectItem>
                   <SelectItem value="date_asc">Oldest First</SelectItem>
-                  <SelectItem value="amount_desc">Amount: High â†’ Low</SelectItem>
-                  <SelectItem value="amount_asc">Amount: Low â†’ High</SelectItem>
+                  <SelectItem value="amount_desc">Amount: High → Low</SelectItem>
+                  <SelectItem value="amount_asc">Amount: Low → High</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={coordinatorFilter} onValueChange={setCoordinatorFilter}>
@@ -403,7 +403,7 @@ function QuotesContent() {
                     className="flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-slate-900"
                   >
                     {snapshotExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    Status Snapshot â€” {snapshotEmail.split("@")[0]}
+                    Status Snapshot — {snapshotEmail.split("@")[0]}
                   </button>
                   {snapshotExpanded && (
                     <div className="mt-4">
@@ -423,7 +423,7 @@ function QuotesContent() {
         {/* Active filter warning */}
         {(statusFilter !== "all" || coordinatorFilter !== "all" || search || myQuotesOnly || selectedSubmitter !== "all" || alertsOnly) && (
           <div className="flex items-center gap-2 mb-4 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
-            <span>Filters are active â€” some quotes may be hidden.</span>
+            <span>Filters are active — some quotes may be hidden.</span>
             <button
               onClick={() => { setSearch(""); setStatusFilter("all"); setCoordinatorFilter("all"); setMyQuotesOnly(false); setSelectedSubmitter("all"); setAlertsOnly(false); }}
               className="ml-auto font-medium underline hover:no-underline"
@@ -433,7 +433,7 @@ function QuotesContent() {
           </div>
         )}
 
-        {/* Status Alerts â€” reflects the currently filtered quote list */}
+        {/* Status Alerts — reflects the currently filtered quote list */}
         <StatusAlerts quotes={filteredQuotes} />
 
         {/* Bulk select-all control */}

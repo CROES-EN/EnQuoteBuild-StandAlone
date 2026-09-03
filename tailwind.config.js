@@ -77,11 +77,16 @@ module.exports = {
   				to: {
   					height: '0'
   				}
+  			},
+  			'refresh-slide': {
+  				'0%': { transform: 'translateX(-100%)' },
+  				'100%': { transform: 'translateX(350%)' }
   			}
   		},
   		animation: {
   			'accordion-down': 'accordion-down 0.2s ease-out',
-  			'accordion-up': 'accordion-up 0.2s ease-out'
+  			'accordion-up': 'accordion-up 0.2s ease-out',
+  			'refresh-slide': 'refresh-slide 1.1s ease-in-out infinite'
   		}
   	}
   },

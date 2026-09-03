@@ -11,7 +11,10 @@ Deno.serve(async (req) => {
       id: u.id,
       email: u.email,
       full_name: u.full_name,
-      app_role: u.app_role
+      app_role: u.app_role,
+      additional_roles: u.additional_roles || [],
+      department: u.department,
+      display_name: u.display_name
     })));
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });

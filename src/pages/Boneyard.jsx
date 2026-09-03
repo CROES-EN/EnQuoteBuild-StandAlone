@@ -58,7 +58,7 @@ function BoneyardContent() {
             status: restoredStatus,
             changed_by: currentUser.email,
             changed_at: now,
-            reason: restoreNote.trim() || "Restored from Boneyard â€” HO decision received"
+            reason: restoreNote.trim() || "Restored from Boneyard — HO decision received"
           }
         ]
       }
@@ -94,7 +94,7 @@ function BoneyardContent() {
               </div>
               <h1 className="text-3xl font-bold text-slate-900">Boneyard</h1>
             </div>
-            <p className="text-slate-500 ml-13">Quotes on hold pending homeowner decision â€” excluded from SLA &amp; revenue reporting</p>
+            <p className="text-slate-500 ml-13">Quotes on hold pending homeowner decision — excluded from SLA &amp; revenue reporting</p>
           </div>
           <div className="text-right">
             <p className="text-2xl font-bold text-amber-700">{dateFiltered.length}</p>
@@ -240,7 +240,7 @@ function BoneyardContent() {
           <Textarea
             value={restoreNote}
             onChange={(e) => setRestoreNote(e.target.value)}
-            placeholder="Optional note (e.g. 'HO confirmed approval on 5/12 â€” proceeding with invoice')"
+            placeholder="Optional note (e.g. 'HO confirmed approval on 5/12 — proceeding with invoice')"
             rows={3}
           />
           <DialogFooter>

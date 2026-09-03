@@ -517,6 +517,14 @@ const DEFAULT_LABOR_RATE = 125;
 const TRAVEL_HOUR_RATE = 65;
 const MILEAGE_RATE = 0.73;
 
+// --- Picklist / O&M Status defaults ----------------------------------------
+// The Quote Request Agent (Step 1) output does not currently carry an
+// explicit Picklist or O&M Status value, so the draft agent defaults both
+// to the most common case -- an On-Demand quote that has just been
+// requested -- rather than leaving these required Quote form fields blank.
+const DEFAULT_PICKLIST = "On-Demand";
+const DEFAULT_OM_STATUS = "Quote Requested";
+
 function resolveWorstCase(value) {
   if (value === null || value === undefined) return null;
   const str = String(value).trim();
@@ -530,11 +538,27 @@ function resolveWorstCase(value) {
 }
 
 // --- Scope of work generation (template-based, no LLM) ---------------------
+function getPrimaryRequestedItemName(request) {
+  const candidates = [
+    ...(request.products || []).map((item) => item?.name),
+    ...(request.materials || []).map((item) => item?.name),
+    ...(request.services || []).map((item) => item?.name)
+  ];
+
+  return candidates.find((name) => typeof name === "string" && name.trim().length > 0)?.trim() || null;
+}
+
 function generateScopeOfWork(request) {
   const parts = [];
+  const scopeText = request.scopeDescription ? request.scopeDescription.trim() : "";
+  const primaryItem = getPrimaryRequestedItemName(request);
 
-  if (request.scopeDescription) {
-    parts.push(request.scopeDescription.trim());
+  if (scopeText) {
+    const normalizedScope = scopeText.replace(/\s+/g, " ");
+    if (normalizedScope.length >= 160) {
+      return normalizedScope;
+    }
+    parts.push(normalizedScope);
   } else if (request.problemDescription || request.rootCause) {
     const problem = request.problemDescription ? request.problemDescription.trim() : "";
     const cause = request.rootCause ? request.rootCause.trim() : "";
@@ -550,6 +574,12 @@ function generateScopeOfWork(request) {
 
   if (parts.length === 0) {
     return "Scope of work requires manual entry -- insufficient detail was provided in the quote request to generate a summary.";
+  }
+
+  if (primaryItem && parts.join(" ").length < 160) {
+    const itemName = String(primaryItem).replace(/^\s*[-*•]\s*/, "").trim();
+    const itemSummary = itemName || "identified component";
+    return `Replace one failed/non-producing ${itemSummary} identified during diagnostics and verify proper system operation following installation. Work includes removal of the failed module, installation of a compatible replacement module, operational testing, and confirmation of production functionality.`;
   }
 
   return parts.join(" ");
@@ -709,6 +739,8 @@ export function generateQuoteDraft(request) {
     case_number: request.caseNumber || "",
     customer: request.customer || "",
     site_address: request.siteAddress || "",
+    picklist: DEFAULT_PICKLIST,
+    om_status: DEFAULT_OM_STATUS,
     scope_of_work: scopeOfWork,
     fst_count: fstCount,
     labor_hours: laborHours,

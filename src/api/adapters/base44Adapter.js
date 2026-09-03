@@ -122,8 +122,18 @@ export const base44Adapter = {
   createLocalRecord: (collectionName, data) =>
     resolveEntity(collectionName).create(data),
 
-  updateLocalRecord: (collectionName, id, data) =>
-    resolveEntity(collectionName).update(id, data),
+  updateLocalRecord: async (collectionName, id, data) => {
+    // Direct client writes to another user's User record are rejected by the platform
+    // (only base44.auth.updateMe on your own account is allowed) - route role/permission
+    // edits from the Users page through the privileged updateUserRole function instead,
+    // which uses asServiceRole after verifying the caller is an admin.
+    if (collectionName === "users") {
+      const response = await base44.functions.invoke("updateUserRole", { userId: id, data });
+      if (response?.data?.error) throw new Error(response.data.error);
+      return response?.data?.user || response?.data;
+    }
+    return resolveEntity(collectionName).update(id, data);
+  },
 
   deleteLocalRecord: (collectionName, id) =>
     resolveEntity(collectionName).delete(id),

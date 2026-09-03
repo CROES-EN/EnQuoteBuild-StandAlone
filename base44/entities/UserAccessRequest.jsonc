@@ -1,0 +1,75 @@
+{
+  "name": "UserAccessRequest",
+  "type": "object",
+  "properties": {
+    "requested_email": {
+      "type": "string"
+    },
+    "requested_role": {
+      "type": "string",
+      "enum": [
+        "submitter",
+        "approver",
+        "invoicer",
+        "admin"
+      ]
+    },
+    "reason": {
+      "type": "string"
+    },
+    "requested_by_email": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "requested_email",
+    "requested_role",
+    "requested_by_email"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        { "user_condition": { "email": "smosley@enphaseenergy.com" } },
+        { "user_condition": { "email": "croeschberger@enphaseenergy.com" } },
+        { "user_condition": { "email": "shawkins@enphaseenergy.com" } },
+        { "user_condition": { "email": "vseganos@enphaseenergy.com" } },
+        { "user_condition": { "email": "REDACTED-USER1@example.invalid" } },
+        { "user_condition": { "email": "jwood@enphaseenergy.com" } },
+        { "user_condition": { "email": "mjb@enphaseenergy.com" } }
+      ]
+    },
+    "create": {
+      "$or": [
+        { "user_condition": { "email": "smosley@enphaseenergy.com" } },
+        { "user_condition": { "email": "croeschberger@enphaseenergy.com" } },
+        { "user_condition": { "email": "shawkins@enphaseenergy.com" } },
+        { "user_condition": { "email": "vseganos@enphaseenergy.com" } },
+        { "user_condition": { "email": "REDACTED-USER1@example.invalid" } },
+        { "user_condition": { "email": "jwood@enphaseenergy.com" } },
+        { "user_condition": { "email": "mjb@enphaseenergy.com" } }
+      ]
+    },
+    "update": {
+      "$or": [
+        { "user_condition": { "email": "smosley@enphaseenergy.com" } },
+        { "user_condition": { "email": "croeschberger@enphaseenergy.com" } },
+        { "user_condition": { "email": "shawkins@enphaseenergy.com" } },
+        { "user_condition": { "email": "vseganos@enphaseenergy.com" } },
+        { "user_condition": { "email": "REDACTED-USER1@example.invalid" } },
+        { "user_condition": { "email": "jwood@enphaseenergy.com" } },
+        { "user_condition": { "email": "mjb@enphaseenergy.com" } }
+      ]
+    },
+    "delete": {
+      "$or": [
+        { "user_condition": { "email": "smosley@enphaseenergy.com" } },
+        { "user_condition": { "email": "croeschberger@enphaseenergy.com" } },
+        { "user_condition": { "email": "shawkins@enphaseenergy.com" } },
+        { "user_condition": { "email": "vseganos@enphaseenergy.com" } },
+        { "user_condition": { "email": "REDACTED-USER1@example.invalid" } },
+        { "user_condition": { "email": "jwood@enphaseenergy.com" } },
+        { "user_condition": { "email": "mjb@enphaseenergy.com" } }
+      ]
+    }
+  }
+}
