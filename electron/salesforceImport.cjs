@@ -1,0 +1,103 @@
+/**
+ * Salesforce Embedded Import - opens a real, separate BrowserWindow pointed at the user's own
+ * Salesforce report URL, letting them log in (including 2FA) and click through Export exactly
+ * as they already do manually today (Export -> Details Only -> Comma Delimited .csv -> Export -
+ * confirmed against real screenshots this was built from). This module does NOT scrape or
+ * automate Salesforce's own UI in any way - it only (a) opens the real page, and (b) watches
+ * for the resulting file download so it can be captured and handed back to the renderer for
+ * auto-import, instead of requiring the user to separately find the downloaded file in their
+ * Downloads folder and import it by hand afterward. The manual "Import Report" flow (a plain
+ * file picker) is left completely untouched as an alternative, per explicit request.
+ *
+ * Uses a PERSISTENT session partition ("persist:enquote-salesforce") - per explicit request
+ * ("Lets allow it to remember my session") - so Salesforce's own session cookies persist
+ * across app restarts, meaning the user should only need to complete 2FA again once
+ * Salesforce's own session naturally expires, not on every single import. This is a genuine,
+ * real security tradeoff (session cookies persist on disk between imports) that was explicitly
+ * chosen over an ephemeral/always-fresh-login alternative.
+ */
+
+const { BrowserWindow, session } = require("electron");
+const path = require("node:path");
+const os = require("node:os");
+const fs = require("node:fs");
+
+let salesforceWindow = null;
+
+/**
+ * Opens (or re-points/focuses, if already open) the embedded Salesforce report window.
+ *
+ * @param {string} reportUrl - the user's own saved Salesforce report URL.
+ * @param {(result: {name: string, base64: string}) => void} onFileDownloaded - called once per
+ *   completed download with the file's name + base64 content, for the caller to hand off to the
+ *   renderer for auto-import.
+ */
+function openSalesforceReportWindow(reportUrl, onFileDownloaded) {
+  const partitionSession = session.fromPartition("persist:enquote-salesforce");
+
+  // Re-registered every open (removeAllListeners first) rather than once at module load, so a
+  // fresh onFileDownloaded callback (tied to the current IPC caller) is always the one that
+  // actually fires - avoids accumulating stale listeners across repeated opens.
+  partitionSession.removeAllListeners("will-download");
+  partitionSession.on("will-download", (_event, item) => {
+    const fileName = item.getFilename();
+    const ext = path.extname(fileName).toLowerCase();
+    // Only auto-capture the export formats this feature is built for - anything else (e.g. a
+    // PDF from elsewhere in Salesforce's own UI) falls through to Electron's normal save-to-
+    // disk/Save-As behavior, completely untouched by this handler.
+    if (![".csv", ".xls", ".xlsx"].includes(ext)) return;
+
+    // Electron's DownloadItem has no direct in-memory buffer API - the reliable, documented
+    // approach is to redirect the save path to a real temp file, read it back once complete,
+    // then delete the temp file - the user never sees a Save dialog or a file appear in their
+    // visible Downloads folder, which is the actual automation this feature provides.
+    const tempPath = path.join(os.tmpdir(), `enquote-sf-import-${Date.now()}${ext}`);
+    item.setSavePath(tempPath);
+
+    item.once("done", (_doneEvent, state) => {
+      if (state !== "completed") {
+        console.warn("[salesforce-import] Download did not complete:", state);
+        return;
+      }
+      try {
+        const buffer = fs.readFileSync(tempPath);
+        onFileDownloaded({ name: fileName, base64: buffer.toString("base64") });
+      } catch (error) {
+        console.warn("[salesforce-import] Could not read downloaded file:", error.message);
+      } finally {
+        try { fs.unlinkSync(tempPath); } catch { /* best-effort cleanup only */ }
+      }
+    });
+  });
+
+  if (salesforceWindow && !salesforceWindow.isDestroyed()) {
+    salesforceWindow.focus();
+    salesforceWindow.loadURL(reportUrl);
+    return;
+  }
+
+  salesforceWindow = new BrowserWindow({
+    width: 1280,
+    height: 900,
+    title: "Salesforce Report - EnQuote Import",
+    // No preload/contextBridge here deliberately - this window only ever shows Salesforce's
+    // own real pages; EnQuote's renderer APIs have no reason to exist inside it, and omitting
+    // a preload keeps this window's capabilities minimal on principle.
+    webPreferences: {
+      session: partitionSession,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
+    }
+  });
+
+  salesforceWindow.loadURL(reportUrl);
+  salesforceWindow.on("closed", () => { salesforceWindow = null; });
+}
+
+function closeSalesforceReportWindow() {
+  if (salesforceWindow && !salesforceWindow.isDestroyed()) salesforceWindow.close();
+  salesforceWindow = null;
+}
+
+module.exports = { openSalesforceReportWindow, closeSalesforceReportWindow };

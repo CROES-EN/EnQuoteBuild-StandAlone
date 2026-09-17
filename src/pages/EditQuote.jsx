@@ -15,294 +15,294 @@ import { AlertTriangle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 
 function EditQuoteContent() {
-  const { isApprover, isAdmin, roles, user, isLoading: loadingUser } = useUserRole();
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const location = useLocation();
-  const urlParams = new URLSearchParams(location.search);
-  const quoteId = urlParams.get("id");
-  // Set when a save is rejected because the quote changed elsewhere since this form loaded
-  // it (see updateMutation's onError below). Showing a clear "someone/something else
-  // changed this" message and a reload action is much safer than either silently failing
-  // or silently overwriting the newer data.
-  const [conflictError, setConflictError] = useState(null);
+ const { isApprover, isAdmin, roles, user, isLoading: loadingUser } = useUserRole();
+ const navigate = useNavigate();
+ const queryClient = useQueryClient();
+ const location = useLocation();
+ const urlParams = new URLSearchParams(location.search);
+ const quoteId = urlParams.get("id");
+ // Set when a save is rejected because the quote changed elsewhere since this form loaded
+ // it (see updateMutation's onError below). Showing a clear "someone/something else
+ // changed this" message and a reload action is much safer than either silently failing
+ // or silently overwriting the newer data.
+ const [conflictError, setConflictError] = useState(null);
 
-  const { data: quote, isLoading: loadingQuote } = useQuery({
-    queryKey: ["quote", quoteId],
-    queryFn: async () => {
-      return getQuoteById(quoteId);
-    },
-    enabled: !!quoteId
-  });
+ const { data: quote, isLoading: loadingQuote } = useQuery({
+ queryKey: ["quote", quoteId],
+ queryFn: async () => {
+ return getQuoteById(quoteId);
+ },
+ enabled: !!quoteId
+ });
 
-  const { data: products = [] } = useQuery({
-    queryKey: ["products"],
-    queryFn: async () => {
-      return getProducts();
-    },
-  });
+ const { data: products = [] } = useQuery({
+ queryKey: ["products"],
+ queryFn: async () => {
+ return getProducts();
+ },
+ });
 
-  const { data: allQuotes = [] } = useQuery({
-    queryKey: ["quotes"],
-    queryFn: async () => {
-    const quotes = await getQuotes();
-      return quotes.filter(q => q.is_current_version !== false);
-    }
-  });
+ const { data: allQuotes = [] } = useQuery({
+ queryKey: ["quotes", "edit-quote"],
+ queryFn: async () => {
+ const quotes = await getQuotes();
+ return quotes.filter(q => q.is_current_version !== false);
+ }
+ });
 
-  const updateMutation = useMutation({
-    mutationFn: async (data) => {
-      const user = await getCurrentUser();
-      
-      // If editing a submitted, approved, or rejected quote, create a new version
-      if (quote?.status !== "draft") {
-        // Mark current version as not current
-        await updateQuote(quoteId, {
-          is_current_version: false
-        });
-        
-        // Get the parent quote ID (either this quote's parent, or this quote itself if it's the original)
-        const parentQuoteId = quote.parent_quote_id || quoteId;
-        
-        // Get all existing versions to determine the next version number
-        const allVersions = (await getQuotes()).filter(q => q.id === parentQuoteId || q.parent_quote_id === parentQuoteId);
-        
-        const maxVersion = Math.max(...allVersions.map(v => v.version_number || 1));
-        const newVersionNumber = maxVersion + 1;
-        
-        // Create new version
-        const newQuote = await createQuote({
-          ...data,
-          parent_quote_id: parentQuoteId,
-          version_number: newVersionNumber,
-          is_current_version: true,
-          status: "submitted",
-          submitted_date: new Date().toISOString(),
-          rejection_reason: null,
-          status_history: [
-            {
-              status: "submitted",
-              changed_by: user.email,
-              changed_at: new Date().toISOString(),
-              reason: `New version (v${newVersionNumber}) created from v${quote.version_number || 1}`
-            }
-          ]
-        });
-        
-        if (isLocalDataSource) return newQuote;
+ const updateMutation = useMutation({
+ mutationFn: async (data) => {
+ const user = await getCurrentUser();
+ 
+ // If editing a submitted, approved, or rejected quote, create a new version
+ if (quote?.status !== "draft") {
+ // Mark current version as not current
+ await updateQuote(quoteId, {
+ is_current_version: false
+ });
+ 
+ // Get the parent quote ID (either this quote's parent, or this quote itself if it's the original)
+ const parentQuoteId = quote.parent_quote_id || quoteId;
+ 
+ // Get all existing versions to determine the next version number
+ const allVersions = (await getQuotes()).filter(q => q.id === parentQuoteId || q.parent_quote_id === parentQuoteId);
+ 
+ const maxVersion = Math.max(...allVersions.map(v => v.version_number || 1));
+ const newVersionNumber = maxVersion + 1;
+ 
+ // Create new version
+ const newQuote = await createQuote({
+ ...data,
+ parent_quote_id: parentQuoteId,
+ version_number: newVersionNumber,
+ is_current_version: true,
+ status: "submitted",
+ submitted_date: new Date().toISOString(),
+ rejection_reason: null,
+ status_history: [
+ {
+ status: "submitted",
+ changed_by: user.email,
+ changed_at: new Date().toISOString(),
+ reason: `New version (v${newVersionNumber}) created from v${quote.version_number || 1}`
+ }
+ ]
+ });
+ 
+ if (isLocalDataSource) return newQuote;
 
-        // Send notification emails
-        try {
-          const distributions = await base44.entities.EmailDistribution.filter({
-            email_type: "quote_submitted",
-            is_active: true
-          });
-          
-          const emailResults = await Promise.allSettled([
-            ...distributions.map(dist =>
-              base44.integrations.Core.SendEmail({
-                to: dist.recipient_email,
-                subject: `Quote Updated (v${newVersionNumber}): ${newQuote.site_id || newQuote.quote_number}`,
-                body: `A new version of a quote has been submitted for approval.\n\nSite ID: ${newQuote.site_id}\nVersion: ${newVersionNumber}\nTotal: $${newQuote.total.toFixed(2)}\n\nPlease review and approve/reject in the system.`
-              }).then(() => ({ email: dist.recipient_email, success: true }))
-                .catch(err => ({ email: dist.recipient_email, success: false }))
-            ),
-            ...(newQuote.created_by ? [
-              base44.integrations.Core.SendEmail({
-                to: newQuote.created_by,
-                subject: `Quote Updated (v${newVersionNumber}): ${newQuote.site_id || newQuote.quote_number}`,
-                body: `A new version of your quote has been submitted for approval.\n\nSite ID: ${newQuote.site_id}\nVersion: ${newVersionNumber}\nTotal: $${newQuote.total.toFixed(2)}\n\nYou will be notified once it's reviewed.`
-              }).then(() => ({ email: newQuote.created_by, success: true }))
-                .catch(err => ({ email: newQuote.created_by, success: false }))
-            ] : [])
-          ]);
-          
-          const failedEmails = emailResults
-            .filter(result => result.status === 'fulfilled' && !result.value.success)
-            .map(result => result.value.email);
-          
-          if (failedEmails.length > 0) {
-            toast.error(`Failed to send notifications to: ${failedEmails.join(', ')}`);
-          } else {
-            toast.success(`Version ${newVersionNumber} created and notifications sent`);
-          }
-        } catch (error) {
-          toast.error('Failed to send email notifications');
-        }
-        
-        return newQuote;
-      }
-      
-      // If it's a draft, just update it normally. Pass the quote's last-known revision so
-      // the local repository can detect a concurrent change (e.g. a Base44 import landing
-      // while this form was open) and reject instead of silently overwriting it - see
-      // onError below for how that's surfaced. Ignored (harmlessly) by non-local adapters.
-      return updateQuote(quoteId, data, quote?._rev);
-    },
-    onSuccess: (newQuote) => {
-      queryClient.invalidateQueries({ queryKey: ["quote", quoteId] });
-      queryClient.invalidateQueries({ queryKey: ["quotes"] });
-      // Navigate to the new quote if a new version was created
-      const targetQuoteId = newQuote?.id || quoteId;
-      navigate(createPageUrl(`QuoteDetails?id=${targetQuoteId}`));
-    },
-    onError: (error) => {
-      // Electron's IPC boundary only reliably forwards an Error's `message` (wrapped as
-      // "Error invoking remote method '...': Error: <original message>" - confirmed by
-      // testing against a real running instance), not custom properties - so the conflict
-      // signal is detected via a marker WITHIN the message, not a `.code` property or an
-      // exact prefix match, and the original text is recovered by slicing after the marker.
-      const message = String(error?.message || "");
-      const marker = "CONFLICT:";
-      const markerIndex = message.indexOf(marker);
-      if (markerIndex !== -1) {
-        setConflictError(message.slice(markerIndex + marker.length).trim());
-        return;
-      }
-      toast.error(message || "Failed to save changes.");
-    }
-  });
+ // Send notification emails
+ try {
+ const distributions = await base44.entities.EmailDistribution.filter({
+ email_type: "quote_submitted",
+ is_active: true
+ });
+ 
+ const emailResults = await Promise.allSettled([
+ ...distributions.map(dist =>
+ base44.integrations.Core.SendEmail({
+ to: dist.recipient_email,
+ subject: `Quote Updated (v${newVersionNumber}): ${newQuote.site_id || newQuote.quote_number}`,
+ body: `A new version of a quote has been submitted for approval.\n\nSite ID: ${newQuote.site_id}\nVersion: ${newVersionNumber}\nTotal: $${newQuote.total.toFixed(2)}\n\nPlease review and approve/reject in the system.`
+ }).then(() => ({ email: dist.recipient_email, success: true }))
+ .catch(err => ({ email: dist.recipient_email, success: false }))
+ ),
+ ...(newQuote.created_by ? [
+ base44.integrations.Core.SendEmail({
+ to: newQuote.created_by,
+ subject: `Quote Updated (v${newVersionNumber}): ${newQuote.site_id || newQuote.quote_number}`,
+ body: `A new version of your quote has been submitted for approval.\n\nSite ID: ${newQuote.site_id}\nVersion: ${newVersionNumber}\nTotal: $${newQuote.total.toFixed(2)}\n\nYou will be notified once it's reviewed.`
+ }).then(() => ({ email: newQuote.created_by, success: true }))
+ .catch(err => ({ email: newQuote.created_by, success: false }))
+ ] : [])
+ ]);
+ 
+ const failedEmails = emailResults
+ .filter(result => result.status === 'fulfilled' && !result.value.success)
+ .map(result => result.value.email);
+ 
+ if (failedEmails.length > 0) {
+ toast.error(`Failed to send notifications to: ${failedEmails.join(', ')}`);
+ } else {
+ toast.success(`Version ${newVersionNumber} created and notifications sent`);
+ }
+ } catch (error) {
+ toast.error('Failed to send email notifications');
+ }
+ 
+ return newQuote;
+ }
+ 
+ // If it's a draft, just update it normally. Pass the quote's last-known revision so
+ // the local repository can detect a concurrent change (e.g. a Base44 import landing
+ // while this form was open) and reject instead of silently overwriting it - see
+ // onError below for how that's surfaced. Ignored (harmlessly) by non-local adapters.
+ return updateQuote(quoteId, data, quote?._rev);
+ },
+ onSuccess: (newQuote) => {
+ queryClient.invalidateQueries({ queryKey: ["quote", quoteId] });
+ queryClient.invalidateQueries({ queryKey: ["quotes"] });
+ // Navigate to the new quote if a new version was created
+ const targetQuoteId = newQuote?.id || quoteId;
+ navigate(createPageUrl(`QuoteDetails?id=${targetQuoteId}`));
+ },
+ onError: (error) => {
+ // Electron's IPC boundary only reliably forwards an Error's `message` (wrapped as
+ // "Error invoking remote method '...': Error: <original message>" - confirmed by
+ // testing against a real running instance), not custom properties - so the conflict
+ // signal is detected via a marker WITHIN the message, not a `.code` property or an
+ // exact prefix match, and the original text is recovered by slicing after the marker.
+ const message = String(error?.message || "");
+ const marker = "CONFLICT:";
+ const markerIndex = message.indexOf(marker);
+ if (markerIndex !== -1) {
+ setConflictError(message.slice(markerIndex + marker.length).trim());
+ return;
+ }
+ toast.error(message || "Failed to save changes.");
+ }
+ });
 
-  const saveCopyMutation = useMutation({
-    mutationFn: async (data) => {
-      const currentUser = await getCurrentUser();
-      const suffix = `${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 900 + 100)}`;
-      return createQuote({
-        ...data,
-        quote_number: `Q-${suffix}`,
-        owner_email: currentUser.email,
-        status: "draft_without_internal",
-        pre_approved: false,
-        pre_approved_by: null,
-        pre_approved_date: null,
-        status_history: [{
-          status: "draft_without_internal",
-          changed_by: currentUser.email,
-          changed_at: new Date().toISOString(),
-          reason: `Saved as a pricing option from ${quote?.quote_number || quote?.site_id}`
-        }]
-      });
-    },
-    onSuccess: (copiedQuote) => {
-      queryClient.invalidateQueries({ queryKey: ["quotes"] });
-      toast.success("Quote copy created as a new pricing option");
-      navigate(createPageUrl(`EditQuote?id=${copiedQuote.id}`));
-    }
-  });
+ const saveCopyMutation = useMutation({
+ mutationFn: async (data) => {
+ const currentUser = await getCurrentUser();
+ const suffix = `${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 900 + 100)}`;
+ return createQuote({
+ ...data,
+ quote_number: `Q-${suffix}`,
+ owner_email: currentUser.email,
+ status: "draft_without_internal",
+ pre_approved: false,
+ pre_approved_by: null,
+ pre_approved_date: null,
+ status_history: [{
+ status: "draft_without_internal",
+ changed_by: currentUser.email,
+ changed_at: new Date().toISOString(),
+ reason: `Saved as a pricing option from ${quote?.quote_number || quote?.site_id}`
+ }]
+ });
+ },
+ onSuccess: (copiedQuote) => {
+ queryClient.invalidateQueries({ queryKey: ["quotes"] });
+ toast.success("Quote copy created as a new pricing option");
+ navigate(createPageUrl(`EditQuote?id=${copiedQuote.id}`));
+ }
+ });
 
-  if (loadingQuote || loadingUser) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+ if (loadingQuote || loadingUser) {
+ return (
+ <div className="min-h-screen bg-background flex items-center justify-center">
+ <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+ </div>
+ );
+ }
 
-  const canViewVersionHistory = roles.includes("approver");
-  const isOriginalCreator = quote?.created_by_id === user?.id;
-  const canEdit = isOriginalCreator || isApprover || isAdmin;
+ const canViewVersionHistory = roles.includes("approver");
+ const isOriginalCreator = quote?.created_by_id === user?.id;
+ const canEdit = isOriginalCreator || isApprover || isAdmin;
 
-  if (!canEdit) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
-        <div className="max-w-md w-full text-center">
-          <h2 className="text-2xl font-bold text-slate-900 mb-2">Cannot Edit</h2>
-          <p className="text-slate-600">Only the original quote creator, an approver, or an admin can edit this quote.</p>
-          <Link to={createPageUrl(`QuoteDetails?id=${quoteId}`)}>
-            <Button className="mt-4">Back to Quote</Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
+ if (!canEdit) {
+ return (
+ <div className="min-h-screen bg-background flex items-center justify-center p-4">
+ <div className="max-w-md w-full text-center">
+ <h2 className="text-2xl font-bold text-foreground mb-2">Cannot Edit</h2>
+ <p className="text-muted-foreground">Only the original quote creator, an approver, or an admin can edit this quote.</p>
+ <Link to={createPageUrl(`QuoteDetails?id=${quoteId}`)}>
+ <Button className="mt-4">Back to Quote</Button>
+ </Link>
+ </div>
+ </div>
+ );
+ }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <Link to={createPageUrl(`QuoteDetails?id=${quoteId}`)}>
-            <Button variant="ghost" className="text-slate-600 mb-4">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Quote
-            </Button>
-          </Link>
-          <h1 className="text-3xl font-bold text-slate-900">Edit Quote</h1>
-          <p className="text-slate-600 mt-1">{quote?.quote_number}</p>
-        </div>
+ return (
+ <div className="min-h-screen bg-background">
+ <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+ {/* Header */}
+ <div className="mb-8">
+ <Link to={createPageUrl(`QuoteDetails?id=${quoteId}`)}>
+ <Button variant="ghost" className="text-muted-foreground mb-4">
+ <ArrowLeft className="w-4 h-4 mr-2" />
+ Back to Quote
+ </Button>
+ </Link>
+ <h1 className="text-3xl font-bold text-foreground">Edit Quote</h1>
+ <p className="text-muted-foreground mt-1">{quote?.quote_number}</p>
+ </div>
 
-        {conflictError && (
-          <Card className="p-5 border-amber-200 bg-amber-50 mb-6">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
-              <div className="flex-1">
-                <p className="font-semibold text-amber-800 mb-1">Your changes weren't saved</p>
-                <p className="text-amber-700 text-sm">{conflictError}</p>
-                <Button
-                  size="sm"
-                  className="mt-3 bg-amber-600 hover:bg-amber-700"
-                  onClick={async () => {
-                    setConflictError(null);
-                    await queryClient.invalidateQueries({ queryKey: ["quote", quoteId] });
-                  }}
-                >
-                  Reload Latest Version
-                </Button>
-              </div>
-            </div>
-          </Card>
-        )}
+ {conflictError && (
+ <Card className="p-5 border-amber-200 bg-amber-50 mb-6">
+ <div className="flex items-start gap-3">
+ <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
+ <div className="flex-1">
+ <p className="font-semibold text-amber-800 mb-1">Your changes weren't saved</p>
+ <p className="text-amber-700 text-sm">{conflictError}</p>
+ <Button
+ size="sm"
+ className="mt-3 bg-amber-600 hover:bg-amber-700"
+ onClick={async () => {
+ setConflictError(null);
+ await queryClient.invalidateQueries({ queryKey: ["quote", quoteId] });
+ }}
+ >
+ Reload Latest Version
+ </Button>
+ </div>
+ </div>
+ </Card>
+ )}
 
-        <QuoteForm
-          quote={quote}
-          products={products}
-          allQuotes={allQuotes}
-          onSave={(data) => { setConflictError(null); updateMutation.mutate(data); }}
-          onSaveCopy={(data) => saveCopyMutation.mutate(data)}
-          onCancel={() => navigate(createPageUrl(`QuoteDetails?id=${quoteId}`))}
-          isLoading={updateMutation.isPending || saveCopyMutation.isPending}
-          isAdmin={isAdmin}
-        />
+ <QuoteForm
+ quote={quote}
+ products={products}
+ allQuotes={allQuotes}
+ onSave={(data) => { setConflictError(null); updateMutation.mutate(data); }}
+ onSaveCopy={(data) => saveCopyMutation.mutate(data)}
+ onCancel={() => navigate(createPageUrl(`QuoteDetails?id=${quoteId}`))}
+ isLoading={updateMutation.isPending || saveCopyMutation.isPending}
+ isAdmin={isAdmin}
+ />
 
-        {/* Rejection notes */}
-        {quote?.rejection_reason && (
-          <Card className="p-5 border-rose-200 bg-rose-50 mt-6">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-rose-500 mt-0.5 shrink-0" />
-              <div>
-                <p className="font-semibold text-rose-800 mb-1">Internal Rejection Reason</p>
-                <p className="text-rose-700 text-sm">{quote.rejection_reason}</p>
-              </div>
-            </div>
-          </Card>
-        )}
-        {quote?.ho_rejection_reason && (
-          <Card className="p-5 border-rose-200 bg-rose-50 mt-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-rose-500 mt-0.5 shrink-0" />
-              <div>
-                <p className="font-semibold text-rose-800 mb-1">HO Rejection Reason</p>
-                <p className="text-rose-700 text-sm">{quote.ho_rejection_reason}</p>
-              </div>
-            </div>
-          </Card>
-        )}
+ {/* Rejection notes */}
+ {quote?.rejection_reason && (
+ <Card className="p-5 border-rose-200 bg-rose-50 mt-6">
+ <div className="flex items-start gap-3">
+ <AlertTriangle className="w-5 h-5 text-rose-500 mt-0.5 shrink-0" />
+ <div>
+ <p className="font-semibold text-rose-800 mb-1">Internal Rejection Reason</p>
+ <p className="text-rose-700 text-sm">{quote.rejection_reason}</p>
+ </div>
+ </div>
+ </Card>
+ )}
+ {quote?.ho_rejection_reason && (
+ <Card className="p-5 border-rose-200 bg-rose-50 mt-4">
+ <div className="flex items-start gap-3">
+ <AlertTriangle className="w-5 h-5 text-rose-500 mt-0.5 shrink-0" />
+ <div>
+ <p className="font-semibold text-rose-800 mb-1">HO Rejection Reason</p>
+ <p className="text-rose-700 text-sm">{quote.ho_rejection_reason}</p>
+ </div>
+ </div>
+ </Card>
+ )}
 
-        {/* Version history */}
-        {canViewVersionHistory && (
-          <div className="mt-6">
-            <QuoteVersionHistory quote={quote} />
-          </div>
-        )}
-      </div>
-    </div>
-  );
+ {/* Version history */}
+ {canViewVersionHistory && (
+ <div className="mt-6">
+ <QuoteVersionHistory quote={quote} />
+ </div>
+ )}
+ </div>
+ </div>
+ );
 }
 
 export default function EditQuote() {
-  return (
-    <RoleGuard allowedRoles={["submitter", "approver", "admin"]}>
-      <EditQuoteContent />
-    </RoleGuard>
-  );
+ return (
+ <RoleGuard allowedRoles={["submitter", "approver", "admin"]}>
+ <EditQuoteContent />
+ </RoleGuard>
+ );
 }

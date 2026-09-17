@@ -1,4 +1,4 @@
-import { Card } from "@/components/ui/card";
+﻿import { Card } from "@/components/ui/card";
 import { motion } from "framer-motion";
 import { ArrowUp, ArrowDown, Minus } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -8,23 +8,23 @@ export default function MetricCard({ title, value, subtitle, icon: Icon, trend, 
     if (!trend) return null;
     if (trend > 0) return <ArrowUp className="w-4 h-4 text-green-600" />;
     if (trend < 0) return <ArrowDown className="w-4 h-4 text-red-600" />;
-    return <Minus className="w-4 h-4 text-slate-400" />;
+    return <Minus className="w-4 h-4 text-muted-foreground" />;
   };
 
   const getTrendColor = () => {
     if (trend > 0) return "text-green-600";
     if (trend < 0) return "text-red-600";
-    return "text-slate-400";
+    return "text-muted-foreground";
   };
 
   const CardContent = (
-    <Card className={`p-6 border-slate-200 hover:shadow-lg transition-all ${href ? 'cursor-pointer hover:border-indigo-300' : ''}`}>
+    <Card className={`p-6 border-border hover:shadow-lg transition-all ${href ? 'cursor-pointer hover:border-indigo-300' : ''}`}>
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <p className="text-sm text-slate-600 mb-1">{title}</p>
-          <p className="text-3xl font-bold text-slate-900">{value}</p>
+          <p className="text-sm text-muted-foreground mb-1">{title}</p>
+          <p className="text-3xl font-bold text-foreground">{value}</p>
           {subtitle && (
-            <p className="text-sm text-slate-500 mt-1">{subtitle}</p>
+            <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
           )}
           {trend !== undefined && (
             <div className={`flex items-center gap-1 mt-2 text-sm font-medium ${getTrendColor()}`}>
@@ -58,3 +58,4 @@ export default function MetricCard({ title, value, subtitle, icon: Icon, trend, 
     </motion.div>
   );
 }
+

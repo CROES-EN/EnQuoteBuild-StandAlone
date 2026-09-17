@@ -11,7 +11,7 @@ function loadSavedFilters() {
   }
 }
 import { base44 } from "@/api/base44Client";
-import { bulkUpdateQuotes } from "@/api/dataClient";
+import { bulkUpdateQuotes, getQuotes } from "@/api/dataClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -65,6 +65,7 @@ function QuotesContent() {
   const [selectedSubmitter, setSelectedSubmitter] = useState(savedFilters.selectedSubmitter || "all");
   const [snapshotExpanded, setSnapshotExpanded] = useState(true);
   const [alertsOnly, setAlertsOnly] = useState(false);
+  const [duplicatesOnly, setDuplicatesOnly] = useState(false);
 
   useEffect(() => {
     localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify({ search, statusFilter, coordinatorFilter, sortBy, myQuotesOnly, selectedSubmitter }));
@@ -97,10 +98,10 @@ function QuotesContent() {
 
 
   const { data: quotes = [], isLoading, error } = useQuery({
-    queryKey: ["quotes"],
+    queryKey: ["quotes", "list"],
     queryFn: async () => {
-    const allQuotes = await getQuotes();
-    return allQuotes
+      const allQuotes = await getQuotes();
+      return allQuotes
         .filter(q => q.is_current_version !== false)
         .map(q => ({
           ...q,
@@ -108,6 +109,18 @@ function QuotesContent() {
         }));
     }
   });
+
+  // Diagnostic only - purely additive, does not change any existing behavior. If the quotes
+  // query ever fails (network issue, thrown exception inside queryFn, etc.), this makes the
+  // REAL error visible instead of silently rendering "No quotes found" with zero indication
+  // anything went wrong - `error` was already being captured by useQuery above but was never
+  // logged or displayed anywhere, so a real failure was previously indistinguishable from
+  // "there just aren't any quotes."
+  useEffect(() => {
+    if (error) {
+      console.error("[Quotes] Failed to load quotes:", error);
+    }
+  }, [error]);
 
   const { data: myMentions = [] } = useQuery({
     queryKey: ["quoteAlerts", "mentions", user?.email],
@@ -150,6 +163,31 @@ function QuotesContent() {
   // Get unique coordinators from quotes (use owner_email if set, else created_by)
   const coordinators = [...new Set(quotes.map(q => q.owner_email || q.created_by).filter(Boolean))].sort();
 
+  // Groups the FULL, unfiltered quotes list by (site_id, total) and flags any site with 2+
+  // quotes sharing the EXACT SAME total - per explicit, simplified design decision: "All I
+  // simply needed the duplicate quote button to do was show if a site ID and a quote total
+  // had the same exact values." This REPLACES the earlier distinct-quote_number-count logic
+  // entirely - quote_number is no longer part of the duplicate check at all. Total is rounded
+  // to 2 decimals before comparing, so ordinary floating-point representation differences
+  // (e.g. 100.1 vs 100.10000000001) never cause a false negative/positive on an otherwise
+  // identical dollar amount.
+  const duplicateSiteIds = (() => {
+    const totalsBySite = new Map();
+    quotes.forEach((q) => {
+      const site = q.site_id;
+      if (!site || q.total === null || q.total === undefined) return;
+      const roundedTotal = Math.round(Number(q.total) * 100) / 100;
+      if (!totalsBySite.has(site)) totalsBySite.set(site, new Map());
+      const totalCounts = totalsBySite.get(site);
+      totalCounts.set(roundedTotal, (totalCounts.get(roundedTotal) || 0) + 1);
+    });
+    return new Set(
+      Array.from(totalsBySite.entries())
+        .filter(([, totalCounts]) => Array.from(totalCounts.values()).some((count) => count >= 2))
+        .map(([site]) => site)
+    );
+  })();
+
   const baseFilteredQuotes = quotes.filter((quote) => {
     const effectiveOwner = quote.owner_email || quote.created_by;
     const matchesSearch = 
@@ -170,13 +208,17 @@ function QuotesContent() {
     return 0;
   });
 
-  const filteredQuotes = alertsOnly
+  const alertsFilteredQuotes = alertsOnly
     ? baseFilteredQuotes.filter((q) => {
         if (dismissedQuoteIds.has(q.id)) return false;
         const alert = computeQuoteAlert(q);
         return userHasAlertAccess(alert, q, user?.email, isAdmin) || mentionedQuoteIds.has(q.id);
       })
     : baseFilteredQuotes;
+
+  const filteredQuotes = duplicatesOnly
+    ? alertsFilteredQuotes.filter((q) => duplicateSiteIds.has(q.site_id))
+    : alertsFilteredQuotes;
 
   const alertCount = quotes.filter((q) => {
     if (dismissedQuoteIds.has(q.id)) return false;
@@ -265,13 +307,13 @@ function QuotesContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">Quotes</h1>
-            <p className="text-slate-600 mt-1">View and manage all your quotes</p>
+            <h1 className="text-3xl font-bold text-foreground">Quotes</h1>
+            <p className="text-muted-foreground mt-1">View and manage all your quotes</p>
           </div>
           <div className="flex gap-2">
             <Button
@@ -295,6 +337,15 @@ function QuotesContent() {
               <ListChecks className="w-4 h-4 mr-2" />
               {bulkMode ? "Done" : "Select"}
             </Button>
+            <Button
+              variant={duplicatesOnly ? "default" : "outline"}
+              onClick={() => setDuplicatesOnly((prev) => !prev)}
+              className={duplicatesOnly ? "bg-amber-600 hover:bg-amber-700" : "border-slate-300"}
+              title="Sites with 2 or more quotes that share the exact same total"
+            >
+              <AlertCircle className="w-4 h-4 mr-2" />
+              Show Duplicates{quotes.filter((q) => duplicateSiteIds.has(q.site_id)).length > 0 ? ` (${quotes.filter((q) => duplicateSiteIds.has(q.site_id)).length})` : ""}
+            </Button>
             <Button variant="outline" onClick={downloadCSV} className="border-slate-300">
               <Download className="w-4 h-4 mr-2" />
               Export CSV
@@ -309,11 +360,11 @@ function QuotesContent() {
         </div>
 
         {/* Filters */}
-        <Card className="p-4 mb-6 border-slate-200">
+        <Card className="p-4 mb-6 border-border">
           <div className="flex flex-col gap-4">
             <div className="flex flex-col md:flex-row gap-4">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   placeholder="Search by Site ID, Case Number, or Client Name..."
                   value={search}
@@ -328,8 +379,8 @@ function QuotesContent() {
                 <SelectContent>
                   <SelectItem value="date_desc">Newest First</SelectItem>
                   <SelectItem value="date_asc">Oldest First</SelectItem>
-                  <SelectItem value="amount_desc">Amount: High → Low</SelectItem>
-                  <SelectItem value="amount_asc">Amount: Low → High</SelectItem>
+                  <SelectItem value="amount_desc">Amount: High to Low</SelectItem>
+                  <SelectItem value="amount_asc">Amount: Low to High</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={coordinatorFilter} onValueChange={setCoordinatorFilter}>
@@ -368,7 +419,7 @@ function QuotesContent() {
                   "px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors flex items-center gap-1.5",
                   myQuotesOnly
                     ? "bg-indigo-600 text-white"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    : "bg-muted text-muted-foreground hover:bg-slate-200"
                 )}
               >
                 <User className="w-4 h-4" />
@@ -382,7 +433,7 @@ function QuotesContent() {
                     "px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors",
                     statusFilter === filter.value
                       ? "bg-indigo-100 text-indigo-700"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      : "bg-muted text-muted-foreground hover:bg-slate-200"
                   )}
                 >
                   {filter.label}
@@ -397,13 +448,13 @@ function QuotesContent() {
                 : (myQuotesOnly ? user?.email : null);
               if (!snapshotEmail) return null;
               return (
-                <div className="border-t border-slate-100 pt-4">
+                <div className="border-t border-border pt-4">
                   <button
                     onClick={() => setSnapshotExpanded(!snapshotExpanded)}
-                    className="flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-slate-900"
+                    className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-foreground"
                   >
-                    {snapshotExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    Status Snapshot — {snapshotEmail.split("@")[0]}
+                    {snapshotExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4"/>}
+                    Status Snapshot - {snapshotEmail.split("@")[0]}
                   </button>
                   {snapshotExpanded && (
                     <div className="mt-4">
@@ -423,7 +474,7 @@ function QuotesContent() {
         {/* Active filter warning */}
         {(statusFilter !== "all" || coordinatorFilter !== "all" || search || myQuotesOnly || selectedSubmitter !== "all" || alertsOnly) && (
           <div className="flex items-center gap-2 mb-4 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
-            <span>Filters are active — some quotes may be hidden.</span>
+            <span>Filters are active - some quotes may be hidden.</span>
             <button
               onClick={() => { setSearch(""); setStatusFilter("all"); setCoordinatorFilter("all"); setMyQuotesOnly(false); setSelectedSubmitter("all"); setAlertsOnly(false); }}
               className="ml-auto font-medium underline hover:no-underline"
@@ -433,7 +484,18 @@ function QuotesContent() {
           </div>
         )}
 
-        {/* Status Alerts — reflects the currently filtered quote list */}
+        {/* Load error banner - purely additive; only ever shows if the quotes query actually
+            failed. See the useEffect above for the matching console.error - together these
+            make a real fetch failure immediately visible instead of silently looking like
+            "there are just no quotes." */}
+        {error && (
+          <Card className="p-4 mb-4 border-rose-300 bg-rose-50">
+            <p className="font-semibold text-rose-800 mb-1">Could not load quotes</p>
+            <p className="text-sm text-rose-700">{error?.message || String(error)}</p>
+          </Card>
+        )}
+
+        {/* Status Alerts - reflects the currently filtered quote list */}
         <StatusAlerts quotes={filteredQuotes} />
 
         {/* Bulk select-all control */}
@@ -453,7 +515,7 @@ function QuotesContent() {
                 });
               }}
             />
-            <span className="text-slate-600 font-medium">
+            <span className="text-muted-foreground font-medium">
               Select all visible ({filteredQuotes.length})
             </span>
           </div>
@@ -463,7 +525,7 @@ function QuotesContent() {
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[1, 2, 3, 4, 5, 6].map(i => (
-              <Card key={i} className="h-48 animate-pulse bg-slate-100" />
+              <Card key={i} className="h-48 animate-pulse bg-muted" />
             ))}
           </div>
         ) : filteredQuotes.length > 0 ? (
@@ -492,11 +554,11 @@ function QuotesContent() {
             })}
           </div>
         ) : (
-          <Card className="p-12 text-center border-slate-200">
+          <Card className="p-12 text-center border-border">
             <FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-slate-900 mb-2">No quotes found</h3>
-            <p className="text-slate-600">
-              {search || statusFilter !== "all" || coordinatorFilter !== "all" || myQuotesOnly || selectedSubmitter !== "all"
+            <h3 className="text-lg font-semibold text-foreground mb-2">No quotes found</h3>
+            <p className="text-muted-foreground">
+              {search || statusFilter !== "all" || coordinatorFilter !== "all" || myQuotesOnly || selectedSubmitter !== "all" || duplicatesOnly
                 ? "Try adjusting your filters" 
                 : "Create your first quote to get started"}
             </p>

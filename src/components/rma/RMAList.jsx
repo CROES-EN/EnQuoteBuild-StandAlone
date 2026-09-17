@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+﻿import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -107,7 +107,7 @@ export default function RMAList({ rmas, onEdit, isLoading }) {
   if (isLoading) {
     return (
       <Card className="p-12 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-border border-t-slate-800 rounded-full animate-spin" />
       </Card>
     );
   }
@@ -116,16 +116,16 @@ export default function RMAList({ rmas, onEdit, isLoading }) {
     return (
       <Card className="p-12 flex flex-col items-center justify-center text-center">
         <Inbox className="w-12 h-12 text-slate-300 mb-3" />
-        <p className="text-slate-500 font-medium">No RMAs found</p>
-        <p className="text-sm text-slate-400 mt-1">Try adjusting your filters or add a new RMA.</p>
+        <p className="text-muted-foreground font-medium">No RMAs found</p>
+        <p className="text-sm text-muted-foreground mt-1">Try adjusting your filters or add a new RMA.</p>
       </Card>
     );
   }
 
   return (
     <Card className="overflow-hidden">
-      <div className="flex items-center justify-between p-4 border-b border-slate-100">
-        <p className="text-sm text-slate-600">
+      <div className="flex items-center justify-between p-4 border-b border-border">
+        <p className="text-sm text-muted-foreground">
           {sortedRmas.length} RMA{sortedRmas.length !== 1 ? "s" : ""}
         </p>
         <DropdownMenu>
@@ -151,12 +151,12 @@ export default function RMAList({ rmas, onEdit, isLoading }) {
 
       <div className="overflow-x-auto">
         <table className="w-full">
-          <thead className="bg-slate-50 border-b border-slate-100">
+          <thead className="bg-secondary border-b border-border">
             <tr>
               {visibleColumns.map(col => (
                 <th
                   key={col.key}
-                  className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors whitespace-nowrap"
+                  className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer hover:bg-muted transition-colors whitespace-nowrap"
                   onClick={() => handleSort(col.key)}
                 >
                   <div className="flex items-center gap-1">
@@ -176,11 +176,11 @@ export default function RMAList({ rmas, onEdit, isLoading }) {
             {paginatedRmas.map(rma => (
               <tr
                 key={rma.id}
-                className="hover:bg-slate-50 cursor-pointer transition-colors"
+                className="hover:bg-secondary cursor-pointer transition-colors"
                 onClick={() => onEdit(rma)}
               >
                 {visibleColumns.map(col => (
-                  <td key={col.key} className="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">
+                  <td key={col.key} className="px-4 py-3 text-sm text-foreground whitespace-nowrap">
                     {renderCell(rma, col.key)}
                   </td>
                 ))}
@@ -191,7 +191,7 @@ export default function RMAList({ rmas, onEdit, isLoading }) {
                     className="h-8 w-8"
                     onClick={(e) => { e.stopPropagation(); onEdit(rma); }}
                   >
-                    <Pencil className="w-4 h-4 text-slate-500" />
+                    <Pencil className="w-4 h-4 text-muted-foreground" />
                   </Button>
                 </td>
               </tr>
@@ -201,8 +201,8 @@ export default function RMAList({ rmas, onEdit, isLoading }) {
       </div>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between p-4 border-t border-slate-100">
-          <p className="text-sm text-slate-600">
+        <div className="flex items-center justify-between p-4 border-t border-border">
+          <p className="text-sm text-muted-foreground">
             Page {currentPage + 1} of {totalPages}
           </p>
           <div className="flex gap-2">

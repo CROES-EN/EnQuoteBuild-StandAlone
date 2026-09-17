@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { createLocalRecord, getCurrentUser, listLocalCollection } from "@/api/dataClient";
@@ -61,8 +61,8 @@ function SVCancelTrackerPage() {
             <AlertTriangle className="w-5 h-5 text-rose-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">SV Cancel Tracker</h1>
-            <p className="text-sm text-slate-500">Track canceled and rescheduled site visit escalations</p>
+            <h1 className="text-2xl font-bold text-foreground">SV Cancel Tracker</h1>
+            <p className="text-sm text-muted-foreground">Track canceled and rescheduled site visit escalations</p>
           </div>
         </div>
         <Button
@@ -78,7 +78,7 @@ function SVCancelTrackerPage() {
       {showForm && (
         <Card className="border-rose-200 bg-rose-50/30">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base text-slate-800">New Cancellation Escalation</CardTitle>
+            <CardTitle className="text-base text-foreground">New Cancellation Escalation</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -158,13 +158,13 @@ function SVCancelTrackerPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-5 pb-4">
-            <p className="text-xs text-slate-500 mb-1">Total Escalations</p>
-            <p className="text-2xl font-bold text-slate-900">{records.length}</p>
+            <p className="text-xs text-muted-foreground mb-1">Total Escalations</p>
+            <p className="text-2xl font-bold text-foreground">{records.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-5 pb-4">
-            <p className="text-xs text-slate-500 mb-1">Total Cancels</p>
+            <p className="text-xs text-muted-foreground mb-1">Total Cancels</p>
             <p className="text-2xl font-bold text-rose-600">
               {records.reduce((sum, r) => sum + (r.cancel_count || 0), 0)}
             </p>
@@ -172,7 +172,7 @@ function SVCancelTrackerPage() {
         </Card>
         <Card>
           <CardContent className="pt-5 pb-4">
-            <p className="text-xs text-slate-500 mb-1">HO Contacted</p>
+            <p className="text-xs text-muted-foreground mb-1">HO Contacted</p>
             <p className="text-2xl font-bold text-emerald-600">
               {records.filter(r => r.ho_contacted).length}
             </p>
@@ -180,7 +180,7 @@ function SVCancelTrackerPage() {
         </Card>
         <Card>
           <CardContent className="pt-5 pb-4">
-            <p className="text-xs text-slate-500 mb-1">HO Not Contacted</p>
+            <p className="text-xs text-muted-foreground mb-1">HO Not Contacted</p>
             <p className="text-2xl font-bold text-amber-600">
               {records.filter(r => !r.ho_contacted).length}
             </p>
@@ -195,9 +195,9 @@ function SVCancelTrackerPage() {
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="p-8 text-center text-slate-500">Loading...</div>
+            <div className="p-8 text-center text-muted-foreground">Loading...</div>
           ) : records.length === 0 ? (
-            <div className="p-10 text-center text-slate-400">
+            <div className="p-10 text-center text-muted-foreground">
               <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-slate-300" />
               <p>No escalations logged yet</p>
             </div>
@@ -207,19 +207,19 @@ function SVCancelTrackerPage() {
                 <div key={record.id} className="px-6 py-4 flex flex-col md:flex-row md:items-center gap-3">
                   <div className="flex-1 min-w-0 grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-1">
                     <div>
-                      <p className="text-xs text-slate-400">Site ID</p>
-                      <p className="font-semibold text-slate-900">{record.site_id}</p>
+                      <p className="text-xs text-muted-foreground">Site ID</p>
+                      <p className="font-semibold text-foreground">{record.site_id}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-400">Case ID</p>
-                      <p className="font-medium text-slate-700">{record.case_id}</p>
+                      <p className="text-xs text-muted-foreground">Case ID</p>
+                      <p className="font-medium text-foreground">{record.case_id}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-400">Cancels</p>
+                      <p className="text-xs text-muted-foreground">Cancels</p>
                       <p className="font-semibold text-rose-600">{record.cancel_count}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-400">HO Contacted</p>
+                      <p className="text-xs text-muted-foreground">HO Contacted</p>
                       <Badge className={record.ho_contacted
                         ? "bg-emerald-100 text-emerald-700 border-0"
                         : "bg-amber-100 text-amber-700 border-0"}>
@@ -228,9 +228,9 @@ function SVCancelTrackerPage() {
                     </div>
                   </div>
                   {record.notes && (
-                    <p className="text-sm text-slate-500 md:max-w-xs truncate">{record.notes}</p>
+                    <p className="text-sm text-muted-foreground md:max-w-xs truncate">{record.notes}</p>
                   )}
-                  <div className="flex items-center gap-4 text-xs text-slate-400 shrink-0">
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground shrink-0">
                     {record.submitted_by && (
                       <span className="flex items-center gap-1">
                         <User className="w-3 h-3" />

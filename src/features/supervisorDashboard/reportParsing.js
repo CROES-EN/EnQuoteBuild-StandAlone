@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Parsing/aggregation helpers for importing report exports (.xlsx/.xls/.csv/.html) into the
  * Supervisor Dashboard's daily metrics - CXONE/NICE (Contact Center + Workforce Management),
  * Salesforce, Incorta (O&M Scheduling / Case Backlog - including a raw "Export to HTML" dashboard
@@ -340,7 +340,7 @@ function wrapWorkbook(workbook) {
  */
 export async function readWorkbookRows(file) {
   const buffer = await file.arrayBuffer();
-  return wrapWorkbook(read(buffer, { type: "array", raw: true }));
+  return wrapWorkbook(read(buffer, { type: "array", raw: true, codepage: 65001 }));
 }
 
 /**
@@ -350,7 +350,7 @@ export async function readWorkbookRows(file) {
  * than from a user-driven `<input type="file">` selection.
  */
 export function readWorkbookFromBytes(bytes) {
-  return wrapWorkbook(read(bytes, { type: "array", raw: true }));
+  return wrapWorkbook(read(bytes, { type: "array", raw: true, codepage: 65001 }));
 }
 
 const HTML_REPORT_EXTENSIONS = new Set([".html", ".htm"]);
@@ -383,7 +383,7 @@ export async function peekReportFile(file) {
   const buffer = await file.arrayBuffer();
   // `bookSheets: true` stops SheetJS after reading just the sheet-name index - it does not
   // touch any sheet's actual cell data, so this stays fast even for a huge multi-tab workbook.
-  const peek = read(buffer, { type: "array", bookSheets: true });
+  const peek = read(buffer, { type: "array", bookSheets: true, codepage: 65001 });
   return { kind: "spreadsheet", sheetNames: peek.SheetNames || [], _buffer: buffer };
 }
 
@@ -408,7 +408,7 @@ export function readPeekedSheets(peeked, sheetNames) {
 
   // `sheets: [...]` limits SheetJS to fully parsing only the requested tabs - every other tab's
   // cells are never converted into memory, which is the whole point of the peek/read split.
-  const workbook = read(peeked._buffer, { type: "array", raw: true, sheets: sheetNames });
+  const workbook = read(peeked._buffer, { type: "array", raw: true, sheets: sheetNames, codepage: 65001 });
   return mergeSheetRowSets(sheetNames.map(name => {
     const sheet = workbook.Sheets[name];
     return sheet ? utils.sheet_to_json(sheet, { header: 1, raw: true, defval: "" }) : [];
@@ -431,7 +431,7 @@ export function readPeekedSheet(peeked, sheetName) {
   if (peeked.kind === "html") {
     return readHtmlSectionRows(peeked._text, sheetName);
   }
-  const workbook = read(peeked._buffer, { type: "array", raw: true, sheets: [sheetName] });
+  const workbook = read(peeked._buffer, { type: "array", raw: true, sheets: [sheetName], codepage: 65001 });
   const sheet = workbook.Sheets[sheetName];
   return sheet ? utils.sheet_to_json(sheet, { header: 1, raw: true, defval: "" }) : [];
 }
@@ -508,7 +508,23 @@ function extractHtmlSection(html, sectionName) {
   const i = markers.findIndex(marker => marker.name === sectionName);
   if (i < 0) return "";
   const start = markers[i].index;
-  const end = i + 1 < markers.length ? markers[i + 1].index : html.length;
+  // CONFIRMED FIX (2026-09-08): large Incorta "Export to HTML" dumps repeat the SAME section
+  // title once per <table> chunk when a section is split across several tables. The previous
+  // "end = next marker, whatever its name" logic mistook the NEXT occurrence of the SAME title
+  // for the start of a different section, silently cutting off every chunk after the first (this
+  // is what caused a 2,792-row section to be truncated to its first ~1,000-row chunk even after
+  // readHtmlSectionRows's own multi-table concatenation logic was fixed - that function never
+  // even received the later chunks, because they were excluded here, one level upstream). The end
+  // boundary is now the next marker whose name DIFFERS from sectionName - skipping over any
+  // number of repeated same-name markers - or end of document if none remain. A normal,
+  // non-chunked section (whose name appears exactly once) is completely unaffected, since its
+  // very next marker was already a different name.
+  let endMarkerIndex = i + 1;
+  while (endMarkerIndex < markers.length && markers[endMarkerIndex].name === sectionName) {
+    endMarkerIndex++;
+  }
+  const end = endMarkerIndex < markers.length ? markers[endMarkerIndex].index : html.length;
+  console.log("[DIAG] extractHtmlSection:", JSON.stringify(sectionName), "| markers matching:", markers.filter(m => m.name === sectionName).length, "| slice length (chars):", html.slice(start, end).length);
   return html.slice(start, end);
 }
 
@@ -539,19 +555,37 @@ export function readHtmlSectionRows(html, sectionName) {
 
   const doc = new DOMParser().parseFromString(`<!doctype html><html><body>${slice}</body></html>`, "text/html");
   const candidates = Array.from(doc.querySelectorAll("table")).filter(table => table.tHead && table.tHead.rows.length);
+  console.log("[DIAG] readHtmlSectionRows: candidate <table> count:", candidates.length, "| row counts:", candidates.map(t => t.rows.length));
   if (!candidates.length) return [];
 
   // The real data grid is the largest qualifying table by row count - decorative/legend tables
   // that happen to also use <thead> are always tiny by comparison.
-  const table = candidates.reduce((best, t) => (t.rows.length > best.rows.length ? t : best));
+  const referenceTable = candidates.reduce((best, t) => (t.rows.length > best.rows.length ? t : best));
 
-  const headerRows = Array.from(table.tHead.rows).map(cellsWithColspan);
+  const headerRows = Array.from(referenceTable.tHead.rows).map(cellsWithColspan);
   const columnCount = Math.max(0, ...headerRows.map(r => r.length));
   const compoundHeader = Array.from({ length: columnCount }, (_, col) =>
     headerRows.map(r => r[col]).filter(Boolean).join(" - ")
   );
 
-  const bodyRows = Array.from(table.tBodies).flatMap(tbody => Array.from(tbody.rows).map(cellsWithColspan));
+  // CONFIRMED FIX (2026-09-08): large Incorta "Export to HTML" dumps split one big data grid
+  // into SEVERAL separate <table> chunks - each with its own repeated <thead> - once row count
+  // gets large enough (confirmed against a real quarter-to-date export: 1,000 + 1,000 + 792 =
+  // 2,792 rows split across 3 chunked tables). Keeping only the single largest table silently
+  // discarded the other chunks. Every candidate table whose header EXACTLY matches
+  // referenceTable's compound header is treated as another chunk of the SAME grid, and all of
+  // their body rows are concatenated together - for a normal, non-chunked section this only
+  // ever matches referenceTable itself, so behavior is unchanged for every case that already
+  // worked correctly.
+  function computeCompoundHeaderFor(t) {
+    const rows = Array.from(t.tHead.rows).map(cellsWithColspan);
+    const cols = Math.max(0, ...rows.map(r => r.length));
+    return Array.from({ length: cols }, (_, col) => rows.map(r => r[col]).filter(Boolean).join(" - "));
+  }
+  const compoundHeaderKey = compoundHeader.join("\u0001");
+  const matchingTables = candidates.filter(t => computeCompoundHeaderFor(t).join("\u0001") === compoundHeaderKey);
+  const bodyRows = matchingTables.flatMap(t => Array.from(t.tBodies).flatMap(tbody => Array.from(tbody.rows).map(cellsWithColspan)));
+  console.log("[DIAG] readHtmlSectionRows: matchingTables count:", matchingTables.length, "| FINAL row count returned:", bodyRows.length);
 
   return [compoundHeader, ...bodyRows];
 }

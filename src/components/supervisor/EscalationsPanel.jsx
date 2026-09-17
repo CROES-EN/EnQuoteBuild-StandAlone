@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import { TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -81,7 +81,7 @@ export default function EscalationsPanel({ records, selectedDate, onChanged }) {
   }
 
   return (
-    <Card className="border-slate-200">
+    <Card className="border-border">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <TriangleAlert className="h-5 w-5 text-amber-600" />
@@ -173,7 +173,7 @@ export default function EscalationsPanel({ records, selectedDate, onChanged }) {
 
         <div>
           <Label className="mb-1.5 block">Travel / Field Coverage Blockers</Label>
-          <p className="mb-1.5 text-xs text-slate-500">
+          <p className="mb-1.5 text-xs text-muted-foreground">
             From the Travel Plan Tracker — travel plans awaiting approval, field coverage limitations, staffing conflicts
           </p>
           <Textarea

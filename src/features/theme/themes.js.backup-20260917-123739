@@ -1,0 +1,219 @@
+﻿/**
+ * EnQuote theme definitions, styled after popular VS Code color themes.
+ *
+ * CORRECTED APPROACH (v2): rather than maintaining a second, parallel set of CSS variables
+ * that only intercepts raw Tailwind classes (bg-white, text-slate-900), this drives shadcn's
+ * OWN existing HSL CSS-variable system directly (--background, --card, --foreground, etc. -
+ * already defined in index.css and already wired into tailwind.config.js's darkMode: ["class"]
+ * setup). This is the system shadcn/ui components like <Card> (which uses bg-card) already
+ * read from, so setting these variables re-themes EVERY shadcn component automatically,
+ * without needing a second override stylesheet chasing individual utility classes.
+ *
+ * Values are in shadcn's expected format: "H S% L%" (space-separated, no hsl() wrapper - Tailwind's
+ * config already wraps these as hsl(var(--background)) etc.).
+ *
+ * "light-plus" matches the app's ORIGINAL index.css :root values exactly - selecting it produces
+ * zero visual change from how the app looked before this feature existed.
+ *
+ * "dark-plus", "monokai", "solarized-dark", and "solarized-light" also set isDark, which
+ * ThemeContext.jsx uses to toggle Tailwind's "dark" class on <html> - required because several
+ * of index.css's existing dark-mode values (in the .dark block) differ structurally from
+ * :root's, and toggling the class ensures any component relying on Tailwind's dark: variant
+ * (not just CSS variables) also responds correctly.
+ */
+
+export const THEMES = {
+  "light-plus": {
+    id: "light-plus",
+    name: "Light+ (Default)",
+    description: "The app's original look - clean white background.",
+    isDark: false,
+    previewColors: ["#ffffff", "#f8fafc", "#4f46e5"],
+    variables: {
+      "--background": "210 20% 98%",
+      "--foreground": "0 0% 3.9%",
+      "--card": "0 0% 100%",
+      "--card-foreground": "0 0% 3.9%",
+      "--popover": "0 0% 100%",
+      "--popover-foreground": "0 0% 3.9%",
+      "--primary": "243 75% 59%",
+      "--primary-foreground": "0 0% 98%",
+      "--secondary": "0 0% 96.1%",
+      "--secondary-foreground": "0 0% 9%",
+      "--muted": "0 0% 96.1%",
+      "--muted-foreground": "0 0% 45.1%",
+      "--accent": "0 0% 96.1%",
+      "--accent-foreground": "0 0% 9%",
+      "--destructive": "0 84.2% 60.2%",
+      "--destructive-foreground": "0 0% 98%",
+      "--border": "0 0% 89.8%",
+      "--input": "0 0% 89.8%",
+      "--ring": "243 75% 59%",
+      "--sidebar-background": "0 0% 100%",
+      "--sidebar-foreground": "240 5.3% 26.1%",
+      "--sidebar-primary": "240 5.9% 10%",
+      "--sidebar-primary-foreground": "0 0% 98%",
+      "--sidebar-accent": "240 4.8% 95.9%",
+      "--sidebar-accent-foreground": "240 5.9% 10%",
+      "--sidebar-border": "220 13% 91%",
+      "--sidebar-ring": "217.2 91.2% 59.8%"
+    }
+  },
+
+  "dark-plus": {
+    id: "dark-plus",
+    name: "Dark+",
+    description: "VS Code's iconic default dark theme.",
+    isDark: true,
+    previewColors: ["#1e1e1e", "#252526", "#007acc"],
+    variables: {
+      "--background": "0 0% 12%",
+      "--foreground": "0 0% 83%",
+      "--card": "0 0% 15%",
+      "--card-foreground": "0 0% 83%",
+      "--popover": "0 0% 15%",
+      "--popover-foreground": "0 0% 83%",
+      "--primary": "201 100% 40%",
+      "--primary-foreground": "0 0% 98%",
+      "--secondary": "0 0% 18%",
+      "--secondary-foreground": "0 0% 83%",
+      "--muted": "0 0% 18%",
+      "--muted-foreground": "0 0% 63%",
+      "--accent": "0 0% 20%",
+      "--accent-foreground": "0 0% 90%",
+      "--destructive": "0 62.8% 40%",
+      "--destructive-foreground": "0 0% 98%",
+      "--border": "0 0% 24%",
+      "--input": "0 0% 24%",
+      "--ring": "201 100% 40%",
+      "--sidebar-background": "0 0% 15%",
+      "--sidebar-foreground": "0 0% 83%",
+      "--sidebar-primary": "201 100% 40%",
+      "--sidebar-primary-foreground": "0 0% 100%",
+      "--sidebar-accent": "0 0% 20%",
+      "--sidebar-accent-foreground": "0 0% 90%",
+      "--sidebar-border": "0 0% 24%",
+      "--sidebar-ring": "201 100% 40%"
+    }
+  },
+
+  "monokai": {
+    id: "monokai",
+    name: "Monokai",
+    description: "Warm, high-contrast dark theme with vivid accents.",
+    isDark: true,
+    previewColors: ["#272822", "#3e3d32", "#f92672"],
+    variables: {
+      "--background": "70 4% 15%",
+      "--foreground": "60 30% 96%",
+      "--card": "68 6% 18%",
+      "--card-foreground": "60 30% 96%",
+      "--popover": "68 6% 18%",
+      "--popover-foreground": "60 30% 96%",
+      "--primary": "80 76% 53%",
+      "--primary-foreground": "70 4% 10%",
+      "--secondary": "60 5% 24%",
+      "--secondary-foreground": "60 30% 96%",
+      "--muted": "60 5% 24%",
+      "--muted-foreground": "60 5% 62%",
+      "--accent": "338 95% 56%",
+      "--accent-foreground": "60 30% 96%",
+      "--destructive": "338 95% 56%",
+      "--destructive-foreground": "60 30% 96%",
+      "--border": "60 6% 28%",
+      "--input": "60 6% 28%",
+      "--ring": "80 76% 53%",
+      "--sidebar-background": "70 4% 16%",
+      "--sidebar-foreground": "60 30% 96%",
+      "--sidebar-primary": "80 76% 53%",
+      "--sidebar-primary-foreground": "70 4% 10%",
+      "--sidebar-accent": "60 5% 24%",
+      "--sidebar-accent-foreground": "60 30% 96%",
+      "--sidebar-border": "60 6% 28%",
+      "--sidebar-ring": "80 76% 53%"
+    }
+  },
+
+  "solarized-dark": {
+    id: "solarized-dark",
+    name: "Solarized Dark",
+    description: "Low-contrast, precision-tuned dark theme, easy on the eyes.",
+    isDark: true,
+    previewColors: ["#002b36", "#073642", "#268bd2"],
+    variables: {
+      "--background": "193 100% 11%",
+      "--foreground": "44 87% 94%",
+      "--card": "192 81% 14%",
+      "--card-foreground": "44 87% 94%",
+      "--popover": "192 81% 14%",
+      "--popover-foreground": "44 87% 94%",
+      "--primary": "205 69% 49%",
+      "--primary-foreground": "44 87% 94%",
+      "--secondary": "192 66% 17%",
+      "--secondary-foreground": "44 87% 94%",
+      "--muted": "192 66% 17%",
+      "--muted-foreground": "186 8% 55%",
+      "--accent": "192 66% 19%",
+      "--accent-foreground": "44 87% 94%",
+      "--destructive": "1 71% 52%",
+      "--destructive-foreground": "44 87% 94%",
+      "--border": "192 60% 22%",
+      "--input": "192 60% 22%",
+      "--ring": "205 69% 49%",
+      "--sidebar-background": "192 81% 13%",
+      "--sidebar-foreground": "44 87% 94%",
+      "--sidebar-primary": "205 69% 49%",
+      "--sidebar-primary-foreground": "44 87% 94%",
+      "--sidebar-accent": "192 66% 17%",
+      "--sidebar-accent-foreground": "44 87% 94%",
+      "--sidebar-border": "192 60% 22%",
+      "--sidebar-ring": "205 69% 49%"
+    }
+  },
+
+  "solarized-light": {
+    id: "solarized-light",
+    name: "Solarized Light",
+    description: "The warm cream-toned counterpart to Solarized Dark.",
+    isDark: false,
+    previewColors: ["#fdf6e3", "#eee8d5", "#268bd2"],
+    variables: {
+      "--background": "44 87% 94%",
+      "--foreground": "192 81% 14%",
+      "--card": "44 46% 90%",
+      "--card-foreground": "192 81% 14%",
+      "--popover": "44 46% 90%",
+      "--popover-foreground": "192 81% 14%",
+      "--primary": "205 69% 49%",
+      "--primary-foreground": "44 87% 94%",
+      "--secondary": "45 30% 85%",
+      "--secondary-foreground": "192 81% 14%",
+      "--muted": "45 30% 85%",
+      "--muted-foreground": "186 8% 45%",
+      "--accent": "45 30% 82%",
+      "--accent-foreground": "192 81% 14%",
+      "--destructive": "1 71% 52%",
+      "--destructive-foreground": "44 87% 94%",
+      "--border": "45 25% 78%",
+      "--input": "45 25% 78%",
+      "--ring": "205 69% 49%",
+      "--sidebar-background": "44 60% 92%",
+      "--sidebar-foreground": "192 81% 14%",
+      "--sidebar-primary": "205 69% 49%",
+      "--sidebar-primary-foreground": "44 87% 94%",
+      "--sidebar-accent": "45 30% 85%",
+      "--sidebar-accent-foreground": "192 81% 14%",
+      "--sidebar-border": "45 25% 78%",
+      "--sidebar-ring": "205 69% 49%"
+    }
+  }
+};
+
+export const THEME_LIST = Object.values(THEMES);
+
+export const DEFAULT_THEME_ID = "light-plus";
+
+export function getTheme(themeId) {
+  return THEMES[themeId] || THEMES[DEFAULT_THEME_ID];
+}
+

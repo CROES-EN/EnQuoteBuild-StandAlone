@@ -1,0 +1,16 @@
+﻿function getReportsInboxPaths() {
+  const root = "C:\\\\Users\\\\croeschberger\\\\OneDrive - Enphase Energy\\\\O&M Excel Spreadsheets\\\\Incorta";
+  return {
+    root,
+    processed: path.join(root, "Processed"),
+    needsReview: path.join(root, "Needs Review")
+  };
+}
+
+function ensureReportsInboxFolders() {
+  const paths = getReportsInboxPaths();
+  [paths.root, paths.processed, paths.needsReview].forEach((dir) => {
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+    } catch (error) {
+      co

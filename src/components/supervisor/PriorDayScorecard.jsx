@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+﻿import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Phone, Mail, FileText, Users, TrendingUp, TrendingDown, Minus } from "lucide-react";
@@ -23,13 +23,13 @@ function hasValue(value) {
 }
 
 function DeltaBadge({ delta }) {
-  if (!delta) return <span className="text-xs text-slate-400">No prior data</span>;
+  if (!delta) return <span className="text-xs text-muted-foreground">No prior data</span>;
   if (delta.trend === "flat") {
-    return <span className="inline-flex items-center gap-1 text-xs text-slate-500"><Minus className="w-3 h-3" /> No change</span>;
+    return <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Minus className="w-3 h-3" /> No change</span>;
   }
 
   const isGood = delta.direction === "neutral" ? null : (delta.direction === "higherIsBetter" ? delta.trend === "up" : delta.trend === "down");
-  const colorClass = isGood === null ? "text-slate-500" : (isGood ? "text-emerald-600" : "text-rose-600");
+  const colorClass = isGood === null ? "text-muted-foreground" : (isGood ? "text-emerald-600" : "text-rose-600");
   const Icon = delta.trend === "up" ? TrendingUp : TrendingDown;
   const sign = delta.change > 0 ? "+" : "";
 
@@ -43,22 +43,22 @@ function DeltaBadge({ delta }) {
 
 function MetricRow({ icon: Icon, iconClass, label, value, subLabel, delta, sourceBadges }) {
   return (
-    <div className="flex items-start justify-between gap-4 py-4 border-b border-slate-100 last:border-0">
+    <div className="flex items-start justify-between gap-4 py-4 border-b border-border last:border-0">
       <div className="flex items-start gap-3">
         <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${iconClass}`}>
           <Icon className="w-4 h-4" />
         </div>
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
-          <p className="text-2xl font-bold text-slate-900 mt-0.5">{value}</p>
-          {subLabel && <p className="text-xs text-slate-400 mt-0.5">{subLabel}</p>}
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+          <p className="text-2xl font-bold text-foreground mt-0.5">{value}</p>
+          {subLabel && <p className="text-xs text-muted-foreground mt-0.5">{subLabel}</p>}
           <div className="mt-1"><DeltaBadge delta={delta} /></div>
         </div>
       </div>
       {sourceBadges?.length > 0 && (
         <div className="flex flex-col gap-1 items-end shrink-0">
           {sourceBadges.map(src => (
-            <Badge key={src} variant="outline" className="text-[10px] py-0 px-1.5 text-slate-500 border-slate-200">
+            <Badge key={src} variant="outline" className="text-[10px] py-0 px-1.5 text-muted-foreground border-border">
               {SOURCE_LABELS[src] || src}
             </Badge>
           ))}
@@ -83,10 +83,10 @@ export default function PriorDayScorecard({ records, selectedDate, onSelectedDat
 
   if (!current) {
     return (
-      <Card className="border-slate-200">
+      <Card className="border-border">
         <CardHeader><CardTitle className="text-base">Prior Day Results</CardTitle></CardHeader>
         <CardContent>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-muted-foreground">
             No daily metrics yet. Import a CXONE/Salesforce report or add a day manually to get started.
           </p>
         </CardContent>
@@ -98,7 +98,7 @@ export default function PriorDayScorecard({ records, selectedDate, onSelectedDat
   const callsAhtSources = sources.filter(s => current.sources[s] && (hasValue(current.calls) || hasValue(current.aht_seconds)));
 
   return (
-    <Card className="border-slate-200">
+    <Card className="border-border">
       <CardHeader className="pb-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <CardTitle className="text-base">Prior Day Results</CardTitle>
@@ -111,7 +111,7 @@ export default function PriorDayScorecard({ records, selectedDate, onSelectedDat
             </SelectContent>
           </Select>
         </div>
-        <p className="text-sm text-slate-500">{formatDateLabel(current.date)}</p>
+        <p className="text-sm text-muted-foreground">{formatDateLabel(current.date)}</p>
       </CardHeader>
       <CardContent className="pt-0">
         <MetricRow
@@ -148,9 +148,9 @@ export default function PriorDayScorecard({ records, selectedDate, onSelectedDat
           sourceBadges={sources.filter(s => current.sources[s] && hasValue(current.staffing_present))}
         />
         {current.notes && (
-          <div className="mt-3 pt-3 border-t border-slate-100">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Notes</p>
-            <p className="text-sm text-slate-600 mt-1 whitespace-pre-wrap">{current.notes}</p>
+          <div className="mt-3 pt-3 border-t border-border">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Notes</p>
+            <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{current.notes}</p>
           </div>
         )}
       </CardContent>

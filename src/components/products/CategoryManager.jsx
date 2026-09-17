@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -51,10 +51,10 @@ export default function CategoryManager({ products, onRename, onDelete, onClose 
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+      <div className="flex items-center justify-between pb-3 border-b border-border">
         <div>
-          <h2 className="text-xl font-semibold text-slate-900">Manage Categories</h2>
-          <p className="text-sm text-slate-500 mt-0.5">Rename or delete product categories</p>
+          <h2 className="text-xl font-semibold text-foreground">Manage Categories</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">Rename or delete product categories</p>
         </div>
         <Button type="button" variant="ghost" size="icon" onClick={onClose}>
           <X className="w-5 h-5" />
@@ -62,7 +62,7 @@ export default function CategoryManager({ products, onRename, onDelete, onClose 
       </div>
 
       {categories.length === 0 ? (
-        <p className="text-slate-500 text-sm text-center py-8">No categories found.</p>
+        <p className="text-muted-foreground text-sm text-center py-8">No categories found.</p>
       ) : (
         <div className="divide-y divide-slate-100">
           {categories.map((cat) => {
@@ -86,23 +86,23 @@ export default function CategoryManager({ products, onRename, onDelete, onClose 
                     <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:text-green-700" onClick={commitRename}>
                       <Check className="w-4 h-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400" onClick={cancelEdit}>
+                    <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={cancelEdit}>
                       <X className="w-4 h-4" />
                     </Button>
                   </>
                 ) : (
                   <>
-                    <span className="flex-1 text-sm font-medium text-slate-800">{cat}</span>
+                    <span className="flex-1 text-sm font-medium text-foreground">{cat}</span>
                     <Badge variant="secondary" className="text-xs">
                       {count} {count === 1 ? "item" : "items"}
                     </Badge>
-                    <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400 hover:text-slate-700" onClick={() => startEdit(cat)}>
+                    <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => startEdit(cat)}>
                       <Pencil className="w-3.5 h-3.5" />
                     </Button>
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="h-8 w-8 text-slate-400 hover:text-rose-600"
+                      className="h-8 w-8 text-muted-foreground hover:text-rose-600"
                       onClick={() => setConfirmDelete(cat)}
                       title={count > 0 ? "Category has items assigned" : "Delete category"}
                     >

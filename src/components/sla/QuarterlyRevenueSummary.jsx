@@ -1,4 +1,4 @@
-import { Card } from "@/components/ui/card";
+﻿import { Card } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { parseISO, getYear, getQuarter, format } from "date-fns";
 import { TrendingUp } from "lucide-react";
@@ -48,14 +48,14 @@ export default function QuarterlyRevenueSummary({ quotes }) {
     : null;
 
   return (
-    <Card className="p-6 border-slate-200">
+    <Card className="p-6 border-border">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
         <div className="flex items-center gap-2">
           <TrendingUp className="w-5 h-5 text-purple-600" />
-          <h3 className="text-lg font-semibold text-slate-900">Quarterly Revenue Summary</h3>
+          <h3 className="text-lg font-semibold text-foreground">Quarterly Revenue Summary</h3>
         </div>
-        <div className="flex flex-wrap gap-4 text-sm text-slate-500">
-          <span>This Quarter: <span className="font-semibold text-slate-700">{formatCurrency(currentQ.quoted)}</span></span>
+        <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+          <span>This Quarter: <span className="font-semibold text-foreground">{formatCurrency(currentQ.quoted)}</span></span>
           <span>Paid: <span className="font-semibold text-emerald-700">{formatCurrency(currentQ.paid)}</span></span>
           {qoqChange !== null && (
             <span className={parseInt(qoqChange) >= 0 ? "text-green-600 font-semibold" : "text-rose-600 font-semibold"}>
@@ -80,7 +80,7 @@ export default function QuarterlyRevenueSummary({ quotes }) {
         </BarChart>
       </ResponsiveContainer>
 
-      <div className="flex items-center gap-4 mt-3 text-xs text-slate-500">
+      <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-violet-400 inline-block" /> Quoted</span>
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-indigo-500 inline-block" /> Invoiced</span>
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-emerald-500 inline-block" /> Paid</span>
@@ -90,23 +90,23 @@ export default function QuarterlyRevenueSummary({ quotes }) {
       <div className="mt-6 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-100">
-              <th className="text-left py-2 px-3 text-xs font-medium text-slate-500">Quarter</th>
-              <th className="text-right py-2 px-3 text-xs font-medium text-slate-500">Quotes</th>
-              <th className="text-right py-2 px-3 text-xs font-medium text-slate-500">Quoted Value</th>
-              <th className="text-right py-2 px-3 text-xs font-medium text-slate-500">Invoiced</th>
-              <th className="text-right py-2 px-3 text-xs font-medium text-slate-500">Paid</th>
-              <th className="text-right py-2 px-3 text-xs font-medium text-slate-500">Collection Rate</th>
+            <tr className="border-b border-border">
+              <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Quarter</th>
+              <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground">Quotes</th>
+              <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground">Quoted Value</th>
+              <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground">Invoiced</th>
+              <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground">Paid</th>
+              <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground">Collection Rate</th>
             </tr>
           </thead>
           <tbody>
             {[...data].reverse().map(row => (
-              <tr key={row.key} className={`border-b border-slate-50 hover:bg-slate-50 ${row.key === currentKey ? "bg-purple-50/40" : ""}`}>
-                <td className="py-2.5 px-3 font-semibold text-slate-800">
+              <tr key={row.key} className={`border-b border-slate-50 hover:bg-secondary ${row.key === currentKey ? "bg-purple-50/40" : ""}`}>
+                <td className="py-2.5 px-3 font-semibold text-foreground">
                   {row.key} {row.key === currentKey && <span className="text-xs font-normal text-purple-600 ml-1">(current)</span>}
                 </td>
-                <td className="py-2.5 px-3 text-right text-slate-600">{row.count}</td>
-                <td className="py-2.5 px-3 text-right font-medium text-slate-800">{formatCurrency(row.quoted)}</td>
+                <td className="py-2.5 px-3 text-right text-muted-foreground">{row.count}</td>
+                <td className="py-2.5 px-3 text-right font-medium text-foreground">{formatCurrency(row.quoted)}</td>
                 <td className="py-2.5 px-3 text-right text-indigo-700">{formatCurrency(row.invoiced)}</td>
                 <td className="py-2.5 px-3 text-right text-emerald-700">{formatCurrency(row.paid)}</td>
                 <td className="py-2.5 px-3 text-right">

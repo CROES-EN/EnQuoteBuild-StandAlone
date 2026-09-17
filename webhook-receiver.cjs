@@ -1,4 +1,4 @@
-﻿const http = require('http');
+const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -266,6 +266,108 @@ function resolveRepositoryDirectory(explicitDir) {
 
 const SYNC_THROTTLE_MS = 15 * 60 * 1000;
 
+// ---------------------------------------------------------------------------
+// Queued-snapshot mechanism (fixes a real data-loss bug)
+//
+// PREVIOUS BEHAVIOR: when a webhook arrived inside the 15-minute throttle
+// window, the incoming snapshot was discarded outright - never saved
+// anywhere, never retried. If a homeowner's quote status changed on Base44
+// during that window, the update was silently lost and the local app kept
+// showing stale data indefinitely (confirmed root cause of a real "wrong
+// status badge" bug).
+//
+// NEW BEHAVIOR: a throttled snapshot is written to a small
+// "enquote-pending-snapshot.json" file (one per data directory, sitting
+// right next to the real data file) instead of being thrown away, and a
+// timer is scheduled to apply it automatically the moment the throttle
+// window clears - even if no further webhook ever arrives. A newer
+// throttled delivery simply overwrites the pending file and reschedules the
+// timer (we only ever need to keep the LATEST snapshot, never a history).
+// If the app/receiver process restarts before the timer fires, the next
+// webhook OR the next force-refresh will pick up and apply the still-queued
+// snapshot before doing anything else, so nothing is lost across restarts.
+// ---------------------------------------------------------------------------
+const PENDING_SNAPSHOT_FILENAME = 'enquote-pending-snapshot.json';
+const pendingApplyTimers = new Map(); // targetDir -> Node timer
+
+function pendingSnapshotPath(targetDir) {
+  return path.join(targetDir, PENDING_SNAPSHOT_FILENAME);
+}
+
+function savePendingSnapshot(targetDir, payload) {
+  try {
+    fs.writeFileSync(pendingSnapshotPath(targetDir), JSON.stringify(payload), 'utf8');
+    return true;
+  } catch (error) {
+    logEvent('error', `Could not save throttled snapshot for later import - it may be lost: ${error.message}`);
+    return false;
+  }
+}
+
+function loadPendingSnapshot(targetDir) {
+  const target = pendingSnapshotPath(targetDir);
+  if (!fs.existsSync(target)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(target, 'utf8'));
+  } catch (error) {
+    logEvent('error', `Could not read queued snapshot file (it will be discarded, this data is lost): ${error.message}`);
+    return null;
+  }
+}
+
+function clearPendingSnapshot(targetDir) {
+  try {
+    const target = pendingSnapshotPath(targetDir);
+    if (fs.existsSync(target)) fs.unlinkSync(target);
+  } catch (error) {
+    logEvent('warn', `Could not remove queued snapshot file after applying it: ${error.message}`);
+  }
+}
+
+// Applies a queued snapshot (if one exists) directly via repo.importData - deliberately
+// NOT routed back through persistSnapshotToLocalApp/its throttle check, since by the time
+// this is called we've already established it's safe to import (either the window has
+// cleared, or this is a fresh delivery that's allowed to proceed).
+async function applyQueuedSnapshotIfPresent(targetDir, repo) {
+  const pending = loadPendingSnapshot(targetDir);
+  if (!pending) return false;
+  logEvent('info', 'Applying a previously queued (throttled) snapshot before continuing...');
+  try {
+    const stored = await repo.importData(pending);
+    clearPendingSnapshot(targetDir);
+    logEvent('success', `Queued snapshot applied successfully (${Array.isArray(stored) ? stored.length : 0} quotes on disk now).`);
+    return true;
+  } catch (error) {
+    // Left in place on disk so the NEXT opportunity (next webhook, next scheduled timer,
+    // or next force-refresh) can retry it, instead of losing it on a transient failure.
+    logEvent('error', `Failed to apply queued snapshot (left in place, will retry later): ${error.message}`);
+    return false;
+  }
+}
+
+function scheduleApplyPendingSnapshot(targetDir, delayMs) {
+  const existingTimer = pendingApplyTimers.get(targetDir);
+  if (existingTimer) clearTimeout(existingTimer);
+
+  const timer = setTimeout(async () => {
+    pendingApplyTimers.delete(targetDir);
+    try {
+      const repo = repositoryFor(targetDir);
+      const applied = await applyQueuedSnapshotIfPresent(targetDir, repo);
+      if (applied) {
+        logEvent('info', 'Throttle window has cleared - the queued snapshot was applied automatically, no data was lost.');
+      }
+    } catch (error) {
+      logEvent('error', `Error while auto-applying queued snapshot on schedule: ${error.message}`);
+    }
+  }, Math.max(0, delayMs));
+
+  // Doesn't hold the process open on its own - the HTTP server already does that; this just
+  // avoids this timer being the (irrelevant) reason the process stays alive if it didn't need to.
+  if (typeof timer.unref === 'function') timer.unref();
+  pendingApplyTimers.set(targetDir, timer);
+}
+
 
 async function persistSnapshotToLocalApp(payload, explicitDir, options = {}) {
   const targetDir = resolveRepositoryDirectory(explicitDir);
@@ -282,19 +384,35 @@ async function persistSnapshotToLocalApp(payload, explicitDir, options = {}) {
     logEvent('info', `Time since last import: ${timeSinceLastImport}ms (threshold: ${SYNC_THROTTLE_MS}ms)`);
 
     if (timeSinceLastImport < SYNC_THROTTLE_MS) {
-      logEvent('warn', 'Import skipped - throttle window active. Incoming snapshot was NOT saved.', {
-        secondsUntilNextSync: Math.ceil((SYNC_THROTTLE_MS - timeSinceLastImport) / 1000)
-      });
+      const remainingMs = SYNC_THROTTLE_MS - timeSinceLastImport;
+      const queued = savePendingSnapshot(targetDir, payload);
+      if (queued) {
+        scheduleApplyPendingSnapshot(targetDir, remainingMs);
+        logEvent('warn', 'Import throttled - snapshot QUEUED (not discarded). It will be applied automatically once the throttle window clears.', {
+          secondsUntilNextSync: Math.ceil(remainingMs / 1000)
+        });
+      } else {
+        logEvent('error', 'Import throttled AND could not be queued - this snapshot will be lost unless another webhook arrives after the window clears.', {
+          secondsUntilNextSync: Math.ceil(remainingMs / 1000)
+        });
+      }
       return {
         targetDir,
         storedQuoteCount: Array.isArray(currentData?.quotes) ? currentData.quotes.length : 0,
         storedProductCount: Array.isArray(currentData?.products) ? currentData.products.length : 0,
         cached: true,
         reason: 'throttled',
-        secondsUntilNextSync: Math.ceil((SYNC_THROTTLE_MS - timeSinceLastImport) / 1000)
+        queued,
+        secondsUntilNextSync: Math.ceil(remainingMs / 1000)
       };
     }
   }
+
+  // Clear to proceed (window elapsed, or bypassThrottle was requested). If an earlier
+  // delivery is still sitting queued - e.g. the receiver process restarted before its
+  // scheduled timer fired - apply it first so it's never silently skipped just because a
+  // fresher webhook happened to arrive before the timer did.
+  await applyQueuedSnapshotIfPresent(targetDir, repo);
 
   logEvent('info', 'Importing new snapshot data...');
   const normalized = normalizeIncomingSnapshot(payload);
@@ -450,10 +568,23 @@ async function handleForceRefresh(req, res) {
   // the NEXT real Base44 webhook delivery for another 15 minutes. Instead, refresh simply reports
   // whatever the webhook receiver already has stored on disk (most recent successful import),
   // and the Electron app reloads its window to pick up any changes.
+  //
+  // It DOES, however, take this opportunity to apply any snapshot that was queued earlier by
+  // the throttle (see applyQueuedSnapshotIfPresent above) if the window has since cleared -
+  // a manual refresh click is a reasonable moment to also surface anything that was waiting.
   try {
     const targetDir = resolveRepositoryDirectory(explicitDir);
     const repo = repositoryFor(targetDir);
-    const currentData = await repo.exportData();
+
+    const currentDataBefore = await repo.exportData();
+    const lastImportedAt = currentDataBefore?.meta?.last_imported_at ? new Date(currentDataBefore.meta.last_imported_at).getTime() : 0;
+    const windowHasCleared = (Date.now() - lastImportedAt) >= SYNC_THROTTLE_MS;
+    let appliedQueued = false;
+    if (windowHasCleared) {
+      appliedQueued = await applyQueuedSnapshotIfPresent(targetDir, repo);
+    }
+
+    const currentData = appliedQueued ? await repo.exportData() : currentDataBefore;
     const summary = {
       targetDir,
       storedQuoteCount: Array.isArray(currentData?.quotes) ? currentData.quotes.length : 0,
@@ -461,9 +592,10 @@ async function handleForceRefresh(req, res) {
       lastImportedAt: currentData?.meta?.last_imported_at || null,
       cached: false,
       imported: false,
-      forced: true
+      forced: true,
+      appliedQueuedSnapshot: appliedQueued
     };
-    logEvent('success', `Refresh check complete - ${summary.storedQuoteCount} quotes currently on disk (last imported: ${summary.lastImportedAt || 'never'})`);
+    logEvent('success', `Refresh check complete - ${summary.storedQuoteCount} quotes currently on disk (last imported: ${summary.lastImportedAt || 'never'})${appliedQueued ? ' [a queued snapshot was just applied]' : ''}`);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, received: true, ...summary }));
   } catch (error) {
@@ -565,6 +697,7 @@ async function handleWebhookPost(req, res) {
     count: 1,
     imported: importSummary.imported || false,
     cached: importSummary.cached || false,
+    queued: importSummary.queued || false,
     targetDir: importSummary.targetDir,
     storedQuoteCount: importSummary.storedQuoteCount,
     storedProductCount: importSummary.storedProductCount,

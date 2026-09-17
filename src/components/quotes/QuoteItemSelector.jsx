@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -110,11 +110,11 @@ export default function QuoteItemSelector({ products, selectedItems, onItemsChan
     <div className="space-y-6">
       {/* Selected Items */}
       <div>
-        <h3 className="text-sm font-medium text-slate-700 mb-3">Quote Items</h3>
-        <Card className="border-slate-200 overflow-hidden">
+        <h3 className="text-sm font-medium text-foreground mb-3">Quote Items</h3>
+        <Card className="border-border overflow-hidden">
           <AnimatePresence mode="popLayout">
             {selectedItems.length === 0 ? (
-              <div className="p-8 text-center text-slate-500">
+              <div className="p-8 text-center text-muted-foreground">
                 <Package className="w-8 h-8 mx-auto mb-2 text-slate-300" />
                 <p>No items added yet</p>
                 <p className="text-sm">Select products or services below</p>
@@ -130,9 +130,9 @@ export default function QuoteItemSelector({ products, selectedItems, onItemsChan
                     className="p-4 flex items-center gap-4"
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-slate-900 truncate">{item.name}</p>
+                      <p className="font-medium text-foreground truncate">{item.name}</p>
                       <div className="flex items-center gap-3 mt-1">
-                        <p className="text-sm text-slate-500">
+                        <p className="text-sm text-muted-foreground">
                           ${item.unit_price.toFixed(2)} / {item.unit}
                           {item.upcharge && <span className="text-amber-600 font-medium"> (+40%)</span>}
                         </p>
@@ -144,7 +144,7 @@ export default function QuoteItemSelector({ products, selectedItems, onItemsChan
                           />
                           <label
                             htmlFor={`tax-${index}`}
-                            className="text-xs text-slate-600 cursor-pointer"
+                            className="text-xs text-muted-foreground cursor-pointer"
                           >
                             Taxable
                           </label>
@@ -157,7 +157,7 @@ export default function QuoteItemSelector({ products, selectedItems, onItemsChan
                           />
                           <label
                             htmlFor={`upcharge-${index}`}
-                            className="text-xs text-slate-600 cursor-pointer"
+                            className="text-xs text-muted-foreground cursor-pointer"
                           >
                             40% Upcharge
                           </label>
@@ -192,22 +192,22 @@ export default function QuoteItemSelector({ products, selectedItems, onItemsChan
                       </Button>
                     </div>
                     <div className="w-24 text-right">
-                      <p className="font-semibold text-slate-900">${item.total.toFixed(2)}</p>
+                      <p className="font-semibold text-foreground">${item.total.toFixed(2)}</p>
                     </div>
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-slate-400 hover:text-rose-600"
+                      className="h-8 w-8 text-muted-foreground hover:text-rose-600"
                       onClick={() => removeItem(index)}
                     >
                       <X className="w-4 h-4" />
                     </Button>
                   </motion.div>
                 ))}
-                <div className="p-4 bg-slate-50 flex justify-between items-center">
-                  <span className="font-medium text-slate-700">Subtotal</span>
-                  <span className="text-xl font-bold text-slate-900">${subtotal.toFixed(2)}</span>
+                <div className="p-4 bg-secondary flex justify-between items-center">
+                  <span className="font-medium text-foreground">Subtotal</span>
+                  <span className="text-xl font-bold text-foreground">${subtotal.toFixed(2)}</span>
                 </div>
               </div>
             )}
@@ -220,7 +220,7 @@ export default function QuoteItemSelector({ products, selectedItems, onItemsChan
         {/* Global Search + Add Custom Item */}
         <div className="flex gap-2 mb-3">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search all products & services..."
               value={globalSearch}
@@ -243,7 +243,7 @@ export default function QuoteItemSelector({ products, selectedItems, onItemsChan
         {/* Global search results */}
         {globalSearch.trim().length > 0 ? (
           <div>
-            <p className="text-xs text-slate-500 mb-2">{globalSearchResults.length} result{globalSearchResults.length !== 1 ? "s" : ""}</p>
+            <p className="text-xs text-muted-foreground mb-2">{globalSearchResults.length} result{globalSearchResults.length !== 1 ? "s" : ""}</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-64 overflow-y-auto">
               {globalSearchResults.map((product) => {
                 const isSelected = selectedItems.some(item => item.product_id === product.id);
@@ -255,23 +255,23 @@ export default function QuoteItemSelector({ products, selectedItems, onItemsChan
                     onClick={() => addItem(product)}
                     className={cn(
                       "p-3 rounded-lg border text-left transition-all flex items-center gap-3",
-                      isSelected ? "border-indigo-300 bg-indigo-50" : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                      isSelected ? "border-indigo-300 bg-indigo-50" : "border-border hover:border-slate-300 hover:bg-secondary"
                     )}
                   >
                     <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center shrink-0", isService ? "bg-violet-100" : "bg-emerald-100")}>
                       {isService ? <Wrench className="w-4 h-4 text-violet-600" /> : <Package className="w-4 h-4 text-emerald-600" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-slate-900 truncate">{product.name}</p>
-                      <p className="text-xs text-slate-400">{product.category}</p>
-                      <p className="text-sm text-slate-500">${product.unit_price?.toFixed(2)} / {product.unit || "unit"}</p>
+                      <p className="font-medium text-foreground truncate">{product.name}</p>
+                      <p className="text-xs text-muted-foreground">{product.category}</p>
+                      <p className="text-sm text-muted-foreground">${product.unit_price?.toFixed(2)} / {product.unit || "unit"}</p>
                     </div>
-                    <Plus className={cn("w-5 h-5 shrink-0", isSelected ? "text-indigo-500" : "text-slate-400")} />
+                    <Plus className={cn("w-5 h-5 shrink-0", isSelected ? "text-indigo-500" : "text-muted-foreground")} />
                   </button>
                 );
               })}
               {globalSearchResults.length === 0 && (
-                <div className="col-span-2 py-8 text-center text-slate-500">
+                <div className="col-span-2 py-8 text-center text-muted-foreground">
                   <p>No products found</p>
                   <Button
                     type="button"
@@ -290,7 +290,7 @@ export default function QuoteItemSelector({ products, selectedItems, onItemsChan
         ) : (
         <>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-medium text-slate-700">Add Items</h3>
+          <h3 className="text-sm font-medium text-foreground">Add Items</h3>
           {selectedCategory && (
             <Button
               variant="ghost"
@@ -301,7 +301,7 @@ export default function QuoteItemSelector({ products, selectedItems, onItemsChan
               }}
               className="text-xs"
             >
-              ← Back to Categories
+              â† Back to Categories
             </Button>
           )}
         </div>
@@ -317,7 +317,7 @@ export default function QuoteItemSelector({ products, selectedItems, onItemsChan
                   key={category.name}
                   type="button"
                   onClick={() => setSelectedCategory(category.name)}
-                  className="p-4 rounded-lg border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-left transition-all flex items-center gap-3 group"
+                  className="p-4 rounded-lg border border-border hover:border-slate-300 hover:bg-secondary text-left transition-all flex items-center gap-3 group"
                 >
                   <div className={cn(
                     "w-12 h-12 rounded-lg flex items-center justify-center shrink-0 transition-colors",
@@ -330,8 +330,8 @@ export default function QuoteItemSelector({ products, selectedItems, onItemsChan
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-slate-900">{category.name}</p>
-                    <p className="text-sm text-slate-500">
+                    <p className="font-medium text-foreground">{category.name}</p>
+                    <p className="text-sm text-muted-foreground">
                       {categoryProducts.length} {categoryProducts.length === 1 ? 'item' : 'items'}
                     </p>
                   </div>
@@ -342,7 +342,7 @@ export default function QuoteItemSelector({ products, selectedItems, onItemsChan
         ) : (
           <>
             <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder="Search in this category..."
                 value={search}
@@ -365,7 +365,7 @@ export default function QuoteItemSelector({ products, selectedItems, onItemsChan
                       "p-3 rounded-lg border text-left transition-all flex items-center gap-3",
                       isSelected
                         ? "border-indigo-300 bg-indigo-50"
-                        : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                        : "border-border hover:border-slate-300 hover:bg-secondary"
                     )}
                   >
                     <div className={cn(
@@ -379,20 +379,20 @@ export default function QuoteItemSelector({ products, selectedItems, onItemsChan
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-slate-900 truncate">{product.name}</p>
-                      <p className="text-sm text-slate-500">
+                      <p className="font-medium text-foreground truncate">{product.name}</p>
+                      <p className="text-sm text-muted-foreground">
                         ${product.unit_price?.toFixed(2)} / {product.unit || "unit"}
                       </p>
                     </div>
                     <Plus className={cn(
                       "w-5 h-5 shrink-0",
-                      isSelected ? "text-indigo-500" : "text-slate-400"
+                      isSelected ? "text-indigo-500" : "text-muted-foreground"
                     )} />
                   </button>
                 );
               })}
               {filteredProducts.length === 0 && (
-                <div className="col-span-2 py-8 text-center text-slate-500">
+                <div className="col-span-2 py-8 text-center text-muted-foreground">
                   No products found
                 </div>
               )}

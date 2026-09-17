@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { FileText, Info } from "lucide-react";
@@ -34,10 +34,10 @@ function toNumberOrNull(value) {
 
 function StatTile({ label, value, helperText }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 text-2xl font-bold text-slate-900">{value === null || value === undefined ? "N/A" : formatNumber(value)}</p>
-      {helperText && <p className="mt-1 text-xs text-slate-500">{helperText}</p>}
+    <div className="rounded-xl border border-border bg-secondary p-4">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-1 text-2xl font-bold text-foreground">{value === null || value === undefined ? "N/A" : formatNumber(value)}</p>
+      {helperText && <p className="mt-1 text-xs text-muted-foreground">{helperText}</p>}
     </div>
   );
 }
@@ -121,13 +121,13 @@ export default function QuoteOperationsPanel({
   }
 
   return (
-    <Card className="border-slate-200">
+    <Card className="border-border">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <FileText className="h-5 w-5 text-indigo-600" />
           Quote Operations
         </CardTitle>
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-muted-foreground">
           Drafted, Completed, and Backlog are computed live from EnQuote's own quote data for{" "}
           {selectedDate || "the selected date"} - they're never manually entered and can't go stale.
         </p>
@@ -144,15 +144,15 @@ export default function QuoteOperationsPanel({
           <StatTile label="Quote Backlog at End" value={isLoading ? null : quoteOps.backlogEnd} />
         </div>
 
-        <div className="rounded-lg border border-slate-200 p-4">
-          <p className="mb-2 text-sm font-semibold text-slate-700">"Completed" status definition</p>
-          <p className="mb-3 text-xs text-slate-500">
+        <div className="rounded-lg border border-border p-4">
+          <p className="mb-2 text-sm font-semibold text-foreground">"Completed" status definition</p>
+          <p className="mb-3 text-xs text-muted-foreground">
             The business hasn't formally ratified a single "Completed" status - the exact set checked below is what's
             counted above and always shown on the Daily Snapshot Report.
           </p>
           <div className="flex flex-wrap gap-4">
             {COMPLETED_STATUS_OPTIONS.map(option => (
-              <label key={option.value} className="flex items-center gap-2 text-sm text-slate-700">
+              <label key={option.value} className="flex items-center gap-2 text-sm text-foreground">
                 <Checkbox
                   checked={completedStatuses.includes(option.value)}
                   onCheckedChange={(checked) => toggleCompletedStatus(option.value, Boolean(checked))}
@@ -174,16 +174,16 @@ export default function QuoteOperationsPanel({
               onChange={(e) => updateSfQuotesReceived(e.target.value)}
               placeholder="e.g. 28"
             />
-            <p className="mt-1 text-xs text-slate-500">Manual entry - no live Salesforce integration exists yet.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Manual entry - no live Salesforce integration exists yet.</p>
           </div>
           <StatTile
             label="Unreconciled Quote Requests (approximate)"
             value={intakeGap}
-            helperText="Salesforce Received − EnQuote Drafted. Not a true Case Number ↔ Quote ID match."
+            helperText="Salesforce Received âˆ’ EnQuote Drafted. Not a true Case Number â†” Quote ID match."
           />
         </div>
 
-        <div className="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">
+        <div className="flex items-start gap-2 rounded-lg border border-border bg-secondary p-3 text-xs text-muted-foreground">
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <p>{formatNumber(reportableCount)} EnQuote quotes considered reportable (current version, not Boneyard, not excluded from reporting).</p>
         </div>

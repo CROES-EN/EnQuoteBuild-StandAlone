@@ -1,4 +1,4 @@
-const formatTimestamp = (value) => {
+﻿const formatTimestamp = (value) => {
   if (!value) return "";
   return new Date(value).toLocaleString("en-US", {
     timeZone: "America/Denver",

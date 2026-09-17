@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+﻿import { useMemo, useState } from "react";
 import {
   CalendarClock,
   Download,
@@ -70,7 +70,7 @@ export default function ImportCenter({ records, onRequestImport }) {
       <div className="space-y-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <FolderInput className="h-4 w-4" /> Available for Import
             </CardTitle>
           </CardHeader>
@@ -81,9 +81,9 @@ export default function ImportCenter({ records, onRequestImport }) {
           </CardContent>
         </Card>
 
-        <Card className="border-slate-200">
+        <Card className="border-border">
           <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-500">
+            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
               <Settings2 className="h-4 w-4" /> Setup Required
             </CardTitle>
           </CardHeader>
@@ -130,11 +130,11 @@ function ReportListButton({ def, active, onClick }) {
       type="button"
       onClick={onClick}
       className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-        active ? "bg-indigo-50 text-indigo-700 font-medium" : "text-slate-600 hover:bg-slate-50"
+        active ? "bg-indigo-50 text-indigo-700 font-medium" : "text-muted-foreground hover:bg-secondary"
       }`}
     >
       <span className="flex items-center gap-1.5">
-        {setupRequired ? <Settings2 className="h-3.5 w-3.5 shrink-0 text-amber-500" /> : <FileSpreadsheet className="h-3.5 w-3.5 shrink-0 text-slate-400" />}
+        {setupRequired ? <Settings2 className="h-3.5 w-3.5 shrink-0 text-amber-500" /> : <FileSpreadsheet className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
         {def.displayName}
       </span>
     </button>
@@ -144,8 +144,8 @@ function ReportListButton({ def, active, onClick }) {
 function InfoRow({ label, children }) {
   return (
     <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-[180px_1fr] sm:gap-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</p>
-      <div className="text-sm text-slate-700">{children}</div>
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+      <div className="text-sm text-foreground">{children}</div>
     </div>
   );
 }
@@ -158,8 +158,8 @@ function ReportInstructions({ definition, fields, stats, onImportClick, onCustom
       <CardHeader className="border-b pb-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <CardTitle className="text-xl text-slate-900">{definition.displayName}</CardTitle>
-            <p className="mt-1 text-sm text-slate-500">{definition.purpose}</p>
+            <CardTitle className="text-xl text-foreground">{definition.displayName}</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">{definition.purpose}</p>
           </div>
           {setupRequired ? (
             <Badge variant="outline" className="whitespace-nowrap border-amber-300 bg-amber-50 text-amber-700">Setup Required</Badge>
@@ -200,7 +200,7 @@ function ReportInstructions({ definition, fields, stats, onImportClick, onCustom
 
             {definition.importNotes && (
               <InfoRow label="Import notes">
-                <span className="inline-flex items-start gap-1.5 text-slate-600">
+                <span className="inline-flex items-start gap-1.5 text-muted-foreground">
                   <Info className="h-3.5 w-3.5 shrink-0 mt-0.5 text-indigo-500" />
                   {definition.importNotes}
                 </span>
@@ -218,10 +218,10 @@ function ReportInstructions({ definition, fields, stats, onImportClick, onCustom
             <InfoRow label="Columns this report can fill in">
               <div className="flex flex-wrap gap-1.5">
                 {fields.map(field => (
-                  <Badge key={field.key} variant="outline" className="border-slate-200 text-slate-600">{field.label}</Badge>
+                  <Badge key={field.key} variant="outline" className="border-border text-muted-foreground">{field.label}</Badge>
                 ))}
               </div>
-              <p className="mt-1 text-xs text-slate-400">
+              <p className="mt-1 text-xs text-muted-foreground">
                 Every column above is optional to map - "Not in this file" is always allowed - but at least one
                 metric column, plus a date column (or a single date you choose for the whole file), must be
                 mapped for an import to save anything.
@@ -256,8 +256,8 @@ function ReportInstructions({ definition, fields, stats, onImportClick, onCustom
               <InfoRow label="Example field mappings">
                 <ul className="space-y-0.5">
                   {definition.exampleMappings.map(m => (
-                    <li key={m.source} className="text-sm text-slate-600">
-                      <span className="font-mono text-xs text-slate-500">"{m.source}"</span> → {m.target}
+                    <li key={m.source} className="text-sm text-muted-foreground">
+                      <span className="font-mono text-xs text-muted-foreground">"{m.source}"</span> → {m.target}
                     </li>
                   ))}
                 </ul>
@@ -267,7 +267,7 @@ function ReportInstructions({ definition, fields, stats, onImportClick, onCustom
             <InfoRow label="Last successful import">
               {stats.lastImportedAt ? (
                 <span className="inline-flex items-center gap-1.5">
-                  <CalendarClock className="h-3.5 w-3.5 text-slate-400" />
+                  <CalendarClock className="h-3.5 w-3.5 text-muted-foreground" />
                   {new Date(stats.lastImportedAt).toLocaleString()}
                 </span>
               ) : "No import recorded yet for this report."}
@@ -277,7 +277,7 @@ function ReportInstructions({ definition, fields, stats, onImportClick, onCustom
               {stats.earliestDate ? (
                 <>
                   {formatDateLabel(stats.earliestDate)} – {formatDateLabel(stats.latestDate)}
-                  <span className="ml-1 text-xs text-slate-400">(dates this report has imported data for)</span>
+                  <span className="ml-1 text-xs text-muted-foreground">(dates this report has imported data for)</span>
                 </>
               ) : "No data imported yet for this report."}
             </InfoRow>

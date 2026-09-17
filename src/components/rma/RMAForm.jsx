@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -131,29 +131,29 @@ export default function RMAForm({ rma, users, manufacturers, defaultOwner, onSav
 
       {rma?.status_history?.length > 0 && (
         <div className="space-y-2">
-          <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
             <History className="w-4 h-4" />
             Status History
           </div>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-2.5 max-h-48 overflow-y-auto">
+          <div className="rounded-lg border border-border bg-secondary p-4 space-y-2.5 max-h-48 overflow-y-auto">
             {rma.status_history.map((entry, i) => (
               <div key={i} className="flex items-center gap-3 text-sm">
-                <span className="text-slate-500 whitespace-nowrap min-w-[100px]">
+                <span className="text-muted-foreground whitespace-nowrap min-w-[100px]">
                   {entry.changed_at ? format(new Date(entry.changed_at), "MMM d, yyyy") : "—"}
                 </span>
                 <span className="text-slate-300">→</span>
-                <span className="font-medium text-slate-800">{entry.new_status}</span>
+                <span className="font-medium text-foreground">{entry.new_status}</span>
                 {entry.previous_status && (
-                  <span className="text-slate-400 text-xs">(from {entry.previous_status})</span>
+                  <span className="text-muted-foreground text-xs">(from {entry.previous_status})</span>
                 )}
-                <span className="text-slate-400 text-xs ml-auto">by {entry.changed_by}</span>
+                <span className="text-muted-foreground text-xs ml-auto">by {entry.changed_by}</span>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+      <div className="flex justify-end gap-3 pt-4 border-t border-border">
         <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
         <Button type="submit" disabled={isLoading}>
           {isLoading ? "Saving..." : (rma ? "Update RMA" : "Create RMA")}

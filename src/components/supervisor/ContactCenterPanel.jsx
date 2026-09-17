@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Phone, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -61,15 +61,15 @@ function formatRate(rate) {
 
 function SummaryMetric({ icon: Icon, iconClass, label, value, subLabel }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+    <div className="rounded-xl border border-border bg-secondary p-4">
       <div className="flex items-start gap-3">
         <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${iconClass}`}>
           <Icon className="h-4 w-4" />
         </div>
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
-          <p className="mt-1 text-2xl font-bold text-slate-900">{value}</p>
-          {subLabel ? <p className="mt-1 text-xs text-slate-500">{subLabel}</p> : null}
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+          <p className="mt-1 text-2xl font-bold text-foreground">{value}</p>
+          {subLabel ? <p className="mt-1 text-xs text-muted-foreground">{subLabel}</p> : null}
         </div>
       </div>
     </div>
@@ -154,16 +154,16 @@ export default function ContactCenterPanel({ records = [], selectedDate, onChang
   const handleRate = computeHandleRate(numericValues.callsHandled, numericValues.callsOffered);
 
   return (
-    <Card className="border-slate-200">
+    <Card className="border-border">
       <CardHeader className="pb-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <CardTitle className="text-base">Contact Center</CardTitle>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-muted-foreground">
               Inline daily entry for queue volume, timing, and backlog snapshot data.
             </p>
           </div>
-          <Badge variant="outline" className="border-slate-200 text-slate-600">
+          <Badge variant="outline" className="border-border text-muted-foreground">
             {selectedDate ? formatDateLabel(selectedDate) : "No date selected"}
           </Badge>
         </div>
@@ -210,7 +210,7 @@ export default function ContactCenterPanel({ records = [], selectedDate, onChang
           <div>
             <Label className="mb-1.5 block">Emails Received</Label>
             <div className="relative">
-              <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input className="pl-9" type="number" min="0" inputMode="numeric" value={form.emails_received} onChange={(e) => updateField("emails_received", e.target.value)} placeholder="e.g. 120" />
             </div>
           </div>
@@ -228,8 +228,8 @@ export default function ContactCenterPanel({ records = [], selectedDate, onChang
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-          <p className="text-sm text-slate-500">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+          <p className="text-sm text-muted-foreground">
             Blank fields only leave existing saved values untouched for this date.
           </p>
           <Button onClick={handleSave} disabled={saving || !selectedDate}>

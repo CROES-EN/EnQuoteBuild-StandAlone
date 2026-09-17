@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+﻿import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrendingDown, TrendingUp, Minus, AlertCircle, CheckCircle2, Clock } from "lucide-react";
@@ -103,38 +103,38 @@ export default function RejectionOverview({ allQuotes = [], users = [] }) {
     <div className="space-y-6">
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="border-slate-200">
+        <Card className="border-border">
           <CardContent className="p-4">
-            <p className="text-xs text-slate-500 mb-1">Overall Rejection Rate</p>
+            <p className="text-xs text-muted-foreground mb-1">Overall Rejection Rate</p>
             <p className={`text-2xl font-bold ${getRateColor(overallRate)}`}>{overallRate}%</p>
-            <p className="text-xs text-slate-400 mt-1">{totalRejected} of {totalSubmitted} quotes</p>
+            <p className="text-xs text-muted-foreground mt-1">{totalRejected} of {totalSubmitted} quotes</p>
           </CardContent>
         </Card>
-        <Card className="border-slate-200">
+        <Card className="border-border">
           <CardContent className="p-4">
-            <p className="text-xs text-slate-500 mb-1">Current Open Rejections</p>
+            <p className="text-xs text-muted-foreground mb-1">Current Open Rejections</p>
             <p className="text-2xl font-bold text-red-600">{totalRejected}</p>
-            <p className="text-xs text-slate-400 mt-1">Awaiting resubmission</p>
+            <p className="text-xs text-muted-foreground mt-1">Awaiting resubmission</p>
           </CardContent>
         </Card>
-        <Card className="border-slate-200">
+        <Card className="border-border">
           <CardContent className="p-4">
-            <p className="text-xs text-slate-500 mb-1">Coordinators Tracked</p>
-            <p className="text-2xl font-bold text-slate-800">{stats.length}</p>
-            <p className="text-xs text-slate-400 mt-1">With submitted quotes</p>
+            <p className="text-xs text-muted-foreground mb-1">Coordinators Tracked</p>
+            <p className="text-2xl font-bold text-foreground">{stats.length}</p>
+            <p className="text-xs text-muted-foreground mt-1">With submitted quotes</p>
           </CardContent>
         </Card>
-        <Card className="border-slate-200">
+        <Card className="border-border">
           <CardContent className="p-4">
-            <p className="text-xs text-slate-500 mb-1">High Risk (&ge;30%)</p>
+            <p className="text-xs text-muted-foreground mb-1">High Risk (&ge;30%)</p>
             <p className="text-2xl font-bold text-orange-600">{stats.filter(s => s.rejectionRate >= 30).length}</p>
-            <p className="text-xs text-slate-400 mt-1">Coordinators</p>
+            <p className="text-xs text-muted-foreground mt-1">Coordinators</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Chart */}
-      <Card className="border-slate-200">
+      <Card className="border-border">
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Rejection Rate by Coordinator</CardTitle>
         </CardHeader>
@@ -158,7 +158,7 @@ export default function RejectionOverview({ allQuotes = [], users = [] }) {
       </Card>
 
       {/* Per-Coordinator Table */}
-      <Card className="border-slate-200">
+      <Card className="border-border">
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Coordinator Breakdown</CardTitle>
         </CardHeader>
@@ -166,23 +166,23 @@ export default function RejectionOverview({ allQuotes = [], users = [] }) {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-100 bg-slate-50">
-                  <th className="text-left py-2 px-4 text-xs font-medium text-slate-500">Coordinator</th>
-                  <th className="text-center py-2 px-3 text-xs font-medium text-slate-500">Total Submitted</th>
-                  <th className="text-center py-2 px-3 text-xs font-medium text-slate-500">Approved</th>
-                  <th className="text-center py-2 px-3 text-xs font-medium text-slate-500">Rejected (Open)</th>
-                  <th className="text-center py-2 px-3 text-xs font-medium text-slate-500">Rejection Rate</th>
-                  <th className="text-center py-2 px-3 text-xs font-medium text-slate-500">Approval Rate</th>
+                <tr className="border-b border-border bg-secondary">
+                  <th className="text-left py-2 px-4 text-xs font-medium text-muted-foreground">Coordinator</th>
+                  <th className="text-center py-2 px-3 text-xs font-medium text-muted-foreground">Total Submitted</th>
+                  <th className="text-center py-2 px-3 text-xs font-medium text-muted-foreground">Approved</th>
+                  <th className="text-center py-2 px-3 text-xs font-medium text-muted-foreground">Rejected (Open)</th>
+                  <th className="text-center py-2 px-3 text-xs font-medium text-muted-foreground">Rejection Rate</th>
+                  <th className="text-center py-2 px-3 text-xs font-medium text-muted-foreground">Approval Rate</th>
                 </tr>
               </thead>
               <tbody>
                 {stats.map((c) => (
-                  <tr key={c.name} className={`border-b border-slate-50 hover:bg-slate-50 ${getRateBg(c.rejectionRate)}`}>
-                    <td className="py-2.5 px-4 font-medium text-slate-800 flex items-center gap-2">
+                  <tr key={c.name} className={`border-b border-slate-50 hover:bg-secondary ${getRateBg(c.rejectionRate)}`}>
+                    <td className="py-2.5 px-4 font-medium text-foreground flex items-center gap-2">
                       {getTrendIcon(c.rejectionRate)}
                       {c.name}
                     </td>
-                    <td className="py-2.5 px-3 text-center text-slate-600">{c.total}</td>
+                    <td className="py-2.5 px-3 text-center text-muted-foreground">{c.total}</td>
                     <td className="py-2.5 px-3 text-center">
                       <span className="text-green-700 font-medium">{c.approved}</span>
                     </td>
@@ -190,14 +190,14 @@ export default function RejectionOverview({ allQuotes = [], users = [] }) {
                       {c.currentRejections > 0 ? (
                         <Badge className="bg-red-100 text-red-700 text-xs">{c.currentRejections}</Badge>
                       ) : (
-                        <span className="text-slate-400">0</span>
+                        <span className="text-muted-foreground">0</span>
                       )}
                     </td>
                     <td className="py-2.5 px-3 text-center">
                       <span className={`font-bold ${getRateColor(c.rejectionRate)}`}>{c.rejectionRate}%</span>
                     </td>
                     <td className="py-2.5 px-3 text-center">
-                      <span className="text-slate-600">{c.approvalRate}%</span>
+                      <span className="text-muted-foreground">{c.approvalRate}%</span>
                     </td>
                   </tr>
                 ))}

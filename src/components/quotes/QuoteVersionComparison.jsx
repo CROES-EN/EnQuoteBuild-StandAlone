@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { getQuotes } from "@/api/dataClient";
 import { useQuery } from "@tanstack/react-query";
@@ -27,15 +27,15 @@ function FieldComparison({ label, oldValue, newValue }) {
   
   return (
     <div className="border-l-2 border-amber-400 pl-4 py-2">
-      <p className="text-sm font-medium text-slate-700 mb-2">{label}</p>
+      <p className="text-sm font-medium text-foreground mb-2">{label}</p>
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-rose-50 rounded-lg p-3">
           <p className="text-xs text-rose-600 font-medium mb-1">Previous</p>
-          <p className="text-sm text-slate-900">{String(oldValue || '-')}</p>
+          <p className="text-sm text-foreground">{String(oldValue || '-')}</p>
         </div>
         <div className="bg-emerald-50 rounded-lg p-3">
           <p className="text-xs text-emerald-600 font-medium mb-1">Updated</p>
-          <p className="text-sm text-slate-900">{String(newValue || '-')}</p>
+          <p className="text-sm text-foreground">{String(newValue || '-')}</p>
         </div>
       </div>
     </div>
@@ -50,13 +50,13 @@ function ItemsComparison({ oldItems = [], newItems = [] }) {
   
   return (
     <div className="border-l-2 border-amber-400 pl-4 py-2">
-      <p className="text-sm font-medium text-slate-700 mb-2">Line Items</p>
+      <p className="text-sm font-medium text-foreground mb-2">Line Items</p>
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-rose-50 rounded-lg p-3">
           <p className="text-xs text-rose-600 font-medium mb-2">Previous</p>
           <div className="space-y-1">
             {oldItems.map((item, idx) => (
-              <div key={idx} className="text-xs text-slate-700">
+              <div key={idx} className="text-xs text-foreground">
                 {item.name} - ${item.total?.toFixed(2)}
               </div>
             ))}
@@ -66,7 +66,7 @@ function ItemsComparison({ oldItems = [], newItems = [] }) {
           <p className="text-xs text-emerald-600 font-medium mb-2">Updated</p>
           <div className="space-y-1">
             {newItems.map((item, idx) => (
-              <div key={idx} className="text-xs text-slate-700">
+              <div key={idx} className="text-xs text-foreground">
                 {item.name} - ${item.total?.toFixed(2)}
               </div>
             ))}
@@ -98,9 +98,9 @@ export default function QuoteVersionComparison({ quote }) {
   
   return (
     <>
-      <Card className="p-6 border-slate-200 mt-6">
+      <Card className="p-6 border-border mt-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+          <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
             <GitCompare className="w-5 h-5" />
             Compare Versions
           </h3>
@@ -153,7 +153,7 @@ export default function QuoteVersionComparison({ quote }) {
           <div className="space-y-4">
             <div className="flex items-center gap-4">
               <div className="flex-1">
-                <label className="text-sm text-slate-600 mb-2 block">
+                <label className="text-sm text-muted-foreground mb-2 block">
                   Compare Current Version with:
                 </label>
                 <Select value={compareVersionId} onValueChange={setCompareVersionId}>
@@ -173,9 +173,9 @@ export default function QuoteVersionComparison({ quote }) {
             
             {compareVersion && (
               <div className="space-y-4 pt-4">
-                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                <div className="flex items-center gap-3 p-3 bg-secondary rounded-lg">
                   <div className="flex-1">
-                    <p className="text-sm text-slate-600">Comparing</p>
+                    <p className="text-sm text-muted-foreground">Comparing</p>
                     <p className="font-medium">
                       Version {compareVersion.version_number} → Version {quote.version_number}
                     </p>
@@ -213,7 +213,7 @@ export default function QuoteVersionComparison({ quote }) {
                 )}
                 
                 <div className="space-y-4">
-                  <h4 className="font-semibold text-slate-900">Changes Made</h4>
+                  <h4 className="font-semibold text-foreground">Changes Made</h4>
                   
                   <FieldComparison 
                     label="Site ID"
@@ -306,7 +306,7 @@ export default function QuoteVersionComparison({ quote }) {
                   
                   {/* No changes detected */}
                   {!compareVersion.site_id && !compareVersion.case_number && (
-                    <div className="text-center py-8 text-slate-500">
+                    <div className="text-center py-8 text-muted-foreground">
                       <p>No significant changes detected between these versions.</p>
                     </div>
                   )}
@@ -315,7 +315,7 @@ export default function QuoteVersionComparison({ quote }) {
             )}
             
             {!compareVersion && (
-              <div className="text-center py-12 text-slate-500">
+              <div className="text-center py-12 text-muted-foreground">
                 <GitCompare className="w-12 h-12 mx-auto mb-3 text-slate-300" />
                 <p>Select a version to compare changes</p>
               </div>

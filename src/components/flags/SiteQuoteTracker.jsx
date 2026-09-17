@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { getQuotes } from "@/api/dataClient";
@@ -36,9 +36,9 @@ const STATUS_COLOR = {
   invoice_paid: "bg-green-200 text-green-800",
   scheduled: "bg-teal-200 text-teal-800",
   pending_materials: "bg-yellow-100 text-yellow-700",
-  on_hold: "bg-slate-100 text-slate-600",
-  draft_without_internal: "bg-slate-100 text-slate-500",
-  draft_without_fst: "bg-slate-100 text-slate-500",
+  on_hold: "bg-muted text-muted-foreground",
+  draft_without_internal: "bg-muted text-muted-foreground",
+  draft_without_fst: "bg-muted text-muted-foreground",
 };
 
 function getTroubleScore(site) {
@@ -116,45 +116,45 @@ function SiteRow({ site }) {
   return (
     <div className={cn("border-2 rounded-xl overflow-hidden", level.color.includes("red") ? "border-red-200" : level.color.includes("orange") ? "border-orange-200" : "border-yellow-200")}>
       <button
-        className="w-full flex items-center justify-between px-4 py-3 bg-white hover:bg-slate-50 text-left gap-4"
+        className="w-full flex items-center justify-between px-4 py-3 bg-card hover:bg-secondary text-left gap-4"
         onClick={() => setExpanded(!expanded)}
       >
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <div className="flex flex-col items-start min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-bold text-slate-800">Site {site.site_id}</span>
+              <span className="font-bold text-foreground">Site {site.site_id}</span>
               {site.submitter && (
                 <span className="text-xs text-indigo-600 font-medium bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">
                   👤 {site.submitter}
                 </span>
               )}
             </div>
-            <div className="flex flex-wrap gap-3 mt-1 text-xs text-slate-500">
+            <div className="flex flex-wrap gap-3 mt-1 text-xs text-muted-foreground">
               <span>📋 {site.totalQuotes} quote{site.totalQuotes !== 1 ? "s" : ""}</span>
-              {site.totalRejections > 0 && <span className="text-red-600 font-medium">✕ {site.totalRejections} rejection{site.totalRejections !== 1 ? "s" : ""}</span>}
-              {site.hoRejections > 0 && <span className="text-red-700 font-medium">✕ {site.hoRejections} HO rejection{site.hoRejections !== 1 ? "s" : ""}</span>}
-              {site.reworkCount > 0 && <span className="text-orange-600 font-medium">↺ {site.reworkCount} rework{site.reworkCount !== 1 ? "s" : ""}</span>}
+              {site.totalRejections > 0 && <span className="text-red-600 font-medium">âœ• {site.totalRejections} rejection{site.totalRejections !== 1 ? "s" : ""}</span>}
+              {site.hoRejections > 0 && <span className="text-red-700 font-medium">âœ• {site.hoRejections} HO rejection{site.hoRejections !== 1 ? "s" : ""}</span>}
+              {site.reworkCount > 0 && <span className="text-orange-600 font-medium">â†º {site.reworkCount} rework{site.reworkCount !== 1 ? "s" : ""}</span>}
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0 text-xs text-slate-400">
-          <span>Score: <strong className="text-slate-700">{score}</strong></span>
+        <div className="flex items-center gap-2 shrink-0 text-xs text-muted-foreground">
+          <span>Score: <strong className="text-foreground">{score}</strong></span>
           {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
         </div>
       </button>
 
       {expanded && (
-        <div className="border-t border-slate-100 bg-slate-50 px-4 py-3 space-y-2">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Quote History</p>
+        <div className="border-t border-border bg-secondary px-4 py-3 space-y-2">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Quote History</p>
           {site.quotes
             .sort((a, b) => new Date(b.updated_date) - new Date(a.updated_date))
             .map(q => {
               const rejInHistory = (q.status_history || []).filter(h => h.status === "rejected" || h.status === "ho_rejected");
               const resubmits = (q.status_history || []).filter(h => h.status === "submitted");
               return (
-                <div key={q.id} className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs space-y-1">
+                <div key={q.id} className="bg-card border border-border rounded-lg px-3 py-2 text-xs space-y-1">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <span className="font-semibold text-slate-700">
+                  <span className="font-semibold text-foreground">
                     #{q.quote_number || "—"}
                     {q.version_number > 1 && <span className="ml-1 text-indigo-500">v{q.version_number}</span>}
                     {getQuoteSubmitter(q) && (
@@ -163,18 +163,18 @@ function SiteRow({ site }) {
                       </span>
                     )}
                   </span>
-                  <Badge className={cn("text-xs", STATUS_COLOR[q.status] || "bg-slate-100 text-slate-600")}>
+                  <Badge className={cn("text-xs", STATUS_COLOR[q.status] || "bg-muted text-muted-foreground")}>
                       {STATUS_LABEL[q.status] || q.status}
                     </Badge>
                   </div>
                   {q.total != null && (
-                    <p className="text-slate-500">Total: <strong className="text-slate-700">${(q.total || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}</strong></p>
+                    <p className="text-muted-foreground">Total: <strong className="text-foreground">${(q.total || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></p>
                   )}
                   {rejInHistory.length > 0 && (
                     <div className="space-y-0.5">
                       {rejInHistory.map((h, i) => (
                         <p key={i} className="text-red-600">
-                          ✕ Rejected by {h.changed_by || "unknown"} on {h.changed_at ? format(new Date(h.changed_at), "MMM d, yyyy") : "—"}
+                          âœ• Rejected by {h.changed_by || "unknown"} on {h.changed_at ? format(new Date(h.changed_at), "MMM d, yyyy") : "—"}
                           {h.reason && ` — "${h.reason}"`}
                         </p>
                       ))}
@@ -184,9 +184,9 @@ function SiteRow({ site }) {
                     <p className="text-red-500 italic">Reason: {q.rejection_reason}</p>
                   )}
                   {resubmits.length > 1 && (
-                    <p className="text-orange-600">↺ Resubmitted {resubmits.length - 1} time{resubmits.length > 2 ? "s" : ""}</p>
+                    <p className="text-orange-600">â†º Resubmitted {resubmits.length - 1} time{resubmits.length > 2 ? "s" : ""}</p>
                   )}
-                  <p className="text-slate-400">
+                  <p className="text-muted-foreground">
                     Last updated: {q.updated_date ? format(new Date(q.updated_date), "MMM d, yyyy") : "—"}
                   </p>
                 </div>
@@ -227,7 +227,7 @@ export default function SiteQuoteTracker() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-16 gap-2 text-slate-400">
+      <div className="flex items-center justify-center py-16 gap-2 text-muted-foreground">
         <RefreshCw className="w-5 h-5 animate-spin" />
         <span>Loading quote history...</span>
       </div>
@@ -258,14 +258,14 @@ export default function SiteQuoteTracker() {
         </Card>
       </div>
 
-      <p className="text-xs text-slate-400">
-        Trouble score = (rejections × 2) + reworks + (HO rejections × 2). Sites with score ≥ 2 shown.
+      <p className="text-xs text-muted-foreground">
+        Trouble score = (rejections Ã— 2) + reworks + (HO rejections Ã— 2). Sites with score ≥ 2 shown.
         Click any site to expand its full quote history.
       </p>
 
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+        <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
         <Input
           className="pl-9"
           placeholder="Search by Site ID..."
@@ -278,8 +278,8 @@ export default function SiteQuoteTracker() {
       {filtered.length === 0 ? (
         <Card className="p-10 text-center">
           <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-3" />
-          <p className="font-semibold text-slate-700">No troubled sites found</p>
-          <p className="text-sm text-slate-400 mt-1">Sites with repeated rejections or reworks will appear here.</p>
+          <p className="font-semibold text-foreground">No troubled sites found</p>
+          <p className="text-sm text-muted-foreground mt-1">Sites with repeated rejections or reworks will appear here.</p>
         </Card>
       ) : (
         <div className="space-y-3">

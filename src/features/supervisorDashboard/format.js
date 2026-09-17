@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Shared display-formatting helpers for the Supervisor Dashboard.
  */
 

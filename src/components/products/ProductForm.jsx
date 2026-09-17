@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -80,8 +80,8 @@ export default function ProductForm({ product, onSave, onCancel, isLoading, exis
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="flex items-center justify-between pb-4 border-b border-slate-200">
-        <h2 className="text-xl font-semibold text-slate-900">
+      <div className="flex items-center justify-between pb-4 border-b border-border">
+        <h2 className="text-xl font-semibold text-foreground">
           {product ? "Edit Item" : "Add New Item"}
         </h2>
         <Button type="button" variant="ghost" size="icon" onClick={onCancel}>
@@ -157,7 +157,7 @@ export default function ProductForm({ product, onSave, onCancel, isLoading, exis
             placeholder="https://example.com/product-page"
             className="mt-1.5"
           />
-          <p className="text-xs text-slate-500 mt-1">Webpage URL for ordering or reference</p>
+          <p className="text-xs text-muted-foreground mt-1">Webpage URL for ordering or reference</p>
         </div>
 
         <div>
@@ -176,7 +176,7 @@ export default function ProductForm({ product, onSave, onCancel, isLoading, exis
           <div>
             <Label htmlFor="unit_price">Unit Price *</Label>
             <div className="relative mt-1.5">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
               <Input
                 id="unit_price"
                 type="number"
@@ -284,10 +284,10 @@ export default function ProductForm({ product, onSave, onCancel, isLoading, exis
           )}
         </div>
 
-        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+        <div className="flex items-center justify-between p-4 bg-secondary rounded-lg">
           <div>
             <Label htmlFor="is_active" className="text-sm font-medium">Active</Label>
-            <p className="text-xs text-slate-500 mt-0.5">Available for use in quotes</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Available for use in quotes</p>
           </div>
           <Switch
             id="is_active"

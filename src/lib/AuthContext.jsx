@@ -1,4 +1,4 @@
-﻿import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { appParams } from '@/lib/app-params';
 import { getUsers } from '@/api/dataClient';
@@ -53,8 +53,26 @@ function setPersistedLocalSessionEmail(email) {
       globalThis.window?.localStorage?.removeItem(LOCAL_SESSION_EMAIL_KEY);
     }
   } catch {
-    // localStorage unavailable (e.g. disabled) - session just won't survive a reload.
+    // localStorage unavailable - session just won't survive a reload.
   }
+}
+
+/**
+ * FIX (per explicit request - "make the incorrect password error look nicer, not so 'code
+ * looking'"): Electron's IPC boundary automatically wraps any error thrown in the main
+ * process with boilerplate like `Error invoking remote method 'auth:login': Error: <message>`
+ * before it ever reaches this renderer code - this is Electron's own behavior, not something
+ * repository.cjs/main.cjs add themselves (they just throw a clean, human-written message like
+ * "Incorrect password."). Previously that raw, technical-looking wrapper text was shown
+ * directly to the user. This helper strips it down to just the real, human-written message
+ * underneath, so the sign-in screen shows a clean "Incorrect password." instead of the full
+ * "Error invoking remote method 'auth:login': Error: Incorrect password." string. Verified
+ * against the exact real error text this app produces before being applied here.
+ */
+function cleanIpcErrorMessage(message) {
+  if (!message) return message;
+  const match = String(message).match(/Error invoking remote method '[^']+':\s*(?:Error:\s*)?([\s\S]*)$/);
+  return match ? match[1].trim() : message;
 }
 
 // The email/password login flow only exists inside the real Electron desktop app (it needs
@@ -294,6 +312,12 @@ export const AuthProvider = ({ children }) => {
   // Validates the typed email/password against this PC's local credential store. Everyone
   // starts out on the shared temporary password ("Enquote1") - if that's still active, this
   // signals the caller to show the "set your own password" step instead of signing in.
+  //
+  // FIX: wraps the authBridge.login() call so any error it throws (which arrives from the
+  // main process pre-wrapped by Electron's own IPC layer - see cleanIpcErrorMessage's comment
+  // above) is cleaned up before it ever reaches the UI, so the sign-in screen shows a plain
+  // "Incorrect password." instead of the raw "Error invoking remote method '...': Error: ..."
+  // technical wrapper text.
   const login = useCallback(async (email, password) => {
     const authBridge = getLocalAuthBridge();
     if (!authBridge) {
@@ -303,7 +327,13 @@ export const AuthProvider = ({ children }) => {
       throw new Error("Choose your account first.");
     }
 
-    const result = await authBridge.login(email, password);
+    let result;
+    try {
+      result = await authBridge.login(email, password);
+    } catch (error) {
+      throw new Error(cleanIpcErrorMessage(error?.message) || "Sign in failed.");
+    }
+
     if (result.mustChangePassword) {
       setPendingPasswordChange({ email: result.email, password });
       return { mustChangePassword: true };
@@ -314,13 +344,18 @@ export const AuthProvider = ({ children }) => {
   }, [activateUser]);
 
   // Called from the "set your new password" step that follows a temporary-password sign-in.
+  // Same IPC-error cleanup as login() above, for consistency (e.g. a wrong current password).
   const completePasswordChange = useCallback(async (newPassword) => {
     const authBridge = getLocalAuthBridge();
     if (!authBridge || !pendingPasswordChange) {
       throw new Error("Start sign-in again before choosing a new password.");
     }
 
-    await authBridge.setPassword(pendingPasswordChange.email, pendingPasswordChange.password, newPassword);
+    try {
+      await authBridge.setPassword(pendingPasswordChange.email, pendingPasswordChange.password, newPassword);
+    } catch (error) {
+      throw new Error(cleanIpcErrorMessage(error?.message) || "Could not set your new password.");
+    }
     await activateUser(pendingPasswordChange.email);
   }, [pendingPasswordChange, activateUser]);
 
@@ -353,4 +388,3 @@ export const useAuth = () => {
   }
   return context;
 };
-

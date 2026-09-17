@@ -1,4 +1,4 @@
-import { Card } from "@/components/ui/card";
+﻿import { Card } from "@/components/ui/card";
 import { User, FileText, Clock, DollarSign } from "lucide-react";
 import { differenceInHours, parseISO } from "date-fns";
 
@@ -51,8 +51,8 @@ export default function CoordinatorPerformance({ quotes }) {
     .slice(0, 5);
 
   return (
-    <Card className="p-6 border-slate-200">
-      <h3 className="text-lg font-semibold text-slate-900 mb-4">Top Coordinators</h3>
+    <Card className="p-6 border-border">
+      <h3 className="text-lg font-semibold text-foreground mb-4">Top Coordinators</h3>
       <div className="space-y-4">
         {sortedCoordinators.map((coordinator, index) => {
           const approvalRate = coordinator.totalQuotes > 0
@@ -60,40 +60,40 @@ export default function CoordinatorPerformance({ quotes }) {
             : 0;
 
           return (
-            <div key={index} className="p-4 bg-slate-50 rounded-lg">
+            <div key={index} className="p-4 bg-secondary rounded-lg">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
                     <User className="w-5 h-5 text-indigo-600" />
                   </div>
                   <div>
-                    <p className="font-semibold text-slate-900">{coordinator.name}</p>
-                    <p className="text-sm text-slate-500">{coordinator.totalQuotes} quotes</p>
+                    <p className="font-semibold text-foreground">{coordinator.name}</p>
+                    <p className="text-sm text-muted-foreground">{coordinator.totalQuotes} quotes</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-slate-600">Approval Rate</p>
+                  <p className="text-sm text-muted-foreground">Approval Rate</p>
                   <p className="text-lg font-bold text-green-600">{approvalRate}%</p>
                 </div>
               </div>
               
               <div className="grid grid-cols-3 gap-3">
-                <div className="text-center p-2 bg-white rounded">
-                  <FileText className="w-4 h-4 text-slate-400 mx-auto mb-1" />
-                  <p className="text-xs text-slate-500">Approved</p>
-                  <p className="text-sm font-semibold text-slate-900">{coordinator.approvedQuotes}</p>
+                <div className="text-center p-2 bg-card rounded">
+                  <FileText className="w-4 h-4 text-muted-foreground mx-auto mb-1" />
+                  <p className="text-xs text-muted-foreground">Approved</p>
+                  <p className="text-sm font-semibold text-foreground">{coordinator.approvedQuotes}</p>
                 </div>
-                <div className="text-center p-2 bg-white rounded">
-                  <Clock className="w-4 h-4 text-slate-400 mx-auto mb-1" />
-                  <p className="text-xs text-slate-500">Avg Time</p>
-                  <p className="text-sm font-semibold text-slate-900">
+                <div className="text-center p-2 bg-card rounded">
+                  <Clock className="w-4 h-4 text-muted-foreground mx-auto mb-1" />
+                  <p className="text-xs text-muted-foreground">Avg Time</p>
+                  <p className="text-sm font-semibold text-foreground">
                     {coordinator.avgApprovalTime > 0 ? `${coordinator.avgApprovalTime.toFixed(1)}h` : 'N/A'}
                   </p>
                 </div>
-                <div className="text-center p-2 bg-white rounded">
-                  <DollarSign className="w-4 h-4 text-slate-400 mx-auto mb-1" />
-                  <p className="text-xs text-slate-500">Total Value</p>
-                  <p className="text-sm font-semibold text-slate-900">
+                <div className="text-center p-2 bg-card rounded">
+                  <DollarSign className="w-4 h-4 text-muted-foreground mx-auto mb-1" />
+                  <p className="text-xs text-muted-foreground">Total Value</p>
+                  <p className="text-sm font-semibold text-foreground">
                     ${(coordinator.totalValue / 1000).toFixed(1)}k
                   </p>
                 </div>

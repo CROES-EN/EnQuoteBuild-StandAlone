@@ -1,9 +1,9 @@
-import { cn } from "@/lib/utils";
+﻿import { cn } from "@/lib/utils";
 
 const statusConfig = {
   draft_without_internal: {
-    bg: "bg-slate-100",
-    text: "text-slate-700",
+    bg: "bg-muted",
+    text: "text-foreground",
     dot: "bg-slate-400",
     label: "Quote Draft"
   },
@@ -14,8 +14,8 @@ const statusConfig = {
     label: "Quote Missing Details"
   },
   draft: {
-    bg: "bg-slate-100",
-    text: "text-slate-700",
+    bg: "bg-muted",
+    text: "text-foreground",
     dot: "bg-slate-400",
     label: "Quote Draft"
   },

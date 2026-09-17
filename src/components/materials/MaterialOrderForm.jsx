@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,8 +43,8 @@ export default function MaterialOrderForm({ order, onSave, onCancel, isLoading }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      <div className="flex items-center justify-between pb-4 border-b border-slate-200">
-        <h2 className="text-xl font-semibold text-slate-900">
+      <div className="flex items-center justify-between pb-4 border-b border-border">
+        <h2 className="text-xl font-semibold text-foreground">
           {order ? "Edit Order Request" : "New Material Order Request"}
         </h2>
         <Button type="button" variant="ghost" size="icon" onClick={onCancel}>
@@ -115,7 +115,7 @@ export default function MaterialOrderForm({ order, onSave, onCancel, isLoading }
         <div>
           <Label htmlFor="cost">Estimated Cost ($)</Label>
           <div className="relative mt-1.5">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
             <Input
               id="cost"
               type="number"

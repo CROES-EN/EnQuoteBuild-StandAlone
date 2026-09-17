@@ -1,4 +1,4 @@
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+﻿import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
 function daysBetween(a, b) {
   if (!a || !b) return null;
@@ -46,7 +46,7 @@ export default function TurnaroundByTeam({ quotes }) {
     }))
     .sort((a, b) => (b["Total Cycle"] || 0) - (a["Total Cycle"] || 0));
 
-  if (!data.length) return <p className="text-sm text-slate-400 py-4">Not enough data for turnaround analysis yet.</p>;
+  if (!data.length) return <p className="text-sm text-muted-foreground py-4">Not enough data for turnaround analysis yet.</p>;
 
   return (
     <div>
@@ -62,7 +62,7 @@ export default function TurnaroundByTeam({ quotes }) {
           <Bar dataKey="Total Cycle" fill="#6366f1" radius={[3, 3, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
-      <p className="text-xs text-slate-400 mt-2">
+      <p className="text-xs text-muted-foreground mt-2">
         Longer "Draft → Submit" times may indicate hesitation or gaps in quote building skills.
         Longer "Submit → Decision" times may indicate review bottlenecks.
       </p>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { getQuotes } from "@/api/dataClient";
@@ -109,7 +109,7 @@ export default function CoachingFeedback({ currentUserEmail }) {
             return (
               <div
                 key={review.id}
-                className={`rounded-lg border p-3 bg-white ${isRead ? "border-slate-200 opacity-75" : "border-amber-300"}`}
+                className={`rounded-lg border p-3 bg-card ${isRead ? "border-border opacity-75" : "border-amber-300"}`}
               >
                 <div className="flex items-center justify-between">
                   <div
@@ -120,14 +120,14 @@ export default function CoachingFeedback({ currentUserEmail }) {
                       ? <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
                       : <Clock className="w-4 h-4 text-amber-500 shrink-0" />
                     }
-                    <span className="font-medium text-slate-800 text-sm">
+                    <span className="font-medium text-foreground text-sm">
                       Quote {review.quote_number || review.quote_id}
-                      {review.site_id && <span className="text-slate-500 font-normal"> — Site {review.site_id}</span>}
+                      {review.site_id && <span className="text-muted-foreground font-normal"> — Site {review.site_id}</span>}
                     </span>
                     {!isRead && (
                       <Badge className="bg-amber-100 text-amber-700 border border-amber-300 text-xs">New Feedback</Badge>
                     )}
-                    {isExpanded ? <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" /> : <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />}
+                    {isExpanded ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
                   </div>
                   <button
                     onClick={() => clearReview.mutate(review.id)}
@@ -144,19 +144,19 @@ export default function CoachingFeedback({ currentUserEmail }) {
                     {review.rejection_reason_snapshot && (
                       <div>
                         <p className="text-xs font-semibold text-red-600 uppercase tracking-wide mb-1">Rejection Reason</p>
-                        <p className="text-slate-700 bg-red-50 rounded p-2 border border-red-100">{review.rejection_reason_snapshot}</p>
+                        <p className="text-foreground bg-red-50 rounded p-2 border border-red-100">{review.rejection_reason_snapshot}</p>
                       </div>
                     )}
                     {review.coaching_notes && (
                       <div>
                         <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-1">Coaching Notes</p>
-                        <p className="text-slate-700 bg-amber-50 rounded p-2 border border-amber-100">{review.coaching_notes}</p>
+                        <p className="text-foreground bg-amber-50 rounded p-2 border border-amber-100">{review.coaching_notes}</p>
                       </div>
                     )}
                     {review.recommended_edits && (
                       <div>
                         <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-1">Required Edits</p>
-                        <p className="text-slate-700 bg-blue-50 rounded p-2 border border-blue-100">{review.recommended_edits}</p>
+                        <p className="text-foreground bg-blue-50 rounded p-2 border border-blue-100">{review.recommended_edits}</p>
                       </div>
                     )}
                     {!isRead && (

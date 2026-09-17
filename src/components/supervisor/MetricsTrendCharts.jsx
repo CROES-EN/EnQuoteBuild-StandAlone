@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+﻿import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -16,9 +16,9 @@ const RANGE_OPTIONS = [
 
 function ChartCard({ title, children }) {
   return (
-    <Card className="border-slate-200">
+    <Card className="border-border">
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-semibold text-slate-700">{title}</CardTitle>
+        <CardTitle className="text-sm font-semibold text-foreground">{title}</CardTitle>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={240}>
@@ -103,7 +103,7 @@ export default function MetricsTrendCharts({ records }) {
       </div>
 
       {chartData.length === 0 && (
-        <div className="flex flex-col items-center justify-center gap-2 py-10 text-slate-400">
+        <div className="flex flex-col items-center justify-center gap-2 py-10 text-muted-foreground">
           <Activity className="w-8 h-8" />
           <p className="text-sm">No data yet for this range.</p>
         </div>

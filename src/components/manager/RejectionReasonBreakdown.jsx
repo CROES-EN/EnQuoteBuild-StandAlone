@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+﻿import { useMemo } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { subDays } from "date-fns";
 
@@ -31,9 +31,9 @@ const CustomTooltip = ({ active, payload }) => {
   if (!active || !payload?.length) return null;
   const { name, value, payload: d } = payload[0];
   return (
-    <div className="bg-white border border-slate-200 rounded-lg shadow-lg p-3 text-xs">
-      <p className="font-semibold text-slate-800 mb-0.5">{d.bucket}</p>
-      <p className="text-slate-600">{value} review{value !== 1 ? "s" : ""} flagged</p>
+    <div className="bg-card border border-border rounded-lg shadow-lg p-3 text-xs">
+      <p className="font-semibold text-foreground mb-0.5">{d.bucket}</p>
+      <p className="text-muted-foreground">{value} review{value !== 1 ? "s" : ""} flagged</p>
     </div>
   );
 };
@@ -87,7 +87,7 @@ export default function RejectionReasonBreakdown({ reviews, quotes }) {
   const total = chartData.reduce((s, d) => s + d.count, 0);
 
   if (!total) {
-    return <p className="text-sm text-slate-400 py-6 text-center">No review data in the last 60 days.</p>;
+    return <p className="text-sm text-muted-foreground py-6 text-center">No review data in the last 60 days.</p>;
   }
 
   return (
@@ -117,7 +117,7 @@ export default function RejectionReasonBreakdown({ reviews, quotes }) {
         {chartData.map((d, i) => (
           <span
             key={d.bucket}
-            className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-700"
+            className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full bg-muted text-foreground"
           >
             <span
               className="w-2 h-2 rounded-full shrink-0"

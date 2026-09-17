@@ -1,0 +1,333 @@
+﻿import { useMemo, useState, Fragment } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Clock, CalendarRange } from "lucide-react";
+
+/**
+ * Hourly Wait Time Summary grid - replaces the old "Report Data Overview" filter-tiles
+ * section on the Executive Overview tab. Sourced from reportTables.eodb_hourly_wait_time
+ * (see eodbEmailAutoImportWatcher.js's classifier + PST->MST enrichment, or a manual import
+ * via ImportAsTableDialog.jsx's Detail-sheet auto-selection), which stores ONE ROW PER HOUR
+ * PER DATE (the "Detail" sheet layout).
+ *
+ * Layout deliberately mirrors the Incorta "Hourly Wait Time Summary" widget's own grid,
+ * per explicit request: one column-group PER DATE (each with its own date header spanning
+ * 6 sub-columns: Wait Time, # Calls, # ABN Calls, Avg Talktime, ABN %, #Unique Agents),
+ * rows are hour-of-day (converted to Mountain Time), and a Total row per date at the
+ * bottom. The left-most label column header reads "Hourly Wait Time Summary" per earlier
+ * explicit instruction for that column.
+ *
+ * This widget has ITS OWN Reporting Period control (top-right of the header), independent
+ * of the page-level Reporting Period above Executive Overview - confirmed via real testing
+ * that the page-level range is resolved from DAILY METRICS records (Case Backlog, Contact
+ * Center, etc.), which has no relationship to this report type's own imported date
+ * coverage.
+ *
+ * ASSUMPTION FLAGGED FOR REVIEW: raw rows have NO agent-identity field, only a per-row
+ * "#Unique Agents" COUNT - so when multiple raw rows fall in the same date+hour (e.g.
+ * different skills/queues), this component SUMS their #Unique Agents (cannot deduplicate
+ * without agent IDs), and the Total row per date uses the MAX single-hour value that day as
+ * an approximation of "peak agents". If this doesn't match Incorta's own Total exactly,
+ * flag it and the method can be corrected.
+ *
+ * @param {object} props
+ * @param {Array<Record<string, any>>} [props.rows] - reportTables.eodb_hourly_wait_time.rows
+ */
+
+const PRESETS = {
+  LAST_7: "last7",
+  LAST_14: "last14",
+  LAST_30: "last30",
+  ALL: "all",
+  CUSTOM: "custom"
+};
+
+const PRESET_OPTIONS = [
+  { value: PRESETS.LAST_7, label: "Last 7 Days" },
+  { value: PRESETS.LAST_14, label: "Last 14 Days" },
+  { value: PRESETS.LAST_30, label: "Last 30 Days" },
+  { value: PRESETS.ALL, label: "All Available History" },
+  { value: PRESETS.CUSTOM, label: "Custom Range" }
+];
+
+function toNumber(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+// Computed on the fly from the raw "PST Hours"/"PST Date" columns every report row already
+// has regardless of import path - a flat +1 hour offset is correct because US Pacific and
+// Mountain time move on the same DST schedule - correctly rolls hour 23 PST into hour 0 MST
+// of the NEXT calendar date.
+function parseFlexibleDate(value) {
+  if (value instanceof Date) return value;
+  if (typeof value === "number") {
+    return new Date(Math.round((value - 25569) * 86400 * 1000));
+  }
+  if (typeof value === "string" && value.trim()) {
+    const asNumber = Number(value);
+    if (Number.isFinite(asNumber) && value.trim() === String(asNumber)) {
+      return new Date(Math.round((asNumber - 25569) * 86400 * 1000));
+    }
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+  return null;
+}
+
+function derivePstToMst(row) {
+  const pstHour = toNumber(row["PST Hours"]);
+  const pstDate = parseFlexibleDate(row["PST Date"]);
+  if (pstHour === null || !pstDate) return { mstHour: null, mstDate: null };
+  const anchored = new Date(Date.UTC(pstDate.getUTCFullYear(), pstDate.getUTCMonth(), pstDate.getUTCDate(), pstHour));
+  const mst = new Date(anchored.getTime() + 60 * 60 * 1000);
+  return {
+    mstHour: mst.getUTCHours(),
+    mstDate: `${mst.getUTCFullYear()}-${String(mst.getUTCMonth() + 1).padStart(2, "0")}-${String(mst.getUTCDate()).padStart(2, "0")}`
+  };
+}
+
+function formatHourLabel(hour) {
+  const period = hour < 12 ? "AM" : "PM";
+  const display = hour % 12 === 0 ? 12 : hour % 12;
+  return `${display} ${period}`;
+}
+
+function formatMinutes(value) {
+  return value === null || value === undefined ? "" : value.toFixed(1);
+}
+
+function formatCount(value) {
+  return value === null || value === undefined || value === 0 ? "" : String(value);
+}
+
+function formatPercent(value) {
+  return value === null || value === undefined ? "" : `${value.toFixed(1)}%`;
+}
+
+/**
+ * Groups raw rows by (date, hour), producing one cell per date+hour with call-weighted
+ * averages for Wait Time/Avg Talktime (so a bucket combining multiple skill-queue rows for
+ * the same hour isn't skewed by one low-volume row), plus a Total row per date.
+ */
+function buildGrid(rows) {
+  const cellsByKey = new Map();
+  const dateSet = new Set();
+
+  (rows || []).forEach((row) => {
+    const { mstHour: hour, mstDate: date } = derivePstToMst(row);
+    if (hour === null || !date) return;
+    dateSet.add(date);
+
+    const key = `${date}|${hour}`;
+    const calls = toNumber(row["# Calls"]) || 0;
+    const abnCalls = toNumber(row["# ABN Calls"]) || 0;
+    const waitTime = toNumber(row["Wait Time"]);
+    const talkTime = toNumber(row["Avg. Talktime"]);
+    const uniqueAgents = toNumber(row["#Unique Agents"]) || 0;
+
+    const existing = cellsByKey.get(key) || {
+      calls: 0, abnCalls: 0, waitWeightedSum: 0, waitBasis: 0, talkWeightedSum: 0, talkBasis: 0, uniqueAgents: 0
+    };
+    existing.calls += calls;
+    existing.abnCalls += abnCalls;
+    existing.uniqueAgents += uniqueAgents;
+    if (waitTime !== null && calls > 0) {
+      existing.waitWeightedSum += waitTime * calls;
+      existing.waitBasis += calls;
+    }
+    if (talkTime !== null && calls > 0) {
+      existing.talkWeightedSum += talkTime * calls;
+      existing.talkBasis += calls;
+    }
+    cellsByKey.set(key, existing);
+  });
+
+  const cells = new Map();
+  cellsByKey.forEach((v, key) => {
+    cells.set(key, {
+      calls: v.calls,
+      abnCalls: v.abnCalls,
+      waitTime: v.waitBasis > 0 ? v.waitWeightedSum / v.waitBasis : null,
+      talkTime: v.talkBasis > 0 ? v.talkWeightedSum / v.talkBasis : null,
+      abnPct: v.calls > 0 ? (v.abnCalls / v.calls) * 100 : null,
+      uniqueAgents: v.uniqueAgents
+    });
+  });
+
+  const totalsByDate = new Map();
+  Array.from(dateSet).forEach((date) => {
+    let calls = 0, abnCalls = 0, waitWeightedSum = 0, waitBasis = 0, talkWeightedSum = 0, talkBasis = 0, maxUniqueAgents = 0;
+    for (let h = 0; h < 24; h++) {
+      const cell = cells.get(`${date}|${h}`);
+      if (!cell) continue;
+      calls += cell.calls;
+      abnCalls += cell.abnCalls;
+      if (cell.waitTime !== null) { waitWeightedSum += cell.waitTime * cell.calls; waitBasis += cell.calls; }
+      if (cell.talkTime !== null) { talkWeightedSum += cell.talkTime * cell.calls; talkBasis += cell.calls; }
+      maxUniqueAgents = Math.max(maxUniqueAgents, cell.uniqueAgents);
+    }
+    totalsByDate.set(date, {
+      calls,
+      abnCalls,
+      waitTime: waitBasis > 0 ? waitWeightedSum / waitBasis : null,
+      talkTime: talkBasis > 0 ? talkWeightedSum / talkBasis : null,
+      abnPct: calls > 0 ? (abnCalls / calls) * 100 : null,
+      uniqueAgents: maxUniqueAgents
+    });
+  });
+
+  return { dates: Array.from(dateSet).sort(), cells, totalsByDate };
+}
+
+export default function HourlyWaitTimeChart({ rows = [] }) {
+  const [preset, setPreset] = useState(PRESETS.LAST_7);
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
+
+  const allDates = useMemo(() => {
+    const dates = new Set();
+    (rows || []).forEach((row) => {
+      const { mstDate } = derivePstToMst(row);
+      if (mstDate) dates.add(mstDate);
+    });
+    return Array.from(dates).sort();
+  }, [rows]);
+
+  const selectedDates = useMemo(() => {
+    if (!allDates.length) return [];
+    if (preset === PRESETS.ALL) return allDates;
+    if (preset === PRESETS.CUSTOM) {
+      if (!customStart || !customEnd) return allDates;
+      return allDates.filter((d) => d >= customStart && d <= customEnd);
+    }
+    const n = preset === PRESETS.LAST_7 ? 7 : preset === PRESETS.LAST_14 ? 14 : 30;
+    return allDates.slice(Math.max(0, allDates.length - n));
+  }, [allDates, preset, customStart, customEnd]);
+
+  const filteredRows = useMemo(() => {
+    if (selectedDates.length === allDates.length) return rows;
+    const selectedSet = new Set(selectedDates);
+    return (rows || []).filter((row) => selectedSet.has(derivePstToMst(row).mstDate));
+  }, [rows, selectedDates, allDates]);
+
+  const grid = useMemo(() => buildGrid(filteredRows), [filteredRows]);
+  const hasAnyData = grid.dates.length > 0;
+
+  const rangeLabel = grid.dates.length
+    ? (grid.dates.length === 1 ? grid.dates[0] : `${grid.dates[0]} to ${grid.dates[grid.dates.length - 1]}`)
+    : "No dates available";
+
+  return (
+    <Card className="border-border">
+      <CardHeader className="pb-2">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <CardTitle className="text-sm font-semibold text-foreground">Hourly Wait Time Summary</CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">{rangeLabel}</p>
+          </div>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="flex flex-col gap-1">
+              <Label className="flex items-center gap-1 text-xs text-muted-foreground">
+                <CalendarRange className="h-3 w-3" /> Reporting Period
+              </Label>
+              <Select value={preset} onValueChange={setPreset}>
+                <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {PRESET_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {preset === PRESETS.CUSTOM && (
+              <>
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs text-muted-foreground">Start date</Label>
+                  <Input type="date" className="w-36" value={customStart} onChange={(e) => setCustomStart(e.target.value)} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs text-muted-foreground">End date</Label>
+                  <Input type="date" className="w-36" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} />
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {!hasAnyData ? (
+          <div className="flex flex-col items-center justify-center gap-2 py-10 text-muted-foreground">
+            <Clock className="w-8 h-8" />
+            <p className="text-sm">No Hourly Wait Time data yet for this range.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead rowSpan={2} className="sticky left-0 z-10 bg-card align-bottom">Hourly Wait Time Summary</TableHead>
+                  {grid.dates.map((date) => (
+                    <TableHead key={date} colSpan={6} className="text-center border-l-2 border-border bg-secondary/60">{date}</TableHead>
+                  ))}
+                </TableRow>
+                <TableRow>
+                  {grid.dates.map((date) => (
+                    <Fragment key={date}>
+                      <TableHead className="border-l-2 border-border text-right">Wait Time</TableHead>
+                      <TableHead className="border-l border-border text-right"># Calls</TableHead>
+                      <TableHead className="border-l border-border text-right"># ABN Calls</TableHead>
+                      <TableHead className="border-l border-border text-right">Avg Talktime</TableHead>
+                      <TableHead className="border-l border-border text-right">ABN %</TableHead>
+                      <TableHead className="border-l border-border text-right">#Unique Agents</TableHead>
+                    </Fragment>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Array.from({ length: 24 }, (_, hour) => hour).map((hour) => (
+                  <TableRow key={hour}>
+                    <TableCell className="sticky left-0 z-10 bg-card font-medium text-foreground">{formatHourLabel(hour)}</TableCell>
+                    {grid.dates.map((date) => {
+                      const cell = grid.cells.get(`${date}|${hour}`);
+                      return (
+                        <Fragment key={date}>
+                          <TableCell className="border-l-2 border-border text-right">{formatMinutes(cell?.waitTime)}</TableCell>
+                          <TableCell className="border-l border-border text-right">{formatCount(cell?.calls)}</TableCell>
+                          <TableCell className="border-l border-border text-right">{formatCount(cell?.abnCalls)}</TableCell>
+                          <TableCell className="border-l border-border text-right">{formatMinutes(cell?.talkTime)}</TableCell>
+                          <TableCell className={`border-l border-border text-right ${cell?.abnPct ? "text-rose-600 font-medium" : ""}`}>{formatPercent(cell?.abnPct)}</TableCell>
+                          <TableCell className="border-l border-border text-right">{formatCount(cell?.uniqueAgents)}</TableCell>
+                        </Fragment>
+                      );
+                    })}
+                  </TableRow>
+                ))}
+                <TableRow className="border-t-2 border-border font-semibold">
+                  <TableCell className="sticky left-0 z-10 bg-card">Total</TableCell>
+                  {grid.dates.map((date) => {
+                    const total = grid.totalsByDate.get(date);
+                    return (
+                      <Fragment key={date}>
+                        <TableCell className="border-l-2 border-border text-right">{formatMinutes(total?.waitTime)}</TableCell>
+                        <TableCell className="border-l border-border text-right">{formatCount(total?.calls)}</TableCell>
+                        <TableCell className="border-l border-border text-right">{formatCount(total?.abnCalls)}</TableCell>
+                        <TableCell className="border-l border-border text-right">{formatMinutes(total?.talkTime)}</TableCell>
+                        <TableCell className={`border-l border-border text-right ${total?.abnPct ? "text-rose-600 font-medium" : ""}`}>{formatPercent(total?.abnPct)}</TableCell>
+                        <TableCell className="border-l border-border text-right">{formatCount(total?.uniqueAgents)}</TableCell>
+                      </Fragment>
+                    );
+                  })}
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

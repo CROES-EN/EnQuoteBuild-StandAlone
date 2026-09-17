@@ -1,4 +1,4 @@
-import { Card } from "@/components/ui/card";
+﻿import { Card } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
 const statusColors = {
@@ -40,8 +40,8 @@ export default function StatusChart({ quotes }) {
   }));
 
   return (
-    <Card className="p-6 border-slate-200">
-      <h3 className="text-lg font-semibold text-slate-900 mb-4">Quotes by Status</h3>
+    <Card className="p-6 border-border">
+      <h3 className="text-lg font-semibold text-foreground mb-4">Quotes by Status</h3>
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />

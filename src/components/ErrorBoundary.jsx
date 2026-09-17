@@ -1,4 +1,4 @@
-import { Component } from "react";
+﻿import { Component } from "react";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle } from "lucide-react";
 
@@ -8,46 +8,46 @@ import { AlertTriangle } from "lucide-react";
 // which is what React does by default on an uncaught render error with no boundary.
 // This was a real contributor to the "page goes blank sometimes" bug reports.
 export default class ErrorBoundary extends Component {
-  constructor(props) {
-    super(props);
-    this.state = { error: null };
-  }
+ constructor(props) {
+ super(props);
+ this.state = { error: null };
+ }
 
-  static getDerivedStateFromError(error) {
-    return { error };
-  }
+ static getDerivedStateFromError(error) {
+ return { error };
+ }
 
-  componentDidCatch(error, info) {
-    console.error("[ErrorBoundary] Caught a render error:", error, info?.componentStack);
-  }
+ componentDidCatch(error, info) {
+ console.error("[ErrorBoundary] Caught a render error:", error, info?.componentStack);
+ }
 
-  handleReload = () => {
-    this.setState({ error: null });
-    globalThis.window?.location?.reload();
-  };
+ handleReload = () => {
+ this.setState({ error: null });
+ globalThis.window?.location?.reload();
+ };
 
-  render() {
-    if (this.state.error) {
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
-          <div className="max-w-md w-full rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-rose-100 flex items-center justify-center">
-              <AlertTriangle className="w-8 h-8 text-rose-600" />
-            </div>
-            <h2 className="text-2xl font-bold text-slate-900 mb-2">Something went wrong</h2>
-            <p className="text-slate-600 mb-6">
-              This page hit an unexpected error while rendering. Your data is safe - reload to try again.
-            </p>
-            <Button onClick={this.handleReload} className="bg-indigo-600 hover:bg-indigo-700">
-              Reload App
-            </Button>
-            {this.state.error?.message && (
-              <p className="mt-4 text-xs text-slate-400 break-words">{this.state.error.message}</p>
-            )}
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
+ render() {
+ if (this.state.error) {
+ return (
+ <div className="min-h-screen bg-background flex items-center justify-center p-4">
+ <div className="max-w-md w-full rounded-2xl border border-border bg-card p-8 text-center shadow-sm">
+ <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-rose-100 flex items-center justify-center">
+ <AlertTriangle className="w-8 h-8 text-rose-600" />
+ </div>
+ <h2 className="text-2xl font-bold text-foreground mb-2">Something went wrong</h2>
+ <p className="text-muted-foreground mb-6">
+ This page hit an unexpected error while rendering. Your data is safe - reload to try again.
+ </p>
+ <Button onClick={this.handleReload} className="bg-indigo-600 hover:bg-indigo-700">
+ Reload App
+ </Button>
+ {this.state.error?.message && (
+ <p className="mt-4 text-xs text-muted-foreground break-words">{this.state.error.message}</p>
+ )}
+ </div>
+ </div>
+ );
+ }
+ return this.props.children;
+ }
 }

@@ -1,4 +1,4 @@
-import { base44 } from "@/api/base44Client";
+﻿import { base44 } from "@/api/base44Client";
 import { getQuotes } from "@/api/dataClient";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
@@ -26,7 +26,7 @@ export default function QuoteVersionHistory({ quote, canRestore = false, onResto
 
   if (isLoading) {
     return (
-      <Card className="p-6 border-slate-200">
+      <Card className="p-6 border-border">
         <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
       </Card>
     );
@@ -37,8 +37,8 @@ export default function QuoteVersionHistory({ quote, canRestore = false, onResto
   }
 
   return (
-    <Card className="p-6 border-slate-200">
-      <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+    <Card className="p-6 border-border">
+      <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
         <Clock className="w-5 h-5" />
         Version History
       </h3>
@@ -52,19 +52,19 @@ export default function QuoteVersionHistory({ quote, canRestore = false, onResto
                 className={`block p-4 rounded-lg border transition-all ${
                   isCurrent 
                     ? "bg-indigo-50 border-indigo-200" 
-                    : "bg-white border-slate-200 hover:bg-slate-50"
+                    : "bg-card border-border hover:bg-secondary"
                 } ${canRestore && !isCurrent ? "pr-28" : ""}`}
               >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                    isCurrent ? "bg-indigo-600" : "bg-slate-100"
+                    isCurrent ? "bg-indigo-600" : "bg-muted"
                   }`}>
-                    <FileText className={`w-5 h-5 ${isCurrent ? "text-white" : "text-slate-600"}`} />
+                    <FileText className={`w-5 h-5 ${isCurrent ? "text-white" : "text-muted-foreground"}`} />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className={`font-semibold ${isCurrent ? "text-indigo-900" : "text-slate-900"}`}>
+                      <p className={`font-semibold ${isCurrent ? "text-indigo-900" : "text-foreground"}`}>
                         Version {version.version_number || 1}
                       </p>
                       {isCurrent && (
@@ -73,14 +73,14 @@ export default function QuoteVersionHistory({ quote, canRestore = false, onResto
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-slate-500">
+                    <p className="text-sm text-muted-foreground">
                       {format(new Date(version.created_date), "MMM d, yyyy 'at' h:mm a")}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <StatusBadge status={version.status} size="sm" />
-                  <p className="text-lg font-semibold text-slate-900">
+                  <p className="text-lg font-semibold text-foreground">
                     ${(version.total || 0).toFixed(2)}
                   </p>
                 </div>

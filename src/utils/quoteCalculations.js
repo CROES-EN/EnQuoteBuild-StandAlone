@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Shared quote calculation logic — matches the PDF generator.
  * Tax is applied ONLY to line items marked taxable (item.taxable !== false).
  * Labor, travel, and mileage are never taxed.

@@ -1,4 +1,4 @@
-import jsPDF from "jspdf";
+﻿import jsPDF from "jspdf";
 import { format } from "date-fns";
 import { base44 } from "@/api/base44Client";
 import { listLocalCollection } from "@/api/dataClient";

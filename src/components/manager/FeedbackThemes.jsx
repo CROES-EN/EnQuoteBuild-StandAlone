@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { updateReview } from "@/api/dataClient";
@@ -94,12 +94,12 @@ function QuoteCommentThread({ review }) {
   entries.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
 
   return (
-    <div className="border-b border-slate-100 last:border-0">
+    <div className="border-b border-border last:border-0">
       <div className="flex items-start gap-1 py-1.5">
         {/* Secondary expand arrow on left edge */}
         <button
           onClick={() => setOpen(v => !v)}
-          className="flex-shrink-0 mt-0.5 text-slate-400 hover:text-slate-600 transition-colors"
+          className="flex-shrink-0 mt-0.5 text-muted-foreground hover:text-muted-foreground transition-colors"
           title={open ? "Collapse comments" : "Expand comments"}
         >
           {open ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -107,12 +107,12 @@ function QuoteCommentThread({ review }) {
 
         {/* Quote identifier */}
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-medium text-slate-700 truncate">
+          <p className="text-xs font-medium text-foreground truncate">
             #{review.quote_number || review.quote_id?.slice(0, 8)}
-            {review.site_id && <span className="text-slate-400 ml-1">· {review.site_id}</span>}
+            {review.site_id && <span className="text-muted-foreground ml-1">· {review.site_id}</span>}
           </p>
           {!open && review.coaching_notes && (
-            <p className="text-xs text-slate-500 truncate mt-0.5">{review.coaching_notes}</p>
+            <p className="text-xs text-muted-foreground truncate mt-0.5">{review.coaching_notes}</p>
           )}
         </div>
       </div>
@@ -121,24 +121,24 @@ function QuoteCommentThread({ review }) {
       {open && (
         <div className="ml-5 mb-2 space-y-2">
           {entries.length === 0 && (
-            <p className="text-xs text-slate-400 italic">No feedback comments recorded.</p>
+            <p className="text-xs text-muted-foreground italic">No feedback comments recorded.</p>
           )}
           {entries.map((entry, i) => (
-            <div key={i} className="bg-white rounded border border-slate-100 p-2 text-xs">
+            <div key={i} className="bg-card rounded border border-border p-2 text-xs">
               <div className="flex items-center gap-2 mb-1">
-                <span className="font-medium text-slate-600">{entry.author || "Unknown"}</span>
+                <span className="font-medium text-muted-foreground">{entry.author || "Unknown"}</span>
                 {entry.date && (
-                  <span className="text-slate-400">
+                  <span className="text-muted-foreground">
                     {new Date(entry.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                   </span>
                 )}
                 {i === 0 && <span className="bg-blue-50 text-blue-600 border border-blue-100 px-1.5 py-0.5 rounded-full text-[10px] font-medium">Most Recent</span>}
               </div>
               {entry.coaching && (
-                <p className="text-slate-600 leading-relaxed">{entry.coaching}</p>
+                <p className="text-muted-foreground leading-relaxed">{entry.coaching}</p>
               )}
               {entry.edits && (
-                <p className="text-slate-500 mt-1 italic">Recommended edits: {entry.edits}</p>
+                <p className="text-muted-foreground mt-1 italic">Recommended edits: {entry.edits}</p>
               )}
             </div>
           ))}
@@ -175,18 +175,18 @@ function RecatRow({ review, canEdit, quote }) {
   const displayDriver = review.rejection_driver || detectTheme(`${review.coaching_notes || ""} ${review.recommended_edits || ""}`) || "Uncategorized";
 
   return (
-    <div className="border-b border-slate-100 last:border-0">
+    <div className="border-b border-border last:border-0">
       {/* Quote row with left-arrow expand */}
       <div className="flex items-start gap-1 py-1.5">
         <div className="w-3.5 shrink-0" /> {/* spacer to align with QuoteCommentThread */}
         <div className="flex items-start justify-between gap-2 flex-1 min-w-0">
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-medium text-slate-700 truncate">
+            <p className="text-xs font-medium text-foreground truncate">
               #{review.quote_number || review.quote_id?.slice(0, 8)}
-              {review.site_id && <span className="text-slate-400 ml-1">· {review.site_id}</span>}
+              {review.site_id && <span className="text-muted-foreground ml-1">· {review.site_id}</span>}
             </p>
             {review.coaching_notes && (
-              <p className="text-xs text-slate-500 truncate mt-0.5">{review.coaching_notes}</p>
+              <p className="text-xs text-muted-foreground truncate mt-0.5">{review.coaching_notes}</p>
             )}
           </div>
           <div className="flex items-center gap-1 shrink-0">
@@ -220,10 +220,10 @@ function RecatRow({ review, canEdit, quote }) {
                       className="h-6 text-xs w-40"
                     />
                     <button
-                      className="text-[10px] text-slate-400 hover:underline"
+                      className="text-[10px] text-muted-foreground hover:underline"
                       onClick={() => setUseManual(false)}
                     >
-                      ← use dropdown
+                      â† use dropdown
                     </button>
                   </>
                 )}
@@ -240,7 +240,7 @@ function RecatRow({ review, canEdit, quote }) {
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="h-6 w-6 text-slate-400"
+                    className="h-6 w-6 text-muted-foreground"
                     onClick={() => { setEditing(false); setUseManual(false); setManualValue(""); }}
                   >
                     <X className="w-3 h-3" />
@@ -249,14 +249,14 @@ function RecatRow({ review, canEdit, quote }) {
               </div>
             ) : (
               <>
-                <Badge className="text-xs bg-slate-100 text-slate-600 border border-slate-200 whitespace-nowrap">
+                <Badge className="text-xs bg-muted text-muted-foreground border border-border whitespace-nowrap">
                   {displayDriver}
                 </Badge>
                 {canEdit && (
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="h-6 w-6 text-slate-400 hover:text-orange-500"
+                    className="h-6 w-6 text-muted-foreground hover:text-orange-500"
                     onClick={() => { setSelected(displayDriver); setEditing(true); }}
                     title="Re-categorize"
                   >
@@ -277,7 +277,7 @@ export default function FeedbackThemes({ reviews, quotes = [], canEdit = false }
   const [expandedTheme, setExpandedTheme] = useState(null);
   const [showBoneyard, setShowBoneyard] = useState(false);
 
-  if (!reviews.length) return <p className="text-sm text-slate-400 py-4">No review feedback yet.</p>;
+  if (!reviews.length) return <p className="text-sm text-muted-foreground py-4">No review feedback yet.</p>;
 
   // Build quick lookup: quote_id -> quote record
   const quoteMap = {};
@@ -332,31 +332,31 @@ export default function FeedbackThemes({ reviews, quotes = [], canEdit = false }
         const linkedReviews = reviewsWithTheme.filter(r => r._theme === label);
 
         return (
-          <div key={label} className="rounded-lg border border-slate-100 overflow-hidden">
+          <div key={label} className="rounded-lg border border-border overflow-hidden">
             {/* Theme bar row */}
             <button
-              className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 transition-colors text-left"
+              className="w-full flex items-center gap-3 px-3 py-2 hover:bg-secondary transition-colors text-left"
               onClick={() => setExpandedTheme(isExpanded ? null : label)}
             >
-              <span className="text-xs text-slate-700 w-32 shrink-0 font-medium">{label}</span>
-              <div className="flex-1 bg-slate-100 rounded-full h-2">
+              <span className="text-xs text-foreground w-32 shrink-0 font-medium">{label}</span>
+              <div className="flex-1 bg-muted rounded-full h-2">
                 <div
                   className={`${themeColors[idx] || "bg-slate-400"} h-2 rounded-full transition-all`}
                   style={{ width: `${(count / max) * 100}%` }}
                 />
               </div>
-              <span className="text-xs font-semibold text-slate-600 w-6 text-right">{count}</span>
-              <span className="text-slate-400 ml-1">
+              <span className="text-xs font-semibold text-muted-foreground w-6 text-right">{count}</span>
+              <span className="text-muted-foreground ml-1">
                 {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
               </span>
             </button>
 
             {/* Expanded: linked quotes */}
             {isExpanded && (
-              <div className="bg-slate-50 border-t border-slate-100 px-3 py-2">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+              <div className="bg-secondary border-t border-border px-3 py-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                   Related Quotes ({linkedReviews.length})
-                  {canEdit && <span className="normal-case font-normal text-slate-400 ml-1">— click <Pencil className="w-3 h-3 inline" /> to re-categorize</span>}
+                  {canEdit && <span className="normal-case font-normal text-muted-foreground ml-1">— click <Pencil className="w-3 h-3 inline" /> to re-categorize</span>}
                 </p>
                 <div>
                   {linkedReviews.map(r => (
@@ -365,8 +365,8 @@ export default function FeedbackThemes({ reviews, quotes = [], canEdit = false }
                 </div>
                 {/* Pencil re-cat overlay — separate section below the expand rows */}
                 {canEdit && (
-                  <div className="mt-2 pt-2 border-t border-slate-200">
-                    <p className="text-[10px] text-slate-400 uppercase tracking-wide mb-1">Re-categorize</p>
+                  <div className="mt-2 pt-2 border-t border-border">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Re-categorize</p>
                     {linkedReviews.map(r => (
                       <RecatRow key={`recat-${r.id}`} review={r} canEdit={canEdit} quote={quoteMap[r.quote_id]} />
                     ))}
@@ -380,8 +380,8 @@ export default function FeedbackThemes({ reviews, quotes = [], canEdit = false }
 
       {/* Boneyard toggle */}
       {canEdit && (
-        <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-          <span className="text-xs text-slate-400">
+        <div className="pt-2 border-t border-border flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">
             {showBoneyard
               ? "Showing boneyard / HO-engagement quotes"
               : `${boneyardCount} boneyard / HO-engagement quote${boneyardCount !== 1 ? "s" : ""} hidden`}
@@ -391,7 +391,7 @@ export default function FeedbackThemes({ reviews, quotes = [], canEdit = false }
             className={`text-xs font-medium px-2.5 py-1 rounded-full border transition-colors ${
               showBoneyard
                 ? "bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100"
-                : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100"
+                : "bg-secondary border-border text-muted-foreground hover:bg-muted"
             }`}
           >
             {showBoneyard ? "Hide Boneyard Quotes" : "Show Boneyard Quotes"}

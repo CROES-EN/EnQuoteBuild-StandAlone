@@ -1,4 +1,4 @@
-import {
+﻿import {
   HashRouter,
   Routes,
   Route
@@ -24,9 +24,11 @@ import SiteFlagManagerPage from "./pages/SiteFlagManager";
 import PVPanelRMAsPage from "./pages/PVPanelRMAs";
 import InactiveRevenueDashboardPage from "./pages/InactiveRevenueDashboard";
 import InactiveCollectionsPage from "./pages/InactiveCollections";
+import WorkloadPage from "./pages/Workload";
 
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import UserNotRegisteredError from "@/components/UserNotRegisteredError";
+import { ThemeProvider } from "@/features/theme/ThemeContext";
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -43,7 +45,7 @@ const AuthenticatedApp = () => {
   if (isLoadingPublicSettings || isLoadingAuth) {
     return (
       <div className="fixed inset-0 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
+        <div className="w-8 h-8 border-4 border-border border-t-slate-800 rounded-full animate-spin"></div>
       </div>
     );
   }
@@ -117,6 +119,10 @@ const AuthenticatedApp = () => {
         <LayoutWrapper currentPageName="SupervisorDashboard">
           <SupervisorDashboardPage />
         </LayoutWrapper>
+      } />      <Route path="/Workload" element={
+        <LayoutWrapper currentPageName="Workload">
+          <WorkloadPage />
+        </LayoutWrapper>
       } />
       <Route path="/InactiveRevenueDashboard" element={
         <LayoutWrapper currentPageName="InactiveRevenueDashboard">
@@ -137,6 +143,7 @@ const AuthenticatedApp = () => {
 function App() {
 
   return (
+    <ThemeProvider>
     <ErrorBoundary>
       <AuthProvider>
         <QueryClientProvider client={queryClientInstance}>
@@ -149,6 +156,7 @@ function App() {
         </QueryClientProvider>
       </AuthProvider>
     </ErrorBoundary>
+    </ThemeProvider>
   )
 }
 
