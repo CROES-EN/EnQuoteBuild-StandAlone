@@ -1,0 +1,39 @@
+/**
+ * Persists the user's selected theme choice to localStorage. Deliberately simple and separate
+ * from every other data store in this app (opsMetricsStore.js, importedTableStore.js, etc.) -
+ * this is a pure UI preference, not operational data, so it never touches the Electron-bridge
+ * collections API and works identically in both the desktop app and a plain browser tab.
+ *
+ * FIX (per explicit request - "make sure theme settings are per user"): this previously stored
+ * the theme under ONE fixed key shared by everyone signed in on the same PC - so the first
+ * person to pick a theme silently set it for every other teammate who later signs in on that
+ * same machine too. Now uses userScopedStorage.js's scopedKey() to namespace the storage key
+ * by the CURRENTLY SIGNED-IN user, so each person's theme choice is fully independent, even on
+ * a shared PC. A one-time migration copies forward any pre-existing (unscoped) theme choice
+ * the first time this runs for a given user, so nobody's existing preference is silently reset
+ * to the default the moment this fix is deployed.
+ */
+
+import { DEFAULT_THEME_ID, THEMES } from "@/features/theme/themes";
+import { scopedKey, migrateLegacyValueIfNeeded } from "@/lib/userScopedStorage";
+
+const STORAGE_KEY = "enquote_selected_theme_v1";
+
+export function getSavedThemeId() {
+  try {
+    migrateLegacyValueIfNeeded(STORAGE_KEY);
+    const saved = localStorage.getItem(scopedKey(STORAGE_KEY));
+    if (saved && THEMES[saved]) return saved;
+  } catch {
+    // localStorage unavailable (e.g. some restricted contexts) - fall back to default silently.
+  }
+  return DEFAULT_THEME_ID;
+}
+
+export function saveThemeId(themeId) {
+  try {
+    localStorage.setItem(scopedKey(STORAGE_KEY), themeId);
+  } catch {
+    // Ignore write failures - the in-memory selection still works for this session.
+  }
+}

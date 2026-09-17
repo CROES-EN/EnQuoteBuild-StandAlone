@@ -1,0 +1,176 @@
+﻿import { useMemo } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Clock } from "lucide-react";
+
+/**
+ * Hourly Wait Time Summary table - replaces the old "Report Data Overview" filter-tiles
+ * section on the Executive Overview tab. Sourced from reportTables.eodb_hourly_wait_time
+ * (see eodbEmailAutoImportWatcher.js's classifier + PST->MST enrichment, or a manual import
+ * via ImportAsTableDialog.jsx's Detail-sheet auto-selection), which stores ONE ROW PER HOUR
+ * PER DATE (the "Detail" sheet layout) - completely different from the other 5 EODB
+ * widgets, which store one Grand-Total value per DATE (the "Pivot" sheet layout). This is
+ * why this displays one row per MST HOUR-OF-DAY, aggregated across every date in range,
+ * rather than one row per date like the other Executive Overview tables do.
+ *
+ * Columns, left to right (per explicit request): Hourly Wait Time Summary (the hour label),
+ * Avg Wait Time (min), Avg Talk Time (min), Abandonment Rate %.
+ *
+ * @param {object} props
+ * @param {Array<Record<string, any>>} [props.rows] - reportTables.eodb_hourly_wait_time.rows
+ * @param {{start: string, end: string}} [props.activeRange] - same ISO-date range object
+ *   DashboardOverview.jsx already computes and passes to every other ranged chart/table.
+ */
+
+function toNumber(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function formatHourLabel(hour) {
+  if (hour === null || hour === undefined) return "";
+  const h = ((hour % 24) + 24) % 24;
+  const period = h < 12 ? "AM" : "PM";
+  const display = h % 12 === 0 ? 12 : h % 12;
+  return `${display} ${period}`;
+}
+
+// Computed HERE, on the fly, from the raw "PST Hours"/"PST Date" columns every report row
+// already has regardless of import path (manual "Import This Report" OR the Auto-Import
+// watcher) - rather than depending on "MST Hour"/"MST Date" columns that only exist when a
+// file went through the Auto-Import watcher's enrichment. A flat +1 hour offset is correct
+// because US Pacific and Mountain time move on the same DST schedule - correctly rolls hour
+// 23 PST into hour 0 MST of the NEXT calendar date.
+function parseFlexibleDate(value) {
+  if (value instanceof Date) return value;
+  if (typeof value === "number") {
+    return new Date(Math.round((value - 25569) * 86400 * 1000));
+  }
+  if (typeof value === "string" && value.trim()) {
+    const asNumber = Number(value);
+    if (Number.isFinite(asNumber) && value.trim() === String(asNumber)) {
+      return new Date(Math.round((asNumber - 25569) * 86400 * 1000));
+    }
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+  return null;
+}
+
+function derivePstToMst(row) {
+  const pstHour = toNumber(row["PST Hours"]);
+  const pstDate = parseFlexibleDate(row["PST Date"]);
+  if (pstHour === null || !pstDate) return { mstHour: null, mstDate: null };
+  const anchored = new Date(Date.UTC(pstDate.getUTCFullYear(), pstDate.getUTCMonth(), pstDate.getUTCDate(), pstHour));
+  const mst = new Date(anchored.getTime() + 60 * 60 * 1000);
+  return {
+    mstHour: mst.getUTCHours(),
+    mstDate: `${mst.getUTCFullYear()}-${String(mst.getUTCMonth() + 1).padStart(2, "0")}-${String(mst.getUTCDate()).padStart(2, "0")}`
+  };
+}
+
+/**
+ * Aggregates raw per-hour-per-date rows into one record per MST hour-of-day (0-23),
+ * computing CALL-WEIGHTED averages for time-based metrics - so an hour with far more calls
+ * isn't skewed by a single low-volume outlier date the same way a simple unweighted average
+ * across dates would be.
+ */
+function aggregateByHour(rows) {
+  const byHour = new Map();
+  for (let h = 0; h < 24; h++) {
+    byHour.set(h, { hour: h, totalCalls: 0, totalAbnCalls: 0, waitTimeWeightedSum: 0, talkTimeWeightedSum: 0, waitTimeCallBasis: 0, talkTimeCallBasis: 0 });
+  }
+
+  (rows || []).forEach((row) => {
+    const { mstHour: hour } = derivePstToMst(row);
+    if (hour === null || hour < 0 || hour > 23) return;
+    const bucket = byHour.get(hour);
+
+    const calls = toNumber(row["# Calls"]) || 0;
+    const abnCalls = toNumber(row["# ABN Calls"]) || 0;
+    const waitTime = toNumber(row["Wait Time"]);
+    const talkTime = toNumber(row["Avg. Talktime"]);
+
+    bucket.totalCalls += calls;
+    bucket.totalAbnCalls += abnCalls;
+    if (waitTime !== null && calls > 0) {
+      bucket.waitTimeWeightedSum += waitTime * calls;
+      bucket.waitTimeCallBasis += calls;
+    }
+    if (talkTime !== null && calls > 0) {
+      bucket.talkTimeWeightedSum += talkTime * calls;
+      bucket.talkTimeCallBasis += calls;
+    }
+  });
+
+  return Array.from(byHour.values()).map((bucket) => ({
+    hour: bucket.hour,
+    hourLabel: formatHourLabel(bucket.hour),
+    totalCalls: bucket.totalCalls,
+    waitTime: bucket.waitTimeCallBasis > 0 ? Math.round((bucket.waitTimeWeightedSum / bucket.waitTimeCallBasis) * 10) / 10 : null,
+    talkTime: bucket.talkTimeCallBasis > 0 ? Math.round((bucket.talkTimeWeightedSum / bucket.talkTimeCallBasis) * 10) / 10 : null,
+    abnRate: bucket.totalCalls > 0 ? Math.round((bucket.totalAbnCalls / bucket.totalCalls) * 1000) / 10 : null
+  }));
+}
+
+function formatMinutes(value) {
+  return value === null || value === undefined ? "-" : value.toFixed(1);
+}
+
+function formatPercent(value) {
+  return value === null || value === undefined ? "-" : `${value.toFixed(1)}%`;
+}
+
+export default function HourlyWaitTimeChart({ rows = [], activeRange }) {
+  const filteredRows = useMemo(() => {
+    if (!activeRange?.start || !activeRange?.end) return rows;
+    return (rows || []).filter((row) => {
+      const { mstDate } = derivePstToMst(row);
+      return typeof mstDate === "string" && mstDate >= activeRange.start && mstDate <= activeRange.end;
+    });
+  }, [rows, activeRange]);
+
+  const tableData = useMemo(() => aggregateByHour(filteredRows), [filteredRows]);
+  const hasAnyData = tableData.some((row) => row.totalCalls > 0);
+
+  return (
+    <Card className="border-border">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-semibold text-foreground">Hourly Wait Time Summary</CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Avg wait time, talk time, and abandonment rate by hour of day (Mountain Time), aggregated across the selected Reporting Period.
+        </p>
+      </CardHeader>
+      <CardContent>
+        {!hasAnyData ? (
+          <div className="flex flex-col items-center justify-center gap-2 py-10 text-muted-foreground">
+            <Clock className="w-8 h-8" />
+            <p className="text-sm">No Hourly Wait Time data yet for this range.</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Hourly Wait Time Summary</TableHead>
+                <TableHead className="text-right">Avg Wait Time (min)</TableHead>
+                <TableHead className="text-right">Avg Talk Time (min)</TableHead>
+                <TableHead className="text-right">Abandonment Rate %</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {tableData.filter((row) => row.totalCalls > 0).map((row) => (
+                <TableRow key={row.hour}>
+                  <TableCell className="font-medium text-foreground">{row.hourLabel}</TableCell>
+                  <TableCell className="text-right">{formatMinutes(row.waitTime)}</TableCell>
+                  <TableCell className="text-right">{formatMinutes(row.talkTime)}</TableCell>
+                  <TableCell className="text-right">{formatPercent(row.abnRate)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
