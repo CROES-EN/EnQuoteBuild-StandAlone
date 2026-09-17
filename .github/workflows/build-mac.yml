@@ -1,0 +1,71 @@
+# .github/workflows/build-mac.yml
+#
+# Builds the macOS version of EnQuote using a GitHub-hosted macOS runner - this is required
+# because electron-builder's "mac" target (dmg/zip/pkg) can only be produced ON macOS itself
+# (it depends on Mac-only tools like hdiutil/codesign that don't exist on Windows), so this
+# CANNOT run on the Windows machine used for the existing Windows build.
+#
+# Trigger: manually, via GitHub's "Run workflow" button (Actions tab) - does NOT run
+# automatically on every push, so it never interferes with or duplicates the existing
+# Windows build/publish process you already run locally via
+# "npx electron-builder --publish always".
+#
+# Output: uploads the .dmg and .zip as workflow artifacts (downloadable from the Actions
+# run page) AND, if a GitHub release for the current version already exists (created by
+# your Windows build/publish), attaches them to that SAME release automatically - so both
+# platforms end up on one release page together.
+#
+# NOTE ON SIGNING: this build is UNSIGNED (no Apple Developer certificate configured yet).
+# Users will see macOS Gatekeeper's "unidentified developer" warning the first time they
+# open it, and will need to right-click -> Open (or run a terminal command) once to bypass
+# it. This is normal/expected for an unsigned app - see the separate instructions given to
+# end users. Signing/notarization can be added to this workflow later once an Apple
+# Developer Program membership ($99/year) is set up - ask for that update when ready.
+#
+# CONFIRMED against the real package.json: a "mac" build target (dmg + zip, x64 + arm64)
+# already exists in the build config, along with a "desktop:package:mac" npm script (which
+# uses --publish never, for local-only builds) - this workflow reuses that same build
+# command shape, just with --publish always so it actually uploads to GitHub.
+
+name: Build macOS
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build-mac:
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      # NOTE: package.json already has a fully-configured "mac" build target (dmg + zip,
+      # x64 + arm64) and its own "desktop:package:mac" script - confirmed directly from the
+      # real file. That script uses "--publish never" (for local testing use), so this step
+      # runs the equivalent build command directly with "--publish always" instead, to
+      # actually publish to the same GitHub release your Windows build uses.
+      - name: Build and publish macOS app
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VITE_DATA_SOURCE: local
+        run: |
+          npm run build
+          npx electron-builder --mac --publish always
+
+      - name: Upload build artifacts (backup, in case publish step is skipped)
+        uses: actions/upload-artifact@v4
+        with:
+          name: EnQuote-mac-build
+          path: |
+            release/*.dmg
+            release/*.zip
+          if-no-files-found: warn
