@@ -1,10 +1,9 @@
-﻿const { app, BrowserWindow, ipcMain, shell, dialog } = require("electron");
+const { app, BrowserWindow, ipcMain, shell } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const fs = require("node:fs");
 const path = require("node:path");
 const { repositoryFor } = require("./repository.cjs");
 const { createOutboundSync } = require("./outboundSync.cjs");
-const { openSalesforceReportWindow, closeSalesforceReportWindow } = require("./salesforceImport.cjs");
 
 // Loads key=value pairs from an optional .env next to the app so the outbound
 // Base44 credentials never have to be baked into the bundle.
@@ -33,43 +32,12 @@ function loadEnvFile() {
 let quoteRepository;
 let outboundSync;
 let dataDirectoryWatcher;
-
-// --- Zoom (Ctrl+/Ctrl-/Ctrl+0 + in-app buttons) ---
-// Persisted to its own small JSON file in userData - deliberately NOT the main quote data
-// file, so a zoom preference change is never mistaken for a data change by the fs.watch-based
-// import-notification logic above. Zoom is a uniform scale on top of the existing responsive
-// Tailwind layout (not a separate viewport hack), so it should look correct at any level.
-const ZOOM_STEP = 0.1;
-const ZOOM_MIN = 0.5;
-const ZOOM_MAX = 2.0;
-const ZOOM_SETTINGS_FILENAME = "enquote-zoom-settings.json";
-
-function readZoomFactor() {
-  try {
-    const raw = fs.readFileSync(path.join(app.getPath("userData"), ZOOM_SETTINGS_FILENAME), "utf8");
-    const factor = Number(JSON.parse(raw).zoomFactor);
-    return Number.isFinite(factor) && factor >= ZOOM_MIN && factor <= ZOOM_MAX ? factor : 1;
-  } catch {
-    return 1;
-  }
-}
-
-function writeZoomFactor(factor) {
-  try {
-    fs.writeFileSync(path.join(app.getPath("userData"), ZOOM_SETTINGS_FILENAME), JSON.stringify({ zoomFactor: factor }), "utf8");
-  } catch (error) {
-    console.warn("[zoom] Could not persist zoom setting:", error.message);
-  }
-}
-
-function applyZoomDelta(delta) {
-  const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
-  if (!win) return 1;
-  const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round((win.webContents.getZoomFactor() + delta) * 100) / 100));
-  win.webContents.setZoomFactor(next);
-  writeZoomFactor(next);
-  return next;
-}
+let reportsInboxWatcher;
+// token -> { filePath } for a file currently awaiting the renderer's auto-import result, so it
+// can be moved into Processed/ or Needs Review/ once we hear back (see the
+// "reports-inbox:import-result" handler below).
+const pendingReportsInboxFiles = new Map();
+const REPORTS_INBOX_ACK_TIMEOUT_MS = 2 * 60 * 1000;
 let lastDataRefreshAt = 0;
 // Timestamp of the most recent write this process itself made to the data file (e.g. via
 // the quotes:create/update IPC handlers, or the merge-on-import path). fs.watch can't tell
@@ -188,107 +156,25 @@ const REPORT_FILE_EXTENSIONS = new Set([".xlsx", ".xls", ".csv"]);
 // fine since it reads them directly in the renderer, never through this main process/IPC.
 const HTML_REPORT_EXTENSIONS = new Set([".html", ".htm"]);
 
-// getReportsInboxPaths()/ensureReportsInboxFolders() removed - the old "O&M Reports Inbox"
-// (System A) has been fully retired. Its Processed/Needs Review folders are redundant now that
-// the separate EODB/Email Auto-Import watcher (System C) routes recognized files into
-// Calls\/Emails\ directly, and everything else that used to rely on this watcher goes through
-// Report Data Tables' manual import instead.
-
-// ---------------------------------------------------------------------------
-// EODB/Email Auto-Import - a DELIBERATELY SEPARATE watcher from the "O&M Reports Inbox"
-// above. See eodbEmailAutoImportWatcher.js (renderer side) for the full design rationale -
-// in short, the existing inbox's generic daily-aggregate pipeline is explicitly incompatible
-// with (and hard-blocks) EODB exports, due to a real, previously-confirmed data-corruption
-// bug, and has no path into supervisorReportTables anyway. This watcher is genuinely
-// start/stop-able and points at a user-chosen folder (see autoImportSettings.js), rather than
-// one fixed folder watched unconditionally from app launch like watchReportsInbox() above.
-// ---------------------------------------------------------------------------
-let eodbEmailInboxWatcher = null;
-let eodbEmailInboxWatchedPath = null;
-const pendingEodbEmailInboxFiles = new Map();
-const EODB_EMAIL_INBOX_ACK_TIMEOUT_MS = 15000;
-
-function stopEodbEmailInboxWatcher() {
-  if (eodbEmailInboxWatcher) {
-    eodbEmailInboxWatcher.close();
-    eodbEmailInboxWatcher = null;
-  }
-  eodbEmailInboxWatchedPath = null;
+function getReportsInboxPaths() {
+  const root = path.join(app.getPath("documents"), "EnQuote", "O&M Reports Inbox");
+  return {
+    root,
+    processed: path.join(root, "Processed"),
+    needsReview: path.join(root, "Needs Review")
+  };
 }
 
-async function processEodbEmailInboxFile(root, filename) {
-  const filePath = path.join(root, filename);
-  if (!isCandidateReportFile(filename)) return;
-  if (!fs.existsSync(filePath)) return;
-
-  const stable = await waitForFileStable(filePath);
-  if (!stable || !fs.existsSync(filePath)) return;
-
-  let buffer;
-  try {
-    buffer = fs.readFileSync(filePath);
-  } catch (error) {
-    console.warn("[eodb-email-inbox] Could not read new file:", filePath, error.message);
-    return;
-  }
-
-  const windows = BrowserWindow.getAllWindows();
-  if (windows.length === 0) return; // renderer not ready yet - left in place, no dead end (see scanNow below)
-
-  const token = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  pendingEodbEmailInboxFiles.set(token, { filePath, root });
-  setTimeout(() => {
-    if (!pendingEodbEmailInboxFiles.has(token)) return;
-    pendingEodbEmailInboxFiles.delete(token);
-  }, EODB_EMAIL_INBOX_ACK_TIMEOUT_MS);
-
-  windows.forEach((window) => window.webContents.send("eodb-email-inbox:new-file", {
-    token,
-    name: filename,
-    base64: buffer.toString("base64")
-  }));
-}
-
-function scanEodbEmailInboxNow() {
-  if (!eodbEmailInboxWatchedPath) return;
-  let entries = [];
-  try {
-    entries = fs.readdirSync(eodbEmailInboxWatchedPath, { withFileTypes: true });
-  } catch (error) {
-    console.warn("[eodb-email-inbox] Could not scan folder:", error.message);
-    return;
-  }
-  entries
-    .filter((entry) => entry.isFile())
-    .forEach((entry) => { processEodbEmailInboxFile(eodbEmailInboxWatchedPath, entry.name); });
-}
-
-/**
- * Starts (or re-points, if already running) the EODB/Email watcher at `folderPath`. Safe to
- * call repeatedly - always stops any existing watcher first, so changing folders or toggling
- * settings never leaves two watchers running on different paths simultaneously.
- */
-function startEodbEmailInboxWatcher(folderPath) {
-  stopEodbEmailInboxWatcher();
-  if (!folderPath || typeof folderPath !== "string") return;
-
-  try {
-    fs.mkdirSync(folderPath, { recursive: true });
-  } catch (error) {
-    console.warn("[eodb-email-inbox] Could not create watched folder:", folderPath, error.message);
-    return;
-  }
-
-  eodbEmailInboxWatchedPath = folderPath;
-  console.log("[eodb-email-inbox] Watching for EODB/Email auto-import files in:", folderPath);
-
-  try {
-    eodbEmailInboxWatcher = fs.watch(folderPath, { persistent: false }, (_eventType, filename) => {
-      processEodbEmailInboxFile(folderPath, filename);
-    });
-  } catch (error) {
-    console.warn("[eodb-email-inbox] Could not watch folder:", error.message);
-  }
+function ensureReportsInboxFolders() {
+  const paths = getReportsInboxPaths();
+  [paths.root, paths.processed, paths.needsReview].forEach((dir) => {
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+    } catch (error) {
+      console.warn("[reports-inbox] Could not create folder:", dir, error.message);
+    }
+  });
+  return paths;
 }
 
 function isCandidateReportFile(filename) {
@@ -345,19 +231,93 @@ function moveReportsInboxFile(filePath, destinationDir) {
   }
 }
 
-// Files matching one of System C's (the separate EODB/Email Auto-Import watcher -
-// eodbEmailAutoImportWatcher.js) 7 recognized report types are left COMPLETELY untouched by
-// this older watcher - not queued, not sent to the renderer, no ack-timeout started. Both
-// watchers can now point at the same real Incorta folder without racing/colliding: this older
-// pipeline (which explicitly cannot safely auto-map EODB call-detail data - see the Incorta
-// export check further below) simply steps aside for exactly the files System C is designed
-// to handle, leaving everything else (Summary Table, NICE Call - RAW DATA, Pronto-Abandoned
-// Calls, Weekly/Quarterly Email widgets, and anything unrecognized) going to Needs Review
-// exactly as before.
-const SYSTEM_C_RECOGNIZED_FILENAME_PATTERN =
-  /eodb dashboard.*(total call volume|#\s*abandoned calls|abandonment rate|daily wait time summary|average talk time)|pronto metrics dashboard.*(daily email volume|email raw data)/i;
+async function processReportsInboxFile(root, filename) {
+  const filePath = path.join(root, filename);
 
-// processReportsInboxFile()/scanReportsInboxNow()/watchReportsInbox() removed - System A retired.
+  if (isHtmlDashboardExport(filename)) {
+    // Never read an HTML dashboard export's bytes here or ship them over IPC (see the
+    // HTML_REPORT_EXTENSIONS comment above) - just wait for the copy/save to finish, then
+    // relocate it straight to Needs Review so it's clearly flagged for manual import instead of
+    // silently sitting untouched in the inbox forever.
+    if (!fs.existsSync(filePath)) return;
+    const stable = await waitForFileStable(filePath);
+    if (!stable || !fs.existsSync(filePath)) return;
+    console.log("[reports-inbox] HTML dashboard export requires manual import - moving to Needs Review:", filename);
+    const { needsReview } = ensureReportsInboxFolders();
+    moveReportsInboxFile(filePath, needsReview);
+    return;
+  }
+
+  if (!isCandidateReportFile(filename)) return;
+  if (!fs.existsSync(filePath)) return; // e.g. a "rename-away" event, or already moved out
+
+  const stable = await waitForFileStable(filePath);
+  if (!stable || !fs.existsSync(filePath)) return;
+
+  let buffer;
+  try {
+    buffer = fs.readFileSync(filePath);
+  } catch (error) {
+    console.warn("[reports-inbox] Could not read new file:", filePath, error.message);
+    return;
+  }
+
+  const windows = BrowserWindow.getAllWindows();
+  if (windows.length === 0) {
+    // Nobody's listening yet (very early during app startup) - leave the file in place. The
+    // renderer explicitly asks us to re-scan once its listener is ready (see
+    // "reports-inbox:scan-now" below), so this isn't a dead end.
+    return;
+  }
+
+  const token = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  pendingReportsInboxFiles.set(token, { filePath });
+  setTimeout(() => {
+    // Safety net: if the renderer never acknowledges (e.g. the page navigated away mid-parse,
+    // or it crashed), don't leave the file stuck in the inbox forever getting re-processed.
+    if (!pendingReportsInboxFiles.has(token)) return;
+    pendingReportsInboxFiles.delete(token);
+    const { needsReview } = ensureReportsInboxFolders();
+    moveReportsInboxFile(filePath, needsReview);
+  }, REPORTS_INBOX_ACK_TIMEOUT_MS);
+
+  windows.forEach((window) => window.webContents.send("reports-inbox:new-file", {
+    token,
+    name: filename,
+    base64: buffer.toString("base64")
+  }));
+}
+
+function scanReportsInboxNow() {
+  const { root } = ensureReportsInboxFolders();
+  let entries = [];
+  try {
+    entries = fs.readdirSync(root, { withFileTypes: true });
+  } catch (error) {
+    console.warn("[reports-inbox] Could not scan inbox folder:", error.message);
+    return;
+  }
+  entries
+    .filter((entry) => entry.isFile())
+    .forEach((entry) => { processReportsInboxFile(root, entry.name); });
+}
+
+function watchReportsInbox() {
+  const { root } = ensureReportsInboxFolders();
+  console.log("[reports-inbox] Watching for auto-import report files in:", root);
+
+  if (reportsInboxWatcher) {
+    reportsInboxWatcher.close();
+  }
+
+  try {
+    reportsInboxWatcher = fs.watch(root, { persistent: false }, (_eventType, filename) => {
+      processReportsInboxFile(root, filename);
+    });
+  } catch (error) {
+    console.warn("Could not watch O&M Reports Inbox folder:", error.message);
+  }
+}
 
 function configureAutoUpdater() {
   if (!app.isPackaged) {
@@ -400,14 +360,8 @@ function configureAutoUpdater() {
   });
 
   autoUpdater.on("update-downloaded", () => {
-    // FIX: no longer force-quits immediately when the download finishes - this was
-    // interrupting whoever had the app open (a jarring, unexpected close, sometimes
-    // just seconds after opening it). autoInstallOnAppQuit (set above) already
-    // handles this correctly and silently: the update is applied the NEXT time the
-    // app is closed normally by the user, with zero extra prompts or mid-session
-    // interruption - this handler now just logs that it is ready and lets that
-    // existing, non-disruptive mechanism do its job.
-    console.log("Update downloaded - it will install automatically the next time EnQuote is closed.");
+    console.log("Update downloaded; installing and restarting in-place...");
+    autoUpdater.quitAndInstall(false, true);
   });
 
   autoUpdater.checkForUpdatesAndNotify();
@@ -430,36 +384,7 @@ function createWindow() {
       sandbox: true
     }
   });
-  // FIX: only auto-open DevTools during local development - never for the packaged/
-  // installed app end users run. app.isPackaged is Electron's own built-in flag: false
-  // when running from source (npm run desktop:dev, etc.), true for an installed build.
-  if (!app.isPackaged) {
-    mainWindow.webContents.openDevTools();
-  }
-
-  // Applies the user's last-saved zoom level once the page is actually ready to receive it -
-  // setZoomFactor called too early can be silently ignored by Chromium, so this is deliberately
-  // deferred to did-finish-load rather than called right after window creation.
-  mainWindow.webContents.on("did-finish-load", () => {
-    mainWindow.webContents.setZoomFactor(readZoomFactor());
-  });
-
-  // Ctrl+=/Ctrl+-/Ctrl+0 zoom shortcuts - Electron does not enable these by default the way a
-  // normal browser tab does, so they are wired up explicitly here.
-  mainWindow.webContents.on("before-input-event", (event, input) => {
-    if (input.type !== "keyDown" || !(input.control || input.meta)) return;
-    if (input.key === "=" || input.key === "+") {
-      event.preventDefault();
-      mainWindow.webContents.setZoomFactor(applyZoomDelta(ZOOM_STEP));
-    } else if (input.key === "-") {
-      event.preventDefault();
-      mainWindow.webContents.setZoomFactor(applyZoomDelta(-ZOOM_STEP));
-    } else if (input.key === "0") {
-      event.preventDefault();
-      mainWindow.webContents.setZoomFactor(1);
-      writeZoomFactor(1);
-    }
-  });
+  mainWindow.webContents.openDevTools();
 
   if (app.isPackaged) {
     // When packaged we copy the renderer 'dist' into resources via extraResources.
@@ -478,10 +403,7 @@ function createWindow() {
   } else if (process.env.ENQUOTE_REMOTE_URL) {
     mainWindow.loadURL(process.env.ENQUOTE_REMOTE_URL);
   } else {
-    mainWindow.loadURL("http://localhost:5173").catch(() => {
-      console.warn("[EnQuote] Dev server not reachable at localhost:5173 - falling back to dist/index.html. Make sure npm run dev is running BEFORE launching the desktop app.");
-      mainWindow.loadFile(path.join(__dirname, "..", "dist", "index.html"));
-    });
+    mainWindow.loadFile(path.join(__dirname, "..", "dist", "index.html"));
   }
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -640,50 +562,12 @@ app.whenReady().then(() => {
   // event after launch isn't mistaken for a new import.
   lastKnownImportMarker = readImportMarker();
   watchLocalDataFile();
+  watchReportsInbox();
 
   // Wraps a repository method so any write it performs is flagged as "our own", suppressing
   // the fs.watch-triggered reload that would otherwise fire a moment later and wipe the
   // in-progress screen (see markOwnWrite/OWN_WRITE_GRACE_MS above).
-  // ---------------------------------------------------------------------------
-// OneDrive one-way export for supervisorReportTables (Executive Overview cross-manager
-// read access). This machine is the single writer; every other manager's install reads
-// this same file read-only. Never touches quotes/products/any other collection.
-// ---------------------------------------------------------------------------
-function resolveOneDriveSharedFolder() {
-  const base = process.env.OneDriveCommercial || process.env.OneDrive;
-  if (!base) return null;
-  return path.join(base, "EnQuote Shared Data");
-}
-
-async function exportSupervisorReportTablesToOneDrive() {
-  try {
-    const sharedFolder = resolveOneDriveSharedFolder();
-    if (!sharedFolder) {
-      console.warn("[onedrive-export] No OneDrive folder detected on this machine (OneDrive/OneDriveCommercial env var not set) - skipping export.");
-      return;
-    }
-    fs.mkdirSync(sharedFolder, { recursive: true });
-    const reportTables = await quoteRepository.listCollection("supervisorReportTables");
-    const payload = {
-      sourceManagerEmail: process.env.USERNAME ? `${String(process.env.USERNAME).toLowerCase()}@enphaseenergy.com` : null,
-      exportedAt: new Date().toISOString(),
-      reportTables: reportTables || []
-    };
-    const targetPath = path.join(sharedFolder, "supervisorReportTables.shared.json");
-    const tempPath = `${targetPath}.tmp`;
-    fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2), "utf8");
-    // Validate before committing, same safeguard pattern as repository.cjs's own writes.
-    JSON.parse(fs.readFileSync(tempPath, "utf8"));
-    fs.renameSync(tempPath, targetPath);
-    console.log("[onedrive-export] Exported", (reportTables || []).length, "report table(s) to", targetPath);
-  } catch (error) {
-    // Best-effort only - a OneDrive/export problem must NEVER block or fail the actual
-    // local save that triggered this call.
-    console.warn("[onedrive-export] Export failed (local save was NOT affected):", error.message);
-  }
-}
-
-const ownWrite = (fn) => async (...args) => {
+  const ownWrite = (fn) => async (...args) => {
     const result = await fn(...args);
     markOwnWrite();
     return result;
@@ -703,59 +587,9 @@ const ownWrite = (fn) => async (...args) => {
   ipcMain.handle("products:update", (_event, id, changes) => ownWrite(quoteRepository.updateProduct)(id, changes));
   ipcMain.handle("products:delete", (_event, id) => ownWrite(quoteRepository.deleteProduct)(id));
   ipcMain.handle("collections:list", (_event, name) => quoteRepository.listCollection(name));
-  // DIAGNOSTIC WRAPPER (temporary): "collections:create" was intermittently failing with
-  // Electron's generic "reply was never sent" error for 2 specific report types, with no
-  // visible underlying cause in the renderer's DevTools console. This wraps the handler in an
-  // explicit try/catch that logs the FULL error (message + stack trace) directly to this
-  // terminal, and guarantees the promise always settles (resolves OR rejects) rather than
-  // potentially hanging - which both surfaces the real root cause AND, if the bug is a
-  // synchronous throw somehow escaping normal handling, fixes the "no reply" symptom outright.
-  function diagnosticIpcWrap(channelName, fn) {
-    return async (...args) => {
-      try {
-        return await fn(...args);
-      } catch (error) {
-        console.error(`[IPC-DIAGNOSTIC] "${channelName}" handler threw:`, error?.message);
-        console.error(`[IPC-DIAGNOSTIC] Full stack trace:`, error?.stack);
-        console.error(`[IPC-DIAGNOSTIC] Args were:`, JSON.stringify(args).slice(0, 500));
-        throw error;
-      }
-    };
-  }
-  ipcMain.handle("collections:create", async (_event, name, record) => {
-    const result = await diagnosticIpcWrap("collections:create", ownWrite(quoteRepository.createCollectionRecord))(name, record);
-    if (name === "supervisorReportTables") exportSupervisorReportTablesToOneDrive();
-    return result;
-  });
-  ipcMain.handle("onedrive:get-shared-report-tables", async () => {
-    try {
-      const sharedFolder = resolveOneDriveSharedFolder();
-      if (!sharedFolder) return { ok: true, available: false, reportTables: [] };
-      const targetPath = path.join(sharedFolder, "supervisorReportTables.shared.json");
-      if (!fs.existsSync(targetPath)) return { ok: true, available: false, reportTables: [] };
-      const parsed = JSON.parse(fs.readFileSync(targetPath, "utf8"));
-      return {
-        ok: true,
-        available: true,
-        sourceManagerEmail: parsed.sourceManagerEmail || null,
-        exportedAt: parsed.exportedAt || null,
-        reportTables: Array.isArray(parsed.reportTables) ? parsed.reportTables : []
-      };
-    } catch (error) {
-      console.warn("[onedrive-export] Could not read shared report tables:", error.message);
-      return { ok: false, error: error.message, reportTables: [] };
-    }
-  });
-  ipcMain.handle("collections:update", async (_event, name, id, changes) => {
-    const result = await diagnosticIpcWrap("collections:update", ownWrite(quoteRepository.updateCollectionRecord))(name, id, changes);
-    if (name === "supervisorReportTables") exportSupervisorReportTablesToOneDrive();
-    return result;
-  });
-  ipcMain.handle("collections:delete", async (_event, name, id) => {
-    const result = await diagnosticIpcWrap("collections:delete", ownWrite(quoteRepository.deleteCollectionRecord))(name, id);
-    if (name === "supervisorReportTables") exportSupervisorReportTablesToOneDrive();
-    return result;
-  });
+  ipcMain.handle("collections:create", (_event, name, record) => ownWrite(quoteRepository.createCollectionRecord)(name, record));
+  ipcMain.handle("collections:update", (_event, name, id, changes) => ownWrite(quoteRepository.updateCollectionRecord)(name, id, changes));
+  ipcMain.handle("collections:delete", (_event, name, id) => ownWrite(quoteRepository.deleteCollectionRecord)(name, id));
   // Opens a previously-imported report file (e.g. a CXONE/Salesforce export) in the user's
   // default application (Excel, etc.) - a pure "reopen the file I picked earlier" convenience
   // for the Supervisor Dashboard. Read-only from this app's perspective: we never write to the
@@ -770,153 +604,31 @@ const ownWrite = (fn) => async (...args) => {
     const errorMessage = await shell.openPath(targetPath);
     return errorMessage ? { ok: false, error: errorMessage } : { ok: true };
   });
-  ipcMain.handle("dialog:select-folder", async () => {
-    const result = await dialog.showOpenDialog({ properties: ["openDirectory"] });
-    if (result.canceled || !result.filePaths.length) return { ok: true, canceled: true, path: null };
-    return { ok: true, canceled: false, path: result.filePaths[0] };
-  });
-
-  // Creates a folder (and any missing parent folders) if it doesn't already exist - used by
-  // the Auto-Import Settings panel's "Create Calls & Emails folders?" prompt. Deliberately
-  // idempotent (recursive: true never errors if the folder is already there), so re-running
-  // this for a folder that already exists is always safe, not just on first use.
-  ipcMain.handle("reports-folder:create", async (_event, folderPath) => {
-    if (typeof folderPath !== "string" || !folderPath.trim()) {
-      return { ok: false, error: "No folder path was provided." };
-    }
-    try {
-      fs.mkdirSync(folderPath, { recursive: true });
-      return { ok: true, path: folderPath };
-    } catch (error) {
-      return { ok: false, error: error.message };
-    }
-  });
-
-  // Checks whether a folder already exists, WITHOUT creating it - used by the Auto-Import
-  // Settings panel to detect whether a chosen folder already has its Calls/Emails
-  // subfolders (e.g. the user picked a folder they'd already set up before, or is
-  // re-selecting the same folder after a settings reset) so the "Create Calls & Emails
-  // folders?" prompt can be skipped entirely instead of asking again unnecessarily.
-  ipcMain.handle("reports-folder:exists", async (_event, folderPath) => {
-    if (typeof folderPath !== "string" || !folderPath.trim()) {
-      return { ok: false, error: "No folder path was provided." };
-    }
-    try {
-      const stats = fs.statSync(folderPath);
-      return { ok: true, exists: stats.isDirectory() };
-    } catch (error) {
-      if (error.code === "ENOENT") return { ok: true, exists: false };
-      return { ok: false, error: error.message };
-    }
-  });
-
-  ipcMain.handle("reports-folder:read-files", async (_event, folderPath) => {
-    if (typeof folderPath !== "string" || !folderPath.trim()) {
-      return { ok: false, error: "No folder path was provided." };
-    }
-    if (!fs.existsSync(folderPath)) {
-      return { ok: false, error: "That folder no longer exists at its original location." };
-    }
-    const IMPORT_FOLDER_EXTENSIONS = new Set([".xlsx", ".xls", ".csv", ".html", ".htm"]);
-    let entries;
-    try {
-      entries = fs.readdirSync(folderPath, { withFileTypes: true });
-    } catch (error) {
-      return { ok: false, error: error.message };
-    }
-    const files = [];
-    for (const entry of entries) {
-      if (!entry.isFile()) continue;
-      if (entry.name.startsWith("~$") || entry.name.startsWith(".")) continue;
-      const ext = path.extname(entry.name).toLowerCase();
-      if (!IMPORT_FOLDER_EXTENSIONS.has(ext)) continue;
-      try {
-        const buffer = fs.readFileSync(path.join(folderPath, entry.name));
-        files.push({ name: entry.name, base64: buffer.toString("base64") });
-      } catch (error) {
-        console.warn("[import-folder] Could not read file:", entry.name, error.message);
-      }
-    }
-    return { ok: true, files };
-  });
   ipcMain.handle("auth:login", (_event, email, password) => ownWrite(quoteRepository.login)(email, password));
   ipcMain.handle("auth:setPassword", (_event, email, currentPassword, newPassword) => ownWrite(quoteRepository.setPassword)(email, currentPassword, newPassword));
-
-  // Zoom - renderer-triggered equivalents of the Ctrl+/Ctrl-/Ctrl+0 shortcuts above, for a
-  // clickable in-app zoom control (see Layout.jsx). Each returns the RESULTING zoom factor so
-  // the renderer's displayed percentage always reflects the real, clamped value.
-  ipcMain.handle("zoom:in", () => ({ ok: true, zoomFactor: applyZoomDelta(ZOOM_STEP) }));
-  ipcMain.handle("zoom:out", () => ({ ok: true, zoomFactor: applyZoomDelta(-ZOOM_STEP) }));
-  ipcMain.handle("zoom:reset", () => {
-    const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
-    if (win) win.webContents.setZoomFactor(1);
-    writeZoomFactor(1);
-    return { ok: true, zoomFactor: 1 };
-  });
-  ipcMain.handle("zoom:get", () => {
-    const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
-    return { ok: true, zoomFactor: win ? win.webContents.getZoomFactor() : readZoomFactor() };
-  });
-
-  // Salesforce embedded import - see electron/salesforceImport.cjs for the full design
-  // rationale (persistent session partition so login is remembered across restarts, capturing
-  // the CSV/XLSX download automatically instead of requiring a manual Downloads-folder import).
-  ipcMain.handle("salesforce:open-report", (_event, reportUrl, userEmail) => {
-    if (typeof reportUrl !== "string" || !reportUrl.trim()) {
-      return { ok: false, error: "No Salesforce report URL was provided." };
-    }
-    openSalesforceReportWindow(reportUrl, (result) => {
-      BrowserWindow.getAllWindows().forEach((win) => win.webContents.send("salesforce:file-downloaded", result));
-    }, userEmail);
-    return { ok: true };
-  });
-  ipcMain.handle("salesforce:close", () => {
-    closeSalesforceReportWindow();
-    return { ok: true };
-  });
 
   // O&M Reports Inbox - zero-click auto-import (see watchReportsInbox()/processReportsInboxFile()
   // above for the watcher itself). These handlers let the renderer discover/open the watched
   // folder, ask for an immediate re-scan (e.g. right after it registers its "new-file" listener,
   // to pick up anything dropped in before the app/listener was ready), and report back whether an
   // auto-import attempt succeeded so the source file can be filed into Processed/ or Needs Review/.
-  // reports-inbox:get-path / :open-folder / :scan-now removed - System A retired.
-
-  // EODB/Email Auto-Import - separate IPC channel family from the reports-inbox:* handlers
-  // above, since this watcher points at a dynamic, per-user-chosen folder rather than one
-  // fixed path, and can be started/stopped live rather than always running from launch.
-  ipcMain.handle("eodb-email-inbox:configure", (_event, folderPath) => {
-    startEodbEmailInboxWatcher(folderPath);
-    return { ok: true, path: eodbEmailInboxWatchedPath };
+  ipcMain.handle("reports-inbox:get-path", () => ensureReportsInboxFolders().root);
+  ipcMain.handle("reports-inbox:open-folder", async () => {
+    const { root } = ensureReportsInboxFolders();
+    const errorMessage = await shell.openPath(root);
+    return errorMessage ? { ok: false, error: errorMessage } : { ok: true };
   });
-  ipcMain.handle("eodb-email-inbox:stop", () => {
-    stopEodbEmailInboxWatcher();
-    return { ok: true };
-  });
-  ipcMain.handle("eodb-email-inbox:scan-now", () => {
-    scanEodbEmailInboxNow();
+  ipcMain.handle("reports-inbox:scan-now", () => {
+    scanReportsInboxNow();
     return true;
   });
-  ipcMain.on("eodb-email-inbox:report-outcome", (_event, { token, handled, destinationSubfolder } = {}) => {
-    const pending = pendingEodbEmailInboxFiles.get(token);
-    if (!pending) return;
-    pendingEodbEmailInboxFiles.delete(token);
-
-    // Only recognized, successfully-imported files get moved into Calls\/Emails\ - anything
-    // else (unrecognized filenames, Weekly/Quarterly Email widgets, a failed parse) is left
-    // untouched in the watched folder, per explicit request to do away with a Needs-Review-
-    // style catch-all folder.
-    if (!handled || !destinationSubfolder) return;
-    const destinationDir = path.join(pending.root, destinationSubfolder);
-    try {
-      fs.mkdirSync(destinationDir, { recursive: true });
-    } catch (error) {
-      console.warn("[eodb-email-inbox] Could not create destination folder:", destinationDir, error.message);
-      return;
-    }
-    moveReportsInboxFile(pending.filePath, destinationDir);
+  ipcMain.on("reports-inbox:import-result", (_event, { token, success } = {}) => {
+    const pending = pendingReportsInboxFiles.get(token);
+    if (!pending) return; // already handled (e.g. the ack-timeout safety net already fired)
+    pendingReportsInboxFiles.delete(token);
+    const { processed, needsReview } = ensureReportsInboxFolders();
+    moveReportsInboxFile(pending.filePath, success ? processed : needsReview);
   });
-  // reports-inbox:import-result removed - System A retired.
 
   loadEnvFile();
   outboundSync = createOutboundSync({

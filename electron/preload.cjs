@@ -1,4 +1,4 @@
-﻿const { contextBridge, ipcRenderer } = require("electron");
+const { contextBridge, ipcRenderer } = require("electron");
 
 const invoke = (channel, ...args) => ipcRenderer.invoke(channel, ...args);
 
@@ -47,13 +47,6 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
     update: (name, id, changes) => invoke("collections:update", name, id, changes),
     delete: (name, id) => invoke("collections:delete", name, id)
   },
-  // Read-only view of the primary manager's supervisorReportTables, synced via a shared
-  // OneDrive file (see main.cjs's exportSupervisorReportTablesToOneDrive()). This machine
-  // never writes through this channel -- it only reads whatever the primary manager's
-  // machine last exported.
-  onedrive: {
-    getSharedReportTables: () => invoke("onedrive:get-shared-report-tables")
-  },
   auth: {
     login: (email, password) => invoke("auth:login", email, password),
     setPassword: (email, currentPassword, newPassword) => invoke("auth:setPassword", email, currentPassword, newPassword)
@@ -67,42 +60,28 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
     // its default application - never writes to the file, just asks the OS to open it.
     openPath: (targetPath) => invoke("shell:openPath", targetPath)
   },
-  dialogs: {
-    selectFolder: () => invoke("dialog:select-folder"),
-    readFolderFiles: (folderPath) => invoke("reports-folder:read-files", folderPath),
-    createFolder: (folderPath) => invoke("reports-folder:create", folderPath),
-    checkFolderExists: (folderPath) => invoke("reports-folder:exists", folderPath)
-  },  zoom: {
-    in: () => invoke("zoom:in"),
-    out: () => invoke("zoom:out"),
-    reset: () => invoke("zoom:reset"),
-    get: () => invoke("zoom:get")
-  },
-  salesforce: {
-    openReport: (reportUrl, userEmail) => invoke("salesforce:open-report", reportUrl, userEmail),
-    close: () => invoke("salesforce:close"),
-    onFileDownloaded: (callback) => {
-      const listener = (_event, payload) => callback(payload);
-      ipcRenderer.on("salesforce:file-downloaded", listener);
-      return () => ipcRenderer.removeListener("salesforce:file-downloaded", listener);
-    }
-  },
-  // reportsInbox bridge removed - System A (the old "O&M Reports Inbox") is fully retired.
-  // EODB/Email Auto-Import - separate bridge object from reportsInbox above, backing a
-  // second, independently start/stop-able watcher pointed at a per-user, dynamically-chosen
-  // folder (see autoImportSettings.js / AutoImportSettingsPanel.jsx), rather than one fixed
-  // folder watched unconditionally from app launch.
-  eodbEmailInbox: {
-    // Starts (or re-points) the watcher at `folderPath` - called whenever the user chooses/
-    // changes their watched folder, or when the app launches with auto-import already enabled.
-    configure: (folderPath) => invoke("eodb-email-inbox:configure", folderPath),
-    stop: () => invoke("eodb-email-inbox:stop"),
-    scanNow: () => invoke("eodb-email-inbox:scan-now"),
+  reportsInbox: {
+    // The watched local folder (see main.cjs's watchReportsInbox()) a supervisor can drop CXONE/
+    // NICE, Salesforce, Incorta, Care, or escalations report exports into for zero-click
+    // auto-import - no live API access exists to any of those source systems, so this is the
+    // "automatic import" mechanism.
+    getPath: () => invoke("reports-inbox:get-path"),
+    openFolder: () => invoke("reports-inbox:open-folder"),
+    // Asks main to immediately re-scan the inbox folder - call this right after subscribing via
+    // onNewFile so anything dropped in before this listener existed (app was closed, or this is
+    // the very first subscriber after launch) still gets picked up instead of silently missed.
+    scanNow: () => invoke("reports-inbox:scan-now"),
+    // Fires once per detected file, after main has confirmed it's finished being written
+    // (stable file size) and read it from disk. Payload: { token, name, base64 } - the renderer
+    // decodes/parses/imports it, then MUST call sendImportResult(token, ...) so main knows
+    // whether to file the original into Processed/ or Needs Review/. Returns an unsubscribe fn.
     onNewFile: (callback) => {
       const listener = (_event, payload) => callback(payload);
-      ipcRenderer.on("eodb-email-inbox:new-file", listener);
-      return () => ipcRenderer.removeListener("eodb-email-inbox:new-file", listener);
+      ipcRenderer.on("reports-inbox:new-file", listener);
+      return () => ipcRenderer.removeListener("reports-inbox:new-file", listener);
     },
-    reportOutcome: (token, outcome) => ipcRenderer.send("eodb-email-inbox:report-outcome", { token, ...outcome })
+    // Fire-and-forget acknowledgment (not invoke/await - main doesn't block on this) telling
+    // main whether the auto-import for `token` succeeded, so it can move the source file.
+    sendImportResult: (token, result) => ipcRenderer.send("reports-inbox:import-result", { token, ...result })
   }
 });

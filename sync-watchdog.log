@@ -1,5 +1,3 @@
-[2026-09-15 22:22:15] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 169 minutes. Check the app and network.
-[2026-09-15 22:25:14] STALE: last successful sync was 172 minute(s) ago (threshold 45).
 [2026-09-15 22:25:15] Toast shown: EnQuote Sync Stale - No successful Base44 sync in 172 minutes. Check the app and network.
 [2026-09-15 22:28:14] STALE: last successful sync was 175 minute(s) ago (threshold 45).
 [2026-09-15 22:28:14] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 175 minutes. Check the app and network.
@@ -998,3 +996,5 @@
 [2026-09-17 15:40:25] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 189 minutes. Check the app and network.
 [2026-09-17 15:43:21] STALE: last successful sync was 192 minute(s) ago (threshold 45).
 [2026-09-17 15:43:21] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 192 minutes. Check the app and network.
+[2026-09-17 15:52:11] ngrok.exe is NOT running - restarting via Scheduled Task...
+[2026-09-17 15:52:18] webhook-receiver.cjs is NOT running - restarting via Scheduled Task...

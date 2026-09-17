@@ -4,11 +4,7 @@
 //
 // Design goals (in priority order):
 //   1. NEVER create a duplicate quote in Base44.
-//   2. NEVER silently overwrite a newer change that happened directly in
-//      Base44 with an older local edit - if Base44's own copy changed since
-//      this app last confirmed a sync, the push is held back and clearly
-//      flagged as a CONFLICT instead of blindly winning a last-write-wins race.
-//   3. Never block or break the app when Base44 is unreachable - the app is
+//   2. Never block or break the app when Base44 is unreachable - the app is
 //      offline-first, so a failed push must simply leave the quote queued.
 //
 // Duplicate protection is layered:
@@ -22,25 +18,6 @@
 //     need this check since their `remote_id` is already known.
 //   - Only a confirmed success acks the entry; failures increment `attempts`
 //     and leave it pending for the next flush.
-//
-// Conflict protection (updates only):
-//   - Before pushing an edit, we fetch Base44's CURRENT copy of that quote
-//     and compare its `updated_date` against `base44_synced_at` - the
-//     timestamp this app last confirmed a successful sync for this exact
-//     quote. If Base44's copy was updated more recently than that baseline,
-//     someone (or something) changed it directly in Base44 after this app
-//     last knew about it - pushing the local edit now would silently destroy
-//     that change. Instead, the entry is left queued and clearly marked
-//     "CONFLICT" (not counted against the normal retry-attempt limit, so it
-//     keeps being re-checked on every flush rather than eventually being
-//     abandoned) until a human resolves it - e.g. by re-saving locally with
-//     the latest information, or once the remote copy stabilizes.
-//   - LIMITATION: if this app has never successfully synced this specific
-//     quote before (no `base44_synced_at` on record yet - can happen for a
-//     quote that originated in Base44/via webhook import and is being
-//     edited locally for the very first time), there is no baseline to
-//     compare against, and the push proceeds as before (unchanged, existing
-//     behavior) rather than blocking indefinitely with nothing to compare to.
 
 const https = require("node:https");
 const http = require("node:http");
@@ -48,7 +25,6 @@ const http = require("node:http");
 const DEFAULT_INTERVAL_MS = 5 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
 const REQUEST_TIMEOUT_MS = 20000;
-const CONFLICT_PREFIX = "CONFLICT:";
 
 function requestJson(urlString, { method = "GET", headers = {}, body = null } = {}) {
   return new Promise((resolve) => {
@@ -142,50 +118,11 @@ function createOutboundSync({ repository, config, logger = console, onAfterWrite
     return null;
   }
 
-  // Fetches Base44's CURRENT copy of a single quote by its remote id, used
-  // only for the pre-update conflict check below. Returns { ok:false } on
-  // any failure (network error, non-2xx, unparseable body) - callers must
-  // treat that as "could not verify" and NOT proceed to push blindly.
-  async function fetchRemoteQuote(remoteId) {
-    const response = await requestJson(`${entityUrl()}/${remoteId}`, { headers: authHeaders() });
-    if (!response.ok || !response.body || typeof response.body !== "object") {
-      return { ok: false, error: response.error || "Could not read Base44's current copy of this quote." };
-    }
-    return { ok: true, quote: response.body };
-  }
-
   // Pushes an edit to a quote that already exists in Base44 (entry.remote_id is known,
   // set when the edit was queued - see enqueueOutboundUpdate in repository.cjs). Mirrors
   // the official @base44/sdk client's entities.update(), which does a PUT to
   // `${entityUrl}/${id}` rather than posting a new record.
-  //
-  // Before doing that PUT, this now checks Base44's own current `updated_date` against
-  // this app's last confirmed sync point for the SAME quote (`base44_synced_at`). If
-  // Base44 has moved on since then, the push is deliberately held back as a CONFLICT
-  // instead of silently clobbering whatever changed there.
   async function pushUpdate(entry) {
-    const remoteCheck = await fetchRemoteQuote(entry.remote_id);
-    if (!remoteCheck.ok) {
-      // Can't safely verify Base44's current state right now - do NOT push blind.
-      // Leave queued, this will be retried on the next flush like any other failure.
-      return {
-        local_id: entry.local_id,
-        error: `Could not verify Base44's current version before pushing (will retry): ${remoteCheck.error}`
-      };
-    }
-
-    const remoteUpdatedAt = remoteCheck.quote?.updated_date ? Date.parse(remoteCheck.quote.updated_date) : NaN;
-    const localBaselineRaw = entry.quote.base44_synced_at;
-    const localBaseline = localBaselineRaw ? Date.parse(localBaselineRaw) : NaN;
-
-    if (!Number.isNaN(remoteUpdatedAt) && !Number.isNaN(localBaseline) && remoteUpdatedAt > localBaseline) {
-      logger.warn(`[outbound-sync] CONFLICT detected for ${entry.local_id}: Base44 was updated at ${remoteCheck.quote.updated_date}, after this app's last known sync (${localBaselineRaw}). Push held back.`);
-      return {
-        local_id: entry.local_id,
-        error: `${CONFLICT_PREFIX} Base44's copy of this quote was updated at ${remoteCheck.quote.updated_date}, which is more recent than this app's last known sync (${localBaselineRaw}). Skipped to avoid overwriting - re-save locally once resolved to push again.`
-      };
-    }
-
     const response = await requestJson(`${entityUrl()}/${entry.remote_id}`, {
       method: "PUT",
       headers: authHeaders(),
@@ -224,18 +161,6 @@ function createOutboundSync({ repository, config, logger = console, onAfterWrite
     return entry.kind === "update" ? pushUpdate(entry) : pushCreate(entry);
   }
 
-  // A CONFLICT is fundamentally different from a normal transient failure (network
-  // blip, Base44 briefly down, etc.) - it means the two sides genuinely disagree, and
-  // retrying with the SAME stale local data will just detect the same conflict again
-  // forever. Rather than let it silently exhaust MAX_ATTEMPTS and stop being retried
-  // (which would leave a real, human-relevant conflict quietly abandoned), conflicted
-  // entries stay eligible for the flush every single time, so they're re-checked
-  // continuously until a human resolves it (e.g. re-saving locally, or the remote
-  // change being reverted) - at which point the conflict will naturally clear.
-  function isConflictEntry(entry) {
-    return typeof entry.last_error === "string" && entry.last_error.startsWith(CONFLICT_PREFIX);
-  }
-
   async function flush() {
     if (running) return { skipped: "already-running" };
     if (!isConfigured) return { skipped: "not-configured" };
@@ -243,7 +168,7 @@ function createOutboundSync({ repository, config, logger = console, onAfterWrite
     running = true;
     try {
       const pending = await repository.listPendingOutboundQuotes();
-      const eligible = pending.filter((entry) => isConflictEntry(entry) || (entry.attempts || 0) < MAX_ATTEMPTS);
+      const eligible = pending.filter((entry) => (entry.attempts || 0) < MAX_ATTEMPTS);
       if (!eligible.length) return { pushed: 0, failed: 0 };
 
       const results = [];
@@ -258,15 +183,10 @@ function createOutboundSync({ repository, config, logger = console, onAfterWrite
       await repository.markOutboundSynced(results);
       onAfterWrite?.();
       const failed = results.filter((result) => result.error);
-      const conflicts = failed.filter((result) => result.error.startsWith(CONFLICT_PREFIX));
-      const otherFailed = failed.length - conflicts.length;
-      if (conflicts.length) {
-        logger.warn(`[outbound-sync] ${conflicts.length} quote(s) held back due to a CONFLICT with Base44's newer data; they remain queued and will keep being re-checked.`, conflicts);
+      if (failed.length) {
+        logger.warn(`[outbound-sync] ${failed.length} quote(s) failed to sync; they remain queued.`, failed);
       }
-      if (otherFailed) {
-        logger.warn(`[outbound-sync] ${otherFailed} quote(s) failed to sync; they remain queued.`, failed.filter((result) => !result.error.startsWith(CONFLICT_PREFIX)));
-      }
-      return { pushed: results.length - failed.length, failed: failed.length, conflicts: conflicts.length };
+      return { pushed: results.length - failed.length, failed: failed.length };
     } catch (error) {
       logger.warn("[outbound-sync] Flush failed:", error.message);
       return { error: error.message };

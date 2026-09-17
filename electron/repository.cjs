@@ -1,4 +1,4 @@
-﻿const fs = require("node:fs/promises");
+const fs = require("node:fs/promises");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const { z } = require("zod");
@@ -8,17 +8,6 @@ const DATA_VERSION = 1;
 const DEFAULT_SYNC_TTL_MS = 5 * 60 * 1000;
 const DEFAULT_TEMP_PASSWORD = "Enquote1";
 const fileName = "enquote-demo-data-v1.json";
-// Gates the verbose [write-timing] diagnostic logging added this week while chasing the
-// concurrency race + the write() self-deadlock, behind an explicit opt-in env var. Now
-// that both of those bugs are fixed AND verified (clean restart, no recurrence), this
-// logging fires on literally every single write and adds real overhead + noise for no
-// ongoing benefit. Set ENQUOTE_DEBUG_WRITES=1 before launch to re-enable full output if a
-// similar bug ever needs to be chased again - console.warn/console.error calls for the
-// same [write-timing] tag are NOT gated by this and always log, since those represent
-// real failures, not routine timing info.
-function logTiming(...args) {
-  if (process.env.ENQUOTE_DEBUG_WRITES) console.log(...args);
-}
 const productSeed = [
   { id: "demo-product-001", name: "Disconnect Enclosure Repair", description: "Synthetic service item for demonstration quotes.", type: "service", sku: "DEMO-SVC-001", unit_price: 480, unit: "each", category: "Services", is_active: true },
   { id: "demo-product-002", name: "Outdoor Conduit Kit", description: "Synthetic conduit and fittings demonstration kit.", type: "product", sku: "DEMO-MAT-002", unit_price: 185, unit: "each", category: "Conduit & Raceway", is_active: true },
@@ -43,7 +32,7 @@ const updateSchema = z.object({ id: z.string().min(1), changes: z.record(z.unkno
 // "supervisorDailyMetrics" backs the Supervisor Dashboard (Calls/AHT, Emails Worked,
 // Quotes Drafted, Staffing). That dashboard is intentionally independent of Base44, so
 // this collection has no Base44 entity counterpart - it is only ever read/written locally.
-const collectionNames = ["reviews", "activities", "followUps", "users", "siteFlags", "deletionRequests", "materialOrders", "rmas", "svCancels", "supportInteractions", "pdfTemplates", "priceReviews", "followUpConfigs", "pvManufacturers", "supervisorDailyMetrics", "supervisorReportTables", "autoImportSettings"];
+const collectionNames = ["reviews", "activities", "followUps", "users", "siteFlags", "deletionRequests", "materialOrders", "rmas", "svCancels", "supportInteractions", "pdfTemplates", "priceReviews", "followUpConfigs", "pvManufacturers", "supervisorDailyMetrics"];
 const collectionDefaults = {
   reviews: [],
   activities: [],
@@ -206,23 +195,9 @@ function mergeRecordsById(existingList, incomingList, options = {}) {
   if (incoming.length === 0) return existing;
 
   const byId = new Map();
-  // Maps a locally-synced record's CONFIRMED Base44 id (base44_id) back to its own LOCAL id.
-  // This closes a real, confirmed duplicate-record bug: a locally-created quote keeps its
-  // original demo-quote-... id forever (see markOutboundSynced above, which stores the
-  // confirmed Base44 id in `base44_id` but intentionally never changes `id`) - so without this
-  // index, an inbound Base44 snapshot/webhook containing that SAME quote (now keyed by its
-  // real Base44 id) would never match on `id` alone, and would be inserted as a brand-new,
-  // separate record instead of merging into the existing one. Verified via a standalone,
-  // isolated test (test-merge-fix.cjs) before this fix was written, AND independently
-  // confirmed against real production data (a dated CSV comparison between local App data and
-  // Base44's actual export found 15 records matching this exact signature).
-  const base44IdToLocalId = new Map();
   for (const record of existing) {
     if (record && typeof record === "object" && record.id !== undefined && record.id !== null) {
       byId.set(String(record.id), record);
-      if (record.base44_id) {
-        base44IdToLocalId.set(String(record.base44_id), String(record.id));
-      }
     }
   }
 
@@ -234,40 +209,24 @@ function mergeRecordsById(existingList, incomingList, options = {}) {
 
   for (const record of incoming) {
     if (!record || typeof record !== "object" || record.id === undefined || record.id === null) continue;
-    const incomingKey = String(record.id);
-    // Resolve to the EXISTING LOCAL record's key if this incoming id is actually a Base44 id
-    // that a local record already recorded as its own base44_id - this is what makes a
-    // locally-created-then-synced quote merge correctly instead of duplicating.
-    const key = base44IdToLocalId.has(incomingKey) ? base44IdToLocalId.get(incomingKey) : incomingKey;
+    const key = String(record.id);
     const current = byId.get(key);
-    const matchedViaBase44Id = key !== incomingKey;
 
     let winner;
-    let winnerIsIncoming;
     if (!current) {
       winner = record;
-      winnerIsIncoming = true;
     } else {
       const currentTime = getTimestamp(current);
       const incomingTime = getTimestamp(record);
       if (currentTime !== null && incomingTime !== null) {
-        winnerIsIncoming = incomingTime >= currentTime;
+        winner = incomingTime >= currentTime ? record : current;
       } else {
         // No comparable timestamps on one/both sides - prefer the incoming (newly imported) record.
-        winnerIsIncoming = true;
+        winner = record;
       }
-      winner = winnerIsIncoming ? record : current;
     }
 
-    // CRITICAL: if this match came via the base44_id index, the merged result must keep the
-    // EXISTING LOCAL id - never adopt the incoming Base44 id - otherwise this would just
-    // relocate the duplication bug rather than fix it (breaking anything that still
-    // references the original local id: reviews, activities, follow-ups, the outbound queue).
-    if (matchedViaBase44Id && winnerIsIncoming) {
-      winner = { ...winner, id: key, base44_id: incomingKey };
-    }
-
-    if (bumpRevField && winnerIsIncoming) {
+    if (bumpRevField && winner === record) {
       const priorRev = current?.[bumpRevField] || 0;
       winner = { ...winner, [bumpRevField]: priorRev + 1 };
     }
@@ -342,40 +301,7 @@ function repositoryFor(userDataPath) {
     }
   }
 
-  // Serializes every write() call through this single promise chain, so two near-
-  // simultaneous callers (e.g. two auto-imports firing close together, or a manual save
-  // racing an outbound-sync ack) can NEVER interleave their file operations. This is the
-  // root-cause fix for a real, reproduced data corruption bug: with NO serialization, two
-  // concurrent writes both targeting the same shared ".tmp" path could have their
-  // rm/writeFile/rename steps interleave, producing a file with valid JSON followed by
-  // leftover bytes from the other write - reproduced and confirmed via a dedicated
-  // concurrency test (5 of 10 trials corrupted with the old unserialized logic; 0 of 10
-  // with this fix, using the exact same concurrent workload).
-  let writeQueue = Promise.resolve();
-  let __queueDepth = 0;
-  function serializedWrite(performWrite) {
-    __queueDepth++;
-    const __depthAtEnqueue = __queueDepth;
-    const __enqueuedAt = Date.now();
-    logTiming(`[write-timing] Write enqueued - queue depth now: ${__depthAtEnqueue}`);
-    const result = writeQueue.then(async () => {
-      const __waitedMs = Date.now() - __enqueuedAt;
-      if (__waitedMs > 50) {
-        logTiming(`[write-timing] Write started after waiting ${__waitedMs}ms behind other queued writes`);
-      }
-      const out = await performWrite();
-      __queueDepth--;
-      return out;
-    });
-    // Swallow the rejection here so ONE failed write can never permanently jam the queue
-    // for every subsequent caller - the actual error still propagates to whoever awaited
-    // this specific write via `result`.
-    writeQueue = result.catch(() => { __queueDepth--; });
-    return result;
-  }
-
-  async function writeInner(data) {
-    const __t0 = Date.now();
+  async function write(data) {
     await fs.mkdir(userDataPath, { recursive: true });
     const next = {
       ...data,
@@ -385,102 +311,18 @@ function repositoryFor(userDataPath) {
         last_saved_at: new Date().toISOString()
       }
     };
-    const serialized = JSON.stringify(next, null, 2);
-    logTiming(`[write-timing] JSON.stringify + setup took ${Date.now() - __t0}ms (payload size: ${serialized.length} bytes)`);
-    // Unique temp filename per write (not a fixed shared path) - belt-and-suspenders on top
-    // of the queue above, so even an unrelated process touching a stray ".tmp" file can
-    // never collide with an in-flight write here.
-    const tempPath = `${dataPath}.${process.hrtime.bigint()}.tmp`;
-    const __t1 = Date.now();
-    await fs.writeFile(tempPath, serialized, "utf8");
-    logTiming(`[write-timing] Writing temp file took ${Date.now() - __t1}ms`);
-
-    // Validate the temp file actually parses as JSON BEFORE it ever gets renamed into the
-    // live data file - corruption can now only ever affect a throwaway temp file, never the
-    // real one, and the caller gets a clear thrown error instead of silent data loss.
-    const __t2 = Date.now();
+    const tempPath = `${dataPath}.tmp`;
+    await fs.rm(tempPath, { force: true });
+    await fs.writeFile(tempPath, JSON.stringify(next, null, 2), "utf8");
     try {
-      JSON.parse(await fs.readFile(tempPath, "utf8"));
-    } catch (verifyError) {
-      await fs.rm(tempPath, { force: true }).catch(() => {});
-      throw new Error(`Refused to save - the data failed to verify as valid JSON before writing: ${verifyError.message}`);
-    }
-    logTiming(`[write-timing] Verify-read took ${Date.now() - __t2}ms`);
-
-    // Retry the rename a few times with backoff before giving up - a transient EPERM/EBUSY
-    // (e.g. OneDrive or antivirus briefly holding a read handle on the live file while
-    // scanning/syncing it) is exactly the failure mode confirmed in a real log tonight, and
-    // is very often gone within a few hundred milliseconds rather than being permanent.
-    const maxAttempts = 4;
-    const __t3 = Date.now();
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        await fs.rename(tempPath, dataPath);
-        logTiming(`[write-timing] Rename succeeded on attempt ${attempt}, took ${Date.now() - __t3}ms total. FULL writeInner: ${Date.now() - __t0}ms`);
+      await fs.rename(tempPath, dataPath);
+    } catch (error) {
+      if (error.code === "ENOENT") {
+        await fs.writeFile(dataPath, JSON.stringify(next, null, 2), "utf8");
         return;
-      } catch (error) {
-        if (error.code === "ENOENT") {
-          // The live file didn't exist to rename over (e.g. first-ever write) - safe to
-          // write directly, since there's no existing file this could clobber mid-write.
-          await fs.writeFile(dataPath, serialized, "utf8");
-          logTiming(`[write-timing] ENOENT fallback direct-write, took ${Date.now() - __t0}ms total`);
-          return;
-        }
-        console.warn(`[write-timing] Rename attempt ${attempt} FAILED (${error.code}): ${error.message}`);
-        if (attempt === maxAttempts) {
-          await fs.rm(tempPath, { force: true }).catch(() => {});
-          console.error(`[write-timing] ALL ${maxAttempts} rename attempts failed, took ${Date.now() - __t3}ms total before giving up.`);
-          throw error;
-        }
-        await new Promise((resolve) => setTimeout(resolve, attempt * 150));
       }
+      throw error;
     }
-  }
-
-  // Keeps the last 3 successful saves as rolling backups (backup-1 = most recent, backup-3 =
-  // oldest) BEFORE each new write replaces the live file - so a future corruption or a bad
-  // import is always one file copy away from a known-good recovery point, instead of
-  // requiring manual JSON surgery like the incidents fixed by hand this session. Backups
-  // live in a dedicated "Backups" subfolder (not directly alongside the live data file),
-  // per explicit request to keep the AppData root folder clean rather than cluttered with
-  // rotating backup files next to the one file that actually matters day to day.
-  async function rotateBackups() {
-    const __rt0 = Date.now();
-    logTiming("[write-timing] rotateBackups: ENTERED");
-    try {
-      const exists = await fs.access(dataPath).then(() => true).catch(() => false);
-      logTiming(`[write-timing] rotateBackups: fs.access(dataPath) done after ${Date.now() - __rt0}ms, exists=${exists}`);
-      if (!exists) return;
-      const backupDir = path.join(userDataPath, "Backups");
-      await fs.mkdir(backupDir, { recursive: true });
-      logTiming(`[write-timing] rotateBackups: fs.mkdir(backupDir) done after ${Date.now() - __rt0}ms`);
-      const backupFileName = path.basename(dataPath);
-      for (let i = 3; i >= 1; i--) {
-        const from = i === 1 ? dataPath : path.join(backupDir, `${backupFileName}.backup-${i - 1}`);
-        const to = path.join(backupDir, `${backupFileName}.backup-${i}`);
-        logTiming(`[write-timing] rotateBackups: loop i=${i}, checking access to "${from}"`);
-        const fromExists = await fs.access(from).then(() => true).catch(() => false);
-        logTiming(`[write-timing] rotateBackups: loop i=${i}, fromExists=${fromExists}, elapsed ${Date.now() - __rt0}ms`);
-        if (fromExists) {
-          const __copyStart = Date.now();
-          await fs.copyFile(from, to).catch((copyErr) => {
-            console.error(`[write-timing] rotateBackups: copyFile FAILED for i=${i}:`, copyErr?.message);
-          });
-          logTiming(`[write-timing] rotateBackups: loop i=${i}, copyFile took ${Date.now() - __copyStart}ms`);
-        }
-      }
-      logTiming(`[write-timing] rotateBackups: COMPLETED after ${Date.now() - __rt0}ms total`);
-    } catch (rotateError) {
-      // Backup rotation is best-effort only - it must never block or fail an actual save.
-      console.error(`[write-timing] rotateBackups: caught error after ${Date.now() - __rt0}ms:`, rotateError?.message);
-    }
-  }
-
-  async function write(data) {
-    return serializedWrite(async () => {
-      await rotateBackups();
-      await writeInner(data);
-    });
   }
 
   return {
@@ -641,8 +483,6 @@ function repositoryFor(userDataPath) {
         followUpConfigs: z.array(z.record(z.unknown())).optional(),
         pvManufacturers: z.array(z.record(z.unknown())).optional(),
         supervisorDailyMetrics: z.array(z.record(z.unknown())).optional(),
-        supervisorReportTables: z.array(z.record(z.unknown())).optional(),
-        autoImportSettings: z.array(z.record(z.unknown())).optional(),
         userCredentials: z.record(z.unknown()).optional(),
         outboundQueue: z.array(z.record(z.unknown())).optional(),
         meta: z.object({
@@ -766,81 +606,42 @@ function repositoryFor(userDataPath) {
       const data = await read();
       return data[name];
     },
-    // FIX (confirmed via a real, live data-loss incident, then reproduced and verified in
-    // isolation): createCollectionRecord/updateCollectionRecord/deleteCollectionRecord each
-    // independently did read() THEN write() with NO serialization around the read step -
-    // only the final write() itself was serialized (see the writeQueue/serializedWrite
-    // mechanism above, built for a different, earlier corruption bug). When multiple calls
-    // for DIFFERENT record ids run close together (e.g. several auto-imported report files
-    // landing within the same couple of seconds), each one's read() could return the SAME
-    // stale snapshot before any of them had written yet - so whichever call's write() ran
-    // LAST would silently overwrite every other call's change, discarding it with no error.
-    // A dedicated reproduction test confirmed this exactly: 5 concurrent creates for 5
-    // different report types lost 4 of 5 records with the old logic (repeated across 10
-    // trials); wrapping each function's ENTIRE read-modify-write cycle in the SAME
-    // serializedWrite queue already used for raw file writes brought this to 0 lost records
-    // across 10 trials of the identical concurrent workload.
-    // FIX (found via direct code review after all-night live evidence of a PERMANENT,
-    // total write deadlock - confirmed reproduced and fixed in an isolated standalone test
-    // before being applied here): these 3 methods call serializedWrite(), then call the
-    // public write(data) function from INSIDE that callback - but write() ITSELF calls
-    // serializedWrite() again. Since writeQueue is one shared variable, this created a
-    // genuine self-referential deadlock: the inner serializedWrite call gets queued behind
-    // the outer one, but the outer one can never finish until the inner one does (it's
-    // awaiting it) - so neither ever resolves, EVER, for ANY collection, from a fully clean
-    // process. This exactly matches the real symptom: queue depth climbing indefinitely
-    // with zero progress logged afterward, on every single save attempt. The fix: since
-    // these methods are ALREADY running inside a serializedWrite callback, they now call
-    // the actual disk-write steps directly (rotateBackups()/writeInner()) instead of the
-    // public write() wrapper, avoiding the second layer of queueing entirely. A standalone
-    // reproduction confirmed the old code deadlocks (times out, never resolves) and the new
-    // code resolves correctly AND still correctly serializes multiple concurrent calls (no
-    // regression of the original race-condition fix this queueing was built for).
     async createCollectionRecord(name, record) {
       if (!collectionNames.includes(name)) throw new Error(`Unsupported local collection: ${name}`);
-      return serializedWrite(async () => {
-        const data = await read();
-        const now = new Date().toISOString();
-        const item = {
-          created_date: now,
-          updated_date: now,
-          ...z.record(z.unknown()).parse(record),
-          id: record.id || makeId(`demo-${name}`)
-        };
-        data[name].push(item);
-        await rotateBackups();
-        await writeInner(data);
-        return item;
-      });
+      const data = await read();
+      const now = new Date().toISOString();
+      const item = {
+        created_date: now,
+        updated_date: now,
+        ...z.record(z.unknown()).parse(record),
+        id: record.id || makeId(`demo-${name}`)
+      };
+      data[name].push(item);
+      await write(data);
+      return item;
     },
     async updateCollectionRecord(name, id, changes) {
       if (!collectionNames.includes(name)) throw new Error(`Unsupported local collection: ${name}`);
-      return serializedWrite(async () => {
-        const data = await read();
-        const index = data[name].findIndex(item => item.id === id);
-        if (index < 0) throw new Error(`${name} record not found.`);
-        data[name][index] = {
-          ...data[name][index],
-          updated_date: new Date().toISOString(),
-          ...z.record(z.unknown()).parse(changes),
-          id
-        };
-        await rotateBackups();
-        await writeInner(data);
-        return data[name][index];
-      });
+      const data = await read();
+      const index = data[name].findIndex(item => item.id === id);
+      if (index < 0) throw new Error(`${name} record not found.`);
+      data[name][index] = {
+        ...data[name][index],
+        updated_date: new Date().toISOString(),
+        ...z.record(z.unknown()).parse(changes),
+        id
+      };
+      await write(data);
+      return data[name][index];
     },
     async deleteCollectionRecord(name, id) {
       if (!collectionNames.includes(name)) throw new Error(`Unsupported local collection: ${name}`);
-      return serializedWrite(async () => {
-        const data = await read();
-        const next = data[name].filter(item => item.id !== id);
-        if (next.length === data[name].length) throw new Error(`${name} record not found.`);
-        data[name] = next;
-        await rotateBackups();
-        await writeInner(data);
-        return { id };
-      });
+      const data = await read();
+      const next = data[name].filter(item => item.id !== id);
+      if (next.length === data[name].length) throw new Error(`${name} record not found.`);
+      data[name] = next;
+      await write(data);
+      return { id };
     },
     // Validates an email/password sign-in against this PC's local credential store. Every
     // known EnQuote user (the static roster plus anyone already synced in via Base44) is

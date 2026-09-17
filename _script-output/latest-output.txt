@@ -1,7 +1,0 @@
-﻿
-===== Target file =====
-Path: C:\EnQuoteBuild\package.json
-
-===== Checking for existing 'mac' config =====
-A 'mac' section already exists in package.json's build config.
-Nothing to add -- please share that section directly if it needs adjusting.
