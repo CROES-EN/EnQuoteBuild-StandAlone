@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Exports an array of products to an Excel-compatible .xlsx file.
  * Includes ALL catalog details — entity fields plus built-in metadata
  * (ID, created/updated dates, created by) for pricing-accuracy monitoring

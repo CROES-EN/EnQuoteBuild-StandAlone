@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import { HeartHandshake } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -72,7 +72,7 @@ export default function EnphaseCarePanel({ records, selectedDate, onChanged }) {
   }
 
   return (
-    <Card className="border-slate-200">
+    <Card className="border-border">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <HeartHandshake className="h-5 w-5 text-rose-600" />

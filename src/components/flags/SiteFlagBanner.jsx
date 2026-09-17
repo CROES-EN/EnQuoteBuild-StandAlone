@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { AlertTriangle, ShieldAlert, Siren, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
@@ -15,31 +15,31 @@ const FLAG_CONFIG = {
     icon: Siren,
     iconColor: "text-red-600",
     rowHover: "hover:bg-red-100",
-    rowBg: "bg-white",
+    rowBg: "bg-card",
   },
   orange: {
     label: "Level 2 Warning",
-    bg: "bg-orange-50 border-orange-400",
-    header: "bg-orange-100",
+    bg: "bg-warning/10 border border-warning/20 border-l-4 border-l-warning",
+    header: "bg-warning/10",
     text: "text-orange-900",
     subtext: "text-orange-700",
-    badge: "bg-orange-500 text-white",
+    badge: "bg-warning/100 text-white",
     icon: ShieldAlert,
     iconColor: "text-orange-500",
-    rowHover: "hover:bg-orange-50",
-    rowBg: "bg-white",
+    rowHover: "hover:bg-warning/10",
+    rowBg: "bg-card",
   },
   yellow: {
     label: "Level 1 Warning",
-    bg: "bg-yellow-50 border-yellow-400",
-    header: "bg-yellow-100",
+    bg: "bg-warning/10 border-yellow-400",
+    header: "bg-warning/10",
     text: "text-yellow-900",
     subtext: "text-yellow-700",
     badge: "bg-yellow-400 text-yellow-900",
     icon: AlertTriangle,
     iconColor: "text-yellow-500",
-    rowHover: "hover:bg-yellow-50",
-    rowBg: "bg-white",
+    rowHover: "hover:bg-warning/10",
+    rowBg: "bg-card",
   },
 };
 
@@ -70,30 +70,30 @@ function FlagGroup({ level, flags }) {
             <div key={flag.id} className={cn("flex flex-col md:flex-row md:items-center gap-2 px-5 py-3 text-sm", cfg.rowBg, cfg.rowHover)}>
               <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-1">
                 <div>
-                  <p className="text-xs text-slate-400">Site ID</p>
-                  <p className="font-bold text-slate-900">{flag.site_id}</p>
+                  <p className="text-xs text-muted-foreground">Site ID</p>
+                  <p className="font-bold text-foreground">{flag.site_id}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-400">Trigger</p>
+                  <p className="text-xs text-muted-foreground">Trigger</p>
                   <p className={cn("font-medium capitalize", cfg.subtext)}>
                     {flag.flag_source === "both" ? "Truckroll + Support" : flag.flag_source === "truckroll" ? "Truckroll" : "Support Contacts"}
                   </p>
                 </div>
                 {flag.truckroll_count > 0 && (
                   <div>
-                    <p className="text-xs text-slate-400">Truckrolls</p>
-                    <p className="font-semibold text-slate-800">{flag.truckroll_count}</p>
+                    <p className="text-xs text-muted-foreground">Truckrolls</p>
+                    <p className="font-semibold text-foreground">{flag.truckroll_count}</p>
                   </div>
                 )}
                 {flag.support_contact_count > 0 && (
                   <div>
-                    <p className="text-xs text-slate-400">Support (10d)</p>
-                    <p className="font-semibold text-slate-800">{flag.support_contact_count}</p>
+                    <p className="text-xs text-muted-foreground">Support (10d)</p>
+                    <p className="font-semibold text-foreground">{flag.support_contact_count}</p>
                   </div>
                 )}
               </div>
               {flag.notes && (
-                <p className="text-xs text-slate-500 md:max-w-xs truncate">{flag.notes}</p>
+                <p className="text-xs text-muted-foreground md:max-w-xs truncate">{flag.notes}</p>
               )}
               <Link
                 to={createPageUrl(`SiteFlagManager`)}
@@ -121,10 +121,10 @@ export default function SiteFlagBanner({ flags }) {
   return (
     <div className="mb-6">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+        <h2 className="text-base font-bold text-foreground flex items-center gap-2">
           <Siren className="w-5 h-5 text-red-500" />
           Site Flags — Intervention Required
-          <span className="ml-1 px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 text-xs font-bold">{active.length}</span>
+          <span className="ml-1 px-2 py-0.5 rounded-full bg-slate-200 text-foreground text-xs font-bold">{active.length}</span>
         </h2>
         <Link to={createPageUrl("SiteFlagManager")} className="text-xs text-indigo-600 hover:underline font-medium">
           Manage All Flags →

@@ -1,4 +1,4 @@
-import { Card } from "@/components/ui/card";
+﻿import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -11,8 +11,8 @@ const STUCK_STATUSES = [
   { key: "quote_sent_to_ho", label: "Quote Sent to HO", color: "bg-purple-100 text-purple-700" },
   { key: "ho_approved_invoice_required", label: "HO Approved, Invoice Required", color: "bg-amber-100 text-amber-700" },
   { key: "invoiced", label: "Quote Pending Payment", color: "bg-indigo-100 text-indigo-700" },
-  { key: "draft_without_internal", label: "Quote Draft", color: "bg-slate-100 text-slate-700" },
-  { key: "draft_without_fst", label: "Quote Missing Details", color: "bg-slate-100 text-slate-700" },
+  { key: "draft_without_internal", label: "Quote Draft", color: "bg-muted text-foreground" },
+  { key: "draft_without_fst", label: "Quote Missing Details", color: "bg-muted text-foreground" },
   { key: "pending_materials", label: "Quote Pending Materials", color: "bg-purple-100 text-purple-800" },
 ];
 
@@ -39,15 +39,15 @@ export default function StuckQuotes({ quotes }) {
   const urgentCount = stuckQuotes.filter(q => q.hoursInStatus >= 168).length; // 7+ days
 
   return (
-    <Card className="p-6 border-slate-200">
+    <Card className="p-6 border-border">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <AlertTriangle className="w-5 h-5 text-amber-500" />
-          <h3 className="text-lg font-semibold text-slate-900">Stuck Quotes</h3>
-          <span className="text-xs text-slate-400">(3+ days in same status)</span>
+          <h3 className="text-lg font-semibold text-foreground">Stuck Quotes</h3>
+          <span className="text-xs text-muted-foreground">(3+ days in same status)</span>
         </div>
         <div className="flex gap-2">
-          <span className="text-sm font-medium text-slate-600">{stuckQuotes.length} stuck</span>
+          <span className="text-sm font-medium text-muted-foreground">{stuckQuotes.length} stuck</span>
           {urgentCount > 0 && (
             <Badge className="bg-rose-100 text-rose-700 text-xs">{urgentCount} urgent (7+ days)</Badge>
           )}
@@ -59,20 +59,20 @@ export default function StuckQuotes({ quotes }) {
           <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mb-3">
             <Clock className="w-6 h-6 text-green-600" />
           </div>
-          <p className="text-slate-600 font-medium">No stuck quotes!</p>
-          <p className="text-slate-400 text-sm mt-1">All active quotes have moved within the last 3 days.</p>
+          <p className="text-muted-foreground font-medium">No stuck quotes!</p>
+          <p className="text-muted-foreground text-sm mt-1">All active quotes have moved within the last 3 days.</p>
         </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-100">
-                <th className="text-left py-2 px-3 text-xs font-medium text-slate-500">Site ID</th>
-                <th className="text-left py-2 px-3 text-xs font-medium text-slate-500">Status</th>
-                <th className="text-left py-2 px-3 text-xs font-medium text-slate-500">Time Stuck</th>
-                <th className="text-left py-2 px-3 text-xs font-medium text-slate-500">Created By</th>
-                <th className="text-left py-2 px-3 text-xs font-medium text-slate-500">Created</th>
-                <th className="text-left py-2 px-3 text-xs font-medium text-slate-500"></th>
+              <tr className="border-b border-border">
+                <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Site ID</th>
+                <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Status</th>
+                <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Time Stuck</th>
+                <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Created By</th>
+                <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Created</th>
+                <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground"></th>
               </tr>
             </thead>
             <tbody>
@@ -81,10 +81,10 @@ export default function StuckQuotes({ quotes }) {
                 const isUrgent = q.hoursInStatus >= 168;
                 const statusCfg = STUCK_STATUSES.find(s => s.key === q.status);
                 return (
-                  <tr key={q.id} className={`border-b border-slate-50 hover:bg-slate-50 ${isUrgent ? "bg-rose-50/40" : ""}`}>
-                    <td className="py-3 px-3 font-medium text-slate-900">{q.site_id}</td>
+                  <tr key={q.id} className={`border-b border-slate-50 hover:bg-secondary ${isUrgent ? "bg-rose-50/40" : ""}`}>
+                    <td className="py-3 px-3 font-medium text-foreground">{q.site_id}</td>
                     <td className="py-3 px-3">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusCfg?.color || "bg-slate-100 text-slate-600"}`}>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusCfg?.color || "bg-muted text-muted-foreground"}`}>
                         {statusCfg?.label || q.status}
                       </span>
                     </td>
@@ -94,8 +94,8 @@ export default function StuckQuotes({ quotes }) {
                         {days}d
                       </span>
                     </td>
-                    <td className="py-3 px-3 text-slate-600 text-xs">{q.created_by || "—"}</td>
-                    <td className="py-3 px-3 text-slate-500 text-xs">
+                    <td className="py-3 px-3 text-muted-foreground text-xs">{q.created_by || "—"}</td>
+                    <td className="py-3 px-3 text-muted-foreground text-xs">
                       {format(parseISO(q.created_date), "MMM d, yyyy")}
                     </td>
                     <td className="py-3 px-3">

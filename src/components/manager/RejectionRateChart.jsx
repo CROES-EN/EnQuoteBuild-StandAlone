@@ -1,4 +1,4 @@
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
+﻿import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
 export default function RejectionRateChart({ quotes }) {
   // Group by submitter (who moved quote to "submitted")
@@ -27,7 +27,7 @@ export default function RejectionRateChart({ quotes }) {
     }))
     .sort((a, b) => b.rejectionRate - a.rejectionRate);
 
-  if (!data.length) return <p className="text-sm text-slate-400 py-4">Not enough data yet.</p>;
+  if (!data.length) return <p className="text-sm text-muted-foreground py-4">Not enough data yet.</p>;
 
   return (
     <div>
@@ -46,9 +46,9 @@ export default function RejectionRateChart({ quotes }) {
       </ResponsiveContainer>
       <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
         {data.map(d => (
-          <div key={d.name} className="bg-slate-50 rounded-lg px-3 py-2 text-xs">
-            <p className="font-semibold text-slate-700">{d.name}</p>
-            <p className="text-slate-500">{d.submitted} submitted · {d.rejected} rejected</p>
+          <div key={d.name} className="bg-secondary rounded-lg px-3 py-2 text-xs">
+            <p className="font-semibold text-foreground">{d.name}</p>
+            <p className="text-muted-foreground">{d.submitted} submitted · {d.rejected} rejected</p>
           </div>
         ))}
       </div>

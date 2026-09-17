@@ -1,6 +1,7 @@
 ﻿import { useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { getQuotes, listLocalCollection } from "@/api/dataClient";
+import { getQuotes, listLocalCollection, exportLocalData } from "@/api/dataClient";
+import { toast } from "sonner";
 import { useAuth } from "@/lib/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
@@ -14,7 +15,8 @@ import {
   TrendingUp,
   Filter,
   FolderOpen,
-  FolderCheck
+  FolderCheck,
+  Download
 } from "lucide-react";
 import MetricCard from "@/components/dashboard/MetricCard";
 import StatusChart from "@/components/dashboard/StatusChart";
@@ -35,8 +37,31 @@ function DashboardContent() {
   const [coordinatorFilter, setCoordinatorFilter] = useState("all");
   const isLocalDemo = ["mock", "local", "salesforce-mock"].includes(import.meta.env.VITE_DATA_SOURCE);
 
+  // Mirrors the equivalent "Download data backup" button already on the hosted Base44 web
+  // version - reuses the EXACT SAME export mechanism already proven working in
+  // PDFTemplateSettings.jsx (exportLocalData() -> the Electron main process's
+  // repository.cjs exportData(), which returns the ENTIRE raw local data file, every
+  // collection, nothing filtered out - confirmed directly against the real repository.cjs).
+  // The only deliberate change from that existing implementation: the filename no longer
+  // says "demo" - that label was accurate when this was a demo app, but is misleading now
+  // that this holds real production data.
+  async function handleDownloadBackup() {
+    try {
+      const data = await exportLocalData();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `enquote-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+      toast.success("Backup downloaded.");
+    } catch (error) {
+      toast.error(error.message || "Could not download backup.");
+    }
+  }
+
   const { data: allQuotes = [], isLoading } = useQuery({
-  queryKey: ["quotes"],
+  queryKey: ["quotes", "dashboard"],
   queryFn: async () => {
     const quotes = await getQuotes();
 
@@ -83,19 +108,25 @@ function DashboardContent() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-900">ENquote Dashboard</h1>
-          <p className="text-slate-600 mt-1">Performance metrics and workflow insights</p>
+        <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">EnQuote Dashboard</h1>
+            <p className="text-muted-foreground mt-1">Performance metrics and workflow insights</p>
+          </div>
+          <Button variant="outline" onClick={handleDownloadBackup}>
+            <Download className="w-4 h-4 mr-2" />
+            Download data backup
+          </Button>
         </div>
 
         {/* Site Flag Banner */}
@@ -108,14 +139,14 @@ function DashboardContent() {
         <StatusAlerts quotes={allQuotes} />
 
         {/* Filters */}
-        <Card className="p-4 mb-6 border-slate-200">
+        <Card className="p-4 mb-6 border-border">
           <div className="flex items-center gap-2 mb-3">
-            <Filter className="w-4 h-4 text-slate-600" />
-            <h3 className="text-sm font-semibold text-slate-900">Filters</h3>
+            <Filter className="w-4 h-4 text-muted-foreground" />
+            <h3 className="text-sm font-semibold text-foreground">Filters</h3>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-sm text-slate-600 mb-1 block">Status</label>
+              <label className="text-sm text-muted-foreground mb-1 block">Status</label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger>
                   <SelectValue />
@@ -137,7 +168,7 @@ function DashboardContent() {
             </div>
 
             <div>
-              <label className="text-sm text-slate-600 mb-1 block">Coordinator</label>
+              <label className="text-sm text-muted-foreground mb-1 block">Coordinator</label>
               <Select value={coordinatorFilter} onValueChange={setCoordinatorFilter}>
                 <SelectTrigger>
                   <SelectValue />

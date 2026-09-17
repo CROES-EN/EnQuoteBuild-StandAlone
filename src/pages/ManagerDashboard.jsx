@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { getCurrentUser, getQuotes, getReviews } from "@/api/dataClient";
@@ -50,7 +50,7 @@ export default function ManagerDashboard() {
   if (!accessChecked || loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-slate-200 border-t-orange-500 rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-border border-t-orange-500 rounded-full animate-spin" />
       </div>
     );
   }
@@ -59,8 +59,8 @@ export default function ManagerDashboard() {
     return (
       <div className="p-8 flex flex-col items-center justify-center gap-4 text-center">
         <Lock className="w-12 h-12 text-orange-400" />
-        <h2 className="text-xl font-semibold text-slate-700">Access Restricted</h2>
-        <p className="text-slate-500 max-w-md">
+        <h2 className="text-xl font-semibold text-foreground">Access Restricted</h2>
+        <p className="text-muted-foreground max-w-md">
           The Manager Dashboard is only accessible to authorized managers and admins.
         </p>
       </div>
@@ -70,37 +70,37 @@ export default function ManagerDashboard() {
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Manager Dashboard</h1>
-        <p className="text-slate-500 mt-1">
+        <h1 className="text-2xl font-bold text-foreground">Manager Dashboard</h1>
+        <p className="text-muted-foreground mt-1">
           Rejection trends, coaching feedback, and team turnaround analysis to identify training opportunities.
         </p>
       </div>
 
       {/* Summary KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <Card className="border-slate-200">
+        <Card className="border-border">
           <CardContent className="p-4">
-            <p className="text-xs text-slate-500 uppercase tracking-wide">Total Quotes</p>
-            <p className="text-3xl font-bold text-slate-800 mt-1">{totalQuotes}</p>
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Quotes</p>
+            <p className="text-3xl font-bold text-foreground mt-1">{totalQuotes}</p>
           </CardContent>
         </Card>
         <Card className="border-red-100">
           <CardContent className="p-4">
-            <p className="text-xs text-slate-500 uppercase tracking-wide">Total Rejected</p>
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Rejected</p>
             <p className="text-3xl font-bold text-red-600 mt-1">{totalRejected}</p>
           </CardContent>
         </Card>
-        <Card className={`border-slate-200 ${overallRejectionRate >= 30 ? "bg-red-50" : ""}`}>
+        <Card className={`border-border ${overallRejectionRate >= 30 ? "bg-red-50" : ""}`}>
           <CardContent className="p-4">
-            <p className="text-xs text-slate-500 uppercase tracking-wide">Overall Rejection Rate</p>
-            <p className={`text-3xl font-bold mt-1 ${overallRejectionRate >= 30 ? "text-red-600" : "text-slate-800"}`}>
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Overall Rejection Rate</p>
+            <p className={`text-3xl font-bold mt-1 ${overallRejectionRate >= 30 ? "text-red-600" : "text-foreground"}`}>
               {overallRejectionRate}%
             </p>
           </CardContent>
         </Card>
         <Card className="border-green-100">
           <CardContent className="p-4">
-            <p className="text-xs text-slate-500 uppercase tracking-wide">Reviews Completed</p>
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Reviews Completed</p>
             <p className="text-3xl font-bold text-green-600 mt-1">{completedReviews}</p>
           </CardContent>
         </Card>
@@ -108,26 +108,26 @@ export default function ManagerDashboard() {
 
       {/* Row 1: Rejection Rate by Submitter + Common Reasons */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="border-slate-200">
+        <Card className="border-border">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2 text-slate-700">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
               <TrendingDown className="w-4 h-4 text-red-500" />
               Rejection Rate by Submitter
             </CardTitle>
-            <p className="text-xs text-slate-400">Red ≥40% · Orange 20–39% · Green &lt;20%</p>
+            <p className="text-xs text-muted-foreground">Red ≥40% · Orange 20–39% · Green &lt;20%</p>
           </CardHeader>
           <CardContent>
             <RejectionRateChart quotes={quotes} />
           </CardContent>
         </Card>
 
-        <Card className="border-slate-200">
+        <Card className="border-border">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2 text-slate-700">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
               <AlertCircle className="w-4 h-4 text-orange-500" />
               Common Rejection Reasons
             </CardTitle>
-            <p className="text-xs text-slate-400">Click a category to see affected quotes</p>
+            <p className="text-xs text-muted-foreground">Click a category to see affected quotes</p>
           </CardHeader>
           <CardContent>
             <CommonRejectionReasons quotes={quotes} />
@@ -136,13 +136,13 @@ export default function ManagerDashboard() {
       </div>
 
       {/* Rejection Reason Breakdown — last 60 days */}
-      <Card className="border-slate-200">
+      <Card className="border-border">
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2 text-slate-700">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
             <PieChart className="w-4 h-4 text-red-500" />
             Rejection Reason Breakdown
           </CardTitle>
-          <p className="text-xs text-slate-400">What's driving rejections — last 60 days of reviews &amp; feedback</p>
+          <p className="text-xs text-muted-foreground">What's driving rejections — last 60 days of reviews &amp; feedback</p>
         </CardHeader>
         <CardContent>
           <RejectionReasonBreakdown reviews={reviews} quotes={quotes} />
@@ -151,26 +151,26 @@ export default function ManagerDashboard() {
 
       {/* Row 2: Feedback Themes + Turnaround */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="border-slate-200">
+        <Card className="border-border">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2 text-slate-700">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
               <MessageSquare className="w-4 h-4 text-blue-500" />
               Coaching Feedback Themes
             </CardTitle>
-            <p className="text-xs text-slate-400">Topics most frequently flagged in review feedback</p>
+            <p className="text-xs text-muted-foreground">Topics most frequently flagged in review feedback</p>
           </CardHeader>
           <CardContent>
             <FeedbackThemes reviews={reviews} quotes={quotes} canEdit={isAllowed} />
           </CardContent>
         </Card>
 
-        <Card className="border-slate-200">
+        <Card className="border-border">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2 text-slate-700">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
               <Timer className="w-4 h-4 text-indigo-500" />
               Turnaround Time by Submitter
             </CardTitle>
-            <p className="text-xs text-slate-400">Average days per stage — highlights training gaps</p>
+            <p className="text-xs text-muted-foreground">Average days per stage — highlights training gaps</p>
           </CardHeader>
           <CardContent>
             <TurnaroundByTeam quotes={quotes} />

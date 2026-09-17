@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { createLocalRecord, deleteLocalRecord, getCurrentUser, listLocalCollection, updateLocalRecord } from "@/api/dataClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -22,8 +22,8 @@ import SiteQuoteTracker from "@/components/flags/SiteQuoteTracker";
 
 const FLAG_STYLES = {
   red: { bg: "bg-red-100", text: "text-red-800", border: "border-red-300", icon: Siren, label: "Critical Review" },
-  orange: { bg: "bg-orange-100", text: "text-orange-800", border: "border-orange-300", icon: ShieldAlert, label: "Level 2 Warning" },
-  yellow: { bg: "bg-yellow-100", text: "text-yellow-900", border: "border-yellow-300", icon: AlertTriangle, label: "Level 1 Warning" }
+  orange: { bg: "bg-warning/10", text: "text-orange-800", border: "border border-warning/20 border-l-4 border-l-warning", icon: ShieldAlert, label: "Level 2 Warning" },
+  yellow: { bg: "bg-warning/10", text: "text-yellow-900", border: "border border-warning/20 border-l-4 border-l-warning", icon: AlertTriangle, label: "Level 1 Warning" }
 };
 
 function computeFlagLevel(truckrollCount, supportCount) {
@@ -63,11 +63,11 @@ function FlagCard({ flag, onResolve, onDelete }) {
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2 mb-1">
-                <span className="text-lg font-bold text-slate-900">{flag.site_id}</span>
+                <span className="text-lg font-bold text-foreground">{flag.site_id}</span>
                 <Badge className={cn(cfg.bg, cfg.text, "border-0 text-xs")}>{cfg.label}</Badge>
                 {flag.is_resolved && <Badge className="bg-emerald-100 text-emerald-700 border-0 text-xs">Resolved</Badge>}
               </div>
-              <div className="flex flex-wrap gap-4 text-sm text-slate-600 mb-2">
+              <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mb-2">
                 {flag.truckroll_count > 0 &&
                 <span>🚛 <strong>{flag.truckroll_count}</strong> truckroll cancellations</span>
                 }
@@ -77,14 +77,14 @@ function FlagCard({ flag, onResolve, onDelete }) {
                 <span className="capitalize">Source: <strong>{flag.flag_source === "both" ? "Truckroll + Support" : flag.flag_source}</strong></span>
               </div>
               {flag.notes &&
-              <p className="text-sm text-slate-500 bg-slate-50 rounded-lg px-3 py-2 mb-2">{flag.notes}</p>
+              <p className="text-sm text-muted-foreground bg-secondary rounded-lg px-3 py-2 mb-2">{flag.notes}</p>
               }
               {flag.is_resolved && flag.resolved_notes &&
               <p className="text-sm text-emerald-700 bg-emerald-50 rounded-lg px-3 py-2 mb-2">
                   <strong>Resolution:</strong> {flag.resolved_notes}
                 </p>
               }
-              <div className="flex flex-wrap gap-3 text-xs text-slate-400">
+              <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                 {flag.created_date &&
                 <span className="flex items-center gap-1">
                     <Calendar className="w-3 h-3" />
@@ -105,7 +105,7 @@ function FlagCard({ flag, onResolve, onDelete }) {
               <Button size="sm" variant="outline" onClick={() => setShowResolve(true)} className="text-emerald-700 border-emerald-300 hover:bg-emerald-50">
                 <CheckCircle2 className="w-4 h-4 mr-1" /> Resolve
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => onDelete(flag.id)} className="text-slate-400 hover:text-red-500">
+              <Button size="sm" variant="ghost" onClick={() => onDelete(flag.id)} className="text-muted-foreground hover:text-red-500">
                 <Trash2 className="w-4 h-4" />
               </Button>
             </div>
@@ -113,7 +113,7 @@ function FlagCard({ flag, onResolve, onDelete }) {
         </div>
 
         {showResolve &&
-        <div className="mt-4 pt-4 border-t border-slate-200 space-y-3">
+        <div className="mt-4 pt-4 border-t border-border space-y-3">
             <Label>Resolution Notes</Label>
             <Textarea
             placeholder="Describe how the issue was resolved..."
@@ -284,23 +284,23 @@ function SupportUploadTab() {
         </CardHeader>
         <CardContent className="space-y-3">
           {lastUploadInfo ?
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-indigo-100 text-sm text-slate-600">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-card border border-indigo-100 text-sm text-muted-foreground">
               <Clock className="w-4 h-4 text-indigo-400 shrink-0" />
               <span>
                 Last upload: <strong>{new Date(lastUploadInfo.date).toLocaleString("en-US", { timeZone: "America/Boise", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true })}</strong>
-                {lastUploadInfo.by && <span className="text-slate-400"> by {lastUploadInfo.by}</span>}
+                {lastUploadInfo.by && <span className="text-muted-foreground"> by {lastUploadInfo.by}</span>}
               </span>
             </div> :
 
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-indigo-100 text-sm text-slate-400">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-card border border-indigo-100 text-sm text-muted-foreground">
               <Clock className="w-4 h-4 shrink-0" />
               <span>No data uploaded yet</span>
             </div>
           }
-          <p className="text-sm text-slate-600">
-            Export your support report and upload it here. Required columns: <code className="bg-white px-1 rounded text-xs">site_id</code>, <code className="bg-white px-1 rounded text-xs">interaction_date</code>. Optional: <code className="bg-white px-1 rounded text-xs">interaction_type</code>, <code className="bg-white px-1 rounded text-xs">case_number</code>, <code className="bg-white px-1 rounded text-xs">description</code>.
+          <p className="text-sm text-muted-foreground">
+            Export your support report and upload it here. Required columns: <code className="bg-card px-1 rounded text-xs">site_id</code>, <code className="bg-card px-1 rounded text-xs">interaction_date</code>. Optional: <code className="bg-card px-1 rounded text-xs">interaction_type</code>, <code className="bg-card px-1 rounded text-xs">case_number</code>, <code className="bg-card px-1 rounded text-xs">description</code>.
           </p>
-          <input type="file" accept=".csv,.xlsx,.xls" onChange={handleFileUpload} className="block w-full text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-100 file:text-indigo-700 file:font-medium hover:file:bg-indigo-200 cursor-pointer" />
+          <input type="file" accept=".csv,.xlsx,.xls" onChange={handleFileUpload} className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-100 file:text-indigo-700 file:font-medium hover:file:bg-indigo-200 cursor-pointer" />
           {uploadStatus &&
           <div className={cn("text-sm px-4 py-3 rounded-lg font-medium", {
             "bg-emerald-50 text-emerald-800": uploadStatus.type === "success",
@@ -339,7 +339,7 @@ function SupportUploadTab() {
               <Input placeholder="e.g. CS-12345" value={manualForm.case_number} onChange={(e) => setManualForm({ ...manualForm, case_number: e.target.value })} />
             </div>
             <div className="space-y-1.5">
-              <Label>Salesforce Case ID <span className="text-slate-400 text-xs">(optional, for direct link)</span></Label>
+              <Label>Salesforce Case ID <span className="text-muted-foreground text-xs">(optional, for direct link)</span></Label>
               <Input placeholder="e.g. 500Ps00001QxAf0IAF" value={manualForm.salesforce_case_id} onChange={(e) => setManualForm({ ...manualForm, salesforce_case_id: e.target.value })} />
             </div>
             <div className="md:col-span-2 space-y-1.5">
@@ -507,8 +507,8 @@ function SiteFlagManagerContent() {
             <Siren className="w-5 h-5 text-red-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Site Flag Manager</h1>
-            <p className="text-sm text-slate-500">Truckroll &amp; support escalation monitoring</p>
+            <h1 className="text-2xl font-bold text-foreground">Site Flag Manager</h1>
+            <p className="text-sm text-muted-foreground">Truckroll &amp; support escalation monitoring</p>
           </div>
         </div>
         <Button onClick={syncFlags} disabled={syncing} className="bg-indigo-600 hover:bg-indigo-700 gap-2">
@@ -521,8 +521,8 @@ function SiteFlagManagerContent() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-5 pb-4">
-            <p className="text-xs text-slate-500 mb-1">Active Flags</p>
-            <p className="text-2xl font-bold text-slate-900">{activeCount}</p>
+            <p className="text-xs text-muted-foreground mb-1">Active Flags</p>
+            <p className="text-2xl font-bold text-foreground">{activeCount}</p>
           </CardContent>
         </Card>
         <Card className="border-red-200 bg-red-50">
@@ -531,13 +531,13 @@ function SiteFlagManagerContent() {
             <p className="text-2xl font-bold text-red-700">{redCount}</p>
           </CardContent>
         </Card>
-        <Card className="border-orange-200 bg-orange-50">
+        <Card className="border border-warning/20 border-l-4 border-l-warning bg-warning/10">
           <CardContent className="pt-5 pb-4">
             <p className="text-xs text-orange-500 mb-1">Level 2 (Orange)</p>
             <p className="text-2xl font-bold text-orange-700">{orangeCount}</p>
           </CardContent>
         </Card>
-        <Card className="border-yellow-200 bg-yellow-50">
+        <Card className="border border-warning/20 border-l-4 border-l-warning bg-warning/10">
           <CardContent className="pt-5 pb-4">
             <p className="text-xs text-yellow-600 mb-1">Level 1 (Yellow)</p>
             <p className="text-2xl font-bold text-yellow-700">{yellowCount}</p>
@@ -554,7 +554,7 @@ function SiteFlagManagerContent() {
         <TabsContent value="flags" className="space-y-4 mt-4">
           {/* Filters */}
           <div className="flex flex-wrap gap-3 items-center">
-            <Filter className="w-4 h-4 text-slate-400" />
+            <Filter className="w-4 h-4 text-muted-foreground" />
             <Select value={filterLevel} onValueChange={setFilterLevel}>
               <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -575,12 +575,12 @@ function SiteFlagManagerContent() {
           </div>
 
           {flagsLoading ?
-          <div className="text-center py-10 text-slate-400">Loading flags...</div> :
+          <div className="text-center py-10 text-muted-foreground">Loading flags...</div> :
           displayedFlags.length === 0 ?
           <Card className="p-10 text-center">
               <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-3" />
-              <p className="font-semibold text-slate-700">No flags found</p>
-              <p className="text-sm text-slate-500 mt-1">Click "Sync Flags Now" to evaluate current data.</p>
+              <p className="font-semibold text-foreground">No flags found</p>
+              <p className="text-sm text-muted-foreground mt-1">Click "Sync Flags Now" to evaluate current data.</p>
             </Card> :
 
           <div className="space-y-3">
@@ -643,14 +643,14 @@ function SupportInteractionsLog() {
     <div className="space-y-4">
       <div className="flex items-center gap-3">
         <Input placeholder="Search by Site ID or Case #..." value={search} onChange={(e) => {setSearch(e.target.value);setPage(1);}} className="max-w-sm" />
-        {!isLoading && <span className="text-sm text-slate-400">{filtered.length} record{filtered.length !== 1 ? "s" : ""}</span>}
+        {!isLoading && <span className="text-sm text-muted-foreground">{filtered.length} record{filtered.length !== 1 ? "s" : ""}</span>}
       </div>
       <Card>
         <CardContent className="p-0">
           {isLoading ?
-          <div className="p-10 text-center text-slate-400">Loading interactions...</div> :
+          <div className="p-10 text-center text-muted-foreground">Loading interactions...</div> :
           filtered.length === 0 ?
-          <div className="p-10 text-center text-slate-400">No support interactions logged yet.</div> :
+          <div className="p-10 text-center text-muted-foreground">No support interactions logged yet.</div> :
 
           <div className="divide-y divide-slate-100">
               {paginated.map((interaction) => {
@@ -665,43 +665,43 @@ function SupportInteractionsLog() {
               return (
                 <div key={interaction.id} className="px-5 py-3 grid grid-cols-2 md:grid-cols-5 gap-x-4 gap-y-1 text-sm">
                     <div>
-                      <p className="text-xs text-slate-400">Site ID</p>
+                      <p className="text-xs text-muted-foreground">Site ID</p>
                       {enlightenUrl ?
                     <a href={enlightenUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-indigo-600 hover:text-indigo-800 hover:underline">
                           {interaction.site_id}
                         </a> :
 
-                    <p className="font-semibold text-slate-900">{interaction.site_id}</p>
+                    <p className="font-semibold text-foreground">{interaction.site_id}</p>
                     }
                     </div>
                     <div>
-                      <p className="text-xs text-slate-400">Date</p>
-                      <p className="text-slate-700">{(() => {try {const d = parseISO(interaction.interaction_date);return isNaN(d.getTime()) ? "—" : format(d, "MMM d, yyyy");} catch {return "—";}})()}</p>
+                      <p className="text-xs text-muted-foreground">Date</p>
+                      <p className="text-foreground">{(() => {try {const d = parseISO(interaction.interaction_date);return isNaN(d.getTime()) ? "—" : format(d, "MMM d, yyyy");} catch {return "—";}})()}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-400">Type</p>
-                      <p className="text-slate-700">{interaction.interaction_type || "—"}</p>
+                      <p className="text-xs text-muted-foreground">Type</p>
+                      <p className="text-foreground">{interaction.interaction_type || "—"}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-400">Case #</p>
+                      <p className="text-xs text-muted-foreground">Case #</p>
                       {sfUrl ?
                     <a href={sfUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-800 hover:underline">
                           {interaction.case_number || "—"}
                         </a> :
 
-                    <p className="text-slate-700">{interaction.case_number || "—"}</p>
+                    <p className="text-foreground">{interaction.case_number || "—"}</p>
                     }
                     </div>
                     <div>
-                      <p className="text-xs text-slate-400">Repeat Contacts</p>
+                      <p className="text-xs text-muted-foreground">Repeat Contacts</p>
                       <span className={cn(
                       "inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-semibold",
                       repeatCount >= 4 ? "bg-red-100 text-red-700" :
-                      repeatCount >= 3 ? "bg-orange-100 text-orange-700" :
-                      repeatCount >= 2 ? "bg-yellow-100 text-yellow-700" :
-                      "bg-slate-100 text-slate-600"
+                      repeatCount >= 3 ? "bg-warning/10 text-orange-700" :
+                      repeatCount >= 2 ? "bg-warning/10 text-yellow-700" :
+                      "bg-muted text-muted-foreground"
                     )}>
-                        {repeatCount}×
+                        {repeatCount}Ã—
                       </span>
                     </div>
                   </div>);
@@ -712,7 +712,7 @@ function SupportInteractionsLog() {
         </CardContent>
       </Card>
       {totalPages > 1 &&
-      <div className="flex items-center justify-between text-sm text-slate-500">
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
           <span>Page {page} of {totalPages}</span>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>Previous</Button>
@@ -720,7 +720,7 @@ function SupportInteractionsLog() {
           </div>
         </div>
       }
-      <p className="text-xs text-slate-400">* Repeat Contacts shows how many total interactions exist for that site across all uploaded data.</p>
+      <p className="text-xs text-muted-foreground">* Repeat Contacts shows how many total interactions exist for that site across all uploaded data.</p>
     </div>);
 
 }

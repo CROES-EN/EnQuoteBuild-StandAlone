@@ -1,4 +1,4 @@
-import { Card } from "@/components/ui/card";
+﻿import { Card } from "@/components/ui/card";
 import { Clock, CheckCircle, AlertCircle, TrendingUp } from "lucide-react";
 import { differenceInHours, differenceInMinutes, parseISO } from "date-fns";
 
@@ -58,8 +58,8 @@ export default function SLAMetrics({ quotes }) {
     : 'N/A';
 
   return (
-    <Card className="p-6 border-slate-200">
-      <h3 className="text-lg font-semibold text-slate-900 mb-4">SLA & Performance Metrics</h3>
+    <Card className="p-6 border-border">
+      <h3 className="text-lg font-semibold text-foreground mb-4">SLA & Performance Metrics</h3>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="p-4 bg-blue-50 rounded-lg">
           <div className="flex items-center gap-3 mb-2">
@@ -97,15 +97,15 @@ export default function SLAMetrics({ quotes }) {
           </p>
         </div>
 
-        <div className="p-4 bg-slate-50 rounded-lg md:col-span-2">
+        <div className="p-4 bg-secondary rounded-lg md:col-span-2">
           <div className="flex items-center gap-3 mb-2">
-            <Clock className="w-5 h-5 text-slate-600" />
-            <p className="text-sm font-medium text-slate-900">Avg. Time in Submitted Status</p>
+            <Clock className="w-5 h-5 text-muted-foreground" />
+            <p className="text-sm font-medium text-foreground">Avg. Time in Submitted Status</p>
           </div>
-          <p className="text-2xl font-bold text-slate-700">
+          <p className="text-2xl font-bold text-foreground">
             {typeof avgTimeInSubmitted === 'number' ? `${avgTimeInSubmitted}h` : avgTimeInSubmitted}
           </p>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             Time between submission and approval/rejection
           </p>
         </div>

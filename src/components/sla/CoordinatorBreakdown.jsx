@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+﻿import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -155,7 +155,7 @@ function WeekOverWeekChart({ quotes, selectedCoord }) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-semibold text-slate-700">Week-over-Week: Quotes Created & Approved</CardTitle>
+        <CardTitle className="text-sm font-semibold text-foreground">Week-over-Week: Quotes Created & Approved</CardTitle>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={220}>
@@ -199,7 +199,7 @@ function RevenueWoWChart({ quotes, selectedCoord }) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-semibold text-slate-700">Week-over-Week: Revenue ($k)</CardTitle>
+        <CardTitle className="text-sm font-semibold text-foreground">Week-over-Week: Revenue ($k)</CardTitle>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={220}>
@@ -253,27 +253,27 @@ function QuarterlyCoordTable({ quotes }) {
       {data.map(({ quarter, coords }) => (
         <Card key={quarter}>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-slate-700">{quarter}</CardTitle>
+            <CardTitle className="text-sm font-semibold text-foreground">{quarter}</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50">
-                    <th className="text-left px-4 py-2 text-xs font-semibold text-slate-500">Coordinator</th>
-                    <th className="text-center px-3 py-2 text-xs font-semibold text-slate-500">Quotes</th>
-                    <th className="text-center px-3 py-2 text-xs font-semibold text-slate-500">Approved</th>
-                    <th className="text-center px-3 py-2 text-xs font-semibold text-slate-500">Rejected</th>
-                    <th className="text-center px-3 py-2 text-xs font-semibold text-slate-500">Rate</th>
-                    <th className="text-right px-4 py-2 text-xs font-semibold text-slate-500">Quoted</th>
-                    <th className="text-right px-4 py-2 text-xs font-semibold text-slate-500">Collected</th>
+                  <tr className="border-b border-border bg-secondary">
+                    <th className="text-left px-4 py-2 text-xs font-semibold text-muted-foreground">Coordinator</th>
+                    <th className="text-center px-3 py-2 text-xs font-semibold text-muted-foreground">Quotes</th>
+                    <th className="text-center px-3 py-2 text-xs font-semibold text-muted-foreground">Approved</th>
+                    <th className="text-center px-3 py-2 text-xs font-semibold text-muted-foreground">Rejected</th>
+                    <th className="text-center px-3 py-2 text-xs font-semibold text-muted-foreground">Rate</th>
+                    <th className="text-right px-4 py-2 text-xs font-semibold text-muted-foreground">Quoted</th>
+                    <th className="text-right px-4 py-2 text-xs font-semibold text-muted-foreground">Collected</th>
                   </tr>
                 </thead>
                 <tbody>
                   {coords.map(({ coord, total, approved, rejected, quoted, collected }) => (
-                    <tr key={coord} className="border-b border-slate-50 hover:bg-slate-50">
-                      <td className="px-4 py-2.5 font-medium text-slate-800">{coord}</td>
-                      <td className="text-center px-3 py-2.5 text-slate-600">{total}</td>
+                    <tr key={coord} className="border-b border-slate-50 hover:bg-secondary">
+                      <td className="px-4 py-2.5 font-medium text-foreground">{coord}</td>
+                      <td className="text-center px-3 py-2.5 text-muted-foreground">{total}</td>
                       <td className="text-center px-3 py-2.5 text-emerald-700 font-medium">{approved}</td>
                       <td className="text-center px-3 py-2.5 text-rose-600">{rejected}</td>
                       <td className="text-center px-3 py-2.5">
@@ -283,7 +283,7 @@ function QuarterlyCoordTable({ quotes }) {
                           {total > 0 ? `${((approved / total) * 100).toFixed(0)}%` : "—"}
                         </Badge>
                       </td>
-                      <td className="text-right px-4 py-2.5 font-semibold text-slate-800">{fmt$(quoted)}</td>
+                      <td className="text-right px-4 py-2.5 font-semibold text-foreground">{fmt$(quoted)}</td>
                       <td className="text-right px-4 py-2.5 text-emerald-700 font-semibold">{fmt$(collected)}</td>
                     </tr>
                   ))}
@@ -298,7 +298,7 @@ function QuarterlyCoordTable({ quotes }) {
 }
 
 function StagePill({ hours, warnAt = 48, redAt = 120 }) {
-  if (hours == null) return <span className="text-slate-400 text-xs">—</span>;
+  if (hours == null) return <span className="text-muted-foreground text-xs">—</span>;
   const color = hours >= redAt
     ? "bg-red-100 text-red-700"
     : hours >= warnAt
@@ -310,23 +310,23 @@ function StagePill({ hours, warnAt = 48, redAt = 120 }) {
 function CoordDetailRow({ stat, isSelected, onClick, color }) {
   return (
     <tr
-      className={cn("border-b border-slate-100 cursor-pointer transition-colors", isSelected ? "bg-indigo-50" : "hover:bg-slate-50")}
+      className={cn("border-b border-border cursor-pointer transition-colors", isSelected ? "bg-indigo-50" : "hover:bg-secondary")}
       onClick={onClick}
     >
       <td className="px-4 py-3">
         <div className="flex items-center gap-2">
           <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
-          <span className="font-medium text-slate-800 text-sm truncate max-w-[180px]">{stat.coord}</span>
+          <span className="font-medium text-foreground text-sm truncate max-w-[180px]">{stat.coord}</span>
         </div>
       </td>
-      <td className="text-center px-3 py-3 text-sm text-slate-600">{stat.total}</td>
+      <td className="text-center px-3 py-3 text-sm text-muted-foreground">{stat.total}</td>
       <td className="text-center px-3 py-3 text-sm">
         <Badge className={cn("border-0 text-xs", parseInt(stat.approvalRate) >= 70 ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>
           {stat.approvalRate}{stat.approvalRate !== "—" ? "%" : ""}
         </Badge>
       </td>
       <td className="text-center px-3 py-3 text-sm text-rose-600">{stat.rejected}</td>
-      <td className="text-right px-3 py-3 text-sm font-semibold text-slate-800">{fmt$(stat.totalQuoted)}</td>
+      <td className="text-right px-3 py-3 text-sm font-semibold text-foreground">{fmt$(stat.totalQuoted)}</td>
       <td className="text-right px-3 py-3 text-sm text-emerald-700 font-semibold">{fmt$(stat.totalCollected)}</td>
       <td className="text-center px-3 py-3">
         <StagePill hours={stat.stageTimes.draft_to_submitted} warnAt={48} redAt={120} />
@@ -337,7 +337,7 @@ function CoordDetailRow({ stat, isSelected, onClick, color }) {
       <td className="text-center px-3 py-3">
         {stat.stuck > 0
           ? <Badge className="bg-red-100 text-red-700 border-0 text-xs">{stat.stuck} stuck</Badge>
-          : <span className="text-xs text-slate-400">—</span>}
+          : <span className="text-xs text-muted-foreground">—</span>}
       </td>
     </tr>
   );
@@ -366,7 +366,7 @@ export default function CoordinatorBreakdown({ quotes }) {
       {/* Top Revenue Bar Chart */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+          <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
             <DollarSign className="w-4 h-4 text-indigo-500" />
             Revenue Contribution by Coordinator
           </CardTitle>
@@ -393,7 +393,7 @@ export default function CoordinatorBreakdown({ quotes }) {
       {/* Coordinator Table */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+          <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
             <User className="w-4 h-4 text-indigo-500" />
             Per-Coordinator Breakdown (click row to focus charts)
           </CardTitle>
@@ -402,16 +402,16 @@ export default function CoordinatorBreakdown({ quotes }) {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50">
-                  <th className="text-left px-4 py-2 text-xs font-semibold text-slate-500">Coordinator</th>
-                  <th className="text-center px-3 py-2 text-xs font-semibold text-slate-500">Quotes</th>
-                  <th className="text-center px-3 py-2 text-xs font-semibold text-slate-500">Approval %</th>
-                  <th className="text-center px-3 py-2 text-xs font-semibold text-slate-500">Rejected</th>
-                  <th className="text-right px-3 py-2 text-xs font-semibold text-slate-500">Quoted</th>
-                  <th className="text-right px-3 py-2 text-xs font-semibold text-slate-500">Collected</th>
-                  <th className="text-center px-3 py-2 text-xs font-semibold text-slate-500">Draft→Submit</th>
-                  <th className="text-center px-3 py-2 text-xs font-semibold text-slate-500">Submit→Approve</th>
-                  <th className="text-center px-3 py-2 text-xs font-semibold text-slate-500">Gaps</th>
+                <tr className="border-b border-border bg-secondary">
+                  <th className="text-left px-4 py-2 text-xs font-semibold text-muted-foreground">Coordinator</th>
+                  <th className="text-center px-3 py-2 text-xs font-semibold text-muted-foreground">Quotes</th>
+                  <th className="text-center px-3 py-2 text-xs font-semibold text-muted-foreground">Approval %</th>
+                  <th className="text-center px-3 py-2 text-xs font-semibold text-muted-foreground">Rejected</th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Quoted</th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Collected</th>
+                  <th className="text-center px-3 py-2 text-xs font-semibold text-muted-foreground">Draft→Submit</th>
+                  <th className="text-center px-3 py-2 text-xs font-semibold text-muted-foreground">Submit→Approve</th>
+                  <th className="text-center px-3 py-2 text-xs font-semibold text-muted-foreground">Gaps</th>
                 </tr>
               </thead>
               <tbody>
@@ -432,7 +432,7 @@ export default function CoordinatorBreakdown({ quotes }) {
 
       {/* WoW Charts */}
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
           <TrendingUp className="w-4 h-4 text-indigo-500" />
           Week-over-Week Trends
         </h3>
@@ -456,7 +456,7 @@ export default function CoordinatorBreakdown({ quotes }) {
 
       {/* Quarterly Breakdown */}
       <div>
-        <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2 mb-4">
+        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-4">
           <FileText className="w-4 h-4 text-indigo-500" />
           Quarterly Coordinator Summary
         </h3>

@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+﻿import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { getQuotes } from "@/api/dataClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { AlertCircle, CheckCircle2, Clock, FileText, MessageSquare, Wrench, TrendingUp, Pencil, ClipboardList } from "lucide-react";
 
 const formatDate = (d) => d ? new Date(d).toLocaleDateString() : "—";
-const formatCurrency = (v) => `$${(v || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+const formatCurrency = (v) => `$${(v || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 function StatusPill({ status }) {
   const map = {
@@ -19,12 +19,12 @@ function StatusPill({ status }) {
     invoiced: "bg-teal-100 text-teal-700 border-teal-200",
     invoice_paid: "bg-green-200 text-green-800 border-green-300",
     scheduled: "bg-teal-200 text-teal-800 border-teal-300",
-    draft_without_internal: "bg-slate-100 text-slate-600 border-slate-200",
-    draft_without_fst: "bg-slate-100 text-slate-600 border-slate-200",
+    draft_without_internal: "bg-muted text-muted-foreground border-border",
+    draft_without_fst: "bg-muted text-muted-foreground border-border",
   };
   const label = status?.replace(/_/g, " ") || "unknown";
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${map[status] || "bg-slate-100 text-slate-600 border-slate-200"}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${map[status] || "bg-muted text-muted-foreground border-border"}`}>
       {label}
     </span>
   );
@@ -45,7 +45,7 @@ export default function SiteRejectionProgressPanel({ siteId, allReviews = [], on
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="w-6 h-6 border-4 border-slate-200 border-t-orange-500 rounded-full animate-spin" />
+        <div className="w-6 h-6 border-4 border-border border-t-orange-500 rounded-full animate-spin" />
       </div>
     );
   }
@@ -176,8 +176,8 @@ export default function SiteRejectionProgressPanel({ siteId, allReviews = [], on
       {/* Site Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Site: {siteId}</h2>
-          <p className="text-sm text-slate-500 mt-0.5">
+          <h2 className="text-xl font-bold text-foreground">Site: {siteId}</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
             {sorted.length} quote version{sorted.length !== 1 ? "s" : ""} · {rejectionCount} rejection{rejectionCount !== 1 ? "s" : ""}
           </p>
         </div>
@@ -206,15 +206,15 @@ export default function SiteRejectionProgressPanel({ siteId, allReviews = [], on
                   <div className="absolute -left-6 top-2 w-4 h-4 rounded-full bg-slate-400 border-2 border-white flex items-center justify-center">
                     <FileText className="w-2 h-2 text-white" />
                   </div>
-                  <Card className="border-slate-300 bg-slate-50">
+                  <Card className="border-slate-300 bg-secondary">
                     <CardContent className="p-3">
                       <div className="flex items-center justify-between flex-wrap gap-2">
                         <div>
-                          <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">{event.label}</p>
-                          <p className="text-sm font-semibold text-slate-800">Quote #{event.quoteNumber || "—"} · {formatCurrency(event.total)}</p>
+                          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">{event.label}</p>
+                          <p className="text-sm font-semibold text-foreground">Quote #{event.quoteNumber || "—"} · {formatCurrency(event.total)}</p>
                         </div>
                         <div className="flex items-center gap-2">
-                          <p className="text-xs text-slate-400">{formatDate(event.date)}</p>
+                          <p className="text-xs text-muted-foreground">{formatDate(event.date)}</p>
                           {onReviewQuote && event.quoteObj && !isResolved && event.quoteObj.status === "rejected" && reviewByQuoteId[event.quoteObj.id]?.review_status !== "completed" && (
                             <Button size="sm" variant="outline" className="h-6 text-xs px-2 gap-1" onClick={() => onReviewQuote(event.quoteObj)}>
                               <Pencil className="w-3 h-3" /> Write Review
@@ -223,17 +223,17 @@ export default function SiteRejectionProgressPanel({ siteId, allReviews = [], on
                         </div>
                       </div>
                       {event.scopeOfWork && (
-                        <p className="text-xs text-slate-600 mt-2 bg-white rounded px-2 py-1 border border-slate-200 line-clamp-3">
-                          <span className="font-medium text-slate-500">Scope: </span>{event.scopeOfWork}
+                        <p className="text-xs text-muted-foreground mt-2 bg-card rounded px-2 py-1 border border-border line-clamp-3">
+                          <span className="font-medium text-muted-foreground">Scope: </span>{event.scopeOfWork}
                         </p>
                       )}
                       {event.items?.length > 0 && (
                         <div className="mt-2">
-                          <p className="text-xs text-slate-500 font-medium mb-1">Line Items:</p>
+                          <p className="text-xs text-muted-foreground font-medium mb-1">Line Items:</p>
                           <div className="flex flex-wrap gap-1">
                             {event.items.map((item, ii) => (
-                              <span key={ii} className="text-xs bg-white border border-slate-200 rounded px-1.5 py-0.5 text-slate-600">
-                                {item.name} × {item.quantity}
+                              <span key={ii} className="text-xs bg-card border border-border rounded px-1.5 py-0.5 text-muted-foreground">
+                                {item.name} Ã— {item.quantity}
                               </span>
                             ))}
                           </div>
@@ -257,9 +257,9 @@ export default function SiteRejectionProgressPanel({ siteId, allReviews = [], on
                         <p className="text-xs font-bold text-red-600 uppercase tracking-wide flex items-center gap-1">
                           <AlertCircle className="w-3 h-3" /> Rejected
                         </p>
-                        <p className="text-xs text-slate-400">{formatDate(event.date)} · by {event.rejectedBy || "ajennings"}</p>
+                        <p className="text-xs text-muted-foreground">{formatDate(event.date)} · by {event.rejectedBy || "ajennings"}</p>
                       </div>
-                      <p className="text-sm text-slate-800 bg-white border border-red-200 rounded px-2 py-1.5 whitespace-pre-wrap">
+                      <p className="text-sm text-foreground bg-card border border-red-200 rounded px-2 py-1.5 whitespace-pre-wrap">
                         {event.reason || "No reason provided."}
                       </p>
                     </CardContent>
@@ -280,10 +280,10 @@ export default function SiteRejectionProgressPanel({ siteId, allReviews = [], on
                         <p className="text-xs font-bold text-indigo-700 uppercase tracking-wide flex items-center gap-1">
                           <ClipboardList className="w-3 h-3" /> Follow-Up Log
                         </p>
-                        <p className="text-xs text-slate-400">{formatDate(event.date)} · {event.loggedBy || "—"}</p>
+                        <p className="text-xs text-muted-foreground">{formatDate(event.date)} · {event.loggedBy || "—"}</p>
                       </div>
                       {event.note && (
-                        <p className="text-xs text-slate-700 bg-white border border-indigo-200 rounded px-2 py-1.5 whitespace-pre-wrap">{event.note}</p>
+                        <p className="text-xs text-foreground bg-card border border-indigo-200 rounded px-2 py-1.5 whitespace-pre-wrap">{event.note}</p>
                       )}
                     </CardContent>
                   </Card>
@@ -307,21 +307,21 @@ export default function SiteRejectionProgressPanel({ siteId, allReviews = [], on
                           <Badge className={event.status === "completed" ? "bg-green-100 text-green-700 text-xs" : "bg-blue-100 text-blue-700 text-xs"}>
                             {event.status?.replace("_", " ") || "pending"}
                           </Badge>
-                          <p className="text-xs text-slate-400">{formatDate(event.date)} · {event.reviewer}</p>
+                          <p className="text-xs text-muted-foreground">{formatDate(event.date)} · {event.reviewer}</p>
                         </div>
                       </div>
                       {event.coachingNotes && (
                         <div className="mb-2">
-                          <p className="text-xs text-slate-500 font-medium mb-0.5">Coaching Notes:</p>
-                          <p className="text-xs text-slate-700 bg-white border border-blue-200 rounded px-2 py-1.5 whitespace-pre-wrap">{event.coachingNotes}</p>
+                          <p className="text-xs text-muted-foreground font-medium mb-0.5">Coaching Notes:</p>
+                          <p className="text-xs text-foreground bg-card border border-blue-200 rounded px-2 py-1.5 whitespace-pre-wrap">{event.coachingNotes}</p>
                         </div>
                       )}
                       {event.recommendedEdits && (
                         <div>
-                          <p className="text-xs text-slate-500 font-medium mb-0.5 flex items-center gap-1">
+                          <p className="text-xs text-muted-foreground font-medium mb-0.5 flex items-center gap-1">
                             <Wrench className="w-3 h-3" /> Recommended Edits:
                           </p>
-                          <p className="text-xs text-slate-700 bg-white border border-blue-200 rounded px-2 py-1.5 whitespace-pre-wrap">{event.recommendedEdits}</p>
+                          <p className="text-xs text-foreground bg-card border border-blue-200 rounded px-2 py-1.5 whitespace-pre-wrap">{event.recommendedEdits}</p>
                         </div>
                       )}
                     </CardContent>
@@ -342,7 +342,7 @@ export default function SiteRejectionProgressPanel({ siteId, allReviews = [], on
                       <p className="text-xs font-bold text-green-700 uppercase tracking-wide flex items-center gap-1">
                         <CheckCircle2 className="w-3 h-3" /> <StatusPill status={event.status} />
                       </p>
-                      <p className="text-xs text-slate-400">{formatDate(event.date)} · {event.changedBy || "—"}</p>
+                      <p className="text-xs text-muted-foreground">{formatDate(event.date)} · {event.changedBy || "—"}</p>
                     </CardContent>
                   </Card>
                 </div>
@@ -363,7 +363,7 @@ export default function SiteRejectionProgressPanel({ siteId, allReviews = [], on
                   <p className="text-xs font-bold text-yellow-700 uppercase tracking-wide flex items-center gap-1">
                     <Clock className="w-3 h-3" /> Awaiting Resubmission / Resolution
                   </p>
-                  <p className="text-xs text-slate-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     Quote has been rejected {rejectionCount} time{rejectionCount !== 1 ? "s" : ""}. Coaching reviews and recommended edits are above.
                   </p>
                 </CardContent>

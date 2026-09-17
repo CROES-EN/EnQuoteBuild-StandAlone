@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 import { REFRESH_REASON_LABELS } from "@/hooks/useLocalSyncStatus";
 
 const LEVEL_ICON = {
-  info: <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />,
+  info: <Info className="w-3.5 h-3.5 text-muted-foreground shrink-0" />,
   success: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />,
   warn: <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />,
   error: <XCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />
@@ -58,18 +58,18 @@ export default function RefreshStatusDialog({ open, onOpenChange, phase, lastAtt
         </DialogHeader>
 
         {!unreachable && (
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm space-y-1">
+          <div className="rounded-lg border border-border bg-secondary p-3 text-sm space-y-1">
             <div className="flex justify-between">
-              <span className="text-slate-500">Quotes on disk</span>
-              <span className="font-medium text-slate-800">{lastAttempt?.storedQuoteCount ?? "—"}</span>
+              <span className="text-muted-foreground">Quotes on disk</span>
+              <span className="font-medium text-foreground">{lastAttempt?.storedQuoteCount ?? "—"}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">Products on disk</span>
-              <span className="font-medium text-slate-800">{lastAttempt?.storedProductCount ?? "—"}</span>
+              <span className="text-muted-foreground">Products on disk</span>
+              <span className="font-medium text-foreground">{lastAttempt?.storedProductCount ?? "—"}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">Last import attempt</span>
-              <span className="font-medium text-slate-800">
+              <span className="text-muted-foreground">Last import attempt</span>
+              <span className="font-medium text-foreground">
                 {lastAttempt?.finishedAt ? new Date(lastAttempt.finishedAt).toLocaleTimeString() : "—"}
               </span>
             </div>
@@ -79,16 +79,16 @@ export default function RefreshStatusDialog({ open, onOpenChange, phase, lastAtt
         <button
           type="button"
           onClick={() => setLogOpen(v => !v)}
-          className="flex items-center justify-between w-full text-sm font-medium text-slate-600 hover:text-slate-900 transition"
+          className="flex items-center justify-between w-full text-sm font-medium text-muted-foreground hover:text-foreground transition"
         >
           <span>Diagnostic log ({events.length})</span>
           {logOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
         </button>
 
         {logOpen && (
-          <div className="max-h-64 overflow-y-auto rounded-lg border border-slate-200 bg-white divide-y divide-slate-100 text-xs font-mono">
+          <div className="max-h-64 overflow-y-auto rounded-lg border border-border bg-card divide-y divide-slate-100 text-xs font-mono">
             {events.length === 0 && (
-              <div className="p-3 text-slate-400 italic">No events yet.</div>
+              <div className="p-3 text-muted-foreground italic">No events yet.</div>
             )}
             {events.map(e => (
               <div key={e.seq} className={cn("flex items-start gap-2 p-2",
@@ -97,8 +97,8 @@ export default function RefreshStatusDialog({ open, onOpenChange, phase, lastAtt
               >
                 {LEVEL_ICON[e.level] || LEVEL_ICON.info}
                 <div className="flex-1 min-w-0">
-                  <span className="text-slate-400">{new Date(e.time).toLocaleTimeString()}</span>{" "}
-                  <span className="text-slate-700 break-words">{e.message}</span>
+                  <span className="text-muted-foreground">{new Date(e.time).toLocaleTimeString()}</span>{" "}
+                  <span className="text-foreground break-words">{e.message}</span>
                 </div>
               </div>
             ))}

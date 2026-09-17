@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ClipboardCopy, Download, FileDown, RefreshCw, Sparkles } from "lucide-react";
@@ -361,16 +361,16 @@ export default function DailySnapshotReport({
 
   return (
     <div className="space-y-4">
-      <Card className="border-slate-200">
+      <Card className="border-border">
         <CardHeader className="pb-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <CardTitle className="text-base">O&amp;M Daily Operations Snapshot</CardTitle>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-sm text-muted-foreground">
                 {finalReportData.reportingWindowLabel || "Select a date to build a report."}
               </p>
             </div>
-            <Badge variant="outline" className="border-slate-200 text-slate-600">
+            <Badge variant="outline" className="border-border text-muted-foreground">
               Prepared {finalReportData.preparedAt}
             </Badge>
           </div>
@@ -393,7 +393,7 @@ export default function DailySnapshotReport({
         </CardContent>
       </Card>
 
-      <Card className="border-slate-200">
+      <Card className="border-border">
         <CardHeader className="pb-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <CardTitle className="flex items-center gap-2 text-base">
@@ -413,33 +413,33 @@ export default function DailySnapshotReport({
             rows={6}
             placeholder="One bullet per line…"
           />
-          <p className="mt-2 text-xs text-slate-500">
+          <p className="mt-2 text-xs text-muted-foreground">
             Auto-drafted from today's deltas, escalations, and backlog swings - edit freely before exporting. Don't
             overstate trends from a single day.
           </p>
         </CardContent>
       </Card>
 
-      <Card className="border-slate-200">
+      <Card className="border-border">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Data Quality &amp; Exceptions</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 text-sm sm:grid-cols-2">
-          <div><span className="font-medium text-slate-700">Unavailable Metrics:</span> <span className="text-slate-600">{finalReportData.dataQuality.unavailableMetrics.join("; ") || "None"}</span></div>
-          <div><span className="font-medium text-slate-700">Stale Sources:</span> <span className="text-slate-600">{finalReportData.dataQuality.staleSources.join("; ") || "None"}</span></div>
-          <div><span className="font-medium text-slate-700">Filter/Timezone Concerns:</span> <span className="text-slate-600">{finalReportData.dataQuality.filterTimezoneConcerns.join("; ") || "None"}</span></div>
-          <div><span className="font-medium text-slate-700">Duplicate/Malformed Records:</span> <span className="text-slate-600">None recorded for this date</span></div>
-          <div><span className="font-medium text-slate-700">Reconciliation Exceptions:</span> <span className="text-slate-600">{finalReportData.dataQuality.reconciliationExceptions.join("; ") || "None"}</span></div>
-          <div><span className="font-medium text-slate-700">Manual Inputs Used:</span> <span className="text-slate-600">{finalReportData.dataQuality.manualInputsUsed.join("; ") || "None"}</span></div>
+          <div><span className="font-medium text-foreground">Unavailable Metrics:</span> <span className="text-muted-foreground">{finalReportData.dataQuality.unavailableMetrics.join("; ") || "None"}</span></div>
+          <div><span className="font-medium text-foreground">Stale Sources:</span> <span className="text-muted-foreground">{finalReportData.dataQuality.staleSources.join("; ") || "None"}</span></div>
+          <div><span className="font-medium text-foreground">Filter/Timezone Concerns:</span> <span className="text-muted-foreground">{finalReportData.dataQuality.filterTimezoneConcerns.join("; ") || "None"}</span></div>
+          <div><span className="font-medium text-foreground">Duplicate/Malformed Records:</span> <span className="text-muted-foreground">None recorded for this date</span></div>
+          <div><span className="font-medium text-foreground">Reconciliation Exceptions:</span> <span className="text-muted-foreground">{finalReportData.dataQuality.reconciliationExceptions.join("; ") || "None"}</span></div>
+          <div><span className="font-medium text-foreground">Manual Inputs Used:</span> <span className="text-muted-foreground">{finalReportData.dataQuality.manualInputsUsed.join("; ") || "None"}</span></div>
         </CardContent>
       </Card>
 
-      <Card className="border-slate-200">
+      <Card className="border-border">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Full Report Preview</CardTitle>
         </CardHeader>
         <CardContent>
-          <pre className="max-h-[36rem] overflow-auto whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50 p-4 text-xs text-slate-700">
+          <pre className="max-h-[36rem] overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-secondary p-4 text-xs text-foreground">
             {markdownPreview}
           </pre>
         </CardContent>

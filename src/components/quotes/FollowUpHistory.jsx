@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -67,9 +67,9 @@ export default function FollowUpHistory({ quoteId }) {
 
   return (
     <>
-      <Card className="p-6 mt-6 border-slate-200">
+      <Card className="p-6 mt-6 border-border">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold text-slate-900">Follow-Up History</h3>
+          <h3 className="text-lg font-semibold text-foreground">Follow-Up History</h3>
           <Button 
             variant="outline" 
             size="sm"
@@ -82,11 +82,11 @@ export default function FollowUpHistory({ quoteId }) {
         </div>
 
         {sortedLogs.length === 0 ? (
-          <p className="text-slate-500 text-center py-8">No follow-ups sent yet</p>
+          <p className="text-muted-foreground text-center py-8">No follow-ups sent yet</p>
         ) : (
           <div className="space-y-4">
             {sortedLogs.map((log, index) => (
-              <div key={index} className="flex gap-4 pb-4 border-b border-slate-100 last:border-0 last:pb-0">
+              <div key={index} className="flex gap-4 pb-4 border-b border-border last:border-0 last:pb-0">
                 <div className="flex-shrink-0 w-2 h-2 rounded-full bg-indigo-600 mt-2" />
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-1">
@@ -96,20 +96,20 @@ export default function FollowUpHistory({ quoteId }) {
                       ) : (
                         <Clock className="w-4 h-4 text-indigo-600" />
                       )}
-                      <span className="font-medium text-slate-900">
+                      <span className="font-medium text-foreground">
                         {log.was_manual ? "Manual Follow-Up" : "Automated Follow-Up"}
                       </span>
                     </div>
-                    <span className="text-xs text-slate-500">
+                    <span className="text-xs text-muted-foreground">
                       {format(new Date(log.sent_date), "MMM d, yyyy 'at' h:mm a")}
                     </span>
                   </div>
-                  <p className="text-sm text-slate-600">{log.trigger_reason}</p>
-                  <p className="text-xs text-slate-500 mt-1">
+                  <p className="text-sm text-muted-foreground">{log.trigger_reason}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
                     Sent to: {log.recipients.join(", ")}
                   </p>
                   {log.triggered_by && (
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-muted-foreground">
                       Triggered by: {log.triggered_by}
                     </p>
                   )}
@@ -148,7 +148,7 @@ export default function FollowUpHistory({ quoteId }) {
                 rows={6}
                 className="mt-1.5"
               />
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 Available placeholders: {"{quote_number}"}, {"{site_id}"}, {"{total}"}, {"{status}"}
               </p>
             </div>

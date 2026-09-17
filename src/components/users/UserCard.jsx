@@ -1,4 +1,4 @@
-import { Card } from "@/components/ui/card";
+﻿import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Mail, Briefcase, Pencil, Shield, ShieldCheck, ShieldAlert, MoreVertical, KeyRound } from "lucide-react";
@@ -44,7 +44,7 @@ export default function UserCard({ user, onEdit, onResetPassword, index = 0, cur
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05 }}
     >
-      <Card className="p-5 border-slate-200 hover:shadow-md transition-all">
+      <Card className="p-5 border-border hover:shadow-md transition-all">
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-3">
             <div className={cn("w-10 h-10 rounded-full flex items-center justify-center", config.bgColor)}>
@@ -52,12 +52,12 @@ export default function UserCard({ user, onEdit, onResetPassword, index = 0, cur
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-semibold text-slate-900">{user.display_name || user.full_name || "No name"}</h3>
+                <h3 className="font-semibold text-foreground">{user.display_name || user.full_name || "No name"}</h3>
                 {isCurrentUser && (
                   <Badge variant="outline" className="text-xs">You</Badge>
                 )}
               </div>
-              <p className="text-sm text-slate-500">{user.email}</p>
+              <p className="text-sm text-muted-foreground">{user.email}</p>
             </div>
           </div>
           <DropdownMenu>
@@ -65,7 +65,7 @@ export default function UserCard({ user, onEdit, onResetPassword, index = 0, cur
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-slate-400 hover:text-indigo-600"
+                className="h-8 w-8 text-muted-foreground hover:text-indigo-600"
               >
                 <MoreVertical className="w-4 h-4" />
               </Button>
@@ -87,7 +87,7 @@ export default function UserCard({ user, onEdit, onResetPassword, index = 0, cur
           <div className="flex items-center gap-2">
             {[user.app_role, ...(user.additional_roles || [])].filter(Boolean).map(role => <Badge key={role} className={cn("border", (roleConfig[role] || config).color)}>{role.charAt(0).toUpperCase() + role.slice(1)}</Badge>) }
             {user.department && (
-              <div className="flex items-center gap-1 text-sm text-slate-600">
+              <div className="flex items-center gap-1 text-sm text-muted-foreground">
                 <Briefcase className="w-3 h-3" />
                 {user.department}
               </div>

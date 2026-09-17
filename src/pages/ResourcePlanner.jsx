@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
@@ -123,7 +123,7 @@ function ResourcePlannerPage() {
     if (index === 0) return "bg-emerald-100 text-emerald-700 border-emerald-200";
     if (index === 1) return "bg-sky-100 text-sky-700 border-sky-200";
     if (index === 2) return "bg-violet-100 text-violet-700 border-violet-200";
-    return "bg-slate-100 text-slate-600 border-slate-200";
+    return "bg-muted text-muted-foreground border-border";
   };
 
   return (
@@ -134,13 +134,13 @@ function ResourcePlannerPage() {
           <Route className="w-5 h-5 text-sky-600" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Resource Planner</h1>
-          <p className="text-sm text-slate-500">AI-powered FST routing for site visits</p>
+          <h1 className="text-2xl font-bold text-foreground">Resource Planner</h1>
+          <p className="text-sm text-muted-foreground">AI-powered FST routing for site visits</p>
         </div>
       </div>
 
       <Tabs defaultValue="route">
-        <TabsList className="bg-slate-100">
+        <TabsList className="bg-muted">
           <TabsTrigger value="route" className="gap-2">
             <Navigation className="w-4 h-4" /> Route Planner
           </TabsTrigger>
@@ -152,7 +152,7 @@ function ResourcePlannerPage() {
           </TabsTrigger>
         </TabsList>
 
-        {/* ─── ROUTE PLANNER TAB ─── */}
+        {/* â”€â”€â”€ ROUTE PLANNER TAB â”€â”€â”€ */}
         <TabsContent value="route" className="space-y-4 mt-4">
           <Card>
             <CardHeader className="pb-3">
@@ -184,11 +184,11 @@ function ResourcePlannerPage() {
               </div>
               {activeFSTs.length === 0 && !fstsLoading && (
                 <p className="text-sm text-amber-600 flex items-center gap-1">
-                  ⚠️ No active FSTs in roster. Add FSTs in the <strong>FST Roster</strong> tab first.
+                  âš ï¸ No active FSTs in roster. Add FSTs in the <strong>FST Roster</strong> tab first.
                 </p>
               )}
               {activeFSTs.length > 0 && (
-                <p className="text-xs text-slate-400">{activeFSTs.length} active FST{activeFSTs.length !== 1 ? "s" : ""} will be evaluated</p>
+                <p className="text-xs text-muted-foreground">{activeFSTs.length} active FST{activeFSTs.length !== 1 ? "s" : ""} will be evaluated</p>
               )}
             </CardContent>
           </Card>
@@ -201,22 +201,22 @@ function ResourcePlannerPage() {
 
           {isRanking && (
             <Card>
-              <CardContent className="py-12 text-center text-slate-500">
+              <CardContent className="py-12 text-center text-muted-foreground">
                 <Loader2 className="w-8 h-8 animate-spin mx-auto mb-3 text-sky-500" />
                 <p className="font-medium">AI is calculating routes...</p>
-                <p className="text-sm text-slate-400 mt-1">Estimating distance and travel time for each FST</p>
+                <p className="text-sm text-muted-foreground mt-1">Estimating distance and travel time for each FST</p>
               </CardContent>
             </Card>
           )}
 
           {rankings && rankings.length > 0 && (
             <div className="space-y-3">
-              <div className="flex items-center gap-2 text-sm text-slate-500">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Trophy className="w-4 h-4 text-amber-500" />
-                <span>Ranked from closest to furthest for: <strong className="text-slate-800">{svAddress}</strong></span>
+                <span>Ranked from closest to furthest for: <strong className="text-foreground">{svAddress}</strong></span>
               </div>
               {rankings.map((r, index) => (
-                <Card key={index} className={`border ${index === 0 ? "border-emerald-200 shadow-emerald-50 shadow-md" : "border-slate-200"}`}>
+                <Card key={index} className={`border ${index === 0 ? "border-emerald-200 shadow-emerald-50 shadow-md" : "border-border"}`}>
                   <CardContent className="py-4 px-5">
                     <div className="flex items-start gap-4">
                       {/* Rank badge */}
@@ -226,7 +226,7 @@ function ResourcePlannerPage() {
                       {/* Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-2 mb-1">
-                          <span className="font-semibold text-slate-900 text-base">{r.name}</span>
+                          <span className="font-semibold text-foreground text-base">{r.name}</span>
                           {index === 0 && (
                             <Badge className="bg-emerald-100 text-emerald-700 border-0 text-xs">Best Match</Badge>
                           )}
@@ -235,24 +235,24 @@ function ResourcePlannerPage() {
                         {(() => {
                           const fst = activeFSTs.find(f => f.name === r.name);
                           return fst ? (
-                            <p className="text-xs text-slate-400 mb-2 flex items-center gap-1">
+                            <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
                                 <MapPin className="w-3 h-3" />
                                 {fst.city}{fst.state ? `, ${fst.state}` : ""} {fst.zip || ""}
                               </p>
                           ) : null;
                         })()}
-                        <p className="text-sm text-slate-500">{r.notes}</p>
+                        <p className="text-sm text-muted-foreground">{r.notes}</p>
                       </div>
                       {/* Metrics */}
                       <div className="flex gap-4 shrink-0 text-right">
                         <div>
-                          <p className="text-xs text-slate-400">Distance</p>
-                          <p className="font-bold text-slate-800">{r.estimated_miles} mi</p>
+                          <p className="text-xs text-muted-foreground">Distance</p>
+                          <p className="font-bold text-foreground">{r.estimated_miles} mi</p>
                         </div>
                         <div>
-                          <p className="text-xs text-slate-400">Drive Time</p>
-                          <p className="font-bold text-slate-800 flex items-center gap-1 justify-end">
-                            <Clock className="w-3.5 h-3.5 text-slate-400" />
+                          <p className="text-xs text-muted-foreground">Drive Time</p>
+                          <p className="font-bold text-foreground flex items-center gap-1 justify-end">
+                            <Clock className="w-3.5 h-3.5 text-muted-foreground" />
                             {r.estimated_hours_display}
                           </p>
                         </div>
@@ -261,17 +261,17 @@ function ResourcePlannerPage() {
                   </CardContent>
                 </Card>
               ))}
-              <p className="text-xs text-slate-400 text-center pt-1">
+              <p className="text-xs text-muted-foreground text-center pt-1">
                 Estimates are AI-generated based on geographic knowledge. Actual drive times may vary with traffic conditions.
               </p>
             </div>
           )}
         </TabsContent>
 
-        {/* ─── FST ROSTER TAB ─── */}
+        {/* â”€â”€â”€ FST ROSTER TAB â”€â”€â”€ */}
         <TabsContent value="roster" className="space-y-4 mt-4">
           <div className="flex justify-between items-center">
-            <p className="text-sm text-slate-500">{fsts.length} FST{fsts.length !== 1 ? "s" : ""} total · {activeFSTs.length} active</p>
+            <p className="text-sm text-muted-foreground">{fsts.length} FST{fsts.length !== 1 ? "s" : ""} total · {activeFSTs.length} active</p>
             <Button
               onClick={() => { setEditingFST(null); setFstForm(emptyFST); setShowFSTForm(true); }}
               className="bg-sky-600 hover:bg-sky-700 gap-2"
@@ -281,10 +281,10 @@ function ResourcePlannerPage() {
           </div>
 
           {fstsLoading ? (
-            <Card><CardContent className="py-10 text-center text-slate-400">Loading roster...</CardContent></Card>
+            <Card><CardContent className="py-10 text-center text-muted-foreground">Loading roster...</CardContent></Card>
           ) : fsts.length === 0 ? (
             <Card className="border-dashed border-slate-300">
-              <CardContent className="py-12 text-center text-slate-400">
+              <CardContent className="py-12 text-center text-muted-foreground">
                 <Users className="w-8 h-8 mx-auto mb-2 text-slate-300" />
                 <p className="font-medium">No FSTs yet</p>
                 <p className="text-sm mt-1">Add your first FST to start routing site visits</p>
@@ -298,25 +298,25 @@ function ResourcePlannerPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-semibold text-slate-900">{fst.name}</span>
-                          {fst.employee_id && <span className="text-xs text-slate-400">#{fst.employee_id}</span>}
-                          {!fst.is_active && <Badge className="bg-slate-100 text-slate-500 border-0 text-xs">Inactive</Badge>}
+                          <span className="font-semibold text-foreground">{fst.name}</span>
+                          {fst.employee_id && <span className="text-xs text-muted-foreground">#{fst.employee_id}</span>}
+                          {!fst.is_active && <Badge className="bg-muted text-muted-foreground border-0 text-xs">Inactive</Badge>}
                         </div>
-                        <p className="text-sm text-slate-500 flex items-center gap-1">
+                        <p className="text-sm text-muted-foreground flex items-center gap-1">
                           <MapPin className="w-3 h-3 shrink-0" />
                           {fst.city}{fst.state ? `, ${fst.state}` : ""} {fst.zip || ""}
                         </p>
                         {fst.phone && (
-                          <p className="text-sm text-slate-400 flex items-center gap-1 mt-0.5">
+                          <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
                             <Phone className="w-3 h-3 shrink-0" />
                             {fst.phone}
                           </p>
                         )}
-                        {fst.notes && <p className="text-xs text-slate-400 mt-1 truncate">{fst.notes}</p>}
+                        {fst.notes && <p className="text-xs text-muted-foreground mt-1 truncate">{fst.notes}</p>}
                       </div>
                       <div className="flex gap-1 shrink-0">
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(fst)}>
-                          <Pencil className="w-3.5 h-3.5 text-slate-400" />
+                          <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
                         </Button>
                         <Button
                           variant="ghost"
@@ -324,7 +324,7 @@ function ResourcePlannerPage() {
                           className="h-8 w-8 hover:text-rose-600"
                           onClick={() => { if (confirm(`Remove ${fst.name} from roster?`)) deleteFST.mutate(fst.id); }}
                         >
-                          <Trash2 className="w-3.5 h-3.5 text-slate-400" />
+                          <Trash2 className="w-3.5 h-3.5 text-muted-foreground" />
                         </Button>
                       </div>
                     </div>

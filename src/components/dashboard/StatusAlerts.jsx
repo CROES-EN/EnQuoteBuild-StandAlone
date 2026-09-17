@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
@@ -160,7 +160,7 @@ export default function StatusAlerts({ quotes }) {
   };
 
   return (
-    <Card className={`p-4 mb-6 border-amber-300 bg-amber-50 ${collapsed ? "pb-4" : ""}`}>
+    <Card className={`p-4 mb-6 border border-warning/20 border-l-4 border-l-warning bg-warning/10 ${collapsed ? "pb-4" : ""}`}>
       <div className="flex items-start gap-3">
         <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
         <div className="flex-1">
@@ -173,7 +173,7 @@ export default function StatusAlerts({ quotes }) {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="h-7 text-xs border-amber-300 text-amber-700 hover:bg-amber-100"
+                  className="h-7 text-xs border border-warning/20 border-l-4 border-l-warning text-amber-700 hover:bg-warning/10"
                   onClick={handleClearAll}
                   disabled={clearAllMutation.isPending}
                 >
@@ -188,7 +188,7 @@ export default function StatusAlerts({ quotes }) {
               <Button
                 size="sm"
                 variant="outline"
-                className="h-7 text-xs border-amber-300 text-amber-700 hover:bg-amber-100"
+                className="h-7 text-xs border border-warning/20 border-l-4 border-l-warning text-amber-700 hover:bg-warning/10"
                 onClick={() => setCollapsed(!collapsed)}
                 title={collapsed ? "Expand" : "Collapse to review later"}
               >
@@ -200,16 +200,16 @@ export default function StatusAlerts({ quotes }) {
           {!collapsed && (
           <div className="space-y-2 max-h-72 overflow-y-auto">
             {alerts.map((alert, index) => (
-              <div key={index} className="flex items-center justify-between p-2 rounded bg-white hover:bg-amber-100 transition-colors group">
+              <div key={index} className="flex items-center justify-between p-2 rounded bg-card hover:bg-warning/10 transition-colors group">
                 <Link
                   to={createPageUrl(`QuoteDetails?id=${alert.quote.id}`)}
                   className="flex items-center gap-2 flex-1 min-w-0"
                 >
                   <Clock className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span className="text-sm font-medium text-slate-900 truncate">
+                  <span className="text-sm font-medium text-foreground truncate">
                     {alert.quote.site_id || alert.quote.quote_number}
                   </span>
-                  <span className="text-xs text-slate-600 shrink-0">
+                  <span className="text-xs text-muted-foreground shrink-0">
                     {STATUS_LABELS[alert.status] || alert.status}
                   </span>
                 </Link>

@@ -1,4 +1,4 @@
-import { Card } from "@/components/ui/card";
+﻿import { Card } from "@/components/ui/card";
 import { parseISO, getYear, getQuarter, differenceInHours } from "date-fns";
 import { Clock } from "lucide-react";
 
@@ -80,44 +80,44 @@ export default function QuarterlySLASummary({ quotes }) {
   ];
 
   return (
-    <Card className="p-6 border-slate-200">
+    <Card className="p-6 border-border">
       <div className="flex items-center gap-2 mb-5">
         <Clock className="w-5 h-5 text-indigo-600" />
-        <h3 className="text-lg font-semibold text-slate-900">Quarterly SLA Summary</h3>
-        <span className="text-xs text-slate-400">(avg stage times per quarter)</span>
+        <h3 className="text-lg font-semibold text-foreground">Quarterly SLA Summary</h3>
+        <span className="text-xs text-muted-foreground">(avg stage times per quarter)</span>
       </div>
 
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-100">
-              <th className="text-left py-2 px-3 text-xs font-medium text-slate-500">Quarter</th>
-              <th className="text-right py-2 px-3 text-xs font-medium text-slate-500">Quotes</th>
+            <tr className="border-b border-border">
+              <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Quarter</th>
+              <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground">Quotes</th>
               {cols.map(c => (
-                <th key={c.label} className="text-right py-2 px-3 text-xs font-medium text-slate-500 whitespace-nowrap">{c.label}</th>
+                <th key={c.label} className="text-right py-2 px-3 text-xs font-medium text-muted-foreground whitespace-nowrap">{c.label}</th>
               ))}
-              <th className="text-right py-2 px-3 text-xs font-medium text-slate-500">Rejected</th>
-              <th className="text-right py-2 px-3 text-xs font-medium text-slate-500">Paid</th>
+              <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground">Rejected</th>
+              <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground">Paid</th>
             </tr>
           </thead>
           <tbody>
             {rows.map(row => (
-              <tr key={row.key} className={`border-b border-slate-50 hover:bg-slate-50 ${row.key === currentKey ? "bg-indigo-50/40" : ""}`}>
-                <td className="py-2.5 px-3 font-semibold text-slate-800">
+              <tr key={row.key} className={`border-b border-slate-50 hover:bg-secondary ${row.key === currentKey ? "bg-indigo-50/40" : ""}`}>
+                <td className="py-2.5 px-3 font-semibold text-foreground">
                   {row.key}
                   {row.key === currentKey && <span className="text-xs font-normal text-indigo-600 ml-1">(current)</span>}
                 </td>
-                <td className="py-2.5 px-3 text-right text-slate-600">{row.count}</td>
+                <td className="py-2.5 px-3 text-right text-muted-foreground">{row.count}</td>
                 {cols.map(c => {
                   const val = c.fn(row);
                   return (
-                    <td key={c.label} className="py-2.5 px-3 text-right font-medium text-slate-700">
+                    <td key={c.label} className="py-2.5 px-3 text-right font-medium text-foreground">
                       {formatHours(val)}
                     </td>
                   );
                 })}
                 <td className="py-2.5 px-3 text-right">
-                  <span className={row.rejectedCount + row.hoRejectedCount > 0 ? "text-rose-600 font-medium" : "text-slate-400"}>
+                  <span className={row.rejectedCount + row.hoRejectedCount > 0 ? "text-rose-600 font-medium" : "text-muted-foreground"}>
                     {row.rejectedCount + row.hoRejectedCount}
                   </span>
                 </td>

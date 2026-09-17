@@ -127,7 +127,7 @@ export default function QuoteDraftButton({ quote, products, onApply }) {
         type="button"
         variant="outline"
         onClick={() => setOpen(true)}
-        className="border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-50"
+        className="border-indigo-300 bg-card text-indigo-700 hover:bg-indigo-50"
       >
         <Sparkles className="w-4 h-4 mr-2" />
         Quote Draft Agent
@@ -156,7 +156,7 @@ export default function QuoteDraftButton({ quote, products, onApply }) {
 
           {!preview ? (
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700">
+              <label className="text-sm font-medium text-foreground">
                 Paste Quote Request Agent Output
               </label>
               <Textarea
@@ -182,7 +182,7 @@ export default function QuoteDraftButton({ quote, products, onApply }) {
                     which is what FSTs post in Salesforce.
                   </p>
                   <p className="font-medium">What was received (first 500 characters):</p>
-                  <pre className="bg-white border border-amber-200 rounded p-2 text-xs whitespace-pre-wrap max-h-40 overflow-y-auto">
+                  <pre className="bg-card border border-amber-200 rounded p-2 text-xs whitespace-pre-wrap max-h-40 overflow-y-auto">
                     {rawOutput.slice(0, 500) || "(nothing was pasted)"}
                   </pre>
                 </div>
@@ -234,13 +234,13 @@ export default function QuoteDraftButton({ quote, products, onApply }) {
               </div>
 
               <div>
-                <p className="font-semibold text-slate-900">Scope of Work</p>
-                <p className="text-slate-600 whitespace-pre-wrap">{preview.scope_of_work || MANUAL_INPUT_PLACEHOLDER}</p>
+                <p className="font-semibold text-foreground">Scope of Work</p>
+                <p className="text-muted-foreground whitespace-pre-wrap">{preview.scope_of_work || MANUAL_INPUT_PLACEHOLDER}</p>
               </div>
 
               <div>
-                <p className="font-semibold text-slate-900">Quote Items ({preview.items.length})</p>
-                <ul className="list-disc list-inside text-slate-600">
+                <p className="font-semibold text-foreground">Quote Items ({preview.items.length})</p>
+                <ul className="list-disc list-inside text-muted-foreground">
                   {preview.items.map((item, index) => (
                     <li key={index}>
                       {item.quantity} x {item.name} -- ${item.unit_price} ({item.tax_code || "no tax code"})

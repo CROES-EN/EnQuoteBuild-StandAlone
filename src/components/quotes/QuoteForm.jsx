@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -203,8 +203,8 @@ export default function QuoteForm({ quote, products = [], onSave, onSaveDraft, o
         />
       </div>
 {/* Site Information */}
-      <Card className="p-6 border-slate-200">
-        <h3 className="text-lg font-semibold text-slate-900 mb-4">Site Information</h3>
+      <Card className="p-6 border-border">
+        <h3 className="text-lg font-semibold text-foreground mb-4">Site Information</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <Label htmlFor="picklist">Picklist *</Label>
@@ -333,12 +333,12 @@ export default function QuoteForm({ quote, products = [], onSave, onSaveDraft, o
           {/* Labor Mode Toggle (admin only) */}
           {isAdmin && (
             <div className="md:col-span-2 flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-              <span className={`text-sm font-medium ${!isFlat ? "text-slate-900" : "text-slate-400"}`}>Hourly Labor</span>
+              <span className={`text-sm font-medium ${!isFlat ? "text-foreground" : "text-muted-foreground"}`}>Hourly Labor</span>
               <Switch
                 checked={isFlat}
                 onCheckedChange={(checked) => setFormData({ ...formData, labor_mode: checked ? "flat" : "hourly", flat_labor_fee: "", fst_count: "", labor_hours: "" })}
               />
-              <span className={`text-sm font-medium ${isFlat ? "text-slate-900" : "text-slate-400"}`}>Flat Labor Fee</span>
+              <span className={`text-sm font-medium ${isFlat ? "text-foreground" : "text-muted-foreground"}`}>Flat Labor Fee</span>
               <span className="text-xs text-amber-700 ml-2">(Admin only)</span>
             </div>
           )}
@@ -387,7 +387,7 @@ export default function QuoteForm({ quote, products = [], onSave, onSaveDraft, o
                               required
                               className="mt-1.5"
               />
-              <p className="text-xs text-slate-500 mt-1">Fixed labor cost — no hourly calculation applied</p>
+              <p className="text-xs text-muted-foreground mt-1">Fixed labor cost - no hourly calculation applied</p>
             </div>
           )}
           <div>
@@ -403,7 +403,7 @@ export default function QuoteForm({ quote, products = [], onSave, onSaveDraft, o
               required
               className="mt-1.5"
             />
-            <p className="text-xs text-slate-500 mt-1">$65 per hour</p>
+            <p className="text-xs text-muted-foreground mt-1">$65 per hour</p>
           </div>
           <div>
             <Label htmlFor="miles_traveled">Miles Traveled (combined) *</Label>
@@ -418,13 +418,13 @@ export default function QuoteForm({ quote, products = [], onSave, onSaveDraft, o
               required
               className="mt-1.5"
             />
-            <p className="text-xs text-slate-500 mt-1">$0.73 per mile</p>
+            <p className="text-xs text-muted-foreground mt-1">$0.73 per mile</p>
           </div>
         </div>
       </Card>
 
       {/* Item Selection */}
-      <Card className="p-6 border-slate-200">
+      <Card className="p-6 border-border">
         <QuoteItemSelector
           products={products}
           selectedItems={formData.items}
@@ -434,8 +434,8 @@ export default function QuoteForm({ quote, products = [], onSave, onSaveDraft, o
 
       {/* Totals & Notes */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="p-6 border-slate-200">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4">Notes & Terms</h3>
+        <Card className="p-6 border-border">
+          <h3 className="text-lg font-semibold text-foreground mb-4">Notes & Terms</h3>
           <Textarea
             value={formData.notes}
             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
@@ -444,38 +444,38 @@ export default function QuoteForm({ quote, products = [], onSave, onSaveDraft, o
           />
         </Card>
 
-        <Card className="p-6 border-slate-200">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4">Summary</h3>
+        <Card className="p-6 border-border">
+          <h3 className="text-lg font-semibold text-foreground mb-4">Summary</h3>
           <div className="space-y-4">
-            <div className="flex justify-between text-slate-600">
+            <div className="flex justify-between text-muted-foreground">
               <span>Items Subtotal</span>
               <span>${(subtotal - laborCharge - mileageCharge - travelCharge).toFixed(2)}</span>
             </div>
             {laborCharge > 0 && (
-              <div className="flex justify-between text-slate-600">
-                <span>{isFlat ? "Labor (Flat Fee)" : `Labor (${formData.fst_count} FSTs × ${formData.labor_hours} hrs @ $125)`}</span>
+              <div className="flex justify-between text-muted-foreground">
+                <span>{isFlat ? "Labor (Flat Fee)" : `Labor (${formData.fst_count} FSTs Ã— ${formData.labor_hours} hrs @ $125)`}</span>
                 <span>${laborCharge.toFixed(2)}</span>
               </div>
             )}
             {travelCharge > 0 && (
-              <div className="flex justify-between text-slate-600">
+              <div className="flex justify-between text-muted-foreground">
                 <span>Travel ({formData.travel_hours} hrs @ $65)</span>
                 <span>${travelCharge.toFixed(2)}</span>
               </div>
             )}
             {mileageCharge > 0 && (
-              <div className="flex justify-between text-slate-600">
+              <div className="flex justify-between text-muted-foreground">
                 <span>Mileage ({formData.miles_traveled} mi @ $0.73)</span>
                 <span>${mileageCharge.toFixed(2)}</span>
               </div>
             )}
-            <div className="flex justify-between text-slate-700 font-medium pt-2 border-t border-slate-200">
+            <div className="flex justify-between text-foreground font-medium pt-2 border-t border-border">
               <span>Subtotal</span>
               <span>${subtotal.toFixed(2)}</span>
             </div>
             
             <div className="flex items-center justify-between gap-4">
-              <Label className="text-slate-600 shrink-0">Discount</Label>
+              <Label className="text-muted-foreground shrink-0">Discount</Label>
               <div className="flex items-center gap-2">
                 <Select
                   value={formData.discount_type}
@@ -499,7 +499,7 @@ export default function QuoteForm({ quote, products = [], onSave, onSaveDraft, o
                       onChange={(e) => setFormData({ ...formData, discount_flat_amount: e.target.value })}
                       className="w-24 h-8 text-right"
                     />
-                    <span className="text-slate-500">$</span>
+                    <span className="text-muted-foreground">$</span>
                   </>
                 ) : (
                   <>
@@ -512,15 +512,15 @@ export default function QuoteForm({ quote, products = [], onSave, onSaveDraft, o
                       onChange={(e) => setFormData({ ...formData, discount_percent: e.target.value })}
                       className="w-20 h-8 text-right"
                     />
-                    <span className="text-slate-500">%</span>
+                    <span className="text-muted-foreground">%</span>
                   </>
                 )}
-                <span className="text-slate-600 w-24 text-right">-${discountAmount.toFixed(2)}</span>
+                <span className="text-muted-foreground w-24 text-right">-${discountAmount.toFixed(2)}</span>
               </div>
             </div>
 
             <div className="flex items-center justify-between gap-4">
-              <Label htmlFor="federal_tax" className="text-slate-600 shrink-0">Federal Tax</Label>
+              <Label htmlFor="federal_tax" className="text-muted-foreground shrink-0">Federal Tax</Label>
               <div className="flex items-center gap-2">
                 <Input
                   id="federal_tax"
@@ -532,13 +532,13 @@ export default function QuoteForm({ quote, products = [], onSave, onSaveDraft, o
                   onChange={(e) => setFormData({ ...formData, federal_tax_percent: e.target.value })}
                   className="w-20 h-8 text-right"
                 />
-                <span className="text-slate-500">%</span>
-                <span className="text-slate-600 w-24 text-right">+${federalTaxAmount.toFixed(2)}</span>
+                <span className="text-muted-foreground">%</span>
+                <span className="text-muted-foreground w-24 text-right">+${federalTaxAmount.toFixed(2)}</span>
               </div>
             </div>
 
             <div className="flex items-center justify-between gap-4">
-              <Label htmlFor="state_tax" className="text-slate-600 shrink-0">State Tax</Label>
+              <Label htmlFor="state_tax" className="text-muted-foreground shrink-0">State Tax</Label>
               <div className="flex items-center gap-2">
                 <Input
                   id="state_tax"
@@ -550,13 +550,13 @@ export default function QuoteForm({ quote, products = [], onSave, onSaveDraft, o
                   onChange={(e) => setFormData({ ...formData, state_tax_percent: e.target.value })}
                   className="w-20 h-8 text-right"
                 />
-                <span className="text-slate-500">%</span>
-                <span className="text-slate-600 w-24 text-right">+${stateTaxAmount.toFixed(2)}</span>
+                <span className="text-muted-foreground">%</span>
+                <span className="text-muted-foreground w-24 text-right">+${stateTaxAmount.toFixed(2)}</span>
               </div>
             </div>
 
             <div className="flex items-center justify-between gap-4">
-              <Label htmlFor="local_tax" className="text-slate-600 shrink-0">Local Tax</Label>
+              <Label htmlFor="local_tax" className="text-muted-foreground shrink-0">Local Tax</Label>
               <div className="flex items-center gap-2">
                 <Input
                   id="local_tax"
@@ -568,13 +568,13 @@ export default function QuoteForm({ quote, products = [], onSave, onSaveDraft, o
                   onChange={(e) => setFormData({ ...formData, local_tax_percent: e.target.value })}
                   className="w-20 h-8 text-right"
                 />
-                <span className="text-slate-500">%</span>
-                <span className="text-slate-600 w-24 text-right">+${localTaxAmount.toFixed(2)}</span>
+                <span className="text-muted-foreground">%</span>
+                <span className="text-muted-foreground w-24 text-right">+${localTaxAmount.toFixed(2)}</span>
               </div>
             </div>
 
-            <div className="pt-4 border-t border-slate-200 flex justify-between items-center">
-              <span className="text-lg font-semibold text-slate-900">Total</span>
+            <div className="pt-4 border-t border-border flex justify-between items-center">
+              <span className="text-lg font-semibold text-foreground">Total</span>
               <span className="text-2xl font-bold text-orange-600">${total.toFixed(2)}</span>
             </div>
           </div>

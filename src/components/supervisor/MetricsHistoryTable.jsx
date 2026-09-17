@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -63,7 +63,7 @@ export default function MetricsHistoryTable({ records, onEdit, onChanged }) {
                 <TableCell>
                   <div className="flex flex-wrap gap-1">
                     {Object.keys(record.sources || {}).map(src => (
-                      <Badge key={src} variant="outline" className="text-[10px] py-0 px-1.5 text-slate-500 border-slate-200">
+                      <Badge key={src} variant="outline" className="text-[10px] py-0 px-1.5 text-muted-foreground border-border">
                         {SOURCE_LABELS[src] || src}
                       </Badge>
                     ))}
@@ -80,7 +80,7 @@ export default function MetricsHistoryTable({ records, onEdit, onChanged }) {
               </TableRow>
             ))}
             {sorted.length === 0 && (
-              <TableRow><TableCell colSpan={8} className="text-center text-slate-400 py-8">No daily metrics recorded yet.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No daily metrics recorded yet.</TableCell></TableRow>
             )}
           </TableBody>
         </Table>

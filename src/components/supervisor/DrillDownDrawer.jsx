@@ -1,4 +1,4 @@
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+﻿import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDateLabel, formatNumber } from "@/features/supervisorDashboard/format";
@@ -47,7 +47,7 @@ export default function DrillDownDrawer({ open, onOpenChange, title, fieldKey, f
 
         <div className="mt-4">
           {rows.length === 0 ? (
-            <p className="text-sm text-slate-500">No stored records contribute to this value.</p>
+            <p className="text-sm text-muted-foreground">No stored records contribute to this value.</p>
           ) : (
             <Table>
               <TableHeader>
@@ -70,7 +70,7 @@ export default function DrillDownDrawer({ open, onOpenChange, title, fieldKey, f
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
                           {describeSources(record).map(label => (
-                            <Badge key={label} variant="outline" className="border-slate-200 text-xs text-slate-600">{label}</Badge>
+                            <Badge key={label} variant="outline" className="border-border text-xs text-muted-foreground">{label}</Badge>
                           ))}
                         </div>
                       </TableCell>

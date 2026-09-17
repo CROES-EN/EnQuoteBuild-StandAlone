@@ -1,4 +1,4 @@
-import { Card } from "@/components/ui/card";
+﻿import { Card } from "@/components/ui/card";
 import { format } from "date-fns";
 import { FileText, Calendar, User } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -28,7 +28,7 @@ export default function QuoteCard({ quote, index = 0, selectable = false, isSele
       transition={{ delay: index * 0.05 }}
     >
       <Link to={createPageUrl(`QuoteDetails?id=${quote.id}`)}>
-        <Card className={`p-5 hover:shadow-lg transition-all duration-300 border-slate-200 hover:border-indigo-200 group cursor-pointer ${stripeClass} ${isSelected ? "ring-2 ring-indigo-400 border-indigo-400" : ""}`}>
+        <Card className={`p-5 hover:shadow-lg transition-all duration-300 border-border hover:border-indigo-200 group cursor-pointer ${stripeClass} ${isSelected ? "ring-2 ring-indigo-400 border-indigo-400" : ""}`}>
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-3">
               {selectable && (
@@ -43,16 +43,16 @@ export default function QuoteCard({ quote, index = 0, selectable = false, isSele
                 <FileText className="w-5 h-5 text-indigo-600" />
               </div>
               <div>
-                <h3 className="font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors">
+                <h3 className="font-semibold text-foreground group-hover:text-indigo-600 transition-colors">
                   {quote.site_id || "No Site ID"}
                 </h3>
-                <p className="text-sm text-slate-500">{quote.quote_number || "No reference"}</p>
+                <p className="text-sm text-muted-foreground">{quote.quote_number || "No reference"}</p>
               </div>
             </div>
             <div className="flex flex-col items-end gap-1">
               <StatusBadge status={quote.status} size="small" />
               {quote.status_history?.length > 0 && (
-                <span className="text-xs text-slate-400">
+                <span className="text-xs text-muted-foreground">
                   {format(new Date(quote.status_history[quote.status_history.length - 1].changed_at), "MMM d, yyyy")}
                 </span>
               )}
@@ -64,28 +64,28 @@ export default function QuoteCard({ quote, index = 0, selectable = false, isSele
           </div>
           
           <div className="space-y-2 text-sm">
-            <div className="flex items-center gap-2 text-slate-600">
-              <Calendar className="w-4 h-4 text-slate-400" />
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Calendar className="w-4 h-4 text-muted-foreground" />
               {quote.created_date && !Number.isNaN(new Date(quote.created_date).getTime())
                 ? format(new Date(quote.created_date), "MMM d, yyyy")
                 : "Unknown"}
             </div>
           </div>
           
-          <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
+          <div className="mt-4 pt-4 border-t border-border flex items-center justify-between">
             <div className="flex flex-col gap-0.5">
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-muted-foreground">
                 {quote.items?.length || 0} item{quote.items?.length !== 1 ? "s" : ""}
               </span>
               {(quote.owner_email || quote.created_by) && (
-                <span className="text-xs text-slate-400 flex items-center gap-1">
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
                   <User className="w-3 h-3" />
                   {(quote.owner_email || quote.created_by).split("@")[0]}
                 </span>
               )}
             </div>
-            <span className="text-lg font-bold text-slate-900">
-              ${calculatedTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+            <span className="text-lg font-bold text-foreground">
+              ${calculatedTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
         </Card>

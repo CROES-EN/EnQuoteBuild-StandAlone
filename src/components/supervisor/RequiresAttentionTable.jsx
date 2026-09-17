@@ -1,4 +1,4 @@
-import { AlertTriangle } from "lucide-react";
+﻿import { AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,12 +7,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 // Neutral labels only, per spec - no criticality/urgency implied without an approved threshold.
 const REASON_BADGE_CLASS = {
   "Review Recommended": "border-amber-200 bg-amber-50 text-amber-700",
-  "Partial Coverage": "border-slate-200 bg-slate-50 text-slate-600",
-  "Source Missing": "border-slate-200 bg-slate-50 text-slate-600",
+  "Partial Coverage": "border-border bg-secondary text-muted-foreground",
+  "Source Missing": "border-border bg-secondary text-muted-foreground",
   "Current Period": "border-indigo-200 bg-indigo-50 text-indigo-700",
-  "No Threshold Configured": "border-slate-200 bg-slate-50 text-slate-500",
+  "No Threshold Configured": "border-border bg-secondary text-muted-foreground",
   "Import Review Required": "border-amber-200 bg-amber-50 text-amber-700",
-  "Data Incomplete": "border-slate-200 bg-slate-50 text-slate-600"
+  "Data Incomplete": "border-border bg-secondary text-muted-foreground"
 };
 
 /**
@@ -24,15 +24,15 @@ const REASON_BADGE_CLASS = {
  */
 export default function RequiresAttentionTable({ rows = [] }) {
   return (
-    <Card className="border-slate-200">
+    <Card className="border-border">
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+        <CardTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
           <AlertTriangle className="h-4 w-4 text-amber-500" /> Requires Attention
         </CardTitle>
       </CardHeader>
       <CardContent>
         {rows.length === 0 ? (
-          <p className="py-6 text-center text-sm text-slate-400">Nothing flagged for this reporting period.</p>
+          <p className="py-6 text-center text-sm text-muted-foreground">Nothing flagged for this reporting period.</p>
         ) : (
           <Table>
             <TableHeader>
@@ -49,16 +49,16 @@ export default function RequiresAttentionTable({ rows = [] }) {
             <TableBody>
               {rows.map(row => (
                 <TableRow key={row.key}>
-                  <TableCell className="font-medium text-slate-800">{row.area}</TableCell>
+                  <TableCell className="font-medium text-foreground">{row.area}</TableCell>
                   <TableCell>{row.periodValue ?? "—"}</TableCell>
-                  <TableCell className="text-slate-500">{row.change ?? "—"}</TableCell>
-                  <TableCell className="text-slate-500">{row.coverage ?? "—"}</TableCell>
+                  <TableCell className="text-muted-foreground">{row.change ?? "—"}</TableCell>
+                  <TableCell className="text-muted-foreground">{row.coverage ?? "—"}</TableCell>
                   <TableCell>
-                    <Badge variant="outline" className={REASON_BADGE_CLASS[row.reason] || "border-slate-200 text-slate-600"}>
+                    <Badge variant="outline" className={REASON_BADGE_CLASS[row.reason] || "border-border text-muted-foreground"}>
                       {row.reason}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-slate-500">{row.source ?? "—"}</TableCell>
+                  <TableCell className="text-muted-foreground">{row.source ?? "—"}</TableCell>
                   <TableCell className="text-right">
                     <Button size="sm" variant="outline" disabled={!row.onViewRecords} onClick={row.onViewRecords}>
                       View Records

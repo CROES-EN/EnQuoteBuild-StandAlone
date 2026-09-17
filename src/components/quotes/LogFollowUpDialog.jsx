@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { getCurrentUser, updateQuote } from "@/api/dataClient";
@@ -96,7 +96,7 @@ export default function LogFollowUpDialog({ quote, open, onOpenChange, onLogged 
               ))}
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-600 font-medium">Priority:</span>
+              <span className="text-xs text-muted-foreground font-medium">Priority:</span>
               <Select value={mentionPriority} onValueChange={setMentionPriority}>
                 <SelectTrigger className="h-8 w-40">
                   <SelectValue />

@@ -1,4 +1,4 @@
-import { Card } from "@/components/ui/card";
+﻿import { Card } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { getDaysOpen, getDaysInCurrentStatus, RMA_STATUSES, STATUS_COLORS } from "@/components/rma/rmaUtils";
 import { FolderOpen, CheckCircle2, Clock, Timer } from "lucide-react";
@@ -11,8 +11,8 @@ function MetricCard({ icon: Icon, label, value, color }) {
           <Icon className="w-6 h-6 text-white" />
         </div>
         <div className="min-w-0">
-          <p className="text-sm text-slate-500 truncate">{label}</p>
-          <p className="text-2xl font-bold text-slate-900">{value}</p>
+          <p className="text-sm text-muted-foreground truncate">{label}</p>
+          <p className="text-2xl font-bold text-foreground">{value}</p>
         </div>
       </div>
     </Card>
@@ -52,7 +52,7 @@ export default function RMADashboard({ rmas }) {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="p-6">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4">RMAs by Status</h3>
+          <h3 className="text-lg font-semibold text-foreground mb-4">RMAs by Status</h3>
           {statusData.length > 0 ? (
             <ResponsiveContainer width="100%" height={320}>
               <BarChart data={statusData} layout="vertical" margin={{ left: 10, right: 20 }}>
@@ -68,12 +68,12 @@ export default function RMADashboard({ rmas }) {
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <p className="text-slate-400 text-center py-16">No data available</p>
+            <p className="text-muted-foreground text-center py-16">No data available</p>
           )}
         </Card>
 
         <Card className="p-6">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4">RMAs by Manufacturer</h3>
+          <h3 className="text-lg font-semibold text-foreground mb-4">RMAs by Manufacturer</h3>
           {manufacturerData.length > 0 ? (
             <ResponsiveContainer width="100%" height={320}>
               <BarChart data={manufacturerData} margin={{ left: -10, right: 10 }}>
@@ -85,12 +85,12 @@ export default function RMADashboard({ rmas }) {
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <p className="text-slate-400 text-center py-16">No data available</p>
+            <p className="text-muted-foreground text-center py-16">No data available</p>
           )}
         </Card>
 
         <Card className="p-6 lg:col-span-2">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4">RMAs by Case Owner</h3>
+          <h3 className="text-lg font-semibold text-foreground mb-4">RMAs by Case Owner</h3>
           {ownerData.length > 0 ? (
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={ownerData} margin={{ left: -10, right: 10 }}>
@@ -102,7 +102,7 @@ export default function RMADashboard({ rmas }) {
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <p className="text-slate-400 text-center py-16">No data available</p>
+            <p className="text-muted-foreground text-center py-16">No data available</p>
           )}
         </Card>
       </div>

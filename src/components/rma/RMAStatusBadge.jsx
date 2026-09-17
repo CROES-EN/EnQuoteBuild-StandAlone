@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+﻿import { cn } from "@/lib/utils";
 
 const statusConfig = {
   "New": { bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500" },
@@ -12,7 +12,7 @@ const statusConfig = {
   "Replacement Pending Shipment": { bg: "bg-orange-50", text: "text-orange-700", dot: "bg-orange-500" },
   "Replacement Shipped": { bg: "bg-cyan-50", text: "text-cyan-700", dot: "bg-cyan-500" },
   "Replacement Installed": { bg: "bg-teal-50", text: "text-teal-700", dot: "bg-teal-500" },
-  "Closed": { bg: "bg-slate-100", text: "text-slate-600", dot: "bg-slate-400" },
+  "Closed": { bg: "bg-muted", text: "text-muted-foreground", dot: "bg-slate-400" },
   "On Hold": { bg: "bg-red-50", text: "text-red-700", dot: "bg-red-500" }
 };
 

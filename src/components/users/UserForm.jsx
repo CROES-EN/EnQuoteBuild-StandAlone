@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,8 +53,8 @@ export default function UserForm({ user, onSave, onCancel, isLoading }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="flex items-center justify-between pb-4 border-b border-slate-200">
-        <h2 className="text-xl font-semibold text-slate-900">
+      <div className="flex items-center justify-between pb-4 border-b border-border">
+        <h2 className="text-xl font-semibold text-foreground">
           {user ? "Edit User Role" : "Invite User"}
         </h2>
         <Button type="button" variant="ghost" size="icon" onClick={onCancel}>
@@ -63,14 +63,14 @@ export default function UserForm({ user, onSave, onCancel, isLoading }) {
       </div>
 
       {user && (
-        <div className="p-4 bg-slate-50 rounded-lg">
+        <div className="p-4 bg-secondary rounded-lg">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
               <Mail className="w-5 h-5 text-indigo-600" />
             </div>
             <div>
-              <p className="font-medium text-slate-900">{user.full_name || "No name"}</p>
-              <p className="text-sm text-slate-500">{user.email}</p>
+              <p className="font-medium text-foreground">{user.full_name || "No name"}</p>
+              <p className="text-sm text-muted-foreground">{user.email}</p>
             </div>
           </div>
         </div>
@@ -120,7 +120,7 @@ export default function UserForm({ user, onSave, onCancel, isLoading }) {
             </SelectContent>
           </Select>
           {selectedRole && (
-            <p className="text-sm text-slate-500 mt-1.5">{selectedRole.description}</p>
+            <p className="text-sm text-muted-foreground mt-1.5">{selectedRole.description}</p>
           )}
         </div>
 

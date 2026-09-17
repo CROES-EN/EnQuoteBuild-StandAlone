@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Users, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -61,7 +61,7 @@ function Field({ id, label, value, onChange, placeholder, helperText }) {
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
       />
-      {helperText ? <p className="mt-1 text-xs text-slate-500">{helperText}</p> : null}
+      {helperText ? <p className="mt-1 text-xs text-muted-foreground">{helperText}</p> : null}
     </div>
   );
 }
@@ -125,18 +125,18 @@ export default function StaffingPanel({ records = [], selectedDate, onChanged })
   }
 
   return (
-    <Card className="border-slate-200">
+    <Card className="border-border">
       <CardHeader className="pb-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <CardTitle className="text-base">Staffing</CardTitle>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-muted-foreground">
               Manual entry from NICE CXONE Workforce Management.
             </p>
           </div>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-right">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Selected Date</p>
-            <p className="mt-1 text-sm font-semibold text-slate-900">{selectedDate || "No date selected"}</p>
+          <div className="rounded-lg border border-border bg-secondary px-4 py-3 text-right">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Selected Date</p>
+            <p className="mt-1 text-sm font-semibold text-foreground">{selectedDate || "No date selected"}</p>
           </div>
         </div>
       </CardHeader>
@@ -149,10 +149,10 @@ export default function StaffingPanel({ records = [], selectedDate, onChanged })
             </div>
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">Staffing Availability Rate</p>
-              <p className="mt-1 text-3xl font-bold text-slate-900">
+              <p className="mt-1 text-3xl font-bold text-foreground">
                 {availabilityRate !== null ? `${(availabilityRate * 100).toFixed(1)}%` : "N/A"}
               </p>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-muted-foreground">
                 {availabilityRate !== null
                   ? `${formatNumber(toNumberOrNull(form.staffing_present))} available of ${formatNumber(toNumberOrNull(form.staffing_scheduled))} scheduled`
                   : "Shown only when Scheduled Staff is greater than zero."}
@@ -161,17 +161,17 @@ export default function StaffingPanel({ records = [], selectedDate, onChanged })
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+        <div className="rounded-xl border border-border bg-secondary/60 p-4">
           <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-200 text-slate-700">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-200 text-foreground">
               <Users className="h-5 w-5" />
             </div>
             <div className="space-y-1">
-              <p className="text-sm font-semibold text-slate-900">Keep Team Headcount separate from Available Staff</p>
-              <p className="text-xs text-slate-500">
+              <p className="text-sm font-semibold text-foreground">Keep Team Headcount separate from Available Staff</p>
+              <p className="text-xs text-muted-foreground">
                 Team Headcount means active employees assigned to the team.
               </p>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-muted-foreground">
                 Available Staff means production capacity after absences and known partial-day impacts.
               </p>
             </div>
@@ -180,7 +180,7 @@ export default function StaffingPanel({ records = [], selectedDate, onChanged })
 
         <div className="space-y-3">
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Team Assignment</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Team Assignment</p>
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <Field
@@ -196,7 +196,7 @@ export default function StaffingPanel({ records = [], selectedDate, onChanged })
 
         <div className="space-y-3">
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Daily Availability</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Daily Availability</p>
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <Field

@@ -10,148 +10,189 @@ const isLocalDemo = ["mock", "local", "salesforce-mock"].includes(import.meta.en
 const appVersion = appPackage?.version || "0.0.0";
 
 function AppVersionBadge() {
-  return (
-    <div className="fixed bottom-4 left-4 z-10 rounded-md border border-slate-200 bg-white/90 px-2.5 py-1 text-[10px] font-medium tracking-wide text-slate-500 shadow-sm backdrop-blur-sm">
-      v{appVersion}
-    </div>
-  );
+ return (
+ <div className="fixed bottom-4 left-4 z-10 rounded-md border border-border bg-card/90 px-2.5 py-1 text-[10px] font-medium tracking-wide text-muted-foreground shadow-sm backdrop-blur-sm">
+ v{appVersion}
+ </div>
+ );
 }
 
 // Shared hook: fetches the current Base44 user, and -- critically -- surfaces
 // an explicit "needs login" state instead of hanging forever when the
 // session is missing or expired. Base44 remains the required source of
 // truth for Quotes; this only fixes how we react to an unauthenticated call.
+//
+// FIX (sturdiness): this query is invalidated app-wide any time Base44 delivers new data
+// (see Layout.jsx's onDataUpdated handler), which is CORRECT behavior for this query itself
+// (re-verifying the signed-in user/role is reasonable) - the actual bug was in how RoleGuard
+// below REACTED to that refetch. Confirmed root cause: every Base44 webhook delivery was
+// invalidating this exact query, which correctly triggers a background refetch - but
+// RoleGuard treated "isLoading" (React Query's flag for "no data has ever been fetched yet OR
+// is currently (re)fetching") identically to "this is the user's very first visit," and
+// blanked the ENTIRE page (every page RoleGuard wraps, including Workload and every
+// Supervisor Dashboard tab) behind a full-screen spinner every single time - even though the
+// user/role data was already known and almost certainly hadn't actually changed.
+//
+// The fix: this hook now separately tracks whether we've EVER successfully loaded a user
+// (hasLoadedOnceRef, a ref so it never itself triggers a re-render/effect loop). RoleGuard
+// below only shows the full-screen LoadingScreen on that TRUE first load - a later
+// invalidation-triggered refetch happens silently in the background, and `children` stays
+// mounted and visible the entire time, exactly like the Workload/Report Data non-flicker fix
+// applied earlier tonight.
+import { useRef } from "react";
+
 function useCurrentUserQuery() {
-  const { isAuthenticated, user: authUser, navigateToLogin } = useAuth();
+ const { isAuthenticated, user: authUser, navigateToLogin } = useAuth();
+ const hasLoadedOnceRef = useRef(false);
 
-  const { data: queriedUser, isLoading: queryLoading, isError } = useQuery({
-    queryKey: ["currentUser"],
-    queryFn: async () => {
-      if (isAuthenticated && authUser) return authUser;
-      const result = await base44.auth.me();
-      if (!result) {
-        // Treat an empty result as "not authenticated" rather than letting
-        // React Query throw its generic "data cannot be undefined" error.
-        throw new Error("Not authenticated");
-      }
-      return result;
-    },
-    enabled: !isLocalDemo,
-    retry: false
-  });
+ const { data: queriedUser, isLoading: queryLoading, isFetching, isError } = useQuery({
+ queryKey: ["currentUser"],
+ queryFn: async () => {
+ if (isAuthenticated && authUser) return authUser;
+ const result = await base44.auth.me();
+ if (!result) {
+ // Treat an empty result as "not authenticated" rather than letting
+ // React Query throw its generic "data cannot be undefined" error.
+ throw new Error("Not authenticated");
+ }
+ return result;
+ },
+ enabled: !isLocalDemo,
+ retry: false
+ });
 
-  const user = isLocalDemo ? authUser : queriedUser;
-  const isLoading = isLocalDemo ? !authUser : queryLoading;
-  const needsLogin = !isLocalDemo && !isLoading && (isError || !user);
+ const user = isLocalDemo ? authUser : queriedUser;
 
-  return { user, isLoading, needsLogin, navigateToLogin };
+ // isLoading here means "no data has ever been fetched yet" - React Query's own `isLoading`
+ // (as opposed to `isFetching`) already has almost this meaning, but is computed BEFORE the
+ // local-demo short-circuit above, so it's recomputed directly from whether `user` has ever
+ // been populated - this is what makes a later background refetch (isFetching=true,
+ // isLoading effectively false since we already have a user) distinguishable from a genuine
+ // first load (nothing has ever loaded yet).
+ if (user && !hasLoadedOnceRef.current) {
+ hasLoadedOnceRef.current = true;
+ }
+ const isFirstLoad = !hasLoadedOnceRef.current && (isLocalDemo ? !authUser : queryLoading);
+ const isBackgroundRefetch = hasLoadedOnceRef.current && (isLocalDemo ? false : isFetching);
+
+ const needsLogin = !isLocalDemo && !isFirstLoad && (isError || !user);
+
+ return { user, isLoading: isFirstLoad, isBackgroundRefetch, needsLogin, navigateToLogin };
 }
 
 function LoadingScreen() {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
-      <div className="text-center">
-        <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-slate-600">Setting up your account...</p>
-      </div>
-    </div>
-  );
+ return (
+ <div className="min-h-screen bg-background flex items-center justify-center">
+ <div className="text-center">
+ <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+ <p className="text-muted-foreground">Setting up your account...</p>
+ </div>
+ </div>
+ );
 }
 
 function SignInRequired({ navigateToLogin }) {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4 relative">
-      <AppVersionBadge />
-      <Card className="max-w-md w-full p-8 text-center">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-indigo-100 flex items-center justify-center">
-          <LogIn className="w-8 h-8 text-indigo-600" />
-        </div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">Sign In Required</h2>
-        <p className="text-slate-600 mb-6">
-          Your Base44 session has expired or you're not signed in. Sign in to access Quotes and other
-          data stored in Base44.
-        </p>
-        <Button onClick={navigateToLogin} className="bg-indigo-600 hover:bg-indigo-700">
-          <LogIn className="w-4 h-4 mr-2" />
-          Sign In to Base44
-        </Button>
-      </Card>
-    </div>
-  );
+ return (
+ <div className="min-h-screen bg-background flex items-center justify-center p-4 relative">
+ <AppVersionBadge />
+ <Card className="max-w-md w-full p-8 text-center">
+ <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-indigo-100 flex items-center justify-center">
+ <LogIn className="w-8 h-8 text-indigo-600" />
+ </div>
+ <h2 className="text-2xl font-bold text-foreground mb-2">Sign In Required</h2>
+ <p className="text-muted-foreground mb-6">
+ Your Base44 session has expired or you're not signed in. Sign in to access Quotes and other
+ data stored in Base44.
+ </p>
+ <Button onClick={navigateToLogin} className="bg-indigo-600 hover:bg-indigo-700">
+ <LogIn className="w-4 h-4 mr-2" />
+ Sign In to Base44
+ </Button>
+ </Card>
+ </div>
+ );
 }
 
 function RoleNotAssigned() {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
-      <Card className="max-w-md w-full p-8 text-center">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-100 flex items-center justify-center">
-          <ShieldAlert className="w-8 h-8 text-amber-600" />
-        </div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">Role Not Assigned</h2>
-        <p className="text-slate-600">
-          Your account hasn't been assigned a role yet. Please contact an administrator to assign you a
-          role (Submitter, Approver, or Admin).
-        </p>
-      </Card>
-    </div>
-  );
+ return (
+ <div className="min-h-screen bg-background flex items-center justify-center p-4">
+ <Card className="max-w-md w-full p-8 text-center">
+ <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-100 flex items-center justify-center">
+ <ShieldAlert className="w-8 h-8 text-amber-600" />
+ </div>
+ <h2 className="text-2xl font-bold text-foreground mb-2">Role Not Assigned</h2>
+ <p className="text-muted-foreground">
+ Your account hasn't been assigned a role yet. Please contact an administrator to assign you a
+ role (Submitter, Approver, or Admin).
+ </p>
+ </Card>
+ </div>
+ );
 }
 
 function AccessDenied({ role }) {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
-      <Card className="max-w-md w-full p-8 text-center">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-rose-100 flex items-center justify-center">
-          <ShieldAlert className="w-8 h-8 text-rose-600" />
-        </div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">Access Denied</h2>
-        <p className="text-slate-600">You don't have permission to access this page.</p>
-        <p className="text-sm text-slate-400 mt-2">Your role: {role}</p>
-      </Card>
-    </div>
-  );
+ return (
+ <div className="min-h-screen bg-background flex items-center justify-center p-4">
+ <Card className="max-w-md w-full p-8 text-center">
+ <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-rose-100 flex items-center justify-center">
+ <ShieldAlert className="w-8 h-8 text-rose-600" />
+ </div>
+ <h2 className="text-2xl font-bold text-foreground mb-2">Access Denied</h2>
+ <p className="text-muted-foreground">You don't have permission to access this page.</p>
+ <p className="text-sm text-muted-foreground mt-2">Your role: {role}</p>
+ </Card>
+ </div>
+ );
 }
 
 export default function RoleGuard({ children, allowedRoles }) {
-  const { user, isLoading, needsLogin, navigateToLogin } = useCurrentUserQuery();
+ const { user, isLoading, needsLogin, navigateToLogin } = useCurrentUserQuery();
 
-  if (isLoading) {
-    return <LoadingScreen />;
-  }
+ // FIX: isLoading now correctly means "this is a genuine first load, nothing has ever been
+ // fetched yet" (see useCurrentUserQuery above) - a background refetch triggered by e.g. a
+ // Base44 webhook sync no longer reaches this branch, so `children` (the actual page -
+ // Workload, a Supervisor Dashboard tab, Quotes, etc.) stays mounted and visible the entire
+ // time a silent re-verification happens behind the scenes.
+ if (isLoading) {
+ return <LoadingScreen />;
+ }
 
-  if (needsLogin) {
-    return <SignInRequired navigateToLogin={navigateToLogin} />;
-  }
+ if (needsLogin) {
+ return <SignInRequired navigateToLogin={navigateToLogin} />;
+ }
 
-  if (!user?.app_role) {
-    return <RoleNotAssigned />;
-  }
+ if (!user?.app_role) {
+ return <RoleNotAssigned />;
+ }
 
-  const userRoles = [user.app_role, ...(user.additional_roles || [])];
-  if (allowedRoles && !allowedRoles.some((role) => userRoles.includes(role))) {
-    return <AccessDenied role={user.app_role} />;
-  }
+ const userRoles = [user.app_role, ...(user.additional_roles || [])];
+ const isSuperAdmin = userRoles.includes("super_admin");
+ if (allowedRoles && !isSuperAdmin && !allowedRoles.some((role) => userRoles.includes(role))) {
+ return <AccessDenied role={user.app_role} />;
+ }
 
-  return children;
+ return children;
 }
 
 // Hook to get current user role -- unchanged public shape, now also
 // exposes needsLogin / navigateToLogin so pages/components using this hook
 // directly (instead of via <RoleGuard>) can also react to a missing session.
 export function useUserRole() {
-  const { user, isLoading, needsLogin, navigateToLogin } = useCurrentUserQuery();
-  const roles = [user?.app_role, ...(user?.additional_roles || [])].filter(Boolean);
+ const { user, isLoading, needsLogin, navigateToLogin } = useCurrentUserQuery();
+ const roles = [user?.app_role, ...(user?.additional_roles || [])].filter(Boolean);
+ const isSuperAdmin = roles.includes("super_admin");
 
-  return {
-    user,
-    role: user?.app_role,
-    roles,
-    isAdmin: roles.includes("admin"),
-    isApprover: roles.some((role) => ["approver", "admin"].includes(role)),
-    isInvoicer: roles.includes("invoicer"),
-    isSubmitter: roles.some((role) => ["submitter", "approver", "admin"].includes(role)),
-    isLoading,
-    needsLogin,
-    navigateToLogin
-  };
+ return {
+ user,
+ role: user?.app_role,
+ roles,
+ isAdmin: isSuperAdmin || roles.includes("admin"),
+ isApprover: isSuperAdmin || roles.some((role) => ["approver", "admin"].includes(role)),
+ isInvoicer: isSuperAdmin || roles.includes("invoicer"),
+ isSubmitter: isSuperAdmin || roles.some((role) => ["submitter", "approver", "admin"].includes(role)),
+ isSuperAdmin,
+ isLoading,
+ needsLogin,
+ navigateToLogin
+ };
 }

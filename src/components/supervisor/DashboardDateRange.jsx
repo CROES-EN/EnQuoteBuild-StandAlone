@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { CalendarRange, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -91,14 +91,14 @@ export default function DashboardDateRange({ records = [], value, onChange }) {
   }
 
   return (
-    <Card className="border-slate-200">
+    <Card className="border-border">
       <CardContent className="flex flex-wrap items-end gap-4 p-4">
-        <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+        <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
           <CalendarRange className="h-4 w-4" /> Reporting Period
         </div>
 
         <div className="flex flex-col gap-1">
-          <Label className="text-xs text-slate-500">Preset</Label>
+          <Label className="text-xs text-muted-foreground">Preset</Label>
           <Select value={pendingPreset} onValueChange={handlePresetChange}>
             <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -108,7 +108,7 @@ export default function DashboardDateRange({ records = [], value, onChange }) {
         </div>
 
         <div className="flex flex-col gap-1">
-          <Label className="text-xs text-slate-500">Start date</Label>
+          <Label className="text-xs text-muted-foreground">Start date</Label>
           <Input
             type="date"
             className="w-40"
@@ -119,7 +119,7 @@ export default function DashboardDateRange({ records = [], value, onChange }) {
         </div>
 
         <div className="flex flex-col gap-1">
-          <Label className="text-xs text-slate-500">End date</Label>
+          <Label className="text-xs text-muted-foreground">End date</Label>
           <Input
             type="date"
             className="w-40"
@@ -137,11 +137,11 @@ export default function DashboardDateRange({ records = [], value, onChange }) {
         </div>
 
         <div className="ml-auto flex flex-col items-end gap-0.5 text-right">
-          <span className="text-sm font-medium text-slate-800">
+          <span className="text-sm font-medium text-foreground">
             {getPresetLabel(committed.preset)}: {formatRangeLabel(committed)}
           </span>
           {coverage && (
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-muted-foreground">
               {coverage.snapshotCount} snapshot{coverage.snapshotCount === 1 ? "" : "s"} included
               {coverage.missingDateCount > 0 && ` \u00b7 ${coverage.missingDateCount} calendar date${coverage.missingDateCount === 1 ? "" : "s"} missing`}
             </span>

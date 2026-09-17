@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { ExternalLink, BookMarked, Table2, ListChecks, ClipboardCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -177,7 +177,7 @@ function StatusBadge({ status }) {
       className={
         isPrimary ? "border-emerald-200 bg-emerald-50 text-emerald-700"
           : isViewOnly ? "border-amber-200 bg-amber-50 text-amber-700"
-            : "border-slate-200 bg-slate-50 text-slate-600"
+            : "border-border bg-secondary text-muted-foreground"
       }
     >
       {status}
@@ -204,10 +204,10 @@ export default function ReportInventory() {
 
   return (
     <div className="space-y-6">
-      <Card className="border-slate-200 bg-slate-50">
+      <Card className="border-border bg-secondary">
         <CardContent className="p-4 flex items-start gap-3">
-          <BookMarked className="w-5 h-5 text-slate-500 shrink-0 mt-0.5" />
-          <p className="text-sm text-slate-600">
+          <BookMarked className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
+          <p className="text-sm text-muted-foreground">
             Reference only - nothing on this tab imports, edits, or connects to any of these systems. It tells you
             which report is authoritative for each metric and where to find it. Spreadsheets marked{" "}
             <span className="font-medium text-amber-700">view/import only</span> should never be edited in place -
@@ -216,13 +216,13 @@ export default function ReportInventory() {
         </CardContent>
       </Card>
 
-      <Card className="border-slate-200">
+      <Card className="border-border">
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
             <Table2 className="w-4 h-4 text-indigo-600" />
             Quick Source-of-Truth Map
           </CardTitle>
-          <p className="text-xs text-slate-400">Use this hierarchy to prevent overlapping reports from producing conflicting totals.</p>
+          <p className="text-xs text-muted-foreground">Use this hierarchy to prevent overlapping reports from producing conflicting totals.</p>
         </CardHeader>
         <CardContent>
           <div className="border rounded-lg overflow-auto">
@@ -239,7 +239,7 @@ export default function ReportInventory() {
                   <TableRow key={row.need}>
                     <TableCell className="font-medium whitespace-nowrap">{row.need}</TableCell>
                     <TableCell className="whitespace-nowrap">{row.source}</TableCell>
-                    <TableCell className="text-slate-600">{row.measures}</TableCell>
+                    <TableCell className="text-muted-foreground">{row.measures}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -248,13 +248,13 @@ export default function ReportInventory() {
         </CardContent>
       </Card>
 
-      <Card className="border-slate-200">
+      <Card className="border-border">
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
             <BookMarked className="w-4 h-4 text-indigo-600" />
             Complete Report Inventory
           </CardTitle>
-          <p className="text-xs text-slate-400">Direct links are included where confirmed. Where none was surfaced, locate the exact filename rather than guessing a URL.</p>
+          <p className="text-xs text-muted-foreground">Direct links are included where confirmed. Where none was surfaced, locate the exact filename rather than guessing a URL.</p>
         </CardHeader>
         <CardContent>
           <Accordion type="multiple" className="w-full">
@@ -262,9 +262,9 @@ export default function ReportInventory() {
               <AccordionItem key={report.name} value={report.name}>
                 <AccordionTrigger className="text-sm">
                   <div className="flex flex-1 flex-wrap items-center justify-between gap-2 pr-2">
-                    <span className="text-left font-medium text-slate-800">{report.name}</span>
+                    <span className="text-left font-medium text-foreground">{report.name}</span>
                     <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="text-slate-500 border-slate-200">{report.platform}</Badge>
+                      <Badge variant="outline" className="text-muted-foreground border-border">{report.platform}</Badge>
                       <StatusBadge status={report.status} />
                     </div>
                   </div>
@@ -282,14 +282,14 @@ export default function ReportInventory() {
                       </a>
                     )}
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">Use for</p>
-                      <ul className="list-disc list-inside space-y-0.5 text-slate-600">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Use for</p>
+                      <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
                         {report.useFor.map(item => <li key={item}>{item}</li>)}
                       </ul>
                     </div>
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">Reporting rule</p>
-                      <p className="text-slate-600">{report.rule}</p>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Reporting rule</p>
+                      <p className="text-muted-foreground">{report.rule}</p>
                     </div>
                   </div>
                 </AccordionContent>
@@ -299,7 +299,7 @@ export default function ReportInventory() {
         </CardContent>
       </Card>
 
-      <Card className="border-slate-200">
+      <Card className="border-border">
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
             <ListChecks className="w-4 h-4 text-indigo-600" />
@@ -307,29 +307,29 @@ export default function ReportInventory() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
-          <p className="text-slate-600">{CXONE_REPORTS_TO_LOCATE.intro}</p>
+          <p className="text-muted-foreground">{CXONE_REPORTS_TO_LOCATE.intro}</p>
           <div>
-            <p className="font-medium text-slate-700 mb-1">CXone Workforce Management</p>
+            <p className="font-medium text-foreground mb-1">CXone Workforce Management</p>
             <div className="flex flex-wrap gap-1.5 mb-1.5">
               {CXONE_REPORTS_TO_LOCATE.workforce.map(item => (
-                <Badge key={item} variant="outline" className="text-slate-600 border-slate-200 font-normal">{item}</Badge>
+                <Badge key={item} variant="outline" className="text-muted-foreground border-border font-normal">{item}</Badge>
               ))}
             </div>
-            <p className="text-xs text-slate-500">{CXONE_REPORTS_TO_LOCATE.workforceTarget}</p>
+            <p className="text-xs text-muted-foreground">{CXONE_REPORTS_TO_LOCATE.workforceTarget}</p>
           </div>
           <div>
-            <p className="font-medium text-slate-700 mb-1">CXone Queue and Contact Reporting</p>
+            <p className="font-medium text-foreground mb-1">CXone Queue and Contact Reporting</p>
             <div className="flex flex-wrap gap-1.5 mb-1.5">
               {CXONE_REPORTS_TO_LOCATE.queue.map(item => (
-                <Badge key={item} variant="outline" className="text-slate-600 border-slate-200 font-normal">{item}</Badge>
+                <Badge key={item} variant="outline" className="text-muted-foreground border-border font-normal">{item}</Badge>
               ))}
             </div>
-            <p className="text-xs text-slate-500">{CXONE_REPORTS_TO_LOCATE.queueTarget}</p>
+            <p className="text-xs text-muted-foreground">{CXONE_REPORTS_TO_LOCATE.queueTarget}</p>
           </div>
         </CardContent>
       </Card>
 
-      <Card className="border-slate-200">
+      <Card className="border-border">
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
             <Table2 className="w-4 h-4 text-indigo-600" />
@@ -349,7 +349,7 @@ export default function ReportInventory() {
                 {METRIC_DEFINITIONS.map(row => (
                   <TableRow key={row.metric}>
                     <TableCell className="font-medium whitespace-nowrap align-top">{row.metric}</TableCell>
-                    <TableCell className="text-slate-600">{row.definition}</TableCell>
+                    <TableCell className="text-muted-foreground">{row.definition}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -358,13 +358,13 @@ export default function ReportInventory() {
         </CardContent>
       </Card>
 
-      <Card className="border-slate-200">
+      <Card className="border-border">
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
             <ClipboardCheck className="w-4 h-4 text-indigo-600" />
             Configuration Checklist Before Production Use
           </CardTitle>
-          <p className="text-xs text-slate-400">{checkedCount} of {CHECKLIST_ITEMS.length} confirmed - saved on this PC only.</p>
+          <p className="text-xs text-muted-foreground">{checkedCount} of {CHECKLIST_ITEMS.length} confirmed - saved on this PC only.</p>
         </CardHeader>
         <CardContent className="space-y-2.5">
           {CHECKLIST_ITEMS.map((item, index) => (
@@ -374,7 +374,7 @@ export default function ReportInventory() {
                 onCheckedChange={() => toggleChecklistItem(index)}
                 className="mt-0.5"
               />
-              <span className={checklist[index] ? "text-slate-400 line-through" : "text-slate-700"}>{item}</span>
+              <span className={checklist[index] ? "text-muted-foreground line-through" : "text-foreground"}>{item}</span>
             </label>
           ))}
         </CardContent>

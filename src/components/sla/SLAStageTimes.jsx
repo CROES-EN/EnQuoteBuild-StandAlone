@@ -1,4 +1,4 @@
-import { Card } from "@/components/ui/card";
+﻿import { Card } from "@/components/ui/card";
 import { Clock, ArrowRight } from "lucide-react";
 import { differenceInHours, parseISO } from "date-fns";
 
@@ -117,11 +117,11 @@ export default function SLAStageTimes({ quotes }) {
   const maxAvg = Math.max(...stageData.map(s => s.avgH || 0), 1);
 
   return (
-    <Card className="p-6 border-slate-200">
+    <Card className="p-6 border-border">
       <div className="flex items-center gap-2 mb-6">
-        <Clock className="w-5 h-5 text-slate-600" />
-        <h3 className="text-lg font-semibold text-slate-900">SLA Stage Times</h3>
-        <span className="text-xs text-slate-400 ml-1">(avg time per lifecycle stage)</span>
+        <Clock className="w-5 h-5 text-muted-foreground" />
+        <h3 className="text-lg font-semibold text-foreground">SLA Stage Times</h3>
+        <span className="text-xs text-muted-foreground ml-1">(avg time per lifecycle stage)</span>
       </div>
 
       <div className="space-y-5">
@@ -135,33 +135,33 @@ export default function SLAStageTimes({ quotes }) {
                 <div>
                   <div className="flex items-center gap-2">
                     <ArrowRight className={`w-4 h-4 ${c.icon}`} />
-                    <p className="font-semibold text-slate-800">{stage.label}</p>
+                    <p className="font-semibold text-foreground">{stage.label}</p>
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.badge}`}>
                       {stage.n} quotes
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500 mt-0.5 ml-6">{stage.description}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 ml-6">{stage.description}</p>
                 </div>
                 <div className="flex items-baseline gap-3 sm:text-right">
                   <div>
-                    <p className="text-xs text-slate-500">Avg</p>
+                    <p className="text-xs text-muted-foreground">Avg</p>
                     <p className={`text-2xl font-bold ${c.value}`}>{formatHours(stage.avgH)}</p>
                   </div>
                   {stage.minH !== null && (
                     <div>
-                      <p className="text-xs text-slate-500">Min</p>
-                      <p className="text-sm font-medium text-slate-600">{formatHours(stage.minH)}</p>
+                      <p className="text-xs text-muted-foreground">Min</p>
+                      <p className="text-sm font-medium text-muted-foreground">{formatHours(stage.minH)}</p>
                     </div>
                   )}
                   {stage.maxH !== null && (
                     <div>
-                      <p className="text-xs text-slate-500">Max</p>
-                      <p className="text-sm font-medium text-slate-600">{formatHours(stage.maxH)}</p>
+                      <p className="text-xs text-muted-foreground">Max</p>
+                      <p className="text-sm font-medium text-muted-foreground">{formatHours(stage.maxH)}</p>
                     </div>
                   )}
                 </div>
               </div>
-              <div className="w-full bg-white/60 rounded-full h-2">
+              <div className="w-full bg-card/60 rounded-full h-2">
                 <div
                   className={`h-2 rounded-full transition-all duration-700 ${c.bar}`}
                   style={{ width: `${barWidth}%` }}

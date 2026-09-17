@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Card } from "@/components/ui/card";
@@ -28,14 +28,14 @@ export default function EditMyName({ currentUser }) {
   if (!currentUser) return null;
 
   return (
-    <Card className="p-4 border-slate-200 mb-6">
+    <Card className="p-4 border-border mb-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <UserCircle className="w-4 h-4 text-slate-500" />
-          <span className="text-sm font-medium text-slate-700">Display Name</span>
+          <UserCircle className="w-4 h-4 text-muted-foreground" />
+          <span className="text-sm font-medium text-foreground">Display Name</span>
         </div>
         {!editing && (
-          <Button variant="ghost" size="sm" onClick={() => setEditing(true)} className="h-7 text-xs text-slate-500 hover:text-indigo-600">
+          <Button variant="ghost" size="sm" onClick={() => setEditing(true)} className="h-7 text-xs text-muted-foreground hover:text-indigo-600">
             <Pencil className="w-3 h-3 mr-1" /> Edit
           </Button>
         )}
@@ -45,11 +45,11 @@ export default function EditMyName({ currentUser }) {
         <div className="mt-3 space-y-3">
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <Label className="text-xs text-slate-500">First Name</Label>
+              <Label className="text-xs text-muted-foreground">First Name</Label>
               <Input value={firstName} onChange={e => setFirstName(e.target.value)} className="mt-1 h-8 text-sm" placeholder="First" />
             </div>
             <div>
-              <Label className="text-xs text-slate-500">Last Name</Label>
+              <Label className="text-xs text-muted-foreground">Last Name</Label>
               <Input value={lastName} onChange={e => setLastName(e.target.value)} className="mt-1 h-8 text-sm" placeholder="Last" />
             </div>
           </div>
@@ -63,7 +63,7 @@ export default function EditMyName({ currentUser }) {
           </div>
         </div>
       ) : (
-        <p className="mt-1 text-slate-900 font-semibold">{currentUser.full_name || <span className="text-slate-400 italic text-sm">No name set</span>}</p>
+        <p className="mt-1 text-foreground font-semibold">{currentUser.full_name || <span className="text-muted-foreground italic text-sm">No name set</span>}</p>
       )}
     </Card>
   );

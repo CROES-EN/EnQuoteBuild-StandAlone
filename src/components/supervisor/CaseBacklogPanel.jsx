@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import { ClipboardList } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -53,9 +53,9 @@ function computeReconciliationVariance(actualEnd, expectedEnd) {
 
 function ComputedMetric({ label, value }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 text-lg font-semibold text-slate-900">{value === null ? "N/A" : formatNumber(value)}</p>
+    <div className="rounded-lg border border-border bg-secondary p-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-1 text-lg font-semibold text-foreground">{value === null ? "N/A" : formatNumber(value)}</p>
     </div>
   );
 }
@@ -116,7 +116,7 @@ export default function CaseBacklogPanel({ records, selectedDate, onChanged }) {
   const expectedEndingBacklog = computeExpectedEndingBacklog(backlogStart, newCasesReceived, casesCompleted);
 
   return (
-    <Card className="border-slate-200">
+    <Card className="border-border">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <ClipboardList className="h-5 w-5 text-indigo-600" />

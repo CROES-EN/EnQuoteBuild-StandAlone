@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+﻿import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
@@ -25,16 +25,16 @@ function rollingAverageByDate(entries, windowSize = 7) {
 
 function ChartCard({ title, children, action, emptyMessage }) {
   return (
-    <Card className="border-slate-200">
+    <Card className="border-border">
       <CardHeader className="pb-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle className="text-sm font-semibold text-slate-700">{title}</CardTitle>
+          <CardTitle className="text-sm font-semibold text-foreground">{title}</CardTitle>
           {action}
         </div>
       </CardHeader>
       <CardContent>
         {children || (
-          <div className="flex flex-col items-center justify-center gap-2 py-10 text-slate-400">
+          <div className="flex flex-col items-center justify-center gap-2 py-10 text-muted-foreground">
             <Activity className="w-8 h-8" />
             <p className="text-sm">{emptyMessage || "No data yet for this range."}</p>
           </div>
@@ -167,7 +167,7 @@ export function QuoteOperationsHistoryChart({ records = [], quoteOpsSeries = [] 
         </ResponsiveContainer>
       )}
       {!showBacklogLine && hasAnyData && (
-        <p className="mt-2 text-xs text-slate-400">
+        <p className="mt-2 text-xs text-muted-foreground">
           Quote Backlog at End trend line requires at least two days with a computable backlog in this range.
         </p>
       )}

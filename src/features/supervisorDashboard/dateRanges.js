@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Historical reporting-period resolution for the Executive Overview.
  *
  * Every helper here works purely off "YYYY-MM-DD" local-calendar strings (the same convention
@@ -11,21 +11,31 @@
  */
 
 export const RANGE_PRESETS = {
+  TODAY: "today",
+  YESTERDAY: "yesterday",
   SINGLE_DAY: "single_day",
   LAST_7_DAYS: "last_7_days",
   LAST_30_DAYS: "last_30_days",
   MONTH_TO_DATE: "month_to_date",
   PREVIOUS_MONTH: "previous_month",
+  THIS_QUARTER: "this_quarter",
+  LAST_QUARTER: "last_quarter",
+  YEAR_TO_DATE: "year_to_date",
   CUSTOM_RANGE: "custom_range",
   ALL_HISTORY: "all_history"
 };
 
 export const RANGE_PRESET_OPTIONS = [
+  { value: RANGE_PRESETS.TODAY, label: "Today" },
+  { value: RANGE_PRESETS.YESTERDAY, label: "Yesterday" },
   { value: RANGE_PRESETS.SINGLE_DAY, label: "Single Day" },
   { value: RANGE_PRESETS.LAST_7_DAYS, label: "Last 7 Days" },
   { value: RANGE_PRESETS.LAST_30_DAYS, label: "Last 30 Days" },
   { value: RANGE_PRESETS.MONTH_TO_DATE, label: "Month to Date" },
   { value: RANGE_PRESETS.PREVIOUS_MONTH, label: "Previous Month" },
+  { value: RANGE_PRESETS.THIS_QUARTER, label: "This Quarter" },
+  { value: RANGE_PRESETS.LAST_QUARTER, label: "Last Quarter" },
+  { value: RANGE_PRESETS.YEAR_TO_DATE, label: "Year to Date" },
   { value: RANGE_PRESETS.CUSTOM_RANGE, label: "Custom Range" },
   { value: RANGE_PRESETS.ALL_HISTORY, label: "All Available History" }
 ];
@@ -85,6 +95,33 @@ function lastDayOfMonth(firstOfMonthStr) {
   return toDateStr(date);
 }
 
+/** First day ("YYYY-MM-DD") of the CALENDAR quarter (Jan-Mar/Apr-Jun/Jul-Sep/Oct-Dec)
+ *  containing `dateStr`. */
+function firstOfQuarter(dateStr) {
+  const date = parseDateStr(dateStr);
+  if (!date) return null;
+  const quarterStartMonth = Math.floor(date.getMonth() / 3) * 3;
+  return toDateStr(new Date(date.getFullYear(), quarterStartMonth, 1));
+}
+
+/** Last day ("YYYY-MM-DD") of the calendar quarter that starts on `firstOfQuarterStr`. */
+function lastDayOfQuarter(firstOfQuarterStr) {
+  const date = parseDateStr(firstOfQuarterStr);
+  if (!date) return null;
+  date.setMonth(date.getMonth() + 3);
+  date.setDate(0);
+  return toDateStr(date);
+}
+
+/** First day ("YYYY-MM-DD") of the calendar quarter immediately BEFORE the one containing
+ *  `dateStr`. */
+function firstOfPreviousQuarter(dateStr) {
+  const currentQuarterStart = parseDateStr(firstOfQuarter(dateStr));
+  if (!currentQuarterStart) return null;
+  currentQuarterStart.setMonth(currentQuarterStart.getMonth() - 3);
+  return toDateStr(currentQuarterStart);
+}
+
 /** Sorted, de-duplicated list of every "YYYY-MM-DD" date present in `records`. */
 export function getRecordDates(records) {
   const dates = new Set((records || []).map(record => record?.date).filter(Boolean));
@@ -110,9 +147,23 @@ export function resolveDateRange({ preset, endDate, startDate, records = [] } = 
   const recordDates = getRecordDates(records);
   const latestRecordDate = recordDates[recordDates.length - 1] || null;
   const earliestRecordDate = recordDates[0] || null;
-  const effectiveEnd = endDate || latestRecordDate || todayStr();
+  const effectiveEnd = endDate || todayStr();
 
   switch (preset) {
+    // TODAY/YESTERDAY intentionally anchor to the REAL current date (the user's own computer
+    // clock, via todayStr()) rather than `effectiveEnd` - unlike every other preset here, which
+    // anchors to the latest STORED record's date so historical data still makes sense to browse.
+    // "Today" should always mean today, even if the most recent import is stale.
+    case RANGE_PRESETS.TODAY: {
+      const today = todayStr();
+      return { start: today, end: today, isInvalid: false };
+    }
+
+    case RANGE_PRESETS.YESTERDAY: {
+      const yesterday = addDays(todayStr(), -1);
+      return { start: yesterday, end: yesterday, isInvalid: false };
+    }
+
     case RANGE_PRESETS.SINGLE_DAY:
       return { start: effectiveEnd, end: effectiveEnd, isInvalid: false };
 
@@ -128,6 +179,21 @@ export function resolveDateRange({ preset, endDate, startDate, records = [] } = 
     case RANGE_PRESETS.PREVIOUS_MONTH: {
       const start = firstOfPreviousMonth(effectiveEnd);
       return { start, end: lastDayOfMonth(start), isInvalid: false };
+    }
+
+    case RANGE_PRESETS.THIS_QUARTER: {
+      const start = firstOfQuarter(effectiveEnd);
+      return { start, end: effectiveEnd, isInvalid: false };
+    }
+
+    case RANGE_PRESETS.LAST_QUARTER: {
+      const start = firstOfPreviousQuarter(effectiveEnd);
+      return { start, end: lastDayOfQuarter(start), isInvalid: false };
+    }
+
+    case RANGE_PRESETS.YEAR_TO_DATE: {
+      const [year] = String(effectiveEnd).split("-");
+      return { start: `${year}-01-01`, end: effectiveEnd, isInvalid: false };
     }
 
     case RANGE_PRESETS.CUSTOM_RANGE: {
@@ -169,6 +235,23 @@ export function getPreviousPeriodRange({ preset, start, end }) {
   if (preset === RANGE_PRESETS.PREVIOUS_MONTH) {
     const prevPrevFirst = firstOfPreviousMonth(start);
     return { start: prevPrevFirst, end: lastDayOfMonth(prevPrevFirst) };
+  }
+
+  if (preset === RANGE_PRESETS.THIS_QUARTER) {
+    const prevQuarterFirst = firstOfPreviousQuarter(start);
+    return { start: prevQuarterFirst, end: lastDayOfQuarter(prevQuarterFirst) };
+  }
+
+  if (preset === RANGE_PRESETS.LAST_QUARTER) {
+    const prevPrevQuarterFirst = firstOfPreviousQuarter(start);
+    return { start: prevPrevQuarterFirst, end: lastDayOfQuarter(prevPrevQuarterFirst) };
+  }
+
+  if (preset === RANGE_PRESETS.YEAR_TO_DATE) {
+    const elapsedDays = diffDays(start, end) + 1;
+    const [year] = String(start).split("-");
+    const prevYearStart = `${Number(year) - 1}-01-01`;
+    return { start: prevYearStart, end: addDays(prevYearStart, elapsedDays - 1) };
   }
 
   const durationDays = diffDays(start, end) + 1;

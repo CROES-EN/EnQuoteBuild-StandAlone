@@ -1,4 +1,4 @@
-import { Card } from "@/components/ui/card";
+﻿import { Card } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { startOfWeek, format, subWeeks, parseISO, isAfter, isBefore } from "date-fns";
 import { TrendingUp } from "lucide-react";
@@ -26,15 +26,15 @@ export default function WeeklyInflow({ quotes, dateRange }) {
   const trend = lastWeek > 0 ? (((thisWeek - lastWeek) / lastWeek) * 100).toFixed(0) : null;
 
   return (
-    <Card className="p-6 border-slate-200">
+    <Card className="p-6 border-border">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <TrendingUp className="w-5 h-5 text-indigo-600" />
-          <h3 className="text-lg font-semibold text-slate-900">Weekly New Quote Inflow</h3>
+          <h3 className="text-lg font-semibold text-foreground">Weekly New Quote Inflow</h3>
         </div>
-        <div className="flex gap-4 text-sm text-slate-500">
-          <span><span className="font-semibold text-slate-700">{totalInflow}</span> total</span>
-          <span><span className="font-semibold text-slate-700">{avgPerWeek}</span> avg/week</span>
+        <div className="flex gap-4 text-sm text-muted-foreground">
+          <span><span className="font-semibold text-foreground">{totalInflow}</span> total</span>
+          <span><span className="font-semibold text-foreground">{avgPerWeek}</span> avg/week</span>
           {trend !== null && (
             <span className={parseInt(trend) >= 0 ? "text-green-600 font-semibold" : "text-rose-600 font-semibold"}>
               {parseInt(trend) >= 0 ? "+" : ""}{trend}% vs last week

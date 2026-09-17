@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+﻿import { useState, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { createReview, getCurrentUser, getQuotes, getReviews, getUsers, updateReview } from "@/api/dataClient";
@@ -26,7 +26,7 @@ const isRejectedByAjennings = (quote) => {
 };
 
 const formatDate = (d) => d ? new Date(d).toLocaleDateString() : "—";
-const formatCurrency = (v) => `$${(v || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+const formatCurrency = (v) => `$${(v || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function RejectedQuoteReview() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -122,7 +122,7 @@ export default function RejectedQuoteReview() {
     pending: "bg-yellow-100 text-yellow-700",
     in_progress: "bg-blue-100 text-blue-700",
     completed: "bg-green-100 text-green-700",
-    resolved: "bg-slate-100 text-slate-500",
+    resolved: "bg-muted text-muted-foreground",
   };
 
   const statusIcon = {
@@ -182,8 +182,8 @@ export default function RejectedQuoteReview() {
     return (
       <div className="p-8 flex flex-col items-center justify-center gap-4 text-center">
         <AlertCircle className="w-12 h-12 text-orange-400" />
-        <h2 className="text-xl font-semibold text-slate-700">Access Restricted</h2>
-        <p className="text-slate-500 max-w-md">
+        <h2 className="text-xl font-semibold text-foreground">Access Restricted</h2>
+        <p className="text-muted-foreground max-w-md">
           This review section is only accessible to authorized reviewers (tmeyer, dankenman).
         </p>
       </div>
@@ -193,8 +193,8 @@ export default function RejectedQuoteReview() {
   return (
     <div className="p-6 max-w-5xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Rejected Quote Reviews</h1>
-        <p className="text-slate-500 mt-1">
+        <h1 className="text-2xl font-bold text-foreground">Rejected Quote Reviews</h1>
+        <p className="text-muted-foreground mt-1">
           Quotes rejected by ajennings — review, provide coaching, and recommend edits for resubmission.
         </p>
       </div>
@@ -229,14 +229,14 @@ export default function RejectedQuoteReview() {
           return (
             <Card
               key={s}
-              className={`border-slate-200 cursor-pointer transition-all hover:shadow-md ${isActive ? "ring-2 ring-orange-400 border-orange-300" : ""}`}
+              className={`border-border cursor-pointer transition-all hover:shadow-md ${isActive ? "ring-2 ring-orange-400 border-orange-300" : ""}`}
               onClick={() => setStatusFilter(isActive ? "all" : s)}
             >
               <CardContent className="p-4 flex items-center gap-3">
                 <Badge className={`${statusColors[s]} text-xs`}>
                   {statusIcon[s]} {s.replace("_", " ")}
                 </Badge>
-                <span className="text-2xl font-bold text-slate-800">{count}</span>
+                <span className="text-2xl font-bold text-foreground">{count}</span>
               </CardContent>
             </Card>
           );
@@ -246,7 +246,7 @@ export default function RejectedQuoteReview() {
       {/* Search + Sort + Filter Controls */}
       <div className="flex flex-wrap gap-2 mb-4 items-center">
         <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+          <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
           <Input
             className="pl-9"
             placeholder="Search by quote number or site ID..."
@@ -288,7 +288,7 @@ export default function RejectedQuoteReview() {
             {bulkClosing ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5 mr-1" />}
             {bulkClosing ? "Closing..." : "Mark All Complete"}
           </Button>
-          <Button size="sm" variant="ghost" className="text-slate-500 px-2" onClick={() => setSelectedSiteIds(new Set())}>
+          <Button size="sm" variant="ghost" className="text-muted-foreground px-2" onClick={() => setSelectedSiteIds(new Set())}>
             <X className="w-3.5 h-3.5" />
           </Button>
         </div>
@@ -296,9 +296,9 @@ export default function RejectedQuoteReview() {
 
       {/* Quote List — grouped by site */}
       {isLoading ? (
-        <div className="text-center py-12 text-slate-400">Loading rejected quotes...</div>
+        <div className="text-center py-12 text-muted-foreground">Loading rejected quotes...</div>
       ) : searchFiltered.length === 0 ? (
-        <div className="text-center py-12 text-slate-400">
+        <div className="text-center py-12 text-muted-foreground">
           <CheckCircle2 className="w-10 h-10 mx-auto mb-2 text-green-300" />
           No rejected quotes from ajennings found.
         </div>
@@ -343,7 +343,7 @@ export default function RejectedQuoteReview() {
 
           if (siteEntries.length === 0) {
             return (
-              <div className="text-center py-12 text-slate-400">
+              <div className="text-center py-12 text-muted-foreground">
                 <CheckCircle2 className="w-10 h-10 mx-auto mb-2 text-green-300" />
                 No quotes match the selected filters.
               </div>
@@ -361,12 +361,12 @@ export default function RejectedQuoteReview() {
                     key={siteId}
                     className={`transition-all ${
                       reviewStatus === "resolved"
-                        ? "border-slate-200 bg-slate-50 opacity-60"
+                        ? "border-border bg-secondary opacity-60"
                         : selectedSiteIds.has(siteId)
                           ? "border-indigo-400 bg-indigo-50/30 shadow-sm"
                           : hasMultiple || totalRejections > 1
                             ? "hover:shadow-md border-orange-300 bg-orange-50/30"
-                            : "hover:shadow-md border-slate-200"
+                            : "hover:shadow-md border-border"
                     }`}
                   >
                     <CardContent className="p-4">
@@ -374,7 +374,7 @@ export default function RejectedQuoteReview() {
                         <div className="flex items-start gap-3 min-w-0">
                           {(reviewStatus === "pending" || reviewStatus === "in_progress") && (
                             <button
-                              className="mt-0.5 shrink-0 text-slate-400 hover:text-indigo-600 transition-colors"
+                              className="mt-0.5 shrink-0 text-muted-foreground hover:text-indigo-600 transition-colors"
                               onClick={(e) => { e.stopPropagation(); toggleSelectSite(siteId); }}
                             >
                               {selectedSiteIds.has(siteId)
@@ -389,18 +389,18 @@ export default function RejectedQuoteReview() {
                           )}
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <p className="font-semibold text-slate-800">Site: {siteId}</p>
+                              <p className="font-semibold text-foreground">Site: {siteId}</p>
                               {(hasMultiple || totalRejections > 1) && (
                                 <Badge className="bg-orange-100 text-orange-700 text-xs border border-orange-200">
                                   {totalRejections} rejections · {siteQuotes.length} version{siteQuotes.length > 1 ? "s" : ""}
                                 </Badge>
                               )}
                             </div>
-                            <p className="text-sm text-slate-500 mt-0.5">
+                            <p className="text-sm text-muted-foreground mt-0.5">
                               Quote#{siteQuotes.map(q => q.quote_number).filter(Boolean).join(", #") || "—"} · Last rejected {formatDate(rejectionEntry?.changed_at)}
                             </p>
                             {reviewStatus === "resolved" && (
-                              <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+                              <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
                                 <ShieldCheck className="w-3 h-3" /> A later version of this quote has been approved or paid — no review needed.
                               </p>
                             )}
@@ -412,9 +412,9 @@ export default function RejectedQuoteReview() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                          <span className="text-sm font-medium text-slate-700">{formatCurrency(latest.total)}</span>
+                          <span className="text-sm font-medium text-foreground">{formatCurrency(latest.total)}</span>
                           {reviewCount > 0 && (
-                            <span className="text-xs text-slate-400">{reviewCount} review{reviewCount > 1 ? "s" : ""}</span>
+                            <span className="text-xs text-muted-foreground">{reviewCount} review{reviewCount > 1 ? "s" : ""}</span>
                           )}
                           <Badge className={`${statusColors[reviewStatus]} text-xs`}>
                             {statusIcon[reviewStatus]} {reviewStatus.replace("_", " ")}
@@ -428,7 +428,7 @@ export default function RejectedQuoteReview() {
                               <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setSelectedQuote(latest); }}>
                                 Review
                               </Button>
-                              <Button size="sm" variant="ghost" className="text-slate-500 text-xs px-2" onClick={(e) => { e.stopPropagation(); setSelectedSite(siteId); }}>
+                              <Button size="sm" variant="ghost" className="text-muted-foreground text-xs px-2" onClick={(e) => { e.stopPropagation(); setSelectedSite(siteId); }}>
                                 History
                               </Button>
                             </>

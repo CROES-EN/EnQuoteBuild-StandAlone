@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -19,7 +19,7 @@ import {
   autoMapColumns,
   aggregateRowsByDate
 } from "@/features/supervisorDashboard/reportParsing";
-import { saveDailyMetric } from "@/features/supervisorDashboard/opsMetricsStore";
+import { saveDailyMetric, listDailyMetrics } from "@/features/supervisorDashboard/opsMetricsStore";
 import { formatSecondsAsClock } from "@/features/supervisorDashboard/format";
 import { setLastImportedFile } from "@/features/supervisorDashboard/lastImportedFile";
 import {
@@ -29,6 +29,7 @@ import {
   resetFieldVisibility
 } from "@/features/supervisorDashboard/columnPreferences";
 import ColumnCustomizer from "@/components/supervisor/ColumnCustomizer";
+import ImportProgressScreen from "@/components/supervisor/ImportProgressScreen";
 
 const SOURCE_OPTIONS = [
   { value: "cxone", label: "CXONE / NICE Report (Contact Center)" },
@@ -47,7 +48,7 @@ const NONE_VALUE = "__none__";
 function groupFieldDefinitions(fieldDefinitions) {
   const groups = [];
   const byName = new Map();
-  fieldDefinitions.forEach(field => {
+  fieldDefinitions.forEach((field) => {
     const groupName = field.group || "Other";
     if (!byName.has(groupName)) {
       const group = { name: groupName, fields: [] };
@@ -81,6 +82,13 @@ export default function ImportReportDialog({ open, onOpenChange, onImported, ini
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState("");
   const [showCustomizer, setShowCustomizer] = useState(false);
+
+  // Real (non-simulated) import stage tracking for ImportProgressScreen - null while the user is
+  // still choosing/mapping/previewing, "saving" while saveDailyMetric calls are in flight,
+  // "complete" once every record has been saved. Never driven by a timer.
+  const [importStage, setImportStage] = useState(null);
+  const [importSummary, setImportSummary] = useState(null);
+
   // Bumped whenever column-visibility preferences change, to force the memos below (which read
   // localStorage, not React state) to recompute.
   const [prefsVersion, setPrefsVersion] = useState(0);
@@ -108,9 +116,12 @@ export default function ImportReportDialog({ open, onOpenChange, onImported, ini
   const isMultiSheet = selectedSheetNames.length > 1;
 
   // Only preview columns for fields actually mapped in this import - with 30+ possible fields
-  // across every tab, always showing every column (mostly "—") would make the preview unusable.
+  // across every tab, always showing every column (mostly "-") would make the preview unusable.
   const previewFields = useMemo(
-    () => effectiveFieldDefinitions.filter(field => field.key !== "date" && field.key !== "agent" && mapping[field.key] !== null && mapping[field.key] !== undefined),
+    () =>
+      effectiveFieldDefinitions.filter(
+        (field) => field.key !== "date" && field.key !== "agent" && mapping[field.key] !== null && mapping[field.key] !== undefined
+      ),
     [effectiveFieldDefinitions, mapping]
   );
 
@@ -126,8 +137,17 @@ export default function ImportReportDialog({ open, onOpenChange, onImported, ini
   }, [rawRows, headerRowIndex, mapping, hasDateColumn, fallbackDate, source]);
 
   function resetState() {
-    setFileName(""); setFilePath(""); setPeeked(null); setSelectedSheetNames([]);
-    setRawRows([]); setHeaderRowIndex(0); setMapping({}); setError(""); setShowCustomizer(false);
+    setFileName("");
+    setFilePath("");
+    setPeeked(null);
+    setSelectedSheetNames([]);
+    setRawRows([]);
+    setHeaderRowIndex(0);
+    setMapping({});
+    setError("");
+    setShowCustomizer(false);
+    setImportStage(null);
+    setImportSummary(null);
   }
 
   function applyMappingForRows(rows, guessedHeaderRow, fieldDefs) {
@@ -139,7 +159,8 @@ export default function ImportReportDialog({ open, onOpenChange, onImported, ini
 
   async function handleFileChosen(file) {
     if (!file) return;
-    setLoading(true); setError("");
+    setLoading(true);
+    setError("");
     try {
       const peekedFile = await peekReportFile(file);
       setFileName(file.name);
@@ -148,7 +169,6 @@ export default function ImportReportDialog({ open, onOpenChange, onImported, ini
       // empty there and the "reopen this file" shortcut stays hidden, as expected.
       setFilePath(file.path || "");
       setPeeked(peekedFile);
-
       if (peekedFile.sheetNames.length <= 1) {
         // Only one tab/section exists - nothing to choose, so parse it immediately instead of
         // making the user confirm a selection of one (matches this dialog's existing
@@ -169,12 +189,13 @@ export default function ImportReportDialog({ open, onOpenChange, onImported, ini
   }
 
   function toggleSheet(name, checked) {
-    setSelectedSheetNames(prev => (checked ? [...prev, name] : prev.filter(n => n !== name)));
+    setSelectedSheetNames((prev) => (checked ? [...prev, name] : prev.filter((n) => n !== name)));
   }
 
   function handleContinueWithSheets() {
     if (!peeked || !selectedSheetNames.length) return;
-    setLoading(true); setError("");
+    setLoading(true);
+    setError("");
     try {
       if (selectedSheetNames.length === 1) {
         const rows = readPeekedSheet(peeked, selectedSheetNames[0]);
@@ -191,7 +212,10 @@ export default function ImportReportDialog({ open, onOpenChange, onImported, ini
 
   // Goes back to the tab/section picker without discarding the already-peeked file.
   function handleChangeTabs() {
-    setRawRows([]); setHeaderRowIndex(0); setMapping({}); setError("");
+    setRawRows([]);
+    setHeaderRowIndex(0);
+    setMapping({});
+    setError("");
   }
 
   function handleHeaderRowChange(nextIndex) {
@@ -205,68 +229,130 @@ export default function ImportReportDialog({ open, onOpenChange, onImported, ini
     if (!visible) {
       // Hiding a field that's currently mapped clears its mapping too, so a hidden field can
       // never keep quietly importing data behind the scenes.
-      setMapping(prev => {
+      setMapping((prev) => {
         const next = { ...prev };
         delete next[fieldKey];
         return next;
       });
     }
-    setPrefsVersion(v => v + 1);
+    setPrefsVersion((v) => v + 1);
   }
 
   function handleResetVisibility() {
     resetFieldVisibility(source);
-    setPrefsVersion(v => v + 1);
+    setPrefsVersion((v) => v + 1);
   }
 
   async function handleImport() {
     if (!aggregation?.records?.length) return;
     setImporting(true);
+    setImportStage("saving");
     try {
+      // Determine, BEFORE saving anything, which of this import's dates already have a stored
+      // record - this is the only reliable way to report "New" vs "Updated" per date, since
+      // opsMetricsStore's merge is deliberately silent (it never returns whether it created or
+      // updated a record). Reading existing state first never mutates anything.
+      const existingRecords = await listDailyMetrics();
+      const existingDates = new Set(existingRecords.map((r) => r.date));
+
+      let newDateCount = 0;
+      let updatedDateCount = 0;
+
       for (const record of aggregation.records) {
+        if (existingDates.has(record.date)) {
+          updatedDateCount += 1;
+        } else {
+          newDateCount += 1;
+        }
         // eslint-disable-next-line no-await-in-loop
         await saveDailyMetric(record);
       }
+
       setLastImportedFile({ name: fileName, path: filePath, source });
+
+      setImportSummary({
+        newDateCount,
+        updatedDateCount,
+        totalRows: aggregation.totalRowsProcessed,
+        warnings: aggregation.warnings
+      });
+      setImportStage("complete");
+
       toast.success(
         `Imported ${aggregation.records.length} day${aggregation.records.length === 1 ? "" : "s"} from ${fileName}`
       );
       onImported?.();
-      onOpenChange(false);
-      resetState();
     } catch (err) {
+      setImportStage(null);
       toast.error(err.message || "Import failed.");
     }
     setImporting(false);
   }
 
+  function handleCloseAfterComplete() {
+    onOpenChange(false);
+    resetState();
+  }
+
+  function handleImportAnother() {
+    resetState();
+  }
+
   const showSheetPicker = Boolean(peeked && !rawRows.length && peeked.sheetNames.length > 1);
+  const showProgressScreen = Boolean(importStage);
 
   return (
-    <Dialog open={open} onOpenChange={(next) => { onOpenChange(next); if (!next) resetState(); }}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        onOpenChange(next);
+        if (!next) resetState();
+      }}
+    >
+      <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <FileSpreadsheet className="w-5 h-5 text-indigo-600" />
+            <FileSpreadsheet className="h-5 w-5 text-indigo-600" />
             Import Report
           </DialogTitle>
-          <DialogDescription>
-            Upload a CXONE/NICE, Salesforce, Incorta (spreadsheet or HTML dashboard export), Enphase Care, or
-            escalations tracker report export (.xlsx, .xls, .csv, .html, or .htm). Map its columns to the metrics
-            below - imports are paired by date, so separate files covering different tabs for the same day combine
-            instead of overwriting each other. See the <strong>Import Center</strong> tab for full per-report
-            instructions, blank templates, and synthetic sample files.
-          </DialogDescription>
+          {!showProgressScreen && (
+            <DialogDescription>
+              Upload a CXONE/NICE, Salesforce, Incorta (spreadsheet or HTML dashboard export), Enphase Care, or
+              escalations tracker report export (.xlsx, .xls, .csv, .html, or .htm). Map its columns to the metrics
+              below - imports are paired by date, so separate files covering different tabs for the same day combine
+              instead of overwriting each other. See the <strong>Import Center</strong> tab for full per-report
+              instructions, blank templates, and synthetic sample files.
+            </DialogDescription>
+          )}
         </DialogHeader>
 
-        {!peeked && (
-          <div className="py-6 space-y-4">
+        {showProgressScreen && (
+          <ImportProgressScreen
+            stage={importStage}
+            fileName={fileName}
+            totalRows={importSummary?.totalRows ?? 0}
+            newDateCount={importSummary?.newDateCount ?? 0}
+            updatedDateCount={importSummary?.updatedDateCount ?? 0}
+            warnings={importSummary?.warnings ?? []}
+            onClose={handleCloseAfterComplete}
+            onImportAnother={handleImportAnother}
+          />
+        )}
+
+        {!showProgressScreen && !peeked && (
+          <div className="space-y-4 py-6">
             <div>
               <Label className="mb-2 block">Report type</Label>
               <Select value={source} onValueChange={setSource}>
-                <SelectTrigger className="w-96"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-96">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  {SOURCE_OPTIONS.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+                  {SOURCE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -282,12 +368,12 @@ export default function ImportReportDialog({ open, onOpenChange, onImported, ini
               disabled={loading}
               onClick={() => document.getElementById("supervisor-report-file-input")?.click()}
             >
-              <Upload className="mr-2 w-4 h-4" />
-              {loading ? "Reading file…" : "Choose Report File"}
+              <Upload className="mr-2 h-4 w-4" />
+              {loading ? "Reading file..." : "Choose Report File"}
             </Button>
             {error && (
               <Alert variant="destructive">
-                <AlertTriangle className="w-4 h-4" />
+                <AlertTriangle className="h-4 w-4" />
                 <AlertTitle>Couldn't read file</AlertTitle>
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
@@ -295,24 +381,24 @@ export default function ImportReportDialog({ open, onOpenChange, onImported, ini
           </div>
         )}
 
-        {showSheetPicker && (
-          <div className="py-6 space-y-4">
+        {!showProgressScreen && showSheetPicker && (
+          <div className="space-y-4 py-6">
             <div>
-              <Label className="mb-1.5 block text-xs text-slate-500">File</Label>
-              <p className="text-sm font-medium text-slate-700">{fileName}</p>
+              <Label className="mb-1.5 block text-xs text-muted-foreground">File</Label>
+              <p className="text-sm font-medium text-foreground">{fileName}</p>
             </div>
             <div>
-              <p className="text-sm font-semibold text-slate-700 mb-1">
+              <p className="mb-1 text-sm font-semibold text-foreground">
                 {peeked.kind === "html" ? "Select the dashboard section(s) to import" : "Select the tab(s) to import"}
               </p>
-              <p className="text-xs text-slate-500 mb-3">
+              <p className="mb-3 text-xs text-muted-foreground">
                 Only the tab(s)/section(s) you check are read - everything else in this file is left untouched, so
                 a large workbook or dashboard export never slows things down over what you actually need. Select
                 more than one only when they share the same columns (e.g. several same-shaped weekly tabs).
               </p>
-              <div className="max-h-72 overflow-auto border rounded-lg divide-y">
-                {peeked.sheetNames.map(name => (
-                  <label key={name} className="flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer">
+              <div className="max-h-72 divide-y overflow-auto rounded-lg border">
+                {peeked.sheetNames.map((name) => (
+                  <label key={name} className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-secondary">
                     <Checkbox
                       checked={selectedSheetNames.includes(name)}
                       onCheckedChange={(checked) => toggleSheet(name, checked === true)}
@@ -324,38 +410,42 @@ export default function ImportReportDialog({ open, onOpenChange, onImported, ini
             </div>
             {error && (
               <Alert variant="destructive">
-                <AlertTriangle className="w-4 h-4" />
+                <AlertTriangle className="h-4 w-4" />
                 <AlertTitle>Couldn't read selection</AlertTitle>
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
             <div className="flex gap-2">
               <Button onClick={handleContinueWithSheets} disabled={loading || !selectedSheetNames.length}>
-                {loading ? "Reading…" : `Continue with ${selectedSheetNames.length || ""} selected`}
+                {loading ? "Reading..." : `Continue with ${selectedSheetNames.length || ""} selected`}
               </Button>
-              <Button variant="outline" onClick={resetState}>Choose a different file</Button>
+              <Button variant="outline" onClick={resetState}>
+                Choose a different file
+              </Button>
             </div>
           </div>
         )}
 
-        {rawRows.length > 0 && (
+        {!showProgressScreen && rawRows.length > 0 && (
           <div className="space-y-5">
             <div className="flex flex-wrap items-end gap-4">
               <div>
-                <Label className="mb-1.5 block text-xs text-slate-500">File</Label>
-                <p className="text-sm font-medium text-slate-700">{fileName}</p>
+                <Label className="mb-1.5 block text-xs text-muted-foreground">File</Label>
+                <p className="text-sm font-medium text-foreground">{fileName}</p>
               </div>
               <div>
-                <Label className="mb-1.5 block text-xs text-slate-500">{peeked?.kind === "html" ? "Section(s)" : "Tab(s)"}</Label>
-                <p className="text-sm text-slate-700 max-w-xs truncate" title={selectedSheetNames.join(", ")}>
+                <Label className="mb-1.5 block text-xs text-muted-foreground">{peeked?.kind === "html" ? "Section(s)" : "Tab(s)"}</Label>
+                <p className="max-w-xs truncate text-sm text-foreground" title={selectedSheetNames.join(", ")}>
                   {selectedSheetNames.join(", ")}
                 </p>
               </div>
               {!isMultiSheet && (
                 <div>
-                  <Label className="mb-1.5 block text-xs text-slate-500">Header row</Label>
+                  <Label className="mb-1.5 block text-xs text-muted-foreground">Header row</Label>
                   <Select value={String(headerRowIndex)} onValueChange={(v) => handleHeaderRowChange(Number(v))}>
-                    <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-56">
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       {rawRows.slice(0, 15).map((row, index) => (
                         <SelectItem key={index} value={String(index)}>
@@ -367,47 +457,49 @@ export default function ImportReportDialog({ open, onOpenChange, onImported, ini
                 </div>
               )}
               {peeked?.sheetNames?.length > 1 && (
-                <Button variant="outline" size="sm" onClick={handleChangeTabs}>Change tabs</Button>
+                <Button variant="outline" size="sm" onClick={handleChangeTabs}>
+                  Change tabs
+                </Button>
               )}
-              <Button variant="outline" size="sm" onClick={resetState}>Choose a different file</Button>
+              <Button variant="outline" size="sm" onClick={resetState}>
+                Choose a different file
+              </Button>
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-semibold text-slate-700">Map columns to metrics</p>
-                <Button variant="ghost" size="sm" onClick={() => setShowCustomizer(v => !v)}>
-                  <Settings2 className="mr-1.5 w-3.5 h-3.5" />
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-sm font-semibold text-foreground">Map columns to metrics</p>
+                <Button variant="ghost" size="sm" onClick={() => setShowCustomizer((v) => !v)}>
+                  <Settings2 className="mr-1.5 h-3.5 w-3.5" />
                   Customize columns
                 </Button>
               </div>
-
               {showCustomizer && (
                 <div className="mb-4">
-                  <ColumnCustomizer
-                    hiddenKeys={hiddenKeys}
-                    onToggle={handleToggleFieldVisibility}
-                    onReset={handleResetVisibility}
-                  />
+                  <ColumnCustomizer hiddenKeys={hiddenKeys} onToggle={handleToggleFieldVisibility} onReset={handleResetVisibility} />
                 </div>
               )}
-
               <div className="space-y-4">
-                {fieldGroups.map(group => (
+                {fieldGroups.map((group) => (
                   <div key={group.name}>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1.5">{group.name}</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {group.fields.map(field => (
+                    <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group.name}</p>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {group.fields.map((field) => (
                         <div key={field.key} className="flex items-center gap-3">
-                          <Label className="w-44 shrink-0 text-sm text-slate-600">{field.label}</Label>
+                          <Label className="w-44 shrink-0 text-sm text-muted-foreground">{field.label}</Label>
                           <Select
                             value={mapping[field.key] === null || mapping[field.key] === undefined ? NONE_VALUE : String(mapping[field.key])}
-                            onValueChange={(v) => setMapping(prev => ({ ...prev, [field.key]: v === NONE_VALUE ? null : Number(v) }))}
+                            onValueChange={(v) => setMapping((prev) => ({ ...prev, [field.key]: v === NONE_VALUE ? null : Number(v) }))}
                           >
-                            <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
+                            <SelectTrigger className="flex-1">
+                              <SelectValue />
+                            </SelectTrigger>
                             <SelectContent>
                               <SelectItem value={NONE_VALUE}>Not in this file</SelectItem>
-                              {columnOptions.map(col => (
-                                <SelectItem key={col.index} value={String(col.index)}>{col.label}</SelectItem>
+                              {columnOptions.map((col) => (
+                                <SelectItem key={col.index} value={String(col.index)}>
+                                  {col.label}
+                                </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
@@ -421,56 +513,62 @@ export default function ImportReportDialog({ open, onOpenChange, onImported, ini
 
             {!hasDateColumn && (
               <div>
-                <Label className="mb-1.5 block text-sm text-slate-600">
-                  No date column mapped - apply every row to this date:
-                </Label>
+                <Label className="mb-1.5 block text-sm text-muted-foreground">No date column mapped - apply every row to this date:</Label>
                 <Input type="date" value={fallbackDate} onChange={(e) => setFallbackDate(e.target.value)} className="w-48" />
               </div>
             )}
 
             {aggregation && (
               <div>
-                <p className="text-sm font-semibold text-slate-700 mb-2">
+                <p className="mb-2 text-sm font-semibold text-foreground">
                   Preview - {aggregation.records.length} day{aggregation.records.length === 1 ? "" : "s"} of data
                   {aggregation.totalRowsSkipped > 0 && (
-                    <span className="ml-2 text-amber-600 font-normal">({aggregation.totalRowsSkipped} row(s) skipped)</span>
+                    <span className="ml-2 font-normal text-amber-600">({aggregation.totalRowsSkipped} row(s) skipped)</span>
                   )}
                 </p>
-                <div className="max-h-56 overflow-auto border rounded-lg">
+                <div className="max-h-56 overflow-auto rounded-lg border">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Date</TableHead>
-                        {previewFields.map(field => <TableHead key={field.key}>{field.label}</TableHead>)}
+                        {previewFields.map((field) => (
+                          <TableHead key={field.key}>{field.label}</TableHead>
+                        ))}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {aggregation.records.map(record => (
+                      {aggregation.records.map((record) => (
                         <TableRow key={record.date}>
                           <TableCell className="font-medium">{record.date}</TableCell>
-                          {previewFields.map(field => {
+                          {previewFields.map((field) => {
                             const value = record[outputKeyForField(field)];
                             return (
                               <TableCell key={field.key}>
-                                {field.valueType === "duration" ? formatSecondsAsClock(value) : (value ?? "—")}
+                                {field.valueType === "duration" ? formatSecondsAsClock(value) : value ?? "-"}
                               </TableCell>
                             );
                           })}
                         </TableRow>
                       ))}
                       {aggregation.records.length === 0 && (
-                        <TableRow><TableCell colSpan={previewFields.length + 1} className="text-center text-slate-400 py-6">No rows matched - check your column mapping.</TableCell></TableRow>
+                        <TableRow>
+                          <TableCell colSpan={previewFields.length + 1} className="py-6 text-center text-muted-foreground">
+                            No rows matched - check your column mapping.
+                          </TableCell>
+                        </TableRow>
                       )}
                     </TableBody>
                   </Table>
                 </div>
                 {aggregation.warnings.length > 0 && (
                   <Alert className="mt-2">
-                    <AlertTriangle className="w-4 h-4" />
+                    <AlertTriangle className="h-4 w-4" />
                     <AlertTitle>Some rows were skipped</AlertTitle>
                     <AlertDescription>
-                      <ul className="list-disc list-inside space-y-0.5">
-                        {aggregation.warnings.slice(0, 5).map((warning, i) => <li key={i}>{warning}</li>)}
+                      <ul className="list-inside list-disc space-y-0.5">
+                        {aggregation.warnings.slice(0, 5).map((warning, i) => (
+                          <li key={i}>{warning}</li>
+                        ))}
                       </ul>
                     </AlertDescription>
                   </Alert>
@@ -480,18 +578,20 @@ export default function ImportReportDialog({ open, onOpenChange, onImported, ini
           </div>
         )}
 
-        <DialogFooter>
-          {rawRows.length > 0 && (
+        {!showProgressScreen && rawRows.length > 0 && (
+          <DialogFooter>
             <Button onClick={handleImport} disabled={importing || !aggregation?.records?.length}>
-              {importing ? "Importing…" : (
+              {importing ? (
+                "Importing..."
+              ) : (
                 <>
-                  <CheckCircle2 className="mr-2 w-4 h-4" />
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
                   Import {aggregation?.records?.length || 0} day{aggregation?.records?.length === 1 ? "" : "s"}
                 </>
               )}
             </Button>
-          )}
-        </DialogFooter>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );
