@@ -1,0 +1,12 @@
+t=2026-09-17T16:13:15-0600 lvl=info msg="no configuration paths supplied"
+t=2026-09-17T16:13:15-0600 lvl=warn msg="ngrok config file found at legacy location, move to XDG location" xdg_path=C:\Users\croeschberger\AppData\Local\ngrok\ngrok.yml legacy_path=C:\Users\croeschberger\.ngrok2\ngrok.yml err="GetFileAttributesEx C:\\Users\\croeschberger\\AppData\\Local\\ngrok\\ngrok.yml: The system cannot find the path specified."
+t=2026-09-17T16:13:15-0600 lvl=info msg="using configuration at default config path" path=C:\Users\croeschberger\.ngrok2\ngrok.yml
+t=2026-09-17T16:13:15-0600 lvl=info msg="open config file" path=C:\Users\croeschberger\.ngrok2\ngrok.yml err=<nil>
+t=2026-09-17T16:13:15-0600 lvl=info msg="FIPS 140 mode" enabled=false
+t=2026-09-17T16:13:15-0600 lvl=info msg="starting web service" obj=web addr=127.0.0.1:4040 allow_hosts=[]
+t=2026-09-17T16:13:16-0600 lvl=info msg="client session established" obj=tunnels.session
+t=2026-09-17T16:13:16-0600 lvl=info msg="tunnel session started" obj=tunnels.session
+t=2026-09-17T16:13:16-0600 lvl=info msg="started tunnel" obj=tunnels name=command_line addr=http://localhost:3001 url=https://refold-frisk-scarce.ngrok-free.dev
+t=2026-09-17T16:35:39-0600 lvl=info msg="join connections" obj=join id=576cdf79ea9a l=127.0.0.1:3001 r=172.68.174.189:9610
+t=2026-09-17T16:35:40-0600 lvl=info msg="join connections" obj=join id=87a84a9d4162 l=127.0.0.1:3001 r=104.23.160.136:9590
+t=2026-09-17T16:35:42-0600 lvl=info msg="join connections" obj=join id=3cae3dd13aa9 l=127.0.0.1:3001 r=104.23.160.159:10845

@@ -77,3 +77,4 @@ This explicitly forces `VITE_DATA_SOURCE=local` before building.
 
 
 
+$env:GH_TOKEN = "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"
