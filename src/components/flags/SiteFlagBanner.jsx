@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { AlertTriangle, ShieldAlert, Siren, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
@@ -23,7 +23,7 @@ const FLAG_CONFIG = {
     header: "bg-warning/10",
     text: "text-orange-900",
     subtext: "text-orange-700",
-    badge: "bg-warning/100 text-white",
+    badge: "bg-orange-600 text-white",
     icon: ShieldAlert,
     iconColor: "text-orange-500",
     rowHover: "hover:bg-warning/10",

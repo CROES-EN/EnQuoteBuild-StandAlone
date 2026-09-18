@@ -74,7 +74,9 @@ This explicitly forces `VITE_DATA_SOURCE=local` before building.
 - [ ] Team-wide "who's signed in / last signed in when" view (not yet built — would need a
       write-back-to-Base44 path for local sign-in activity, similar to the outbound quote sync)
 - [ ] DevTools auto-open fix — confirmed correct in code, but only verifiable via Tier 2/3 testing (a Tier 1 run will always still show it)
-
-
-
+- [ ] Auto-Quote Drafter - Pulls from Quote Request Cases with Case Comments and builds Quotes and places them in "AI Generated Quote - Needs Review" status
+- [ ] Add another status for On-Demand Quotes for Shane Mosley which integrates the Material Orders tab & allows Shane to order the purchased quote materials before we schedule.
+- [ ] Fix ICON for APP
+- [ ] ANIMATED THEMES??
+- [ ] Hyperlinks for Case Numbers & Site ID's in Workload
 $env:GH_TOKEN = "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"

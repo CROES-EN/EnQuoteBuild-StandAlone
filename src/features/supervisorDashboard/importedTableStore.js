@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Stores raw, row-level report data (Escalations, Audits, Care-Cases, O&M-CS-Cases,
  * Incorta-O&M-Input, SFDC-Quotes, etc.) for browsing inside EnQuote - completely separate
  * from opsMetricsStore.js, which only holds DAILY AGGREGATE numbers (calls handled, quotes
@@ -99,6 +99,25 @@ async function listAll() {
   return await mergeInSharedOneDriveTables(localList);
 }
 
+// LOCAL-ONLY read, with NO OneDrive gap-filling - used specifically by the save/delete
+// functions below to decide "does a record for this report type already exist on THIS
+// machine, so I should update/delete it, or not, so I should create it / treat delete as
+// already-done instead". Using the OneDrive-merged listAll()/getReportTable() for this
+// decision was the confirmed root cause of "record not found" errors on both first-time
+// imports AND Clear Data, whenever a report type was only ever gap-filled in virtually
+// from another manager's shared OneDrive export (never actually saved locally here).
+async function listLocalOnly() {
+  const bridge = localBridge();
+  if (bridge) return (await bridge.list(COLLECTION)) || [];
+  return readBrowserStorage();
+}
+
+// Local-only counterpart to getReportTable() - see listLocalOnly()'s comment above.
+async function getLocalReportTable(reportType) {
+  const all = await listLocalOnly();
+  return all.find((item) => item.id === reportType) ?? null;
+}
+
 /**
  * Replaces all rows for a given report type with a fresh import. Uses `reportType` as the
  * record's `id` (one record per report type, same one-record-per-key pattern opsMetricsStore.js
@@ -116,7 +135,7 @@ async function listAll() {
 export async function saveReportTable(reportType, { columns, rows, sourceFileName, importedAt, importMethod }) {
   const record = { id: reportType, reportType, columns, rows, sourceFileName, importedAt, importMethod: importMethod || "manual" };
   const bridge = localBridge();
-  const existing = await listAll();
+  const existing = await listLocalOnly();
   const match = existing.find((item) => item.id === reportType);
 
   if (bridge) {
@@ -155,7 +174,7 @@ export async function saveReportTable(reportType, { columns, rows, sourceFileNam
  */
 export async function saveStaffingSnapshot({ columns, rows, sourceFileName, importedAt }) {
   const reportType = "staffing";
-  const existing = await getReportTable(reportType);
+  const existing = await getLocalReportTable(reportType);
   const mergedColumns = existing?.columns?.length ? existing.columns : columns;
 
   const incomingDates = new Set(rows.map((row) => row.Date));
@@ -192,7 +211,17 @@ export async function listReportTables() {
 export async function deleteReportTable(reportType) {
   const bridge = localBridge();
   if (bridge) {
-    await bridge.delete(COLLECTION, reportType);
+    try {
+      await bridge.delete(COLLECTION, reportType);
+    } catch (error) {
+      // "record not found" means this report type was never actually saved locally on
+      // this machine (e.g. it was only ever visible via the OneDrive gap-fill) - the end
+      // state the caller wants (this report type is gone from local storage) is already
+      // true, so this is treated as a successful no-op rather than a hard failure. Any
+      // OTHER error (a real IPC/disk failure) still throws normally.
+      const message = String(error?.message || "");
+      if (!message.includes("record not found")) throw error;
+    }
     return;
   }
   const all = readBrowserStorage();
