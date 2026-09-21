@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require("electron");
+﻿const { contextBridge, ipcRenderer } = require("electron");
 
 const invoke = (channel, ...args) => ipcRenderer.invoke(channel, ...args);
 
@@ -106,15 +106,3 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
     reportOutcome: (token, outcome) => ipcRenderer.send("eodb-email-inbox:report-outcome", { token, ...outcome })
   }
 });
-
-// Separate, additive bridge for update status visibility -- does not modify any
-// existing exposeInMainWorld() call, to avoid any risk to already-working bridge
-// methods. A second exposeInMainWorld() call is valid and does not conflict.
-try {
-  const { contextBridge: __ub_contextBridge, ipcRenderer: __ub_ipcRenderer } = require("electron");
-  __ub_contextBridge.exposeInMainWorld("enquoteUpdater", {
-    onUpdateStatus: (callback) => __ub_ipcRenderer.on("updater:status", (_event, data) => callback(data))
-  });
-} catch (error) {
-  console.error("Failed to expose enquoteUpdater bridge:", error);
-}

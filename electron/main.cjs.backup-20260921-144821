@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, dialog } = require("electron");
+﻿const { app, BrowserWindow, ipcMain, shell, dialog } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -359,16 +359,6 @@ const SYSTEM_C_RECOGNIZED_FILENAME_PATTERN =
 
 // processReportsInboxFile()/scanReportsInboxNow()/watchReportsInbox() removed - System A retired.
 
-// Relays electron-updater events to the renderer so update activity is visible in the
-// app itself, instead of only going to a console.log that's invisible when launching
-// the installed app normally (not from a terminal). Does not change update TIMING --
-// same feed URL, same autoDownload, same install-on-quit behavior as before.
-function sendStatus(status, data = {}) {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send("updater:status", { status, ...data });
-  }
-}
-
 function configureAutoUpdater() {
   if (!app.isPackaged) {
     console.log("Auto-update is disabled in development mode.");
@@ -391,27 +381,22 @@ function configureAutoUpdater() {
 
   autoUpdater.on("checking-for-update", () => {
     console.log("Checking for EnQuote updates...");
-    sendStatus("checking");
   });
 
   autoUpdater.on("update-available", (info) => {
     console.log("Update available:", info.version);
-    sendStatus("available", { version: info.version });
   });
 
   autoUpdater.on("update-not-available", () => {
     console.log("EnQuote is up to date.");
-    sendStatus("up-to-date");
   });
 
   autoUpdater.on("download-progress", (progress) => {
     console.log(`Update download progress: ${Math.round(progress.percent)}%`);
-    sendStatus("downloading", { percent: Math.round(progress.percent) });
   });
 
   autoUpdater.on("error", (error) => {
     console.error("Auto-update error:", error);
-    sendStatus("error", { message: String(error) });
   });
 
   autoUpdater.on("update-downloaded", () => {
@@ -423,16 +408,13 @@ function configureAutoUpdater() {
     // interruption - this handler now just logs that it is ready and lets that
     // existing, non-disruptive mechanism do its job.
     console.log("Update downloaded - it will install automatically the next time EnQuote is closed.");
-    sendStatus("ready");
   });
 
   autoUpdater.checkForUpdatesAndNotify();
 }
 
-let mainWindow;
-
 function createWindow() {
-  mainWindow = new BrowserWindow({
+  const mainWindow = new BrowserWindow({
     width: 1500,
     height: 960,
     minWidth: 1100,

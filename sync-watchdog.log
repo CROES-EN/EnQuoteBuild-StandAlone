@@ -1,20 +1,3 @@
-[2026-09-17 17:01:18] OK: relay healthy, last successful sync 10 minute(s) ago.
-[2026-09-17 17:04:17] OK: relay healthy, last successful sync 13 minute(s) ago.
-[2026-09-17 17:07:24] OK: relay healthy, last successful sync 1 minute(s) ago.
-[2026-09-17 17:10:18] OK: relay healthy, last successful sync 4 minute(s) ago.
-[2026-09-17 17:13:16] OK: relay healthy, last successful sync 7 minute(s) ago.
-[2026-09-17 17:16:17] OK: relay healthy, last successful sync 10 minute(s) ago.
-[2026-09-17 17:19:17] OK: relay healthy, last successful sync 13 minute(s) ago.
-[2026-09-17 17:22:16] OK: relay healthy, last successful sync 16 minute(s) ago.
-[2026-09-17 17:25:17] OK: relay healthy, last successful sync 19 minute(s) ago.
-[2026-09-17 17:28:18] OK: relay healthy, last successful sync 22 minute(s) ago.
-[2026-09-17 17:31:16] OK: relay healthy, last successful sync 25 minute(s) ago.
-[2026-09-17 17:34:16] OK: relay healthy, last successful sync 28 minute(s) ago.
-[2026-09-17 17:37:17] OK: relay healthy, last successful sync 31 minute(s) ago.
-[2026-09-17 17:40:18] OK: relay healthy, last successful sync 34 minute(s) ago.
-[2026-09-17 17:43:16] OK: relay healthy, last successful sync 37 minute(s) ago.
-[2026-09-17 17:46:16] OK: relay healthy, last successful sync 40 minute(s) ago.
-[2026-09-17 17:49:16] OK: relay healthy, last successful sync 43 minute(s) ago.
 [2026-09-17 17:52:17] STALE: last successful sync was 46 minute(s) ago (threshold 45).
 [2026-09-17 17:52:18] Toast shown: EnQuote Sync Stale - No successful Base44 sync in 46 minutes. Check the app and network.
 [2026-09-17 17:55:16] STALE: last successful sync was 49 minute(s) ago (threshold 45).
@@ -998,3 +981,20 @@
 [2026-09-21 14:10:21] OK: relay healthy, last successful sync 2 minute(s) ago.
 [2026-09-21 14:13:21] OK: relay healthy, last successful sync 5 minute(s) ago.
 [2026-09-21 14:16:21] OK: relay healthy, last successful sync 8 minute(s) ago.
+[2026-09-21 14:19:22] OK: relay healthy, last successful sync 11 minute(s) ago.
+[2026-09-21 14:22:21] OK: relay healthy, last successful sync 14 minute(s) ago.
+[2026-09-21 14:25:22] OK: relay healthy, last successful sync 17 minute(s) ago.
+[2026-09-21 14:28:24] OK: relay healthy, last successful sync 20 minute(s) ago.
+[2026-09-21 14:31:26] OK: relay healthy, last successful sync 24 minute(s) ago.
+[2026-09-21 14:34:12] webhook-receiver.cjs is NOT running - restarting via Scheduled Task...
+[2026-09-21 14:34:29] OK: relay healthy, last successful sync 27 minute(s) ago.
+[2026-09-21 14:37:23] OK: relay healthy, last successful sync 29 minute(s) ago.
+[2026-09-21 14:40:21] OK: relay healthy, last successful sync 32 minute(s) ago.
+[2026-09-21 14:43:20] OK: relay healthy, last successful sync 35 minute(s) ago.
+[2026-09-21 14:46:23] OK: relay healthy, last successful sync 38 minute(s) ago.
+[2026-09-21 14:49:22] OK: relay healthy, last successful sync 41 minute(s) ago.
+[2026-09-21 14:52:21] OK: relay healthy, last successful sync 44 minute(s) ago.
+[2026-09-21 14:55:22] STALE: last successful sync was 47 minute(s) ago (threshold 45).
+[2026-09-21 14:55:23] Toast shown: EnQuote Sync Stale - No successful Base44 sync in 47 minutes. Check the app and network.
+[2026-09-21 14:58:25] STALE: last successful sync was 51 minute(s) ago (threshold 45).
+[2026-09-21 14:58:25] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 51 minutes. Check the app and network.

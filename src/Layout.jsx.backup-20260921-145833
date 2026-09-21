@@ -1,5 +1,4 @@
 import { Link, useLocation } from "react-router-dom";
-import UpdateStatusBadge from "@/components/UpdateStatusBadge";
 import { createPageUrl } from "@/utils";
 import { cn } from "@/lib/utils";
 import {
@@ -671,7 +670,6 @@ export default function Layout({ children, currentPageName }) {
         lastAttempt={lastAttempt}
         events={events}
       />
-      <UpdateStatusBadge />
     </div>
   );
 }
