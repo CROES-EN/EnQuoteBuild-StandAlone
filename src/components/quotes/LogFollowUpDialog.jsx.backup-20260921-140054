@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { getCurrentUser, updateQuote, createLocalRecords } from "@/api/dataClient";
+import { getCurrentUser, updateQuote, createLocalRecords, createLocalRecord } from "@/api/dataClient";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -73,15 +73,7 @@ export default function LogFollowUpDialog({ quote, open, onOpenChange, onLogged 
       // follow-up ALWAYS clears the alert for this quote, no matter where it was
       // opened from -- onLogged (below) is still called too, for any additional
       // screen-specific behavior a caller may want.
-      // REVERTED: a permanent dismissal here would conflict with the intended behavior --
-      // the alert's "days in status" clock ALREADY correctly resets on its own whenever a
-      // follow-up is logged (LogFollowUpDialog's own status_history push above adds a
-      // fresh changed_at timestamp, which both StatusAlerts.jsx's day-based threshold and
-      // quoteSLA.js's hour-based threshold read directly -- confirmed and tested). A
-      // PERMANENT dismissal would hide this quote's alerts forever, even after the clock
-      // naturally re-crosses the threshold again -- which is the opposite of "reset and
-      // reappear later if still needed." No explicit dismissal is needed for this to work
-      // correctly.
+      await createLocalRecord("statusAlertDismissals", { quote_id: quote.id });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["quotes"] });
@@ -132,9 +124,9 @@ export default function LogFollowUpDialog({ quote, open, onOpenChange, onLogged 
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="yellow">Yellow Ã¢â‚¬â€ Normal</SelectItem>
-                  <SelectItem value="orange">Orange Ã¢â‚¬â€ High</SelectItem>
-                  <SelectItem value="red">Red Ã¢â‚¬â€ Urgent</SelectItem>
+                  <SelectItem value="yellow">Yellow â€” Normal</SelectItem>
+                  <SelectItem value="orange">Orange â€” High</SelectItem>
+                  <SelectItem value="red">Red â€” Urgent</SelectItem>
                 </SelectContent>
               </Select>
             </div>

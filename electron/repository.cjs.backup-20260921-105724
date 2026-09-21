@@ -43,7 +43,7 @@ const updateSchema = z.object({ id: z.string().min(1), changes: z.record(z.unkno
 // "supervisorDailyMetrics" backs the Supervisor Dashboard (Calls/AHT, Emails Worked,
 // Quotes Drafted, Staffing). That dashboard is intentionally independent of Base44, so
 // this collection has no Base44 entity counterpart - it is only ever read/written locally.
-const collectionNames = ["reviews", "activities", "followUps", "users", "siteFlags", "deletionRequests", "materialOrders", "rmas", "svCancels", "supportInteractions", "pdfTemplates", "priceReviews", "followUpConfigs", "pvManufacturers", "supervisorDailyMetrics", "supervisorReportTables", "autoImportSettings", "statusAlertDismissals", "quoteAlerts"];
+const collectionNames = ["reviews", "activities", "followUps", "users", "siteFlags", "deletionRequests", "materialOrders", "rmas", "svCancels", "supportInteractions", "pdfTemplates", "priceReviews", "followUpConfigs", "pvManufacturers", "supervisorDailyMetrics", "supervisorReportTables", "autoImportSettings", "statusAlertDismissals"];
 const collectionDefaults = {
   reviews: [],
   activities: [],
@@ -333,13 +333,11 @@ function repositoryFor(userDataPath) {
       parsed.meta.sync_ttl_ms = parsed.meta.sync_ttl_ms || DEFAULT_SYNC_TTL_MS;
       parsed.userCredentials = parsed.userCredentials || {};
       parsed.outboundQueue = Array.isArray(parsed.outboundQueue) ? parsed.outboundQueue : [];
-      parsed.outboundDismissalQueue = Array.isArray(parsed.outboundDismissalQueue) ? parsed.outboundDismissalQueue : [];
-      parsed.outboundMentionQueue = Array.isArray(parsed.outboundMentionQueue) ? parsed.outboundMentionQueue : [];
       collectionNames.forEach(name => { parsed[name] = parsed[name] || structuredClone(collectionDefaults[name]); });
       return parsed;
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
-      const initial = { version: DATA_VERSION, quotes: seedQuotes, products: productSeed, meta: { sync_ttl_ms: DEFAULT_SYNC_TTL_MS }, userCredentials: {}, outboundQueue: [], outboundDismissalQueue: [], outboundMentionQueue: [] };
+      const initial = { version: DATA_VERSION, quotes: seedQuotes, products: productSeed, meta: { sync_ttl_ms: DEFAULT_SYNC_TTL_MS }, userCredentials: {}, outboundQueue: [] };
       await write(initial);
       return initial;
     }
@@ -661,8 +659,6 @@ function repositoryFor(userDataPath) {
         // passwords and pending quotes would silently never reach Base44.
         userCredentials: current.userCredentials || {},
         outboundQueue: current.outboundQueue || [],
-        outboundDismissalQueue: current.outboundDismissalQueue || [],
-        outboundMentionQueue: current.outboundMentionQueue || [],
         meta: {
           sync_ttl_ms: DEFAULT_SYNC_TTL_MS,
           last_imported_at: new Date().toISOString(),
@@ -813,117 +809,10 @@ function repositoryFor(userDataPath) {
           id: record.id || makeId(`demo-${name}`)
         };
         data[name].push(item);
-        // Dismissals made locally must reach Base44 too -- previously only Quote changes
-        // were ever pushed outbound, so a dismissal made on desktop never reached Base44
-        // (or any other install) at all. This queues it exactly like a quote create,
-        // using the SAME serializedWrite cycle so it's saved atomically with the record
-        // itself.
-        if (name === "statusAlertDismissals") {
-          data.outboundDismissalQueue = Array.isArray(data.outboundDismissalQueue) ? data.outboundDismissalQueue : [];
-          data.outboundDismissalQueue.push({
-            kind: "create",
-            local_id: item.id,
-            quote_id: item.quote_id,
-            status: "pending",
-            attempts: 0,
-            enqueued_at: now,
-            synced_at: null,
-            remote_id: null,
-            last_error: null
-          });
-        }
-        // Mentions made locally must reach Base44 too -- mirrors the dismissal queueing
-        // immediately above, using the exact same pattern for the "quoteAlerts"
-        // collection instead.
-        if (name === "quoteAlerts") {
-          data.outboundMentionQueue = Array.isArray(data.outboundMentionQueue) ? data.outboundMentionQueue : [];
-          data.outboundMentionQueue.push({
-            kind: "create",
-            local_id: item.id,
-            quote_id: item.quote_id,
-            mentioned_email: item.mentioned_email,
-            status: "pending",
-            attempts: 0,
-            enqueued_at: now,
-            synced_at: null,
-            remote_id: null,
-            last_error: null
-          });
-        }
         await rotateBackups();
         await writeInner(data);
         return item;
       });
-    },
-    // Outbound sync queue (mentions) - mirrors listPendingOutboundDismissals()/
-    // markOutboundDismissalsSynced() above, for the "quoteAlerts" -> Base44 direction.
-    async listPendingOutboundMentions() {
-      const data = await read();
-      const queue = data.outboundMentionQueue || [];
-      return queue.filter((entry) => entry.status === "pending");
-    },
-    async markOutboundMentionsSynced(results) {
-      const parsed = z.array(z.object({
-        local_id: z.string().min(1),
-        remote_id: z.string().nullable().optional(),
-        error: z.string().nullable().optional()
-      })).parse(results || []);
-      if (!parsed.length) return { updated: 0 };
-      const data = await read();
-      data.outboundMentionQueue = data.outboundMentionQueue || [];
-      let updated = 0;
-      const now2 = new Date().toISOString();
-      for (const result of parsed) {
-        const entry = data.outboundMentionQueue.find((item) => item.local_id === result.local_id && item.status === "pending");
-        if (!entry) continue;
-        if (result.error) {
-          entry.attempts = (entry.attempts || 0) + 1;
-          entry.last_error = result.error;
-          continue;
-        }
-        entry.status = "synced";
-        entry.synced_at = now2;
-        entry.remote_id = result.remote_id || entry.remote_id || null;
-        entry.last_error = null;
-        updated += 1;
-      }
-      await write(data);
-      return { updated };
-    },
-    // Outbound sync queue (dismissals) - mirrors listPendingOutboundQuotes()/
-    // markOutboundSynced() below, for the "statusAlertDismissals" -> Base44 direction.
-    async listPendingOutboundDismissals() {
-      const data = await read();
-      const queue = data.outboundDismissalQueue || [];
-      return queue.filter((entry) => entry.status === "pending");
-    },
-    async markOutboundDismissalsSynced(results) {
-      const parsed = z.array(z.object({
-        local_id: z.string().min(1),
-        remote_id: z.string().nullable().optional(),
-        error: z.string().nullable().optional()
-      })).parse(results || []);
-      if (!parsed.length) return { updated: 0 };
-      const data = await read();
-      data.outboundDismissalQueue = data.outboundDismissalQueue || [];
-      let updated = 0;
-      const now = new Date().toISOString();
-      for (const result of parsed) {
-        const entry = data.outboundDismissalQueue.find((item) => item.local_id === result.local_id && item.status === "pending");
-        if (!entry) continue;
-        if (result.error) {
-          entry.attempts = (entry.attempts || 0) + 1;
-          entry.last_error = result.error;
-          continue;
-        }
-        entry.status = "synced";
-        entry.synced_at = now;
-        entry.remote_id = result.remote_id || entry.remote_id || null;
-        entry.last_error = null;
-        updated += 1;
-      }
-      await write(data);
-      return { updated };
     },
     async updateCollectionRecord(name, id, changes) {
       if (!collectionNames.includes(name)) throw new Error(`Unsupported local collection: ${name}`);

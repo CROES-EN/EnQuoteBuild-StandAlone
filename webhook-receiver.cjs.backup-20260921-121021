@@ -264,18 +264,7 @@ function resolveRepositoryDirectory(explicitDir) {
   return preferred;
 }
 
-const SYNC_THROTTLE_MS = 60 * 1000;
-// FIX (confirmed root cause of the desktop-vs-web alert count discrepancy): this was
-// previously 15 MINUTES, applied GLOBALLY to every import (not per-quote, not just for
-// exact duplicates) -- meaning if quotes kept changing continuously (completely normal
-// during a work day), a queued snapshot would routinely wait 15+ minutes before ever
-// being applied, since each new incoming webhook just re-queued it further rather than
-// being treated as fresh, importable data. This made desktop's quote data (and therefore
-// every alert computed from it) measurably stale compared to Base44's live state.
-// Lowered to 60 seconds -- still long enough to collapse genuine rapid-fire duplicate
-// deliveries (e.g. two automations firing on the same edit, confirmed and reduced to one
-// this session), but short enough that real, distinct quote changes throughout the day
-// are reflected locally within about a minute instead of potentially 15+.
+const SYNC_THROTTLE_MS = 15 * 60 * 1000;
 
 // ---------------------------------------------------------------------------
 // Queued-snapshot mechanism (fixes a real data-loss bug)

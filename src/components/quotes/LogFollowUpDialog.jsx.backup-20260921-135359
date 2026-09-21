@@ -66,22 +66,6 @@ export default function LogFollowUpDialog({ quote, open, onOpenChange, onLogged 
           }))
         );
       }
-      // FIX: previously, whether logging a follow-up cleared this quote's alert
-      // depended entirely on WHICH screen opened this dialog correctly wiring up an
-      // onLogged callback that happened to dismiss it (StatusAlerts.jsx did; nothing
-      // else was guaranteed to). Moved here, into the dialog itself, so logging a
-      // follow-up ALWAYS clears the alert for this quote, no matter where it was
-      // opened from -- onLogged (below) is still called too, for any additional
-      // screen-specific behavior a caller may want.
-      // REVERTED: a permanent dismissal here would conflict with the intended behavior --
-      // the alert's "days in status" clock ALREADY correctly resets on its own whenever a
-      // follow-up is logged (LogFollowUpDialog's own status_history push above adds a
-      // fresh changed_at timestamp, which both StatusAlerts.jsx's day-based threshold and
-      // quoteSLA.js's hour-based threshold read directly -- confirmed and tested). A
-      // PERMANENT dismissal would hide this quote's alerts forever, even after the clock
-      // naturally re-crosses the threshold again -- which is the opposite of "reset and
-      // reappear later if still needed." No explicit dismissal is needed for this to work
-      // correctly.
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["quotes"] });
@@ -132,9 +116,9 @@ export default function LogFollowUpDialog({ quote, open, onOpenChange, onLogged 
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="yellow">Yellow Ã¢â‚¬â€ Normal</SelectItem>
-                  <SelectItem value="orange">Orange Ã¢â‚¬â€ High</SelectItem>
-                  <SelectItem value="red">Red Ã¢â‚¬â€ Urgent</SelectItem>
+                  <SelectItem value="yellow">Yellow — Normal</SelectItem>
+                  <SelectItem value="orange">Orange — High</SelectItem>
+                  <SelectItem value="red">Red — Urgent</SelectItem>
                 </SelectContent>
               </Select>
             </div>

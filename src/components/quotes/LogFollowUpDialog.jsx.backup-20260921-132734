@@ -1,7 +1,7 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { getCurrentUser, updateQuote, createLocalRecords } from "@/api/dataClient";
+import { getCurrentUser, updateQuote } from "@/api/dataClient";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -43,45 +43,15 @@ export default function LogFollowUpDialog({ quote, open, onOpenChange, onLogged 
         ],
       });
       if (mentions.length > 0) {
-        // FIX (confirmed root cause, same category of bug already found and fixed
-        // twice tonight in Quotes.jsx and outboundSync.cjs): this previously called
-        // base44.functions.invoke("manageQuoteAlerts", ...) directly, which CANNOT
-        // work at all in desktop/local mode -- there is no serverless Base44 backend
-        // to call locally. Every @mention created on desktop has therefore been
-        // silently failing to send. Routed through createLocalRecords() into the
-        // local "quoteAlerts" collection instead -- the same collection Quotes.jsx's
-        // myMentions query already reads from correctly -- and (once
-        // add-dismissal-outbound-sync.ps1's sibling fix is extended to quoteAlerts)
-        // will sync outbound to Base44 the same proven way dismissals now do.
-        await createLocalRecords(
-          "quoteAlerts",
-          mentions.map((m) => ({
-            quote_id: quote.id,
-            site_id: quote.site_id || "",
-            mentioned_email: m.email,
-            mentioned_by: user?.email,
-            message: note.trim(),
-            priority: mentionPriority,
-            is_resolved: false,
-          }))
-        );
+        await base44.functions.invoke("manageQuoteAlerts", {
+          action: "createMentions",
+          mentions,
+          quote_id: quote.id,
+          site_id: quote.site_id,
+          message: note.trim(),
+          priority: mentionPriority,
+        });
       }
-      // FIX: previously, whether logging a follow-up cleared this quote's alert
-      // depended entirely on WHICH screen opened this dialog correctly wiring up an
-      // onLogged callback that happened to dismiss it (StatusAlerts.jsx did; nothing
-      // else was guaranteed to). Moved here, into the dialog itself, so logging a
-      // follow-up ALWAYS clears the alert for this quote, no matter where it was
-      // opened from -- onLogged (below) is still called too, for any additional
-      // screen-specific behavior a caller may want.
-      // REVERTED: a permanent dismissal here would conflict with the intended behavior --
-      // the alert's "days in status" clock ALREADY correctly resets on its own whenever a
-      // follow-up is logged (LogFollowUpDialog's own status_history push above adds a
-      // fresh changed_at timestamp, which both StatusAlerts.jsx's day-based threshold and
-      // quoteSLA.js's hour-based threshold read directly -- confirmed and tested). A
-      // PERMANENT dismissal would hide this quote's alerts forever, even after the clock
-      // naturally re-crosses the threshold again -- which is the opposite of "reset and
-      // reappear later if still needed." No explicit dismissal is needed for this to work
-      // correctly.
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["quotes"] });
@@ -132,9 +102,9 @@ export default function LogFollowUpDialog({ quote, open, onOpenChange, onLogged 
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="yellow">Yellow Ã¢â‚¬â€ Normal</SelectItem>
-                  <SelectItem value="orange">Orange Ã¢â‚¬â€ High</SelectItem>
-                  <SelectItem value="red">Red Ã¢â‚¬â€ Urgent</SelectItem>
+                  <SelectItem value="yellow">Yellow — Normal</SelectItem>
+                  <SelectItem value="orange">Orange — High</SelectItem>
+                  <SelectItem value="red">Red — Urgent</SelectItem>
                 </SelectContent>
               </Select>
             </div>

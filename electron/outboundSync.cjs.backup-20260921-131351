@@ -120,12 +120,6 @@ function createOutboundSync({ repository, config, logger = console, onAfterWrite
 
   const isConfigured = Boolean(serverUrl && appId && apiKey);
   const entityUrl = () => `${String(serverUrl).replace(/\/+$/, "")}/api/apps/${appId}/entities/Quote`;
-  // Parallel entity URL for pushing local dismissals up to Base44 -- previously nothing
-  // in this file ever pushed a StatusAlertDismissal record outbound at all.
-  const dismissalEntityUrl = () => `${String(serverUrl).replace(/\/+$/, "")}/api/apps/${appId}/entities/StatusAlertDismissal`;
-  // Parallel entity URL for pushing local mentions up to Base44 -- mirrors
-  // dismissalEntityUrl() immediately above, for the "QuoteAlert" entity instead.
-  const mentionEntityUrl = () => `${String(serverUrl).replace(/\/+$/, "")}/api/apps/${appId}/entities/QuoteAlert`;
   // Matches the header shape the official @base44/sdk client sends for
   // API-key auth (X-App-Id + api_key, no Authorization/token header).
   const authHeaders = () => ({ "X-App-Id": String(appId), api_key: apiKey });
@@ -243,68 +237,6 @@ function createOutboundSync({ repository, config, logger = console, onAfterWrite
     return { local_id: entry.local_id, remote_id: remoteId };
   }
 
-  // Pushes a locally-created StatusAlertDismissal record up to Base44 -- this is the
-  // fix for a real, confirmed one-way sync gap: dismissing an alert on desktop was
-  // previously NEVER reflected in Base44 (or any other install) at all, only the
-  // reverse direction worked. Built from the start with response-body verification
-  // (the same fix already applied to pushUpdate() for quotes), so this does not repeat
-  // that earlier silent-failure bug.
-  async function pushDismissal(entry) {
-    const response = await requestJson(dismissalEntityUrl(), {
-      method: "POST",
-      headers: authHeaders(),
-      body: { quote_id: entry.quote_id }
-    });
-
-    if (!response.ok) {
-      return { local_id: entry.local_id, error: response.error || "Unknown error" };
-    }
-    const confirmedId = response.body?.id ? String(response.body.id) : null;
-    if (!confirmedId) {
-      logger.warn(`[outbound-sync] Dismissal push for ${entry.local_id} got HTTP ${response.status} but the response body did not confirm an id -- treating as a failed sync, not marking as synced.`, { responseBody: response.body });
-      return {
-        local_id: entry.local_id,
-        error: `Base44 responded ${response.status} but did not confirm the dismissal (no id in response). Will retry.`
-      };
-    }
-    logger.log(`[outbound-sync] Pushed dismissal for quote ${entry.quote_id} -> Base44 ${confirmedId}`);
-    return { local_id: entry.local_id, remote_id: confirmedId };
-  }
-
-  // Pushes a locally-created mention (quoteAlerts record) up to Base44 -- mirrors
-  // pushDismissal() immediately above. Built from the start with the same
-  // response-body verification already applied twice tonight, so this does not
-  // repeat the earlier silent-failure bug.
-  async function pushMention(entry, localRecord) {
-    const response = await requestJson(mentionEntityUrl(), {
-      method: "POST",
-      headers: authHeaders(),
-      body: {
-        quote_id: entry.quote_id,
-        site_id: localRecord?.site_id || "",
-        mentioned_email: entry.mentioned_email,
-        mentioned_by: localRecord?.mentioned_by || "",
-        message: localRecord?.message || "",
-        priority: localRecord?.priority || "yellow",
-        is_resolved: false
-      }
-    });
-
-    if (!response.ok) {
-      return { local_id: entry.local_id, error: response.error || "Unknown error" };
-    }
-    const confirmedId = response.body?.id ? String(response.body.id) : null;
-    if (!confirmedId) {
-      logger.warn(`[outbound-sync] Mention push for ${entry.local_id} got HTTP ${response.status} but the response body did not confirm an id -- treating as a failed sync, not marking as synced.`, { responseBody: response.body });
-      return {
-        local_id: entry.local_id,
-        error: `Base44 responded ${response.status} but did not confirm the mention (no id in response). Will retry.`
-      };
-    }
-    logger.log(`[outbound-sync] Pushed mention for quote ${entry.quote_id} -> Base44 ${confirmedId}`);
-    return { local_id: entry.local_id, remote_id: confirmedId };
-  }
-
   function pushOne(entry) {
     return entry.kind === "update" ? pushUpdate(entry) : pushCreate(entry);
   }
@@ -341,49 +273,6 @@ function createOutboundSync({ repository, config, logger = console, onAfterWrite
       }
 
       await repository.markOutboundSynced(results);
-
-      // Same flush cycle, now also handling any pending dismissal pushes -- kept as a
-      // clearly separate step (not merged into the quote loop above) since dismissals
-      // are a different entity with different fields, but reuses the exact same
-      // queue/ack pattern.
-      const pendingDismissals = await repository.listPendingOutboundDismissals();
-      if (pendingDismissals.length) {
-        const dismissalResults = [];
-        for (const entry of pendingDismissals) {
-          try {
-            dismissalResults.push(await pushDismissal(entry));
-          } catch (error) {
-            dismissalResults.push({ local_id: entry.local_id, error: error.message });
-          }
-        }
-        await repository.markOutboundDismissalsSynced(dismissalResults);
-        const dismissalFailed = dismissalResults.filter((result) => result.error);
-        if (dismissalFailed.length) {
-          logger.warn(`[outbound-sync] ${dismissalFailed.length} dismissal(s) failed to sync; they remain queued.`, dismissalFailed);
-        }
-      }
-
-      // Same flush cycle, now also handling any pending mention pushes -- mirrors the
-      // dismissal step immediately above, for the "quoteAlerts" collection instead.
-      const pendingMentions = await repository.listPendingOutboundMentions();
-      if (pendingMentions.length) {
-        const localQuoteAlerts = await repository.listCollection("quoteAlerts");
-        const mentionResults = [];
-        for (const entry of pendingMentions) {
-          try {
-            const localRecord = (localQuoteAlerts || []).find((item) => item.id === entry.local_id);
-            mentionResults.push(await pushMention(entry, localRecord));
-          } catch (error) {
-            mentionResults.push({ local_id: entry.local_id, error: error.message });
-          }
-        }
-        await repository.markOutboundMentionsSynced(mentionResults);
-        const mentionFailed = mentionResults.filter((result) => result.error);
-        if (mentionFailed.length) {
-          logger.warn(`[outbound-sync] ${mentionFailed.length} mention(s) failed to sync; they remain queued.`, mentionFailed);
-        }
-      }
-
       onAfterWrite?.();
       const failed = results.filter((result) => result.error);
       const conflicts = failed.filter((result) => result.error.startsWith(CONFLICT_PREFIX));

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 
 const FILTERS_STORAGE_KEY = "quotes_filters";
 
@@ -11,7 +11,7 @@ function loadSavedFilters() {
   }
 }
 import { base44 } from "@/api/base44Client";
-import { bulkUpdateQuotes, getQuotes, listLocalCollection, createLocalRecord } from "@/api/dataClient";
+import { bulkUpdateQuotes, getQuotes } from "@/api/dataClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -122,22 +122,12 @@ function QuotesContent() {
     }
   }, [error]);
 
-  // FIX (confirmed root cause): this previously called
-  // base44.functions.invoke("manageQuoteAlerts", ...) directly. base44.functions.invoke
-  // CANNOT work at all in desktop/local mode -- there is no serverless Base44 backend to
-  // call locally -- so this always silently failed, meaning @mentions have never worked
-  // on desktop. Routed through the local "quoteAlerts" collection instead (registered in
-  // repository.cjs's collectionNames), filtering client-side for this user's own
-  // unresolved mentions -- mirrors exactly what manageQuoteAlerts' "getMyAlerts" action
-  // does server-side on the web.
   const { data: myMentions = [] } = useQuery({
     queryKey: ["quoteAlerts", "mentions", user?.email],
     queryFn: async () => {
       if (!user?.email) return [];
-      const allAlerts = await listLocalCollection("quoteAlerts");
-      return (allAlerts || []).filter(
-        (a) => a.mentioned_email === user.email && !a.is_resolved
-      );
+      const res = await base44.functions.invoke("manageQuoteAlerts", { action: "getMyAlerts" });
+      return res?.data || [];
     },
     enabled: !!user?.email,
   });
@@ -152,14 +142,10 @@ function QuotesContent() {
     }
   });
 
-  // FIX (same confirmed root cause already fixed in StatusAlerts.jsx): this is a
-  // SEPARATE query living in this file -- fixing StatusAlerts.jsx's copy did not fix
-  // this one. Routed through listLocalCollection(), the same function every other
-  // working collection uses.
   const { data: dismissals = [] } = useQuery({
     queryKey: ["statusAlertDismissals"],
     queryFn: async () => {
-      return await listLocalCollection("statusAlertDismissals");
+      return await base44.entities.StatusAlertDismissal.list("-created_date", 500);
     },
   });
 
@@ -167,7 +153,7 @@ function QuotesContent() {
 
   const dismissAlertMutation = useMutation({
     mutationFn: async (quoteId) => {
-      await createLocalRecord("statusAlertDismissals", { quote_id: quoteId });
+      await base44.entities.StatusAlertDismissal.create({ quote_id: quoteId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["statusAlertDismissals"] });
