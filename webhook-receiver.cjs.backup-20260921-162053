@@ -525,11 +525,6 @@ const server = http.createServer((req, res) => {
     const events = EVENT_LOG.filter(e => e.seq > since);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, events, latestSeq: EVENT_SEQ }));
-  } else if (req.method === 'GET' && req.url === '/api/base44/webhook/snapshot') {
-    // Lets a TEAMMATE's desktop app (which never runs its own receiver/ngrok tunnel)
-    // pull this machine's current data through the shared ngrok URL, instead of only
-    // being able to report status to callers on this same machine.
-    handleSnapshotRequest(req, res);
   } else {
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: false, error: 'Not found' }));
@@ -562,50 +557,6 @@ function readBody(req) {
     req.on('end', () => resolve(Buffer.concat(chunks)));
     req.on('error', reject);
   });
-}
-
-// Serves this machine's current data to a REMOTE teammate's app, protected by the
-// same shared secret already used for validating inbound Base44 webhook deliveries
-// (ENQUOTE_LOCAL_SYNC_WEBHOOK_SECRET) -- no new secret to generate or distribute.
-// Requests without a valid matching "X-ENQuote-Shared-Secret" header are rejected.
-async function handleSnapshotRequest(req, res) {
-  if (SECRET_IS_PLACEHOLDER) {
-    logEvent('error', 'Rejected snapshot request - no shared secret configured on this relay (still the placeholder value).');
-    res.writeHead(503, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: false, error: 'Shared secret not configured on this relay.' }));
-    return;
-  }
-
-  const providedSecret = req.headers['x-enquote-shared-secret'] || '';
-  const expected = Buffer.from(SECRET_RAW, 'utf8');
-  const provided = Buffer.from(String(providedSecret), 'utf8');
-  const isValid = expected.length === provided.length && crypto.timingSafeEqual(expected, provided);
-
-  if (!isValid) {
-    logEvent('error', 'Rejected snapshot request - invalid or missing shared secret.');
-    res.writeHead(401, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: false, error: 'Unauthorized' }));
-    return;
-  }
-
-  try {
-    const targetDir = resolveRepositoryDirectory(null);
-    const repo = repositoryFor(targetDir);
-    const data = await repo.exportData();
-    logEvent('success', `Snapshot request served - ${Array.isArray(data.quotes) ? data.quotes.length : 0} quotes, ${Array.isArray(data.products) ? data.products.length : 0} products.`);
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      ok: true,
-      version: data.version,
-      quotes: data.quotes,
-      products: data.products,
-      meta: data.meta
-    }));
-  } catch (error) {
-    logEvent('error', `Snapshot request failed: ${error.message}`);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: false, error: error.message }));
-  }
 }
 
 async function handleForceRefresh(req, res) {
