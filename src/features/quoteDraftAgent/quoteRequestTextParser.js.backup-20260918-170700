@@ -1,4 +1,4 @@
-// quoteRequestTextParser.js
+﻿// quoteRequestTextParser.js
 //
 // Parses the plain-text output printed by the Quote Request Agent (Step 1)
 // into a structured object consumed by draftEngine.js. Pure text parsing --
@@ -109,7 +109,6 @@ export function parseQuoteRequestOutput(rawText) {
   const customer = extractField(lines, "Customer Name") || extractField(lines, "Customer");
   const siteAddress = extractField(lines, "Site Address");
   const quoteCategory = extractField(lines, "Quote Category");
-  const rmaRequired = extractField(lines, "RMA Required");
 
   const problemDescription = extractField(lines, "Problem Description");
   const rootCause = extractField(lines, "Root Cause");
@@ -148,15 +147,6 @@ export function parseQuoteRequestOutput(rawText) {
     "Unit": "unit",
     "Notes": "notes"
   });
-  const warrantyReplacementsSection = sliceSection(lines, "Warranty Replacements", ["Technician Recommendations"]);
-  const warrantyReplacements = parseRepeatingEntries(warrantyReplacementsSection, "Equipment", {
-    "Quantity": "quantity",
-    "Serial Number(s)": "serialNumbers",
-    "Warranty Status": "warrantyStatus",
-    "RMA Required": "rmaRequired",
-    "RMA Number": "rmaNumber",
-    "Notes": "notes"
-  });
 
   // Detect if any Required/Conditional field was submitted as "Unknown" --
   // used to decide whether a risk statement should be included.
@@ -182,11 +172,9 @@ export function parseQuoteRequestOutput(rawText) {
     totalLaborHours: isUnknown(totalLaborHours) ? null : totalLaborHours,
     driveHours: isUnknown(driveHours) ? null : driveHours,
     driveMiles: isUnknown(driveMiles) ? null : driveMiles,
-    rmaRequired: isUnknown(rmaRequired) ? "" : rmaRequired || "",
     products,
     services,
     materials,
-    warrantyReplacements,
     hasUnknownFields
   };
 }

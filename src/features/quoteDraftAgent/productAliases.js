@@ -1,0 +1,64 @@
+// productAliases.js
+//
+// The RECOMMENDED, product-centric home for known nicknames/aliases going forward -
+// organized BY PRODUCT (matching your actual catalog item names), rather than the older
+// phrase-keyed learnedCorrections.js. Both files are checked by draftEngine.js; this one
+// is the preferred place to add new aliases from now on, since grouping aliases under the
+// product they belong to is easier to review/maintain as the list grows.
+//
+// To add a new alias: find (or add) the product's exact name below (must match
+// productCatalog.js EXACTLY), then add the phrase a technician might type to its array.
+export const PRODUCT_ALIASES = {
+  "IQ Load Controller": [
+    "pv load shedding box",
+    "load shedding box",
+    "load shedding contactor"
+  ],
+  "3/4 in. x 25 ft. Ultratite Liquidtight Flexible Non-Metallic PVC Conduit": [
+    "3/4 flex conduit"
+  ],
+  "3/4 in. Rain Tight Connectors": [
+    "3/4 straight flex connector"
+  ],
+  "#10 THHN Stranded Copper": [
+    "#10 thhn wire"
+  ],
+  "IQ Field Wireable (plug) Ea. SKU: Q-CONN-10M": [
+    "field wireable plug",
+    "iq field wireable plug",
+    "trunk cable plug",
+    "plug connector"
+  ],
+  "IQ Field Wireable (socket) Ea. SKU: Q-CONN-10F": [
+    "field wireable socket",
+    "iq field wireable socket",
+    "trunk cable socket",
+    "socket connector"
+  ]
+};
+
+function normalizeForLookup(text) {
+  return String(text || "").toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+// Built once, lazily, the first time it's needed: a reverse lookup from a normalized
+// alias phrase directly to its product name, so each real lookup stays fast (a single
+// object property access) no matter how many aliases are added over time.
+let reverseIndex = null;
+function buildReverseIndex() {
+  const index = {};
+  for (const [productName, aliases] of Object.entries(PRODUCT_ALIASES)) {
+    for (const alias of aliases) {
+      index[normalizeForLookup(alias)] = productName;
+    }
+  }
+  return index;
+}
+
+// Returns the corrected catalog item NAME (a string) if this exact requested phrase is a
+// known alias of some product, or null if there is no alias entry for it.
+export function findProductAlias(requestedName) {
+  if (!reverseIndex) reverseIndex = buildReverseIndex();
+  const key = normalizeForLookup(requestedName);
+  return reverseIndex[key] || null;
+}

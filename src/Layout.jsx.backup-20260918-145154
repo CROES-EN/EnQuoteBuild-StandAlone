@@ -115,26 +115,26 @@ export default function Layout({ children, currentPageName }) {
   const { isAuthenticated, isLocalAuthActive, logout } = useAuth();
 
   const navItems = [
-    { name: "Dashboard", icon: LayoutDashboard, page: "Dashboard", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "Workload", icon: Briefcase, page: "Workload", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "Quotes", icon: FileText, page: "Quotes", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "Products & Services", icon: Package, page: "Products", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "Material Orders", icon: ShoppingCart, page: "MaterialOrders", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "PV Panel RMA Tracker", icon: Recycle, page: "PVPanelRMAs", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "SLA Reporting", icon: BarChart3, page: "SLAReporting", roles: ["submitter", "approver", "admin", "invoicer"] },
+    { name: "Dashboard", icon: LayoutDashboard, page: "Dashboard", roles: ["submitter", "approver", "admin"] },
+    { name: "Workload", icon: Briefcase, page: "Workload", roles: ["submitter", "approver", "admin"] },
+    { name: "Quotes", icon: FileText, page: "Quotes", roles: ["submitter", "approver", "admin"] },
+    { name: "Products & Services", icon: Package, page: "Products", roles: ["submitter", "approver", "admin"] },
+    { name: "Material Orders", icon: ShoppingCart, page: "MaterialOrders", roles: ["submitter", "approver", "admin"] },
+    { name: "PV Panel RMA Tracker", icon: Recycle, page: "PVPanelRMAs", roles: ["submitter", "approver", "admin"] },
+    { name: "SLA Reporting", icon: BarChart3, page: "SLAReporting", roles: ["submitter", "approver", "admin"] },
     { name: "Users", icon: Users, page: "Users", roles: ["admin"] },
     { name: "Deletion Requests", icon: Trash2, page: "QuoteDeletionRequests", roles: ["admin"] },
-    { name: "Email Notifications", icon: Mail, page: "EmailNotifications", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "Follow-Up Settings", icon: Bell, page: "FollowUpSettings", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "PDF Template", icon: FileOutput, page: "PDFTemplateSettings", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "Boneyard", icon: Archive, page: "Boneyard", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "SV Cancel Tracker", icon: AlertTriangle, page: "SVCancelTracker", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "Resource Planner", icon: Route, page: "ResourcePlanner", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "Site Flags", icon: Siren, page: "SiteFlagManager", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "Rejection Reviews", icon: AlertTriangle, page: "RejectedQuoteReview", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "Manager Dashboard", icon: LineChart, page: "ManagerDashboard", roles: ["admin", "submitter", "approver", "invoicer"] },
-    { name: "Supervisor Dashboard", icon: Headset, page: "SupervisorDashboard", roles: ["admin", "approver", "submitter", "invoicer"] },
-    { name: "Inactive Revenue", icon: Wallet, page: "InactiveRevenueDashboard", roles: ["admin", "approver", "invoicer", "submitter"] }
+    { name: "Email Notifications", icon: Mail, page: "EmailNotifications", roles: ["admin"] },
+    { name: "Follow-Up Settings", icon: Bell, page: "FollowUpSettings", roles: ["admin"] },
+    { name: "PDF Template", icon: FileOutput, page: "PDFTemplateSettings", roles: ["admin"] },
+    { name: "Boneyard", icon: Archive, page: "Boneyard", roles: ["submitter", "approver", "admin"] },
+    { name: "SV Cancel Tracker", icon: AlertTriangle, page: "SVCancelTracker", roles: ["submitter", "approver", "admin"] },
+    { name: "Resource Planner", icon: Route, page: "ResourcePlanner", roles: ["submitter", "approver", "admin"] },
+    { name: "Site Flags", icon: Siren, page: "SiteFlagManager", roles: ["submitter", "approver", "admin"] },
+    { name: "Rejection Reviews", icon: AlertTriangle, page: "RejectedQuoteReview", roles: ["approver", "admin"] },
+    { name: "Manager Dashboard", icon: LineChart, page: "ManagerDashboard", roles: ["admin", "submitter", "approver"] },
+    { name: "Supervisor Dashboard", icon: Headset, page: "SupervisorDashboard", roles: ["admin", "approver"] },
+    { name: "Inactive Revenue", icon: Wallet, page: "InactiveRevenueDashboard", roles: ["admin", "approver", "invoicer"] }
   ];
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);

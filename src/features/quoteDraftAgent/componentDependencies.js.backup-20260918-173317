@@ -1,0 +1,41 @@
+import { COMPONENT_DEPENDENCIES } from "./componentDependencies";
+export const COMPONENT_DEPENDENCIES = {
+  MICROINVERTER_REPLACEMENT: {
+    required: [
+      "IQ Sealing Cap (Q-BA-CAP-10) Ea"
+    ],
+    optional: [
+      "Enphase Q Terminator Cap",
+      "Enphase Connector Clip (pack of 12)"
+    ]
+  },
+
+  GATEWAY_REPLACEMENT: {
+    required: [
+      "Enphase Envoy Gateway"
+    ],
+    optional: [
+      "Mobile Connect CELLMODEM-07"
+    ]
+  },
+
+  CRITTER_GUARD: {
+    required: [
+      "Critter Guard Fastener Clips 120Pcs Set"
+    ],
+    optional: [
+      "11 inch Black UV-Rated Zip Ties"
+    ]
+  },
+
+  TRUNK_CABLE_REPAIR: {
+    required: [
+      "IQ Field Wireable (socket/female) (single)",
+      "IQ Field Wireable (plug/male) (single)"
+    ],
+    optional: [
+      "Enphase Q Terminator Cap",
+      "Enphase Connector Clip (pack of 12)"
+    ]
+  }
+};

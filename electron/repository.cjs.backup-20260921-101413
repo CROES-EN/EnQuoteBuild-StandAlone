@@ -1,4 +1,4 @@
-const fs = require("node:fs/promises");
+﻿const fs = require("node:fs/promises");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const { z } = require("zod");
@@ -43,7 +43,7 @@ const updateSchema = z.object({ id: z.string().min(1), changes: z.record(z.unkno
 // "supervisorDailyMetrics" backs the Supervisor Dashboard (Calls/AHT, Emails Worked,
 // Quotes Drafted, Staffing). That dashboard is intentionally independent of Base44, so
 // this collection has no Base44 entity counterpart - it is only ever read/written locally.
-const collectionNames = ["reviews", "activities", "followUps", "users", "siteFlags", "deletionRequests", "materialOrders", "rmas", "svCancels", "supportInteractions", "pdfTemplates", "priceReviews", "followUpConfigs", "pvManufacturers", "supervisorDailyMetrics", "supervisorReportTables", "autoImportSettings", "statusAlertDismissals"];
+const collectionNames = ["reviews", "activities", "followUps", "users", "siteFlags", "deletionRequests", "materialOrders", "rmas", "svCancels", "supportInteractions", "pdfTemplates", "priceReviews", "followUpConfigs", "pvManufacturers", "supervisorDailyMetrics", "supervisorReportTables", "autoImportSettings"];
 const collectionDefaults = {
   reviews: [],
   activities: [],
@@ -162,7 +162,6 @@ const seedQuotes = [
 
 const collectionEntityMappings = {
   reviews: ["QuoteReview"],
-  statusAlertDismissals: ["StatusAlertDismissal"],
   activities: ["QuoteActivity"],
   followUps: ["FollowUpLog"],
   users: ["User"],

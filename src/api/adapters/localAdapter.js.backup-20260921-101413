@@ -130,18 +130,6 @@ export const localAdapter = {
 
   listLocalCollection: (name, ...args) => bridge().collections.list(name, ...args),
   createLocalRecord: (name, data) => bridge().collections.create(name, data),
-  // Bulk counterpart to createLocalRecord() - creates several records in one call
-  // (e.g. StatusAlerts.jsx's "Clear All" button dismissing many alerts at once)
-  // instead of requiring one round-trip per record. Uses bridge() (this file's own
-  // Electron-bridge accessor, defined above) - NOT "dh()", which does not exist
-  // anywhere in this file.
-  createLocalRecords: async (name, records) => {
-    const results = [];
-    for (const record of records) {
-      results.push(await bridge().collections.create(name, record));
-    }
-    return results;
-  },
   updateLocalRecord: (name, recordId, data) =>
     bridge().collections.update(name, recordId, data),
   deleteLocalRecord: (name, recordId) =>

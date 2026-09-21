@@ -17,11 +17,6 @@
 import { PRODUCT_CATALOG } from "./productCatalog";
 import { findLearnedCorrection } from "./learnedCorrections";
 import { findProductAlias } from "./productAliases";
-import {
-  checkCombiner6CDependency,
-  checkIQ8AdvisoryAccessories,
-  checkLegacyMicroinverterWarning
-} from "./componentDependencies";
 
 // --- Bundle aliases ---------------------------------------------------------
 //
@@ -810,7 +805,7 @@ function generateScopeOfWork(request) {
   }
 
   if (primaryItem && parts.join(" ").length < 160) {
-    const itemName = String(primaryItem).replace(/^\s*[-*ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢]\s*/, "").trim();
+    const itemName = String(primaryItem).replace(/^\s*[-*ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢]\s*/, "").trim();
     const itemSummary = itemName || "identified component";
     return `Replace one failed/non-producing ${itemSummary} identified during diagnostics and verify proper system operation following installation. Work includes removal of the failed module, installation of a compatible replacement module, operational testing, and confirmation of production functionality.`;
   }
@@ -1043,8 +1038,6 @@ export function generateQuoteDraft(request) {
   const unmatchedItems = [];
   const conversionNotes = [];
   const zeroPricedServiceNames = [];
-  const dependencyAdvisories = [];
-  const legacyWarnings = [];
 
   const allRequestedLines = [
     ...(request.products || []).map((p) => ({ ...p, kind: "product" })),
@@ -1125,66 +1118,6 @@ export function generateQuoteDraft(request) {
       unmatchedItems.push(line.name);
     }
     if (lineItem.conversion_note) conversionNotes.push(lineItem.conversion_note);
-
-    // --- Component Dependency Matrix (verified-source auto-add + advisories) ------
-    //
-    // Only fires on a CONFIDENTLY MATCHED product/material line (never on services,
-    // never on an unmatched "Miscellaneous ..." placeholder) -- this is deliberately
-    // conservative: dependency logic should never compound an already-uncertain match.
-    if (!isService && lineItem.matched) {
-      // IQ Combiner 6C -> auto-add its required control cable. This is the ONLY
-      // dependency confirmed Verified/High-confidence in BOTH the workbook's raw
-      // dependency table AND its own repair-specific BOM template -- every other
-      // "new install" dependency (Gateway, Terminator, trunk cable for a fresh
-      // microinverter) is deliberately NOT auto-added, since an O&M REPLACEMENT
-      // quote is for an EXISTING system that already has those parts -- auto-adding
-      // them here would incorrectly re-charge for equipment the site already has.
-      const combinerDependency = checkCombiner6CDependency(lineItem.name);
-      if (combinerDependency) {
-        const dependencyCatalogItem = PRODUCT_CATALOG.find(
-          (p) => p.name === combinerDependency.addItem.name
-        );
-        if (dependencyCatalogItem) {
-          const depQuantity = combinerDependency.addItem.defaultQuantity;
-          items.push({
-            requested_name: `${lineItem.name} (auto-added dependency)`,
-            name: dependencyCatalogItem.name,
-            quantity: depQuantity,
-            unit_price: dependencyCatalogItem.unit_price,
-            unit: dependencyCatalogItem.unit,
-            total: Math.round(dependencyCatalogItem.unit_price * depQuantity * 100) / 100,
-            taxable: true,
-            tax_code: dependencyCatalogItem.tax_code,
-            section: CATEGORY_TO_SECTION[dependencyCatalogItem.category] || "Electrical Materials",
-            matched: true,
-            match_confidence: "component_dependency",
-            conversion_note: combinerDependency.note,
-            needs_review: true
-          });
-          conversionNotes.push(combinerDependency.note);
-        }
-      }
-
-      // IQ8-family microinverter -> advisory accessory suggestions (NOT auto-added
-      // as priced line items -- these are genuinely conditional per the workbook's
-      // own replacement BOM template, e.g. Sealing Cap is only needed "for every
-      // UNUSED connector," which this engine cannot determine from a simple
-      // request). Collected separately and surfaced in the UI as one-click
-      // suggestions a reviewer can choose to add.
-      const iq8Advisory = checkIQ8AdvisoryAccessories(lineItem.name);
-      if (iq8Advisory) {
-        dependencyAdvisories.push({ triggerItem: lineItem.name, ...iq8Advisory });
-      }
-
-      // Legacy microinverter (M-series, S-series, IQ6, IQ7-series) -> non-blocking
-      // warning surfaced verbatim from the workbook's Compatibility_Matrix, which
-      // explicitly says NOT to auto-select a replacement for these without manual
-      // engineering review.
-      const legacyWarning = checkLegacyMicroinverterWarning(lineItem.name);
-      if (legacyWarning) {
-        legacyWarnings.push({ triggerItem: lineItem.name, ...legacyWarning });
-      }
-    }
   }
 
   items = deduplicateItems(items);
@@ -1227,9 +1160,7 @@ export function generateQuoteDraft(request) {
     })),
     notes: [notes, riskStatement].filter(Boolean).join("\n\n"),
     unmatched_count: unmatchedItems.length,
-    unmatched_items: unmatchedItems,
-    dependency_advisories: dependencyAdvisories,
-    legacy_warnings: legacyWarnings
+    unmatched_items: unmatchedItems
   };
 }
 

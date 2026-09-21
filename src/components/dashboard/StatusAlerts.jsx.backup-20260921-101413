@@ -1,7 +1,6 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { listLocalCollection, createLocalRecord, createLocalRecords } from "@/api/dataClient";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { Card } from "@/components/ui/card";
@@ -63,17 +62,10 @@ export default function StatusAlerts({ quotes }) {
   // Fetch the current user's dismissed alert quote IDs from the database.
   // This is user-scoped via built-in row-level security (created_by_id),
   // so dismissals persist across devices and environments.
-  // FIX (confirmed root cause): this previously called base44.entities.StatusAlertDismissal
-  // directly, bypassing this app's actual local/base44 adapter system entirely. In desktop
-  // ("local") mode, base44.entities does not exist at all -- the call silently threw, React
-  // Query caught it into an error state, and this component's own `= []` fallback made
-  // dismissals appear as an empty list FOREVER, regardless of what was actually dismissed.
-  // Routed through listLocalCollection() -- the same function every other collection
-  // (quotes, reviews, etc.) already uses correctly.
   const { data: dismissals = [], isLoading: dismissalsLoading } = useQuery({
     queryKey: ["statusAlertDismissals"],
     queryFn: async () => {
-      return await listLocalCollection("statusAlertDismissals");
+      return await base44.entities.StatusAlertDismissal.list("-created_date", 500);
     }
   });
 
@@ -81,7 +73,7 @@ export default function StatusAlerts({ quotes }) {
 
   const dismissMutation = useMutation({
     mutationFn: async (quoteId) => {
-      await createLocalRecord("statusAlertDismissals", { quote_id: quoteId });
+      await base44.entities.StatusAlertDismissal.create({ quote_id: quoteId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["statusAlertDismissals"] });
@@ -90,8 +82,7 @@ export default function StatusAlerts({ quotes }) {
 
   const clearAllMutation = useMutation({
     mutationFn: async (quoteIds) => {
-      await createLocalRecords(
-        "statusAlertDismissals",
+      await base44.entities.StatusAlertDismissal.bulkCreate(
         quoteIds.map(id => ({ quote_id: id }))
       );
     },

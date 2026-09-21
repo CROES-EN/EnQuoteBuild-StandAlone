@@ -56,6 +56,23 @@ npm run desktop:local
 This explicitly forces `VITE_DATA_SOURCE=local` before building.
 
 ---
+## Process Before running npxnpx electron-builder --publish always
+
+Make sure Enquote is CLOSED before creating a fresh build:
+`Get-Process | Where-Object { $_.ProcessName -like "*EnQuote*" }`
+
+If that returns anything, force-close it:
+`Get-Process | Where-Object { $_.ProcessName -like "*EnQuote*" } | Stop-Process -Force`
+
+Then re-check to confirm it's actually gone (should return nothing):
+ `Get-Process | Where-Object { $_.ProcessName -like "*EnQuote*" }`
+
+ Then run 
+`Remove-Item -Recurse -Force "C:\EnQuoteBuild\dist" -ErrorAction SilentlyContinue`
+`Remove-Item -Recurse -Force "C:\EnQuoteBuild\release" -ErrorAction SilentlyContinue`
+`npm run build`
+`git status`
+`git add`
 
 ## Release Process (Recap)
 1. Bump `"version"` in `package.json` (e.g. `1.0.1` → `1.0.2`)
@@ -73,10 +90,9 @@ This explicitly forces `VITE_DATA_SOURCE=local` before building.
 - [x] "Incorrect password" showing raw IPC error text (fixed — cleaned up in AuthContext.jsx)
 - [ ] Team-wide "who's signed in / last signed in when" view (not yet built — would need a
       write-back-to-Base44 path for local sign-in activity, similar to the outbound quote sync)
-- [ ] DevTools auto-open fix — confirmed correct in code, but only verifiable via Tier 2/3 testing (a Tier 1 run will always still show it)
-- [ ] Auto-Quote Drafter - Pulls from Quote Request Cases with Case Comments and builds Quotes and places them in "AI Generated Quote - Needs Review" status
+- [x] DevTools auto-open fix — confirmed correct in code, but only verifiable via Tier 2/3 testing (a Tier 1 run will always still show it)
+- [ ] Auto-Quote Drafter - Pulls from Quote Request Cases with Case Comments and builds Quotes and places them in "AI Generated Quote - Needs Review" status *INPROGRESS*
 - [ ] Add another status for On-Demand Quotes for Shane Mosley which integrates the Material Orders tab & allows Shane to order the purchased quote materials before we schedule.
-- [ ] Fix ICON for APP
+- [x] Fix ICON for APP
 - [ ] ANIMATED THEMES??
 - [ ] Hyperlinks for Case Numbers & Site ID's in Workload
-$env:GH_TOKEN = "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"

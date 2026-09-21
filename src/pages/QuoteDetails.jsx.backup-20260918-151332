@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { bulkUpdateQuotes, createLocalRecord, createQuote, createReview, deleteQuote, getCurrentUser, getQuoteById, getQuotes, getReviews, getUsers, isLocalDataSource, listLocalCollection, updateQuote, updateReview } from "@/api/dataClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -202,17 +202,17 @@ function QuoteDetailsContent() {
  });
 
  const { data: deletionRequest } = useQuery({
-    queryKey: ["deletionRequest", quoteId],
-    queryFn: async () => {
-      try {
-        const requests = (await listLocalCollection("deletionRequests")).filter(request => request.quote_id === quoteId && request.status === "pending");
-        return requests[0] ?? null;
-      } catch {
-        return null;
-      }
-    },
-    enabled: !!quoteId
-  });
+ queryKey: ["deletionRequest", quoteId],
+ queryFn: async () => {
+ try {
+ const requests = (await listLocalCollection("deletionRequests")).filter(request => request.quote_id === quoteId && request.status === "pending");
+ return requests[0];
+ } catch {
+ return null;
+ }
+ },
+ enabled: !!quoteId
+ });
 
  const handleRequestDeletion = async () => {
  const user = await safeMe();

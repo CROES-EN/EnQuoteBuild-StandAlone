@@ -16,49 +16,6 @@
 
 import { PRODUCT_CATALOG } from "./productCatalog";
 import { findLearnedCorrection } from "./learnedCorrections";
-import { findProductAlias } from "./productAliases";
-import {
-  checkCombiner6CDependency,
-  checkIQ8AdvisoryAccessories,
-  checkLegacyMicroinverterWarning
-} from "./componentDependencies";
-
-// --- Bundle aliases ---------------------------------------------------------
-//
-// Some requested items are shorthand for a KNOWN GROUP of catalog parts, not a
-// single product -- e.g. "Trunk Cable" really means the cable itself PLUS the
-// plug and socket connectors needed to terminate it. This is deliberately kept
-// separate from the single-item learnedCorrections.js/productAliases.js
-// systems, since a bundle expands into MULTIPLE line items, not one.
-//
-// Connector quantities intentionally default to 1 each (not tied to the cable
-// length) -- the actual number of plugs/sockets needed depends on how many
-// cable runs/splices the job requires, which this engine has no way to know
-// from a single requested line. Every bundle item is flagged needs_review so
-// this is never silently treated as a finished, ready-to-invoice quantity.
-const TRUNK_CABLE_BUNDLE = {
-  note: "Trunk Cable bundle: cable plus one plug and one socket connector included by default -- review lengths & quantities before finalizing, since actual connector count depends on the number of cable runs/splices needed.",
-  items: [
-    { name: "IQ Cable (Q-12-RAW-300)", useRequestedQuantity: true },
-    { name: "IQ Field Wireable (plug) Ea. SKU: Q-CONN-10M", defaultQuantity: 1 },
-    { name: "IQ Field Wireable (socket) Ea. SKU: Q-CONN-10F", defaultQuantity: 1 }
-  ]
-};
-
-const BUNDLE_ALIASES = {
-  "trunk cable": TRUNK_CABLE_BUNDLE,
-  "trunk cable replacement": TRUNK_CABLE_BUNDLE,
-  "trunk cable repair": TRUNK_CABLE_BUNDLE
-};
-
-function normalizeBundleKey(text) {
-  return String(text || "").toLowerCase().replace(/\s+/g, " ").trim();
-}
-
-function expandBundleAlias(requestedName) {
-  const key = normalizeBundleKey(requestedName);
-  return BUNDLE_ALIASES[key] || null;
-}
 
 // --- Tax code reference (from the Quote Draft Agent prompt) --------------
 const TAX_CODES = {
@@ -211,14 +168,6 @@ const STOPWORDS = new Set([
 // happens to appear in both.
 const SERVICE_CATEGORY = "Services";
 
-// Catalog services that must NEVER be auto-selected by matching, even if a request
-// phrase would otherwise phrase/score-match them -- these are shown to the user only
-// if THEY manually add them via the product catalog, never auto-applied by the Draft
-// Agent. Add a catalog item's exact name here to exclude it from auto-matching.
-const NEVER_AUTO_MATCH_SERVICES = new Set([
-  "Microinverter Replacement for RMA'ed 5 MI's and under"
-]);
-
 // Words that, ALONE, are too generic to confidently select one specific
 // catalog SKU out of many (e.g. dozens of catalog entries contain
 // "connector" or "cable"). If a requested item's core tokens reduce to
@@ -294,81 +243,6 @@ function containsSubsequence(haystackTokens, needleTokens) {
   return false;
 }
 
-// --- Fuzzy matching (tolerant of small typos) ------------------------------
-//
-// Computes the classic Levenshtein edit distance between two strings -- the
-// minimum number of single-character insertions, deletions, or substitutions
-// needed to turn one into the other. Used only to tolerate SMALL typos (an
-// extra/missing/wrong letter), never to loosen matching in any broader sense.
-function levenshteinDistance(a, b) {
-  if (a === b) return 0;
-  if (a.length === 0) return b.length;
-  if (b.length === 0) return a.length;
-  let prev = new Array(b.length + 1);
-  let curr = new Array(b.length + 1);
-  for (let j = 0; j <= b.length; j++) prev[j] = j;
-  for (let i = 1; i <= a.length; i++) {
-    curr[0] = i;
-    for (let j = 1; j <= b.length; j++) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      curr[j] = Math.min(
-        prev[j] + 1,
-        curr[j - 1] + 1,
-        prev[j - 1] + cost
-      );
-    }
-    [prev, curr] = [curr, prev];
-  }
-  return prev[b.length];
-}
-
-// Two tokens are considered a fuzzy match ONLY if they are both already a
-// length-4-or-longer word with at most a 1-character difference (a single
-// typo) -- short words (3 letters or fewer) are NEVER fuzzy-matched, since a
-// 1-character edit on a short word (e.g. "cap" vs "cab") is far too likely to
-// accidentally match a genuinely different, unrelated word.
-const FUZZY_MIN_TOKEN_LENGTH = 4;
-const FUZZY_MAX_DISTANCE = 1;
-function tokensFuzzyEqual(tokenA, tokenB) {
-  if (tokenA === tokenB) return true;
-  if (tokenA.length < FUZZY_MIN_TOKEN_LENGTH || tokenB.length < FUZZY_MIN_TOKEN_LENGTH) return false;
-  if (Math.abs(tokenA.length - tokenB.length) > FUZZY_MAX_DISTANCE) return false;
-  return levenshteinDistance(tokenA, tokenB) <= FUZZY_MAX_DISTANCE;
-}
-
-// Same word-boundary "contiguous subsequence" check as containsSubsequence(),
-// but allows each individual word to match via tokensFuzzyEqual() (exact OR a
-// single small typo) instead of requiring byte-for-byte equality. Reuses the
-// exact same 2-or-more-meaningful-words gate as findPhraseMatch(), so this
-// can never fire on a single short/generic word alone.
-function containsFuzzySubsequence(haystackTokens, needleTokens) {
-  if (needleTokens.length === 0 || needleTokens.length > haystackTokens.length) return false;
-  for (let i = 0; i <= haystackTokens.length - needleTokens.length; i++) {
-    let matchesHere = true;
-    for (let j = 0; j < needleTokens.length; j++) {
-      if (!tokensFuzzyEqual(haystackTokens[i + j], needleTokens[j])) {
-        matchesHere = false;
-        break;
-      }
-    }
-    if (matchesHere) return true;
-  }
-  return false;
-}
-
-function findFuzzyPhraseMatch(requestedName, candidates) {
-  const queryTokens = normalizeForPhraseMatch(requestedName).split(" ").filter(Boolean);
-  if (queryTokens.length < 2) return null;
-
-  for (const item of candidates) {
-    const nameTokens = normalizeForPhraseMatch(item.name).split(" ").filter(Boolean);
-    if (containsFuzzySubsequence(nameTokens, queryTokens)) {
-      return item;
-    }
-  }
-  return null;
-}
-
 // Scores a catalog item against the CORE request tokens (the item's own
 // name, e.g. "Q Cable" or "Connectors" -- NOT free-text notes, which are
 // symptom/context descriptions and too noisy to use for matching). Notes
@@ -429,8 +303,7 @@ function findBestCatalogMatch(requestedName, notesText, categoryHint, isService)
   if (coreTokens.length === 0) return { match: null, score: 0, coverage: 0 };
 
   const candidates = PRODUCT_CATALOG.filter((item) =>
-    (isService ? item.category === SERVICE_CATEGORY : item.category !== SERVICE_CATEGORY) &&
-    !NEVER_AUTO_MATCH_SERVICES.has(item.name)
+    isService ? item.category === SERVICE_CATEGORY : item.category !== SERVICE_CATEGORY
   );
 
   let best = null;
@@ -499,8 +372,7 @@ function guessCategoryFromText(text) {
 function matchLineItem(requestedName, requestedQuantity, requestedUnit, notes, categoryHint, isService) {
   const coreTokens = tokenize(requestedName);
   const candidates = PRODUCT_CATALOG.filter((item) =>
-    (isService ? item.category === SERVICE_CATEGORY : item.category !== SERVICE_CATEGORY) &&
-    !NEVER_AUTO_MATCH_SERVICES.has(item.name)
+    isService ? item.category === SERVICE_CATEGORY : item.category !== SERVICE_CATEGORY
   );
   // Checked FIRST, before any phrase/score matching: a small, hand-maintained list of
   // confirmed corrections for requests that the normal word-matching logic could not
@@ -508,7 +380,7 @@ function matchLineItem(requestedName, requestedQuantity, requestedUnit, notes, c
   // mismatch, once identified and confirmed, be fixed permanently with zero risk of
   // ever being mis-matched the same way again -- entirely local, no AI/API involved.
   if (!isService) {
-    const correctedName = findLearnedCorrection(requestedName) || findProductAlias(requestedName);
+    const correctedName = findLearnedCorrection(requestedName);
     if (correctedName) {
       const correctedItem = PRODUCT_CATALOG.find((item) => item.name === correctedName);
       if (correctedItem) {
@@ -561,32 +433,6 @@ function matchLineItem(requestedName, requestedQuantity, requestedUnit, notes, c
       section: CATEGORY_TO_SECTION[phraseMatch.category] || "Electrical Materials",
       matched: true,
       match_confidence: "phrase",
-      conversion_note: conversionNote,
-      needs_review: needsReview
-    };
-  }
-
-  // Second-strongest signal: same phrase-boundary check as above, but
-  // tolerating a single small typo per word (e.g. "Microinvertor" matching
-  // "Microinverter") -- tried only when an EXACT phrase match was not found,
-  // and gated by the exact same 2+-meaningful-words safeguard.
-  const fuzzyMatch = canAttemptSpecificMatch ? findFuzzyPhraseMatch(requestedName, candidates) : null;
-  if (fuzzyMatch) {
-    const { quantity, conversionNote, needsReview } = resolveBilledQuantity(
-      fuzzyMatch, requestedQuantity, requestedUnit
-    );
-    return {
-      requested_name: requestedName,
-      name: fuzzyMatch.name,
-      quantity,
-      unit_price: fuzzyMatch.unit_price,
-      unit: fuzzyMatch.unit,
-      total: Math.round(fuzzyMatch.unit_price * quantity * 100) / 100,
-      taxable: true,
-      tax_code: fuzzyMatch.tax_code,
-      section: CATEGORY_TO_SECTION[fuzzyMatch.category] || "Electrical Materials",
-      matched: true,
-      match_confidence: "fuzzy",
       conversion_note: conversionNote,
       needs_review: needsReview
     };
@@ -710,39 +556,10 @@ function normalizeQuantity(rawQuantity) {
 //   low    = no confident catalog match was found; a category-average placeholder price
 //            was used instead -- these are the lines most worth double-checking.
 function categorizeConfidence(item) {
-  if (item.match_confidence === "learned_correction") return "high";
-  if (item.match_confidence === "bundle_alias") return "high";
   if (item.zero_priced_service) return "medium";
   if (item.matched && item.match_confidence === "phrase") return "high";
-  if (item.matched && item.match_confidence === "fuzzy") return "medium";
   if (item.matched && typeof item.match_confidence === "number") return "medium";
   return "low";
-}
-
-// Produces a short, human-readable explanation of WHY an item received the
-// confidence level it did -- shown as a tooltip in the UI so a reviewer can
-// tell at a glance whether a badge is worth double-checking, without having
-// to guess.
-function getConfidenceReason(item) {
-  if (item.match_confidence === "learned_correction") {
-    return "Matched via a saved correction -- this exact phrase was previously confirmed correct.";
-  }
-  if (item.match_confidence === "bundle_alias") {
-    return "Part of a known bundle (e.g. Trunk Cable = cable + connectors) -- please review the quantity.";
-  }
-  if (item.zero_priced_service) {
-    return "Installation/service labor already covered by the FST's on-site labor hours -- shown at $0 by design, not a guess.";
-  }
-  if (item.matched && item.match_confidence === "phrase") {
-    return "The requested name was found as an exact phrase inside this catalog item's name.";
-  }
-  if (item.matched && item.match_confidence === "fuzzy") {
-    return "Matched allowing a small typo (one letter different) in one word -- please confirm this is the right part.";
-  }
-  if (item.matched && typeof item.match_confidence === "number") {
-    return "Matched using partial word overlap with the catalog -- a reasonable guess, not an exact match.";
-  }
-  return "No confident catalog match was found -- a category-average placeholder price was used. Please verify and correct manually.";
 }
 
 // --- Labor & travel (same rules as the Step 2 prompt) ---------------------
@@ -810,7 +627,7 @@ function generateScopeOfWork(request) {
   }
 
   if (primaryItem && parts.join(" ").length < 160) {
-    const itemName = String(primaryItem).replace(/^\s*[-*ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢]\s*/, "").trim();
+    const itemName = String(primaryItem).replace(/^\s*[-*â€¢]\s*/, "").trim();
     const itemSummary = itemName || "identified component";
     return `Replace one failed/non-producing ${itemSummary} identified during diagnostics and verify proper system operation following installation. Work includes removal of the failed module, installation of a compatible replacement module, operational testing, and confirmation of production functionality.`;
   }
@@ -859,14 +676,6 @@ function generateRiskStatement(request, { hasUnknowns, unmatchedItems }) {
 // "Additional Materials") into a single consolidated line, summing
 // quantity and recomputing the total -- rather than showing the same
 // product twice as separate rows.
-// Detects "Quote Option 1" / "Option 2" style phrasing in a requested line's notes --
-// when present, this item represents an ALTERNATIVE scope, not an additional quantity
-// to be combined with any other option for the same part.
-const QUOTE_OPTION_PATTERN = /\bquote\s*option\s*\d+\b|\boption\s*\d+\b/i;
-function mentionsQuoteOption(notes) {
-  return QUOTE_OPTION_PATTERN.test(String(notes || ""));
-}
-
 function deduplicateItems(items) {
   const merged = new Map();
   const order = [];
@@ -875,23 +684,12 @@ function deduplicateItems(items) {
     const key = item.name.toLowerCase();
     if (merged.has(key)) {
       const existing = merged.get(key);
-      if (existing.is_alternate_option || item.is_alternate_option) {
-        // Multiple quote OPTIONS reference this same item (e.g. Option 1 lists 11,
-        // Option 2 also lists 11) -- these are NOT two separate needs to add together.
-        // Summing would double-count a quantity that was only ever meant once. Using
-        // the larger of the two is a safer default than silently picking either one.
-        existing.quantity = Math.max(existing.quantity, item.quantity);
-        existing.total = Math.round(existing.unit_price * existing.quantity * 100) / 100;
-        existing.needs_review = true;
-        existing.conversion_note = "Multiple quote options reference this item (e.g. Option 1 vs Option 2) -- quantity shown reflects a single option, not the sum of both. Please review the scope of work before finalizing.";
-      } else {
-        existing.quantity += item.quantity;
-        existing.total = Math.round(existing.unit_price * existing.quantity * 100) / 100;
-        if (item.conversion_note && !existing.conversion_note) {
-          existing.conversion_note = item.conversion_note;
-        }
-        existing.needs_review = existing.needs_review || item.needs_review;
+      existing.quantity += item.quantity;
+      existing.total = Math.round(existing.unit_price * existing.quantity * 100) / 100;
+      if (item.conversion_note && !existing.conversion_note) {
+        existing.conversion_note = item.conversion_note;
       }
+      existing.needs_review = existing.needs_review || item.needs_review;
     } else {
       merged.set(key, { ...item });
       order.push(key);
@@ -899,121 +697,6 @@ function deduplicateItems(items) {
   }
 
   return order.map((key) => merged.get(key));
-}
-
-// --- Invalid quote request detection (Enphase Care routing / non-Enphase panels) -------
-//
-// Some requests should NOT go through a standard Enphase parts quote at all:
-//   - An Enphase microinverter RMA replacement, under warranty -- this is normally
-//     covered under an Enphase Care subscription, which can save the homeowner money
-//     versus a standard paid quote.
-//   - Any non-Enphase-branded solar panel/PV module -- Enphase does not manufacture
-//     panels, so these require either a manufacturer RMA form or sourcing a compatible
-//     replacement through a local solar distributor, not a standard parts quote.
-//
-// This is deliberately a HEURISTIC, name/keyword-based check, not a guarantee -- real
-// requests can have unusual wording or genuine special-case exceptions. Every flagged
-// request can still be drafted via an explicit "Draft Anyway" override in the UI; this
-// check only prevents a draft from being silently generated without the reviewer seeing
-// the concern first.
-const NON_ENPHASE_PANEL_BRANDS = [
-  "suniva", "sunpower", "waaree", "certainteed", "solaria", "ja solar", "longi",
-  "panasonic", "trina", "canadian solar", "rec", "silfab", "mission solar",
-  "q cells", "qcells", "hanwha", "axitec", "jinko", "hyundai", "boviet",
-  "heliene", "solartech", "first solar", "yingli", "lg solar"
-];
-// Deliberately does NOT include a bare "panel" keyword alone -- that would false-positive
-// on unrelated catalog items like "electrical panel" / "load panel" / "breaker panel"
-// (confirmed via direct testing). "Solar panel" / "PV module" as full phrases are
-// specific enough to the actual part.
-const PANEL_MODULE_PHRASE_PATTERN = /\bsolar\s*panel\b|\bpv\s*mod(?:ule)?s?\b/i;
-
-function mentionsNonEnphasePanelOrModule(text) {
-  const lower = String(text || "").toLowerCase();
-  if (NON_ENPHASE_PANEL_BRANDS.some((brand) => lower.includes(brand))) return true;
-  return PANEL_MODULE_PHRASE_PATTERN.test(lower);
-}
-
-const NON_ENPHASE_MICROINVERTER_BRANDS = [
-  "solarbridge", "enecsys", "abb", "tigo", "solaredge", "chilicon", "apsystems", "sma"
-];
-function isMicroinverterMention(text) {
-  return /microinverter|micro\s*inverter/i.test(String(text || ""));
-}
-function mentionsCompetingMicroinverterBrand(text) {
-  const lower = String(text || "").toLowerCase();
-  return NON_ENPHASE_MICROINVERTER_BRANDS.some((brand) => lower.includes(brand));
-}
-
-function isAffirmative(value) {
-  return /^\s*(yes|true|approved|confirmed)\s*$/i.test(String(value || ""));
-}
-function indicatesActiveWarrantyOrRma(rmaRequired, warrantyStatus) {
-  if (isAffirmative(rmaRequired)) return true;
-  return /under\s*warranty|active|in\s*warranty|approved/i.test(String(warrantyStatus || ""));
-}
-
-// Scans a parsed Quote Request (see quoteRequestTextParser.js) for the two invalid-quote
-// patterns above. Returns an array of { type, itemName, reason } issues -- an empty array
-// means no concerns were detected. Does NOT modify the request or throw; purely read-only.
-export function detectQuoteBlockingIssues(request) {
-  const issues = [];
-
-  const productAndMaterialLines = [
-    ...(request.products || []),
-    ...(request.materials || [])
-  ];
-  for (const line of productAndMaterialLines) {
-    const searchText = `${line.name || ""} ${line.notes || ""}`;
-    if (mentionsNonEnphasePanelOrModule(searchText)) {
-      issues.push({
-        type: "non_enphase_panel",
-        itemName: line.name,
-        reason: `"${line.name}" appears to be a non-Enphase solar panel or PV module. Enphase does not manufacture panels -- this typically needs a manufacturer RMA form, or a compatible replacement sourced through a local solar distributor, rather than a standard Enphase parts quote.`
-      });
-    }
-  }
-
-  const warrantyEntries = request.warrantyReplacements || [];
-  for (const entry of warrantyEntries) {
-    const searchText = `${entry.name || ""} ${entry.notes || ""}`;
-    if (
-      isMicroinverterMention(searchText) &&
-      !mentionsCompetingMicroinverterBrand(searchText) &&
-      indicatesActiveWarrantyOrRma(entry.rmaRequired, entry.warrantyStatus)
-    ) {
-      issues.push({
-        type: "enphase_microinverter_rma",
-        itemName: entry.name,
-        reason: `"${entry.name}" appears to be an Enphase microinverter RMA replacement under warranty. This is typically covered under an Enphase Care subscription -- which can save the homeowner money -- rather than a standard paid quote.`
-      });
-    }
-  }
-
-  // Secondary signal (only checked if the Warranty Replacements section above found
-  // NOTHING -- avoids showing 2 redundant bullets for the same underlying RMA when both
-  // signals point to it): top-level "RMA Required: Yes" combined with a microinverter
-  // mention in Products/Services, in case Warranty Replacements wasn't filled in.
-  const alreadyHasRmaIssue = issues.some((issue) => issue.type === "enphase_microinverter_rma");
-  if (!alreadyHasRmaIssue && isAffirmative(request.rmaRequired)) {
-    const serviceAndProductLines = [
-      ...(request.products || []),
-      ...(request.services || [])
-    ];
-    for (const line of serviceAndProductLines) {
-      const searchText = `${line.name || ""} ${line.notes || ""}`;
-      if (isMicroinverterMention(searchText) && !mentionsCompetingMicroinverterBrand(searchText)) {
-        issues.push({
-          type: "enphase_microinverter_rma",
-          itemName: line.name,
-          reason: `This request is marked "RMA Required: Yes" and mentions an Enphase microinverter ("${line.name}"). This is typically covered under an Enphase Care subscription rather than a standard paid quote.`
-        });
-        break;
-      }
-    }
-  }
-
-  return issues;
 }
 
 // --- Main entry point -------------------------------------------------------
@@ -1043,8 +726,6 @@ export function generateQuoteDraft(request) {
   const unmatchedItems = [];
   const conversionNotes = [];
   const zeroPricedServiceNames = [];
-  const dependencyAdvisories = [];
-  const legacyWarnings = [];
 
   const allRequestedLines = [
     ...(request.products || []).map((p) => ({ ...p, kind: "product" })),
@@ -1069,43 +750,8 @@ export function generateQuoteDraft(request) {
     }
 
     const isService = line.kind === "service";
-
-    // Bundle aliases (e.g. "Trunk Cable") expand into MULTIPLE catalog line
-    // items at once -- checked before the normal single-item matching path,
-    // and only for products/materials (never services).
-    const bundleExpansion = !isService ? expandBundleAlias(line.name) : null;
-    if (bundleExpansion) {
-      for (const bundlePart of bundleExpansion.items) {
-        const catalogItem = PRODUCT_CATALOG.find((p) => p.name === bundlePart.name);
-        if (!catalogItem) continue;
-        const quantity = bundlePart.useRequestedQuantity
-          ? normalizeQuantity(line.quantity)
-          : bundlePart.defaultQuantity;
-        items.push({
-          requested_name: line.name,
-          name: catalogItem.name,
-          quantity,
-          unit_price: catalogItem.unit_price,
-          unit: catalogItem.unit,
-          total: Math.round(catalogItem.unit_price * quantity * 100) / 100,
-          taxable: true,
-          tax_code: catalogItem.tax_code,
-          section: CATEGORY_TO_SECTION[catalogItem.category] || "Electrical Materials",
-          matched: true,
-          match_confidence: "bundle_alias",
-          conversion_note: bundleExpansion.note,
-          needs_review: true
-        });
-      }
-      conversionNotes.push(bundleExpansion.note);
-      continue;
-    }
-
     const categoryHint = isService ? "Services" : guessCategoryFromText(`${line.name} ${line.notes || ""}`);
     const lineItem = matchLineItem(line.name, line.quantity, line.unit, line.notes, categoryHint, isService);
-    if (mentionsQuoteOption(line.notes)) {
-      lineItem.is_alternate_option = true;
-    }
 
     // Services priced at $0 in the catalog (a CONFIDENT match to a real
     // catalog service that happens to be $0) represent labor already
@@ -1125,66 +771,6 @@ export function generateQuoteDraft(request) {
       unmatchedItems.push(line.name);
     }
     if (lineItem.conversion_note) conversionNotes.push(lineItem.conversion_note);
-
-    // --- Component Dependency Matrix (verified-source auto-add + advisories) ------
-    //
-    // Only fires on a CONFIDENTLY MATCHED product/material line (never on services,
-    // never on an unmatched "Miscellaneous ..." placeholder) -- this is deliberately
-    // conservative: dependency logic should never compound an already-uncertain match.
-    if (!isService && lineItem.matched) {
-      // IQ Combiner 6C -> auto-add its required control cable. This is the ONLY
-      // dependency confirmed Verified/High-confidence in BOTH the workbook's raw
-      // dependency table AND its own repair-specific BOM template -- every other
-      // "new install" dependency (Gateway, Terminator, trunk cable for a fresh
-      // microinverter) is deliberately NOT auto-added, since an O&M REPLACEMENT
-      // quote is for an EXISTING system that already has those parts -- auto-adding
-      // them here would incorrectly re-charge for equipment the site already has.
-      const combinerDependency = checkCombiner6CDependency(lineItem.name);
-      if (combinerDependency) {
-        const dependencyCatalogItem = PRODUCT_CATALOG.find(
-          (p) => p.name === combinerDependency.addItem.name
-        );
-        if (dependencyCatalogItem) {
-          const depQuantity = combinerDependency.addItem.defaultQuantity;
-          items.push({
-            requested_name: `${lineItem.name} (auto-added dependency)`,
-            name: dependencyCatalogItem.name,
-            quantity: depQuantity,
-            unit_price: dependencyCatalogItem.unit_price,
-            unit: dependencyCatalogItem.unit,
-            total: Math.round(dependencyCatalogItem.unit_price * depQuantity * 100) / 100,
-            taxable: true,
-            tax_code: dependencyCatalogItem.tax_code,
-            section: CATEGORY_TO_SECTION[dependencyCatalogItem.category] || "Electrical Materials",
-            matched: true,
-            match_confidence: "component_dependency",
-            conversion_note: combinerDependency.note,
-            needs_review: true
-          });
-          conversionNotes.push(combinerDependency.note);
-        }
-      }
-
-      // IQ8-family microinverter -> advisory accessory suggestions (NOT auto-added
-      // as priced line items -- these are genuinely conditional per the workbook's
-      // own replacement BOM template, e.g. Sealing Cap is only needed "for every
-      // UNUSED connector," which this engine cannot determine from a simple
-      // request). Collected separately and surfaced in the UI as one-click
-      // suggestions a reviewer can choose to add.
-      const iq8Advisory = checkIQ8AdvisoryAccessories(lineItem.name);
-      if (iq8Advisory) {
-        dependencyAdvisories.push({ triggerItem: lineItem.name, ...iq8Advisory });
-      }
-
-      // Legacy microinverter (M-series, S-series, IQ6, IQ7-series) -> non-blocking
-      // warning surfaced verbatim from the workbook's Compatibility_Matrix, which
-      // explicitly says NOT to auto-select a replacement for these without manual
-      // engineering review.
-      const legacyWarning = checkLegacyMicroinverterWarning(lineItem.name);
-      if (legacyWarning) {
-        legacyWarnings.push({ triggerItem: lineItem.name, ...legacyWarning });
-      }
-    }
   }
 
   items = deduplicateItems(items);
@@ -1222,14 +808,11 @@ export function generateQuoteDraft(request) {
       total: item.total,
       taxable: item.taxable,
       tax_code: item.tax_code,
-      confidence: categorizeConfidence(item),
-      confidence_reason: getConfidenceReason(item)
+      confidence: categorizeConfidence(item)
     })),
     notes: [notes, riskStatement].filter(Boolean).join("\n\n"),
     unmatched_count: unmatchedItems.length,
-    unmatched_items: unmatchedItems,
-    dependency_advisories: dependencyAdvisories,
-    legacy_warnings: legacyWarnings
+    unmatched_items: unmatchedItems
   };
 }
 

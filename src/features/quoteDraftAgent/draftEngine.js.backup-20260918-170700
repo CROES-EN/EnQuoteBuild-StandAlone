@@ -17,11 +17,6 @@
 import { PRODUCT_CATALOG } from "./productCatalog";
 import { findLearnedCorrection } from "./learnedCorrections";
 import { findProductAlias } from "./productAliases";
-import {
-  checkCombiner6CDependency,
-  checkIQ8AdvisoryAccessories,
-  checkLegacyMicroinverterWarning
-} from "./componentDependencies";
 
 // --- Bundle aliases ---------------------------------------------------------
 //
@@ -810,7 +805,7 @@ function generateScopeOfWork(request) {
   }
 
   if (primaryItem && parts.join(" ").length < 160) {
-    const itemName = String(primaryItem).replace(/^\s*[-*ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢]\s*/, "").trim();
+    const itemName = String(primaryItem).replace(/^\s*[-*Ã¢â‚¬Â¢]\s*/, "").trim();
     const itemSummary = itemName || "identified component";
     return `Replace one failed/non-producing ${itemSummary} identified during diagnostics and verify proper system operation following installation. Work includes removal of the failed module, installation of a compatible replacement module, operational testing, and confirmation of production functionality.`;
   }
@@ -901,121 +896,6 @@ function deduplicateItems(items) {
   return order.map((key) => merged.get(key));
 }
 
-// --- Invalid quote request detection (Enphase Care routing / non-Enphase panels) -------
-//
-// Some requests should NOT go through a standard Enphase parts quote at all:
-//   - An Enphase microinverter RMA replacement, under warranty -- this is normally
-//     covered under an Enphase Care subscription, which can save the homeowner money
-//     versus a standard paid quote.
-//   - Any non-Enphase-branded solar panel/PV module -- Enphase does not manufacture
-//     panels, so these require either a manufacturer RMA form or sourcing a compatible
-//     replacement through a local solar distributor, not a standard parts quote.
-//
-// This is deliberately a HEURISTIC, name/keyword-based check, not a guarantee -- real
-// requests can have unusual wording or genuine special-case exceptions. Every flagged
-// request can still be drafted via an explicit "Draft Anyway" override in the UI; this
-// check only prevents a draft from being silently generated without the reviewer seeing
-// the concern first.
-const NON_ENPHASE_PANEL_BRANDS = [
-  "suniva", "sunpower", "waaree", "certainteed", "solaria", "ja solar", "longi",
-  "panasonic", "trina", "canadian solar", "rec", "silfab", "mission solar",
-  "q cells", "qcells", "hanwha", "axitec", "jinko", "hyundai", "boviet",
-  "heliene", "solartech", "first solar", "yingli", "lg solar"
-];
-// Deliberately does NOT include a bare "panel" keyword alone -- that would false-positive
-// on unrelated catalog items like "electrical panel" / "load panel" / "breaker panel"
-// (confirmed via direct testing). "Solar panel" / "PV module" as full phrases are
-// specific enough to the actual part.
-const PANEL_MODULE_PHRASE_PATTERN = /\bsolar\s*panel\b|\bpv\s*mod(?:ule)?s?\b/i;
-
-function mentionsNonEnphasePanelOrModule(text) {
-  const lower = String(text || "").toLowerCase();
-  if (NON_ENPHASE_PANEL_BRANDS.some((brand) => lower.includes(brand))) return true;
-  return PANEL_MODULE_PHRASE_PATTERN.test(lower);
-}
-
-const NON_ENPHASE_MICROINVERTER_BRANDS = [
-  "solarbridge", "enecsys", "abb", "tigo", "solaredge", "chilicon", "apsystems", "sma"
-];
-function isMicroinverterMention(text) {
-  return /microinverter|micro\s*inverter/i.test(String(text || ""));
-}
-function mentionsCompetingMicroinverterBrand(text) {
-  const lower = String(text || "").toLowerCase();
-  return NON_ENPHASE_MICROINVERTER_BRANDS.some((brand) => lower.includes(brand));
-}
-
-function isAffirmative(value) {
-  return /^\s*(yes|true|approved|confirmed)\s*$/i.test(String(value || ""));
-}
-function indicatesActiveWarrantyOrRma(rmaRequired, warrantyStatus) {
-  if (isAffirmative(rmaRequired)) return true;
-  return /under\s*warranty|active|in\s*warranty|approved/i.test(String(warrantyStatus || ""));
-}
-
-// Scans a parsed Quote Request (see quoteRequestTextParser.js) for the two invalid-quote
-// patterns above. Returns an array of { type, itemName, reason } issues -- an empty array
-// means no concerns were detected. Does NOT modify the request or throw; purely read-only.
-export function detectQuoteBlockingIssues(request) {
-  const issues = [];
-
-  const productAndMaterialLines = [
-    ...(request.products || []),
-    ...(request.materials || [])
-  ];
-  for (const line of productAndMaterialLines) {
-    const searchText = `${line.name || ""} ${line.notes || ""}`;
-    if (mentionsNonEnphasePanelOrModule(searchText)) {
-      issues.push({
-        type: "non_enphase_panel",
-        itemName: line.name,
-        reason: `"${line.name}" appears to be a non-Enphase solar panel or PV module. Enphase does not manufacture panels -- this typically needs a manufacturer RMA form, or a compatible replacement sourced through a local solar distributor, rather than a standard Enphase parts quote.`
-      });
-    }
-  }
-
-  const warrantyEntries = request.warrantyReplacements || [];
-  for (const entry of warrantyEntries) {
-    const searchText = `${entry.name || ""} ${entry.notes || ""}`;
-    if (
-      isMicroinverterMention(searchText) &&
-      !mentionsCompetingMicroinverterBrand(searchText) &&
-      indicatesActiveWarrantyOrRma(entry.rmaRequired, entry.warrantyStatus)
-    ) {
-      issues.push({
-        type: "enphase_microinverter_rma",
-        itemName: entry.name,
-        reason: `"${entry.name}" appears to be an Enphase microinverter RMA replacement under warranty. This is typically covered under an Enphase Care subscription -- which can save the homeowner money -- rather than a standard paid quote.`
-      });
-    }
-  }
-
-  // Secondary signal (only checked if the Warranty Replacements section above found
-  // NOTHING -- avoids showing 2 redundant bullets for the same underlying RMA when both
-  // signals point to it): top-level "RMA Required: Yes" combined with a microinverter
-  // mention in Products/Services, in case Warranty Replacements wasn't filled in.
-  const alreadyHasRmaIssue = issues.some((issue) => issue.type === "enphase_microinverter_rma");
-  if (!alreadyHasRmaIssue && isAffirmative(request.rmaRequired)) {
-    const serviceAndProductLines = [
-      ...(request.products || []),
-      ...(request.services || [])
-    ];
-    for (const line of serviceAndProductLines) {
-      const searchText = `${line.name || ""} ${line.notes || ""}`;
-      if (isMicroinverterMention(searchText) && !mentionsCompetingMicroinverterBrand(searchText)) {
-        issues.push({
-          type: "enphase_microinverter_rma",
-          itemName: line.name,
-          reason: `This request is marked "RMA Required: Yes" and mentions an Enphase microinverter ("${line.name}"). This is typically covered under an Enphase Care subscription rather than a standard paid quote.`
-        });
-        break;
-      }
-    }
-  }
-
-  return issues;
-}
-
 // --- Main entry point -------------------------------------------------------
 // `request` shape (produced by parsing Step 1 output -- see
 // quoteRequestTextParser.js):
@@ -1043,8 +923,6 @@ export function generateQuoteDraft(request) {
   const unmatchedItems = [];
   const conversionNotes = [];
   const zeroPricedServiceNames = [];
-  const dependencyAdvisories = [];
-  const legacyWarnings = [];
 
   const allRequestedLines = [
     ...(request.products || []).map((p) => ({ ...p, kind: "product" })),
@@ -1125,66 +1003,6 @@ export function generateQuoteDraft(request) {
       unmatchedItems.push(line.name);
     }
     if (lineItem.conversion_note) conversionNotes.push(lineItem.conversion_note);
-
-    // --- Component Dependency Matrix (verified-source auto-add + advisories) ------
-    //
-    // Only fires on a CONFIDENTLY MATCHED product/material line (never on services,
-    // never on an unmatched "Miscellaneous ..." placeholder) -- this is deliberately
-    // conservative: dependency logic should never compound an already-uncertain match.
-    if (!isService && lineItem.matched) {
-      // IQ Combiner 6C -> auto-add its required control cable. This is the ONLY
-      // dependency confirmed Verified/High-confidence in BOTH the workbook's raw
-      // dependency table AND its own repair-specific BOM template -- every other
-      // "new install" dependency (Gateway, Terminator, trunk cable for a fresh
-      // microinverter) is deliberately NOT auto-added, since an O&M REPLACEMENT
-      // quote is for an EXISTING system that already has those parts -- auto-adding
-      // them here would incorrectly re-charge for equipment the site already has.
-      const combinerDependency = checkCombiner6CDependency(lineItem.name);
-      if (combinerDependency) {
-        const dependencyCatalogItem = PRODUCT_CATALOG.find(
-          (p) => p.name === combinerDependency.addItem.name
-        );
-        if (dependencyCatalogItem) {
-          const depQuantity = combinerDependency.addItem.defaultQuantity;
-          items.push({
-            requested_name: `${lineItem.name} (auto-added dependency)`,
-            name: dependencyCatalogItem.name,
-            quantity: depQuantity,
-            unit_price: dependencyCatalogItem.unit_price,
-            unit: dependencyCatalogItem.unit,
-            total: Math.round(dependencyCatalogItem.unit_price * depQuantity * 100) / 100,
-            taxable: true,
-            tax_code: dependencyCatalogItem.tax_code,
-            section: CATEGORY_TO_SECTION[dependencyCatalogItem.category] || "Electrical Materials",
-            matched: true,
-            match_confidence: "component_dependency",
-            conversion_note: combinerDependency.note,
-            needs_review: true
-          });
-          conversionNotes.push(combinerDependency.note);
-        }
-      }
-
-      // IQ8-family microinverter -> advisory accessory suggestions (NOT auto-added
-      // as priced line items -- these are genuinely conditional per the workbook's
-      // own replacement BOM template, e.g. Sealing Cap is only needed "for every
-      // UNUSED connector," which this engine cannot determine from a simple
-      // request). Collected separately and surfaced in the UI as one-click
-      // suggestions a reviewer can choose to add.
-      const iq8Advisory = checkIQ8AdvisoryAccessories(lineItem.name);
-      if (iq8Advisory) {
-        dependencyAdvisories.push({ triggerItem: lineItem.name, ...iq8Advisory });
-      }
-
-      // Legacy microinverter (M-series, S-series, IQ6, IQ7-series) -> non-blocking
-      // warning surfaced verbatim from the workbook's Compatibility_Matrix, which
-      // explicitly says NOT to auto-select a replacement for these without manual
-      // engineering review.
-      const legacyWarning = checkLegacyMicroinverterWarning(lineItem.name);
-      if (legacyWarning) {
-        legacyWarnings.push({ triggerItem: lineItem.name, ...legacyWarning });
-      }
-    }
   }
 
   items = deduplicateItems(items);
@@ -1227,9 +1045,7 @@ export function generateQuoteDraft(request) {
     })),
     notes: [notes, riskStatement].filter(Boolean).join("\n\n"),
     unmatched_count: unmatchedItems.length,
-    unmatched_items: unmatchedItems,
-    dependency_advisories: dependencyAdvisories,
-    legacy_warnings: legacyWarnings
+    unmatched_items: unmatchedItems
   };
 }
 

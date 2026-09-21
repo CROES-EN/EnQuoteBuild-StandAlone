@@ -1,4 +1,4 @@
-import {
+﻿import {
   base44DualAdapter
 } from "./adapters/base44DualAdapter";
 import {
@@ -152,12 +152,6 @@ export const listLocalCollection =
 
 export const createLocalRecord =
   (...args) => call("createLocalRecord", args);
-
-// Bulk counterpart to createLocalRecord() - creates several records in one call
-// (e.g. StatusAlerts.jsx's "Clear All" button dismissing many alerts at once)
-// instead of requiring one round-trip per record.
-export const createLocalRecords =
-  (...args) => call("createLocalRecords", args);
 
 export const updateLocalRecord =
   (...args) => call("updateLocalRecord", args);

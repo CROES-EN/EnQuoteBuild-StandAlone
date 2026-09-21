@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Sparkles, Check, AlertTriangle, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { parseQuoteRequestOutput, hasQuoteRequestEvidence } from "./quoteRequestTextParser";
-import { generateQuoteDraft, detectQuoteBlockingIssues } from "./draftEngine";
+import { generateQuoteDraft } from "./draftEngine";
 
 // Quote Draft Agent (Step 2) -- LOCAL, in-app replacement.
 //
@@ -76,8 +76,6 @@ export default function QuoteDraftButton({ quote, products, onApply }) {
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState(null);
   const [notStep1Warning, setNotStep1Warning] = useState(false);
-  const [blockingIssues, setBlockingIssues] = useState([]);
-  const [pendingRequest, setPendingRequest] = useState(null);
 
   const closeDialog = () => {
     setOpen(false);
@@ -85,14 +83,11 @@ export default function QuoteDraftButton({ quote, products, onApply }) {
     setPreview(null);
     setError(null);
     setNotStep1Warning(false);
-    setBlockingIssues([]);
-    setPendingRequest(null);
   };
 
   const handlePreview = () => {
     setError(null);
     setNotStep1Warning(false);
-    setBlockingIssues([]);
     try {
       if (!hasQuoteRequestEvidence(rawOutput)) {
         setNotStep1Warning(true);
@@ -100,26 +95,12 @@ export default function QuoteDraftButton({ quote, products, onApply }) {
         return;
       }
       const parsedRequest = parseQuoteRequestOutput(rawOutput);
-      const issues = detectQuoteBlockingIssues(parsedRequest);
-      if (issues.length > 0) {
-        setPendingRequest(parsedRequest);
-        setBlockingIssues(issues);
-        setPreview(null);
-        return;
-      }
       const draft = generateQuoteDraft(parsedRequest);
       setPreview(draft);
     } catch (err) {
       setError(err.message || "Could not parse the pasted output.");
       setPreview(null);
     }
-  };
-
-  const handleDraftAnyway = () => {
-    if (!pendingRequest) return;
-    const draft = generateQuoteDraft(pendingRequest);
-    setBlockingIssues([]);
-    setPreview(draft);
   };
 
   const handleApply = () => {
@@ -173,24 +154,7 @@ export default function QuoteDraftButton({ quote, products, onApply }) {
             Open the Quote Request Agent (Step 1) chat to generate this output
           </a>
 
-          {blockingIssues.length > 0 ? (
-            <div className="space-y-3">
-              <div className="text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-4 space-y-2">
-                <p className="font-semibold flex items-center gap-1">
-                  <AlertTriangle className="w-4 h-4" />
-                  This request may not need a standard quote
-                </p>
-                <ul className="list-disc list-inside space-y-1">
-                  {blockingIssues.map((issue, idx) => (
-                    <li key={idx}>{issue.reason}</li>
-                  ))}
-                </ul>
-                <p className="text-xs pt-1">
-                  If this is a special case that genuinely needs a quote, click "Draft Anyway" below to proceed.
-                </p>
-              </div>
-            </div>
-          ) : !preview ? (
+          {!preview ? (
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">
                 Paste Quote Request Agent Output
@@ -291,22 +255,6 @@ export default function QuoteDraftButton({ quote, products, onApply }) {
                 <div><span className="font-semibold">Miles Traveled:</span> {preview.miles_traveled || MANUAL_INPUT_PLACEHOLDER}</div>
               </div>
 
-              {preview.legacy_warnings && preview.legacy_warnings.length > 0 && (
-                <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-1">
-                  <p className="font-medium flex items-center gap-1">
-                    <AlertTriangle className="w-4 h-4" />
-                    Legacy component compatibility review needed
-                  </p>
-                  <ul className="list-disc list-inside space-y-1">
-                    {preview.legacy_warnings.map((warning, idx) => (
-                      <li key={idx}>
-                        <span className="font-medium">{warning.triggerItem}:</span> {warning.message}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
               <div>
                 <p className="font-semibold text-foreground">Scope of Work</p>
                 <p className="text-muted-foreground whitespace-pre-wrap">{preview.scope_of_work || MANUAL_INPUT_PLACEHOLDER}</p>
@@ -337,42 +285,12 @@ export default function QuoteDraftButton({ quote, products, onApply }) {
                   })}
                 </ul>
               </div>
-
-              {preview.dependency_advisories && preview.dependency_advisories.length > 0 && (
-                <div className="text-sm text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg p-3 space-y-2">
-                  <p className="font-medium flex items-center gap-1">
-                    <Sparkles className="w-4 h-4" />
-                    Suggested accessories to review
-                  </p>
-                  {preview.dependency_advisories.map((advisory, aIdx) => (
-                    <div key={aIdx} className="space-y-1">
-                      <p className="text-xs font-medium">For: {advisory.triggerItem}</p>
-                      <ul className="list-disc list-inside space-y-0.5">
-                        {advisory.suggestions.map((suggestion, sIdx) => (
-                          <li key={sIdx} className={suggestion.notInCatalog ? "text-amber-700" : ""}>
-                            {suggestion.name || "IQ Disconnect Tool"}
-                            {suggestion.notInCatalog ? " (not in catalog)" : ""} -- {suggestion.reason}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           )}
 
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={closeDialog}>Cancel</Button>
-            {blockingIssues.length > 0 ? (
-              <>
-                <Button type="button" variant="outline" onClick={() => { setBlockingIssues([]); setPendingRequest(null); }}>Back</Button>
-                <Button type="button" onClick={handleDraftAnyway} className="bg-rose-600 hover:bg-rose-700">
-                  <AlertTriangle className="w-4 h-4 mr-2" />
-                  Draft Anyway
-                </Button>
-              </>
-            ) : !preview ? (
+            {!preview ? (
               <Button type="button" onClick={handlePreview}>
                 <Sparkles className="w-4 h-4 mr-2" />
                 Parse Output

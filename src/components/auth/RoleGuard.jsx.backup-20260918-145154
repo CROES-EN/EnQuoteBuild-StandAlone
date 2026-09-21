@@ -1,4 +1,4 @@
-import { base44 } from "@/api/base44Client";
+﻿import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
 import { Card } from "@/components/ui/card";
@@ -39,13 +39,13 @@ function AppVersionBadge() {
 // invalidation-triggered refetch happens silently in the background, and `children` stays
 // mounted and visible the entire time, exactly like the Workload/Report Data non-flicker fix
 // applied earlier tonight.
-import { useRef, useState, useEffect } from "react";
+import { useRef } from "react";
 
 function useCurrentUserQuery() {
  const { isAuthenticated, user: authUser, navigateToLogin } = useAuth();
  const hasLoadedOnceRef = useRef(false);
 
- const { data: queriedUser, isLoading: queryLoading, isFetching, isError, refetch: refetchUser } = useQuery({
+ const { data: queriedUser, isLoading: queryLoading, isFetching, isError } = useQuery({
  queryKey: ["currentUser"],
  queryFn: async () => {
  if (isAuthenticated && authUser) return authUser;
@@ -76,7 +76,8 @@ function useCurrentUserQuery() {
  const isBackgroundRefetch = hasLoadedOnceRef.current && (isLocalDemo ? false : isFetching);
 
  const needsLogin = !isLocalDemo && !isFirstLoad && (isError || !user);
-  return { user, isLoading: isFirstLoad, isBackgroundRefetch, needsLogin, navigateToLogin, refetchUser };
+
+ return { user, isLoading: isFirstLoad, isBackgroundRefetch, needsLogin, navigateToLogin };
 }
 
 function LoadingScreen() {
@@ -112,28 +113,21 @@ function SignInRequired({ navigateToLogin }) {
  );
 }
 
-function RoleNotAssigned({ onRetry, isRetrying }) {
-  return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="max-w-md w-full p-8 text-center">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-100 flex items-center justify-center">
-          <ShieldAlert className="w-8 h-8 text-amber-600" />
-        </div>
-        <h2 className="text-2xl font-bold text-foreground mb-2">Role Not Assigned</h2>
-        <p className="text-muted-foreground mb-4">
-          Your account hasn't been assigned a role yet. Please contact an administrator to assign you a
-          role (Submitter, Approver, or Admin).
-        </p>
-        <p className="text-xs text-muted-foreground mb-4">
-          If a role has already been assigned, this can sometimes be a brief sync delay -- try
-          refreshing below before contacting an administrator.
-        </p>
-        <Button onClick={onRetry} disabled={isRetrying} variant="outline">
-          {isRetrying ? "Checking..." : "Try Again"}
-        </Button>
-      </Card>
-    </div>
-  );
+function RoleNotAssigned() {
+ return (
+ <div className="min-h-screen bg-background flex items-center justify-center p-4">
+ <Card className="max-w-md w-full p-8 text-center">
+ <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-100 flex items-center justify-center">
+ <ShieldAlert className="w-8 h-8 text-amber-600" />
+ </div>
+ <h2 className="text-2xl font-bold text-foreground mb-2">Role Not Assigned</h2>
+ <p className="text-muted-foreground">
+ Your account hasn't been assigned a role yet. Please contact an administrator to assign you a
+ role (Submitter, Approver, or Admin).
+ </p>
+ </Card>
+ </div>
+ );
 }
 
 function AccessDenied({ role }) {
@@ -152,49 +146,32 @@ function AccessDenied({ role }) {
 }
 
 export default function RoleGuard({ children, allowedRoles }) {
-  const { user, isLoading, needsLogin, navigateToLogin, refetchUser } = useCurrentUserQuery();
-  // FIX (Denice's "Role Not Assigned" bug, confirmed against her real Base44 record which
-  // already had app_role="submitter" set): showing this terminal error the FIRST instant
-  // app_role appears missing risks a false alarm if the currentUser fetch simply beat a
-  // brief sync delay -- the role really was set, the app just asked before it had fully
-  // propagated. Before ever showing the error screen, this automatically retries the fetch
-  // ONCE, silently, staying on the normal loading screen the whole time. Only if the role is
-  // STILL missing after that one retry does the real "Role Not Assigned" screen show -- which
-  // now also has its own manual "Try Again" button as a backstop.
-  const [autoRetryState, setAutoRetryState] = useState("idle"); // idle | retrying | done
-  useEffect(() => {
-    if (isLoading || needsLogin) return;
-    if (user?.app_role) return;
-    if (autoRetryState !== "idle") return;
-    setAutoRetryState("retrying");
-    const timeout = setTimeout(() => {
-      refetchUser().finally(() => setAutoRetryState("done"));
-    }, 1200);
-    return () => clearTimeout(timeout);
-  }, [isLoading, needsLogin, user, autoRetryState, refetchUser]);
-  if (isLoading) {
-    return <LoadingScreen />;
-  }
-  if (needsLogin) {
-    return <SignInRequired navigateToLogin={navigateToLogin} />;
-  }
-  if (!user?.app_role) {
-    if (autoRetryState !== "done") {
-      return <LoadingScreen />;
-    }
-    return (
-      <RoleNotAssigned
-        onRetry={() => { setAutoRetryState("retrying"); refetchUser().finally(() => setAutoRetryState("done")); }}
-        isRetrying={autoRetryState === "retrying"}
-      />
-    );
-  }
-  const userRoles = [user.app_role, ...(user.additional_roles || [])];
-  const isSuperAdmin = userRoles.includes("super_admin");
-  if (allowedRoles && !isSuperAdmin && !allowedRoles.some((role) => userRoles.includes(role))) {
-    return <AccessDenied role={user.app_role} />;
-  }
-  return children;
+ const { user, isLoading, needsLogin, navigateToLogin } = useCurrentUserQuery();
+
+ // FIX: isLoading now correctly means "this is a genuine first load, nothing has ever been
+ // fetched yet" (see useCurrentUserQuery above) - a background refetch triggered by e.g. a
+ // Base44 webhook sync no longer reaches this branch, so `children` (the actual page -
+ // Workload, a Supervisor Dashboard tab, Quotes, etc.) stays mounted and visible the entire
+ // time a silent re-verification happens behind the scenes.
+ if (isLoading) {
+ return <LoadingScreen />;
+ }
+
+ if (needsLogin) {
+ return <SignInRequired navigateToLogin={navigateToLogin} />;
+ }
+
+ if (!user?.app_role) {
+ return <RoleNotAssigned />;
+ }
+
+ const userRoles = [user.app_role, ...(user.additional_roles || [])];
+ const isSuperAdmin = userRoles.includes("super_admin");
+ if (allowedRoles && !isSuperAdmin && !allowedRoles.some((role) => userRoles.includes(role))) {
+ return <AccessDenied role={user.app_role} />;
+ }
+
+ return children;
 }
 
 // Hook to get current user role -- unchanged public shape, now also
