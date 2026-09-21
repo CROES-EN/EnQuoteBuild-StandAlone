@@ -96,3 +96,10 @@ Then re-check to confirm it's actually gone (should return nothing):
 - [x] Fix ICON for APP
 - [ ] ANIMATED THEMES??
 - [ ] Hyperlinks for Case Numbers & Site ID's in Workload
+Remove-Item -Recurse -Force "C:\EnQuoteBuild\release" -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force "C:\EnQuoteBuild\dist" -ErrorAction SilentlyContinue
+git status
+git add -A
+git commit -m "**notes go here**"
+git push origin master  
+npm run build

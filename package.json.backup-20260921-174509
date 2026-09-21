@@ -137,8 +137,7 @@
         "publish": {
             "provider": "github",
             "owner": "CROES-EN",
-            "repo": "EnQuoteBuild-StandAlone",
-            "releaseType": "release"
+            "repo": "EnQuoteBuild-StandAlone"
         },
         "win": {
       "icon": "electron/icon.ico",
