@@ -99,13 +99,6 @@ export const AuthProvider = ({ children }) => {
   const [pendingPasswordChange, setPendingPasswordChange] = useState(null);
   const isLocalAuthActive = isLocalDemo && !!getLocalAuthBridge();
 
-  // Remote shared-sync auto-configuration: replaces manually creating
-  // remote-sync-config.json on every teammate's machine. See main.cjs's
-  // "remoteSync:checkStatus"/"remoteSync:saveSecret" handlers and
-  // RemoteSyncSecretDialog.jsx for the rest of this feature.
-  const [needsRemoteSyncSecret, setNeedsRemoteSyncSecret] = useState(false);
-  const [remoteSyncPromptUrl, setRemoteSyncPromptUrl] = useState(null);
-
   useEffect(() => {
     checkAppState();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -138,33 +131,6 @@ export const AuthProvider = ({ children }) => {
 
   // Loads the live synced users list (if any) to find the full record for the signed-in
   // email, then activates it as the current session user.
-  // Checks whether this machine needs the one-time remote-sync secret prompt.
-  // NEVER throws and never blocks sign-in -- a missing bridge (dev/browser mode) or
-  // an unreachable GitHub check are both treated as "nothing to do right now",
-  // exactly like the app already behaves before this feature existed.
-  const checkRemoteSyncStatus = useCallback(async (email) => {
-    try {
-      const bridge = globalThis.window?.enquoteLocal?.remoteSync;
-      if (!bridge) return;
-      const result = await bridge.checkStatus(email);
-      if (result?.ok && result.needsSecret) {
-        setRemoteSyncPromptUrl(result.syncUrl);
-        setNeedsRemoteSyncSecret(true);
-      } else {
-        setNeedsRemoteSyncSecret(false);
-        setRemoteSyncPromptUrl(null);
-      }
-    } catch (error) {
-      console.warn("[remote-sync] Status check failed (non-blocking):", error?.message || error);
-    }
-  }, []);
-
-  // Called by RemoteSyncSecretDialog.jsx once the secret has been saved successfully.
-  const clearRemoteSyncPrompt = useCallback(() => {
-    setNeedsRemoteSyncSecret(false);
-    setRemoteSyncPromptUrl(null);
-  }, []);
-
   const activateUser = useCallback(async (email) => {
     let record = null;
     try {
@@ -179,8 +145,7 @@ export const AuthProvider = ({ children }) => {
     setNeedsLocalLogin(false);
     setPendingPasswordChange(null);
     setPersistedLocalSessionEmail(email);
-    checkRemoteSyncStatus(email);
-  }, [checkRemoteSyncStatus]);
+  }, []);
 
   const checkAppState = async () => {
     if (isLocalDemo) {
@@ -311,7 +276,7 @@ export const AuthProvider = ({ children }) => {
           message: 'Authentication required'
         });
       }
-      // On timeout or other errors, fall through â€” user will be prompted to log in
+      // On timeout or other errors, fall through — user will be prompted to log in
     }
   };
 
@@ -409,10 +374,7 @@ export const AuthProvider = ({ children }) => {
       pendingPasswordChange,
       isLocalAuthActive,
       login,
-      completePasswordChange,
-      needsRemoteSyncSecret,
-      remoteSyncPromptUrl,
-      clearRemoteSyncPrompt
+      completePasswordChange
     }}>
       {children}
     </AuthContext.Provider>

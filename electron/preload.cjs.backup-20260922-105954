@@ -58,10 +58,6 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
     login: (email, password) => invoke("auth:login", email, password),
     setPassword: (email, currentPassword, newPassword) => invoke("auth:setPassword", email, currentPassword, newPassword)
   },
-  remoteSync: {
-    checkStatus: (signedInEmail) => invoke("remoteSync:checkStatus", signedInEmail),
-    saveSecret: (url, secret) => invoke("remoteSync:saveSecret", url, secret)
-  },
   sync: {
     flushOutbound: () => invoke("sync:flushOutbound"),
     outboundStatus: () => invoke("sync:outboundStatus")

@@ -1,4 +1,5 @@
 # EnQuote — Developer Notes
+to run as host: **node webhook-receiver.cjs**
 
 ## Build / Test / Publish Workflow — Dev → Test → Ship
 
@@ -96,6 +97,7 @@ Then re-check to confirm it's actually gone (should return nothing):
 - [x] Fix ICON for APP
 - [ ] ANIMATED THEMES??
 - [ ] Hyperlinks for Case Numbers & Site ID's in Workload
+- [ ] Add a new status page after H/O Approved which pulls Material Order window page to allow for bulk material orders for the quote.
 Remove-Item -Recurse -Force "C:\EnQuoteBuild\release" -ErrorAction SilentlyContinue
 Remove-Item -Recurse -Force "C:\EnQuoteBuild\dist" -ErrorAction SilentlyContinue
 git status
