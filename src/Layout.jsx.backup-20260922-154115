@@ -49,8 +49,6 @@ import { getTiles, getUnseenImportantCount, onSeenChanged } from "@/features/sup
 import appPackage from "../package.json";
 import enquoteLogo from "@/assets/enquote-logo.png";
 import SidebarLogoAnimation from "@/components/SidebarLogoAnimation";
-import DeveloperConsole from "@/components/DeveloperConsole";
-import { recordError } from "@/features/developerConsole/errorLog";
 
 const isDemoMode = ["mock", "local", "salesforce-mock"].includes(import.meta.env.VITE_DATA_SOURCE);
 const appVersion = appPackage?.version || "0.0.0";
@@ -328,48 +326,6 @@ export default function Layout({ children, currentPageName }) {
     if (!bridge?.get) return;
     bridge.get().then((res) => { if (res?.ok) setZoomFactorState(res.zoomFactor); }).catch(() => {});
   }, []);
-  // Developer Console (Shift+`) - deliberately checks event.code === "Backquote" (the
-  // PHYSICAL key, independent of layout/shift state) combined with event.shiftKey, rather
-  // than checking the backtick character via event.key - the latter would never fire,
-  // since holding Shift while pressing the backtick key produces a tilde character on a
-  // keyboard, not the backtick character. Discreet by design (no visible button anywhere).
-  const [devConsoleOpen, setDevConsoleOpen] = useState(false);
-  useEffect(() => {
-    function handleDevConsoleKeydown(event) {
-      if (event.code === "Backquote" && event.shiftKey) {
-        setDevConsoleOpen((prev) => !prev);
-      }
-    }
-    window.addEventListener("keydown", handleDevConsoleKeydown);
-    return () => window.removeEventListener("keydown", handleDevConsoleKeydown);
-  }, []);
-
-  // Global error capture - confirmed via a full-codebase search that NOTHING previously
-  // caught uncaught JS errors or unhandled promise rejections anywhere in this app (only
-  // React render errors were caught, by ErrorBoundary, and only console.error()'d - never
-  // persisted anywhere). Wired here rather than inside ErrorBoundary since these two error
-  // types happen OUTSIDE React's render cycle entirely, and ErrorBoundary cannot catch them
-  // by design (that is a React-render-only mechanism).
-  useEffect(() => {
-    function handleWindowError(event) {
-      recordError({ source: "window.onerror", message: event?.message, stack: event?.error?.stack });
-    }
-    function handleUnhandledRejection(event) {
-      const reason = event?.reason;
-      recordError({
-        source: "unhandledrejection",
-        message: reason?.message || String(reason),
-        stack: reason?.stack
-      });
-    }
-    window.addEventListener("error", handleWindowError);
-    window.addEventListener("unhandledrejection", handleUnhandledRejection);
-    return () => {
-      window.removeEventListener("error", handleWindowError);
-      window.removeEventListener("unhandledrejection", handleUnhandledRejection);
-    };
-  }, []);
-
   async function handleZoomIn() {
     const bridge = globalThis.window?.enquoteLocal?.zoom;
     if (!bridge?.in) return;
@@ -717,11 +673,6 @@ export default function Layout({ children, currentPageName }) {
         events={events}
         outboundStatus={outboundStatus}
         fetchOutboundStatus={fetchOutboundStatus}
-      />
-      <DeveloperConsole
-        open={devConsoleOpen}
-        onOpenChange={setDevConsoleOpen}
-        syncEvents={events}
       />
       <UpdateStatusBadge />
       <RemoteSyncSecretDialog

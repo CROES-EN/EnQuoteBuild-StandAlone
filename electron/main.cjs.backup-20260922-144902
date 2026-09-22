@@ -5,7 +5,6 @@ const path = require("node:path");
 const { repositoryFor } = require("./repository.cjs");
 const { createOutboundSync } = require("./outboundSync.cjs");
 const { openSalesforceReportWindow, closeSalesforceReportWindow } = require("./salesforceImport.cjs");
-const { analyzeAll } = require("./diagnosticReportAnalyzer.cjs");
 
 // Loads key=value pairs from an optional .env next to the app so the outbound
 // Base44 credentials never have to be baked into the bundle.
@@ -1180,119 +1179,6 @@ const ownWrite = (fn) => async (...args) => {
     return success ? { ok: true } : { ok: false, error: "Could not save the sync configuration locally." };
   });
 
-  // Small POST helper for the diagnostic report feature below. Functionally tested
-  // before this script was written: a correct secret succeeds, a wrong secret is
-  // rejected, an unreachable host fails cleanly with no crash.
-  function postJson(urlString, extraHeaders, bodyObj) {
-    return new Promise((resolve) => {
-      let url;
-      try {
-        url = new URL(urlString);
-      } catch {
-        resolve({ ok: false, error: "Invalid URL" });
-        return;
-      }
-      const transport = url.protocol === "http:" ? require("node:http") : require("node:https");
-      const body = JSON.stringify(bodyObj);
-      const req = transport.request({
-        protocol: url.protocol,
-        hostname: url.hostname,
-        port: url.port || undefined,
-        path: `${url.pathname}${url.search}`,
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body), ...extraHeaders }
-      }, (res) => {
-        let raw = "";
-        res.on("data", (chunk) => { raw += chunk; });
-        res.on("end", () => {
-          const ok = res.statusCode >= 200 && res.statusCode < 300;
-          resolve({ ok, status: res.statusCode, raw });
-        });
-      });
-      req.setTimeout(15000, () => { req.destroy(); resolve({ ok: false, error: "Request timed out." }); });
-      req.on("error", (error) => resolve({ ok: false, error: error.message }));
-      req.write(body);
-      req.end();
-    });
-  }
-
-  // Gathers this machine's real sync health, runs it through the SAME analysis logic
-  // used to manually diagnose tonight's real 404-at-retry-cap bug, and sends the
-  // resulting pre-diagnosed report to the configured host (or localhost, if this
-  // machine IS the host) -- so troubleshooting starts from real, pre-analyzed data
-  // instead of manually pasted terminal output.
-  ipcMain.handle("diagnostics:send", async (_event, senderEmail) => {
-    try {
-      const remoteConfig = readRemoteSyncConfig();
-      const targetBase = remoteConfig?.url ? remoteConfig.url.replace(/\/+$/, "") : "http://localhost:3001";
-      const secret = remoteConfig?.secret || process.env.ENQUOTE_LOCAL_SYNC_WEBHOOK_SECRET || "";
-
-      const data = await quoteRepository.exportData();
-      const outboundQueue = data.outboundQueue || [];
-      const hasEnvKey = Boolean(process.env.BASE44_API_KEY);
-      const isHost = !remoteConfig;
-
-      const findings = analyzeAll({
-        outboundQueue,
-        hasEnvKey,
-        hasRemoteSyncConfig: Boolean(remoteConfig),
-        isHost
-      });
-
-      const report = {
-        senderEmail: senderEmail || "unknown",
-        appVersion: app.getVersion(),
-        sentAt: new Date().toISOString(),
-        isHost,
-        outboundStatus: await quoteRepository.getOutboundQueueStatus(),
-        findings,
-        rawQueueSample: outboundQueue.filter((entry) => entry.status === "pending").slice(0, 20)
-      };
-
-      const result = await postJson(
-        `${targetBase}/api/base44/webhook/diagnostic-report`,
-        { "X-ENQuote-Shared-Secret": secret },
-        report
-      );
-
-      if (!result.ok) {
-        return { ok: false, error: result.error || `Server responded with HTTP ${result.status}` };
-      }
-      return { ok: true };
-    } catch (error) {
-      return { ok: false, error: error.message };
-    }
-  });
-
-  // Reads every submitted teammate diagnostic report from diagnostic-reports/ (written by
-  // webhook-receiver.cjs's handleDiagnosticReport()) so the in-app Developer Console (see
-  // DeveloperConsole.jsx, Shift+` in Layout.jsx) can show them without opening each JSON
-  // file by hand. Read-only - never modifies or deletes any report file.
-  //
-  // KNOWN LIMITATION: resolves diagnostic-reports/ relative to this file's own location
-  // (electron/../diagnostic-reports), which is correct for dev mode (npm run desktop:dev,
-  // where webhook-receiver.cjs also runs from the project root) but has NOT been verified
-  // for a packaged/installed build, where __dirname resolves inside the packaged app
-  // resources rather than the source project root. Revisit if this needs to work from an
-  // installed .exe, not just dev mode.
-  ipcMain.handle("diagnostics:listReports", async () => {
-    try {
-      const fs = require("node:fs");
-      const reportsDir = path.join(__dirname, "..", "diagnostic-reports");
-      if (!fs.existsSync(reportsDir)) return { ok: true, reports: [] };
-      const files = fs.readdirSync(reportsDir).filter((f) => f.endsWith(".json"));
-      const reports = files.map((file) => {
-        try {
-          return JSON.parse(fs.readFileSync(path.join(reportsDir, file), "utf8"));
-        } catch {
-          return null;
-        }
-      }).filter(Boolean);
-      return { ok: true, reports };
-    } catch (error) {
-      return { ok: false, error: error.message, reports: [] };
-    }
-  });
   // Zoom - renderer-triggered equivalents of the Ctrl+/Ctrl-/Ctrl+0 shortcuts above, for a
   // clickable in-app zoom control (see Layout.jsx). Each returns the RESULTING zoom factor so
   // the renderer's displayed percentage always reflects the real, clamped value.

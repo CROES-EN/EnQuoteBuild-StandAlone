@@ -5,7 +5,7 @@ const path = require("node:path");
 const { repositoryFor } = require("./repository.cjs");
 const { createOutboundSync } = require("./outboundSync.cjs");
 const { openSalesforceReportWindow, closeSalesforceReportWindow } = require("./salesforceImport.cjs");
-const { analyzeAll } = require("./diagnosticReportAnalyzer.cjs");
+const { analyzeAll } = require("./diagnosticReportAnalyzer.js");
 
 // Loads key=value pairs from an optional .env next to the app so the outbound
 // Base44 credentials never have to be baked into the bundle.
@@ -1264,35 +1264,6 @@ const ownWrite = (fn) => async (...args) => {
     }
   });
 
-  // Reads every submitted teammate diagnostic report from diagnostic-reports/ (written by
-  // webhook-receiver.cjs's handleDiagnosticReport()) so the in-app Developer Console (see
-  // DeveloperConsole.jsx, Shift+` in Layout.jsx) can show them without opening each JSON
-  // file by hand. Read-only - never modifies or deletes any report file.
-  //
-  // KNOWN LIMITATION: resolves diagnostic-reports/ relative to this file's own location
-  // (electron/../diagnostic-reports), which is correct for dev mode (npm run desktop:dev,
-  // where webhook-receiver.cjs also runs from the project root) but has NOT been verified
-  // for a packaged/installed build, where __dirname resolves inside the packaged app
-  // resources rather than the source project root. Revisit if this needs to work from an
-  // installed .exe, not just dev mode.
-  ipcMain.handle("diagnostics:listReports", async () => {
-    try {
-      const fs = require("node:fs");
-      const reportsDir = path.join(__dirname, "..", "diagnostic-reports");
-      if (!fs.existsSync(reportsDir)) return { ok: true, reports: [] };
-      const files = fs.readdirSync(reportsDir).filter((f) => f.endsWith(".json"));
-      const reports = files.map((file) => {
-        try {
-          return JSON.parse(fs.readFileSync(path.join(reportsDir, file), "utf8"));
-        } catch {
-          return null;
-        }
-      }).filter(Boolean);
-      return { ok: true, reports };
-    } catch (error) {
-      return { ok: false, error: error.message, reports: [] };
-    }
-  });
   // Zoom - renderer-triggered equivalents of the Ctrl+/Ctrl-/Ctrl+0 shortcuts above, for a
   // clickable in-app zoom control (see Layout.jsx). Each returns the RESULTING zoom factor so
   // the renderer's displayed percentage always reflects the real, clamped value.

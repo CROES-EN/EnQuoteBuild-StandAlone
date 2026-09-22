@@ -4,7 +4,6 @@ const path = require('path');
 const crypto = require('crypto');
 const os = require('os');
 const { repositoryFor, normalizeIncomingSnapshot } = require('./electron/repository.cjs');
-const { analyzeAll } = require('./electron/diagnosticReportAnalyzer.cjs');
 
 const PORT = 3001;
 const ENV_PATH = path.join(__dirname, '.env');
@@ -655,17 +654,6 @@ async function handleDiagnosticReport(req, res) {
     res.writeHead(400, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: false, error: 'Report body was not valid JSON.' }));
     return;
-  }
-
-  // Re-analyzes the report on arrival using the exact same shared logic the
-  // sender used -- so this machine's own review never depends on trusting
-  // the sender's app version to have the same analysis logic baked in.
-  // If analysis itself fails for any reason, the report is still saved raw
-  // rather than being lost, and the failure is logged for follow-up.
-  try {
-    report.analysis = analyzeAll(report);
-  } catch (analysisError) {
-    logEvent('error', `Diagnostic report analysis failed (report still saved raw): ${analysisError.message}`);
   }
 
   try {

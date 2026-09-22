@@ -92,9 +92,9 @@ Then re-check to confirm it's actually gone (should return nothing):
 - [ ] Team-wide "who's signed in / last signed in when" view (not yet built — would need a
       write-back-to-Base44 path for local sign-in activity, similar to the outbound quote sync)
 - [x] DevTools auto-open fix — confirmed correct in code, but only verifiable via Tier 2/3 testing (a Tier 1 run will always still show it)
+- [x] Fix ICON for APP
 - [ ] Auto-Quote Drafter - Pulls from Quote Request Cases with Case Comments and builds Quotes and places them in "AI Generated Quote - Needs Review" status *INPROGRESS*
 - [ ] Add another status for On-Demand Quotes for Shane Mosley which integrates the Material Orders tab & allows Shane to order the purchased quote materials before we schedule.
-- [x] Fix ICON for APP
 - [ ] ANIMATED THEMES??
 - [ ] Hyperlinks for Case Numbers & Site ID's in Workload
 - [ ] Add a new status page after H/O Approved which pulls Material Order window page to allow for bulk material orders for the quote.

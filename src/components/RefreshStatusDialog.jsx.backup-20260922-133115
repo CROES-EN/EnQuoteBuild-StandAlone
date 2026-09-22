@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { useAuth } from "@/lib/AuthContext";
+﻿import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -15,8 +14,7 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
-  Info,
-  CloudOff
+  Info
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { REFRESH_REASON_LABELS } from "@/hooks/useLocalSyncStatus";
@@ -34,43 +32,10 @@ const LEVEL_ICON = {
  * in the shared useLocalSyncStatus() hook (see Layout.jsx), so this can be opened at any
  * time (mid-refresh or after it settles) without starting a second, independent poll.
  */
-export default function RefreshStatusDialog({ open, onOpenChange, phase, lastAttempt, events = [], outboundStatus = null, fetchOutboundStatus }) {
+export default function RefreshStatusDialog({ open, onOpenChange, phase, lastAttempt, events = [] }) {
   const [logOpen, setLogOpen] = useState(false);
   const unreachable = phase === "unreachable";
   const isFinished = phase === "success" || phase === "error";
-
-  // Refreshes outbound sync health once whenever the dialog actually opens, so it's
-  // current when someone looks at it without polling continuously in the background.
-  useEffect(() => {
-    if (open) fetchOutboundStatus?.();
-  }, [open, fetchOutboundStatus]);
-
-  // Diagnostic report sending -- gathers real sync health on the main process side
-  // (see main.cjs's "diagnostics:send" handler) and sends it to the configured host,
-  // so troubleshooting can start from real, pre-analyzed data instead of manually
-  // pasted terminal output.
-  const { user } = useAuth();
-  const [sendingReport, setSendingReport] = useState(false);
-  const [reportSent, setReportSent] = useState(false);
-
-  async function handleSendDiagnosticReport() {
-    setSendingReport(true);
-    try {
-      const bridge = globalThis.window?.enquoteLocal?.diagnostics;
-      if (!bridge?.sendReport) throw new Error("Diagnostic reporting is only available in the desktop app.");
-      const result = await bridge.sendReport(user?.email || "unknown");
-      if (result?.ok) {
-        setReportSent(true);
-        setTimeout(() => setReportSent(false), 3000);
-      }
-    } catch {
-      // Silent failure is acceptable here -- this is a best-effort troubleshooting
-      // aid, not a critical path; the button simply stops showing "Sending..." and
-      // never shows "Sent!" if it didn't succeed.
-    } finally {
-      setSendingReport(false);
-    }
-  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -96,43 +61,18 @@ export default function RefreshStatusDialog({ open, onOpenChange, phase, lastAtt
           <div className="rounded-lg border border-border bg-secondary p-3 text-sm space-y-1">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Quotes on disk</span>
-              <span className="font-medium text-foreground">{lastAttempt?.storedQuoteCount ?? "â€”"}</span>
+              <span className="font-medium text-foreground">{lastAttempt?.storedQuoteCount ?? "—"}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Products on disk</span>
-              <span className="font-medium text-foreground">{lastAttempt?.storedProductCount ?? "â€”"}</span>
+              <span className="font-medium text-foreground">{lastAttempt?.storedProductCount ?? "—"}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Last import attempt</span>
               <span className="font-medium text-foreground">
-                {lastAttempt?.finishedAt ? new Date(lastAttempt.finishedAt).toLocaleTimeString() : "â€”"}
+                {lastAttempt?.finishedAt ? new Date(lastAttempt.finishedAt).toLocaleTimeString() : "—"}
               </span>
             </div>
-          </div>
-        )}
-
-        {outboundStatus && !outboundStatus.configured && (
-          <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm flex items-start gap-2">
-            <CloudOff className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-            <span className="text-amber-800">
-              Outbound sync to Base44 is not configured on this machine. Quotes created
-              here will not reach the team until this is fixed.
-            </span>
-          </div>
-        )}
-
-        {outboundStatus && outboundStatus.configured && (
-          <div className="rounded-lg border border-border bg-secondary p-3 text-sm space-y-1">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Synced to Base44</span>
-              <span className="font-medium text-foreground">{outboundStatus.synced} / {outboundStatus.total}</span>
-            </div>
-            {outboundStatus.pending > 0 && (
-              <div className="flex items-center gap-1.5 text-amber-700">
-                <Info className="w-3.5 h-3.5 shrink-0" />
-                <span>{outboundStatus.pending} quote(s) waiting to sync</span>
-              </div>
-            )}
           </div>
         )}
 
@@ -166,14 +106,6 @@ export default function RefreshStatusDialog({ open, onOpenChange, phase, lastAtt
         )}
 
         <div className="flex justify-end gap-2 pt-1">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSendDiagnosticReport}
-            disabled={sendingReport}
-          >
-            {sendingReport ? "Sending..." : reportSent ? "Sent!" : "Send Diagnostic Report"}
-          </Button>
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
             Close
           </Button>

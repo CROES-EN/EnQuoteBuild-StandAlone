@@ -63,8 +63,7 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
     saveSecret: (url, secret) => invoke("remoteSync:saveSecret", url, secret)
   },
   diagnostics: {
-    sendReport: (senderEmail) => invoke("diagnostics:send", senderEmail),
-    listReports: () => invoke("diagnostics:listReports")
+    sendReport: (senderEmail) => invoke("diagnostics:send", senderEmail)
   },
   sync: {
     flushOutbound: () => invoke("sync:flushOutbound"),

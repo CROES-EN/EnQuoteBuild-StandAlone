@@ -154,15 +154,6 @@ function createOutboundSync({ repository, config, logger = console, onAfterWrite
   // treat that as "could not verify" and NOT proceed to push blindly.
   async function fetchRemoteQuote(remoteId) {
     const response = await requestJson(`${entityUrl()}/${remoteId}`, { headers: authHeaders() });
-    // FIX: a 404 specifically means this quote no longer exists on Base44 at all (e.g. it
-    // was moved to Boneyard and deleted there) -- there is nothing to push an update TO in
-    // that case, so this is distinguished from a generic fetch failure (network issue,
-    // temporary outage) which should still be retried. Confirmed real-world case: quotes
-    // stuck retrying forever with "HTTP 404" after being moved to Boneyard and deleted on
-    // Base44's side.
-    if (response.status === 404) {
-      return { ok: false, notFound: true, error: "Quote no longer exists on Base44 (HTTP 404)." };
-    }
     if (!response.ok || !response.body || typeof response.body !== "object") {
       return { ok: false, error: response.error || "Could not read Base44's current copy of this quote." };
     }
@@ -181,17 +172,6 @@ function createOutboundSync({ repository, config, logger = console, onAfterWrite
   async function pushUpdate(entry) {
     const remoteCheck = await fetchRemoteQuote(entry.remote_id);
     if (!remoteCheck.ok) {
-      // FIX: a confirmed 404 (quote deleted on Base44's side) is resolved as a clean
-      // no-op instead of retried forever -- there is no remote record left to push an
-      // update to. Any OTHER failure (network issue, temporary outage, etc.) still
-      // retries exactly as before.
-      if (remoteCheck.notFound) {
-        return {
-          local_id: entry.local_id,
-          resolved: true,
-          error: null
-        };
-      }
       // Can't safely verify Base44's current state right now - do NOT push blind.
       // Leave queued, this will be retried on the next flush like any other failure.
       return {

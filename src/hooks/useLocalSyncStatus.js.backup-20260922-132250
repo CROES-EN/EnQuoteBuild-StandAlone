@@ -85,39 +85,5 @@ export function useLocalSyncStatus() {
     return true;
   }, [bridge]);
 
-  // Outbound sync health (Base44-bound direction) - separate from the inbound
-// phase/lastAttempt/trigger above, which only covers PULLING data down. Surfaces
-// real, actionable sync problems (e.g. a missing .env/API key, or quotes stuck
-// waiting to push) directly in the UI instead of requiring a manual diagnostic.
-// Never throws - returns null on any failure so it can never break the existing
-// refresh flow above.
-const [outboundStatus, setOutboundStatus] = useState(null);
-
-const fetchOutboundStatus = useCallback(async () => {
-  try {
-    const syncBridge = typeof window !== "undefined" ? window.enquoteLocal?.sync : null;
-    if (!syncBridge?.outboundStatus) {
-      setOutboundStatus(null);
-      return null;
-    }
-    const result = await syncBridge.outboundStatus();
-    if (!result) {
-      setOutboundStatus(null);
-      return null;
-    }
-    const normalized = {
-      pending: result.pending ?? 0,
-      synced: result.synced ?? 0,
-      total: result.total ?? 0,
-      configured: result.configured ?? false
-    };
-    setOutboundStatus(normalized);
-    return normalized;
-  } catch {
-    setOutboundStatus(null);
-    return null;
-  }
-}, []);
-
-return { phase, lastAttempt, events, trigger, hasBridge: !!bridge?.refresh, outboundStatus, fetchOutboundStatus };
+  return { phase, lastAttempt, events, trigger, hasBridge: !!bridge?.refresh };
 }

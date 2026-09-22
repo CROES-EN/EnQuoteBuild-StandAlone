@@ -4,7 +4,6 @@ const path = require('path');
 const crypto = require('crypto');
 const os = require('os');
 const { repositoryFor, normalizeIncomingSnapshot } = require('./electron/repository.cjs');
-const { analyzeAll } = require('./electron/diagnosticReportAnalyzer.cjs');
 
 const PORT = 3001;
 const ENV_PATH = path.join(__dirname, '.env');
@@ -531,11 +530,6 @@ const server = http.createServer((req, res) => {
     // pull this machine's current data through the shared ngrok URL, instead of only
     // being able to report status to callers on this same machine.
     handleSnapshotRequest(req, res);
-  } else if (req.method === 'POST' && req.url === '/api/base44/webhook/diagnostic-report') {
-    // Lets a TEAMMATE's desktop app send a self-service diagnostic report (app version,
-    // outbound queue health, recent event log) directly to this machine, so
-    // troubleshooting no longer requires manually pasting terminal output back and forth.
-    handleDiagnosticReport(req, res);
   } else {
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: false, error: 'Not found' }));
@@ -609,81 +603,6 @@ async function handleSnapshotRequest(req, res) {
     }));
   } catch (error) {
     logEvent('error', `Snapshot request failed: ${error.message}`);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: false, error: error.message }));
-  }
-}
-
-// Saves a teammate's self-service diagnostic report as its own timestamped JSON file,
-// protected by the same shared secret already used for the snapshot endpoint. Each
-// report is a small, self-contained snapshot of one machine's sync health at the
-// moment it was sent -- app version, whether it's the host, outbound queue counts, and
-// a slice of its recent event log -- so troubleshooting can start from real data
-// instead of asking someone to paste PowerShell output.
-async function handleDiagnosticReport(req, res) {
-  if (SECRET_IS_PLACEHOLDER) {
-    res.writeHead(503, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: false, error: 'Shared secret not configured on this relay.' }));
-    return;
-  }
-
-  const providedSecret = req.headers['x-enquote-shared-secret'] || '';
-  const expected = Buffer.from(SECRET_RAW, 'utf8');
-  const provided = Buffer.from(String(providedSecret), 'utf8');
-  const isValid = expected.length === provided.length && crypto.timingSafeEqual(expected, provided);
-
-  if (!isValid) {
-    logEvent('error', 'Rejected diagnostic report - invalid or missing shared secret.');
-    res.writeHead(401, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: false, error: 'Unauthorized' }));
-    return;
-  }
-
-  let rawBuf;
-  try {
-    rawBuf = await readBody(req);
-  } catch (error) {
-    res.writeHead(413, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: false, error: error.message }));
-    return;
-  }
-
-  let report;
-  try {
-    report = JSON.parse(rawBuf.toString('utf8'));
-  } catch (error) {
-    res.writeHead(400, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: false, error: 'Report body was not valid JSON.' }));
-    return;
-  }
-
-  // Re-analyzes the report on arrival using the exact same shared logic the
-  // sender used -- so this machine's own review never depends on trusting
-  // the sender's app version to have the same analysis logic baked in.
-  // If analysis itself fails for any reason, the report is still saved raw
-  // rather than being lost, and the failure is logged for follow-up.
-  try {
-    report.analysis = analyzeAll(report);
-  } catch (analysisError) {
-    logEvent('error', `Diagnostic report analysis failed (report still saved raw): ${analysisError.message}`);
-  }
-
-  try {
-    const reportsDir = path.join(__dirname, 'diagnostic-reports');
-    fs.mkdirSync(reportsDir, { recursive: true });
-    // Sanitizes the sender's email for safe use in a filename - strips anything that
-    // isn't alphanumeric/@/./_/- to prevent path traversal or invalid filename
-    // characters, confirmed via a functional test before this endpoint was written.
-    const safeEmail = String(report.senderEmail || 'unknown').replace(/[^a-z0-9@._-]/gi, '_');
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filename = `${timestamp}__${safeEmail}.json`;
-    const targetPath = path.join(reportsDir, filename);
-    fs.writeFileSync(targetPath, JSON.stringify(report, null, 2), 'utf8');
-    logEvent('success', `Diagnostic report received from ${report.senderEmail || 'unknown'} - saved to ${filename}`);
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true }));
-  } catch (error) {
-    logEvent('error', `Failed to save diagnostic report: ${error.message}`);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: false, error: error.message }));
   }

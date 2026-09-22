@@ -1,110 +1,3 @@
-[2026-09-18 14:55:19] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 54 minutes. Check the app and network.
-[2026-09-18 14:58:16] STALE: last successful sync was 57 minute(s) ago (threshold 45).
-[2026-09-18 14:58:16] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 57 minutes. Check the app and network.
-[2026-09-18 15:01:17] STALE: last successful sync was 60 minute(s) ago (threshold 45).
-[2026-09-18 15:01:17] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 60 minutes. Check the app and network.
-[2026-09-18 15:04:17] OK: relay healthy, last successful sync 1 minute(s) ago.
-[2026-09-18 15:07:17] OK: relay healthy, last successful sync 4 minute(s) ago.
-[2026-09-18 15:10:15] OK: relay healthy, last successful sync 7 minute(s) ago.
-[2026-09-18 15:13:15] OK: relay healthy, last successful sync 10 minute(s) ago.
-[2026-09-18 15:16:19] OK: relay healthy, last successful sync 13 minute(s) ago.
-[2026-09-18 15:19:17] OK: relay healthy, last successful sync 1 minute(s) ago.
-[2026-09-18 15:22:17] OK: relay healthy, last successful sync 4 minute(s) ago.
-[2026-09-18 15:25:17] OK: relay healthy, last successful sync 7 minute(s) ago.
-[2026-09-18 15:28:17] OK: relay healthy, last successful sync 10 minute(s) ago.
-[2026-09-18 15:31:17] OK: relay healthy, last successful sync 13 minute(s) ago.
-[2026-09-18 15:34:20] OK: relay healthy, last successful sync 16 minute(s) ago.
-[2026-09-18 15:37:17] OK: relay healthy, last successful sync 19 minute(s) ago.
-[2026-09-18 15:40:17] OK: relay healthy, last successful sync 22 minute(s) ago.
-[2026-09-18 15:43:17] OK: relay healthy, last successful sync 25 minute(s) ago.
-[2026-09-18 15:46:16] OK: relay healthy, last successful sync 28 minute(s) ago.
-[2026-09-18 15:49:16] OK: relay healthy, last successful sync 2 minute(s) ago.
-[2026-09-18 15:52:19] OK: relay healthy, last successful sync 5 minute(s) ago.
-[2026-09-18 15:55:21] OK: relay healthy, last successful sync 8 minute(s) ago.
-[2026-09-18 15:58:18] OK: relay healthy, last successful sync 11 minute(s) ago.
-[2026-09-18 16:01:15] OK: relay healthy, last successful sync 14 minute(s) ago.
-[2026-09-18 16:04:17] OK: relay healthy, last successful sync 2 minute(s) ago.
-[2026-09-18 16:07:16] OK: relay healthy, last successful sync 5 minute(s) ago.
-[2026-09-18 16:10:16] OK: relay healthy, last successful sync 8 minute(s) ago.
-[2026-09-18 16:13:16] OK: relay healthy, last successful sync 11 minute(s) ago.
-[2026-09-18 16:16:19] OK: relay healthy, last successful sync 14 minute(s) ago.
-[2026-09-18 16:19:15] OK: relay healthy, last successful sync 17 minute(s) ago.
-[2026-09-18 16:22:15] OK: relay healthy, last successful sync 20 minute(s) ago.
-[2026-09-18 16:25:17] OK: relay healthy, last successful sync 23 minute(s) ago.
-[2026-09-18 16:28:16] OK: relay healthy, last successful sync 26 minute(s) ago.
-[2026-09-18 16:31:15] OK: relay healthy, last successful sync 29 minute(s) ago.
-[2026-09-18 16:34:16] OK: relay healthy, last successful sync 32 minute(s) ago.
-[2026-09-18 16:37:15] OK: relay healthy, last successful sync 35 minute(s) ago.
-[2026-09-18 16:40:15] OK: relay healthy, last successful sync 38 minute(s) ago.
-[2026-09-18 16:43:15] OK: relay healthy, last successful sync 41 minute(s) ago.
-[2026-09-18 16:46:17] OK: relay healthy, last successful sync 44 minute(s) ago.
-[2026-09-18 16:49:16] STALE: last successful sync was 47 minute(s) ago (threshold 45).
-[2026-09-18 16:49:16] Toast shown: EnQuote Sync Stale - No successful Base44 sync in 47 minutes. Check the app and network.
-[2026-09-18 16:52:16] STALE: last successful sync was 50 minute(s) ago (threshold 45).
-[2026-09-18 16:52:16] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 50 minutes. Check the app and network.
-[2026-09-18 16:55:16] STALE: last successful sync was 53 minute(s) ago (threshold 45).
-[2026-09-18 16:55:16] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 53 minutes. Check the app and network.
-[2026-09-18 16:58:17] STALE: last successful sync was 56 minute(s) ago (threshold 45).
-[2026-09-18 16:58:17] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 56 minutes. Check the app and network.
-[2026-09-18 17:01:16] STALE: last successful sync was 59 minute(s) ago (threshold 45).
-[2026-09-18 17:01:16] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 59 minutes. Check the app and network.
-[2026-09-18 17:04:17] STALE: last successful sync was 62 minute(s) ago (threshold 45).
-[2026-09-18 17:04:18] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 62 minutes. Check the app and network.
-[2026-09-18 17:07:21] STALE: last successful sync was 65 minute(s) ago (threshold 45).
-[2026-09-18 17:07:21] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 65 minutes. Check the app and network.
-[2026-09-18 17:10:17] STALE: last successful sync was 68 minute(s) ago (threshold 45).
-[2026-09-18 17:10:17] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 68 minutes. Check the app and network.
-[2026-09-18 17:13:16] STALE: last successful sync was 71 minute(s) ago (threshold 45).
-[2026-09-18 17:13:16] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 71 minutes. Check the app and network.
-[2026-09-18 17:16:16] STALE: last successful sync was 74 minute(s) ago (threshold 45).
-[2026-09-18 17:16:16] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 74 minutes. Check the app and network.
-[2026-09-18 17:19:17] STALE: last successful sync was 77 minute(s) ago (threshold 45).
-[2026-09-18 17:19:18] Toast shown: EnQuote Sync Stale - No successful Base44 sync in 77 minutes. Check the app and network.
-[2026-09-18 17:22:16] STALE: last successful sync was 80 minute(s) ago (threshold 45).
-[2026-09-18 17:22:16] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 80 minutes. Check the app and network.
-[2026-09-18 17:25:16] STALE: last successful sync was 83 minute(s) ago (threshold 45).
-[2026-09-18 17:25:17] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 83 minutes. Check the app and network.
-[2026-09-18 17:28:15] STALE: last successful sync was 86 minute(s) ago (threshold 45).
-[2026-09-18 17:28:15] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 86 minutes. Check the app and network.
-[2026-09-18 17:31:17] STALE: last successful sync was 89 minute(s) ago (threshold 45).
-[2026-09-18 17:31:17] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 89 minutes. Check the app and network.
-[2026-09-18 17:34:16] STALE: last successful sync was 92 minute(s) ago (threshold 45).
-[2026-09-18 17:34:16] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 92 minutes. Check the app and network.
-[2026-09-18 17:37:17] STALE: last successful sync was 95 minute(s) ago (threshold 45).
-[2026-09-18 17:37:18] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 95 minutes. Check the app and network.
-[2026-09-18 17:40:15] STALE: last successful sync was 98 minute(s) ago (threshold 45).
-[2026-09-18 17:40:15] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 98 minutes. Check the app and network.
-[2026-09-18 18:05:59] Could not reach webhook-receiver /health or /status: The operation has timed out.
-[2026-09-18 18:06:05] Toast shown: EnQuote Sync Problem - Could not reach the local sync relay at all - check sync-watchdog.log.
-[2026-09-21 07:55:50] STALE: last successful sync was 3834 minute(s) ago (threshold 45).
-[2026-09-21 07:55:53] Toast shown: EnQuote Sync Stale - No successful Base44 sync in 3834 minutes. Check the app and network.
-[2026-09-21 08:03:06] ngrok.exe is NOT running - restarting via Scheduled Task...
-[2026-09-21 08:03:25] Could not reach webhook-receiver /health or /status: The operation has timed out.
-[2026-09-21 08:03:26] Toast suppressed (cooldown active): EnQuote Sync Problem - Could not reach the local sync relay at all - check sync-watchdog.log.
-[2026-09-21 08:04:22] STALE: last successful sync was 3842 minute(s) ago (threshold 45).
-[2026-09-21 08:04:22] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 3842 minutes. Check the app and network.
-[2026-09-21 08:07:21] STALE: last successful sync was 3845 minute(s) ago (threshold 45).
-[2026-09-21 08:07:22] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 3845 minutes. Check the app and network.
-[2026-09-21 08:10:20] STALE: last successful sync was 3848 minute(s) ago (threshold 45).
-[2026-09-21 08:10:20] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 3848 minutes. Check the app and network.
-[2026-09-21 08:13:34] STALE: last successful sync was 3852 minute(s) ago (threshold 45).
-[2026-09-21 08:13:34] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 3852 minutes. Check the app and network.
-[2026-09-21 08:16:19] STALE: last successful sync was 3854 minute(s) ago (threshold 45).
-[2026-09-21 08:16:20] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 3854 minutes. Check the app and network.
-[2026-09-21 08:19:24] STALE: last successful sync was 3858 minute(s) ago (threshold 45).
-[2026-09-21 08:19:25] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 3858 minutes. Check the app and network.
-[2026-09-21 08:22:20] STALE: last successful sync was 3860 minute(s) ago (threshold 45).
-[2026-09-21 08:22:21] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 3860 minutes. Check the app and network.
-[2026-09-21 08:25:20] STALE: last successful sync was 3863 minute(s) ago (threshold 45).
-[2026-09-21 08:25:20] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 3863 minutes. Check the app and network.
-[2026-09-21 08:28:19] STALE: last successful sync was 3866 minute(s) ago (threshold 45).
-[2026-09-21 08:28:20] Toast shown: EnQuote Sync Stale - No successful Base44 sync in 3866 minutes. Check the app and network.
-[2026-09-21 08:31:24] OK: relay healthy, last successful sync 3 minute(s) ago.
-[2026-09-21 08:34:19] OK: relay healthy, last successful sync 6 minute(s) ago.
-[2026-09-21 08:37:23] OK: relay healthy, last successful sync 9 minute(s) ago.
-[2026-09-21 08:40:22] OK: relay healthy, last successful sync 12 minute(s) ago.
-[2026-09-21 08:43:20] OK: relay healthy, last successful sync 15 minute(s) ago.
-[2026-09-21 08:48:01] OK: relay healthy, last successful sync 19 minute(s) ago.
 [2026-09-21 08:49:24] OK: relay healthy, last successful sync 21 minute(s) ago.
 [2026-09-21 08:52:19] OK: relay healthy, last successful sync 24 minute(s) ago.
 [2026-09-21 08:55:19] OK: relay healthy, last successful sync 27 minute(s) ago.
@@ -998,3 +891,110 @@
 [2026-09-22 12:04:23] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 71 minutes. Check the app and network.
 [2026-09-22 12:07:24] STALE: last successful sync was 74 minute(s) ago (threshold 45).
 [2026-09-22 12:07:24] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 74 minutes. Check the app and network.
+[2026-09-22 12:10:24] STALE: last successful sync was 77 minute(s) ago (threshold 45).
+[2026-09-22 12:10:24] Toast shown: EnQuote Sync Stale - No successful Base44 sync in 77 minutes. Check the app and network.
+[2026-09-22 12:13:31] STALE: last successful sync was 80 minute(s) ago (threshold 45).
+[2026-09-22 12:13:31] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 80 minutes. Check the app and network.
+[2026-09-22 12:16:25] STALE: last successful sync was 83 minute(s) ago (threshold 45).
+[2026-09-22 12:16:25] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 83 minutes. Check the app and network.
+[2026-09-22 12:19:24] STALE: last successful sync was 86 minute(s) ago (threshold 45).
+[2026-09-22 12:19:24] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 86 minutes. Check the app and network.
+[2026-09-22 12:22:29] STALE: last successful sync was 89 minute(s) ago (threshold 45).
+[2026-09-22 12:22:30] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 89 minutes. Check the app and network.
+[2026-09-22 12:25:22] STALE: last successful sync was 92 minute(s) ago (threshold 45).
+[2026-09-22 12:25:22] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 92 minutes. Check the app and network.
+[2026-09-22 12:28:22] STALE: last successful sync was 95 minute(s) ago (threshold 45).
+[2026-09-22 12:28:22] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 95 minutes. Check the app and network.
+[2026-09-22 12:31:23] STALE: last successful sync was 98 minute(s) ago (threshold 45).
+[2026-09-22 12:31:23] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 98 minutes. Check the app and network.
+[2026-09-22 12:34:24] STALE: last successful sync was 101 minute(s) ago (threshold 45).
+[2026-09-22 12:34:24] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 101 minutes. Check the app and network.
+[2026-09-22 12:37:21] STALE: last successful sync was 104 minute(s) ago (threshold 45).
+[2026-09-22 12:37:21] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 104 minutes. Check the app and network.
+[2026-09-22 12:40:22] STALE: last successful sync was 107 minute(s) ago (threshold 45).
+[2026-09-22 12:40:22] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 107 minutes. Check the app and network.
+[2026-09-22 12:43:22] STALE: last successful sync was 110 minute(s) ago (threshold 45).
+[2026-09-22 12:43:23] Toast shown: EnQuote Sync Stale - No successful Base44 sync in 110 minutes. Check the app and network.
+[2026-09-22 12:46:21] STALE: last successful sync was 113 minute(s) ago (threshold 45).
+[2026-09-22 12:46:21] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 113 minutes. Check the app and network.
+[2026-09-22 12:49:22] STALE: last successful sync was 116 minute(s) ago (threshold 45).
+[2026-09-22 12:49:23] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 116 minutes. Check the app and network.
+[2026-09-22 12:52:20] STALE: last successful sync was 119 minute(s) ago (threshold 45).
+[2026-09-22 12:52:20] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 119 minutes. Check the app and network.
+[2026-09-22 12:55:22] STALE: last successful sync was 122 minute(s) ago (threshold 45).
+[2026-09-22 12:55:22] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 122 minutes. Check the app and network.
+[2026-09-22 12:58:21] STALE: last successful sync was 125 minute(s) ago (threshold 45).
+[2026-09-22 12:58:22] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 125 minutes. Check the app and network.
+[2026-09-22 13:01:30] STALE: last successful sync was 128 minute(s) ago (threshold 45).
+[2026-09-22 13:01:30] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 128 minutes. Check the app and network.
+[2026-09-22 13:04:20] STALE: last successful sync was 131 minute(s) ago (threshold 45).
+[2026-09-22 13:04:20] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 131 minutes. Check the app and network.
+[2026-09-22 13:07:27] STALE: last successful sync was 134 minute(s) ago (threshold 45).
+[2026-09-22 13:07:27] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 134 minutes. Check the app and network.
+[2026-09-22 13:10:21] STALE: last successful sync was 137 minute(s) ago (threshold 45).
+[2026-09-22 13:10:22] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 137 minutes. Check the app and network.
+[2026-09-22 13:13:20] STALE: last successful sync was 140 minute(s) ago (threshold 45).
+[2026-09-22 13:13:20] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 140 minutes. Check the app and network.
+[2026-09-22 13:16:24] STALE: last successful sync was 143 minute(s) ago (threshold 45).
+[2026-09-22 13:16:24] Toast shown: EnQuote Sync Stale - No successful Base44 sync in 143 minutes. Check the app and network.
+[2026-09-22 13:19:20] STALE: last successful sync was 146 minute(s) ago (threshold 45).
+[2026-09-22 13:19:20] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 146 minutes. Check the app and network.
+[2026-09-22 13:22:23] STALE: last successful sync was 149 minute(s) ago (threshold 45).
+[2026-09-22 13:22:23] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 149 minutes. Check the app and network.
+[2026-09-22 13:25:22] STALE: last successful sync was 152 minute(s) ago (threshold 45).
+[2026-09-22 13:25:22] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 152 minutes. Check the app and network.
+[2026-09-22 13:28:23] STALE: last successful sync was 155 minute(s) ago (threshold 45).
+[2026-09-22 13:28:23] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 155 minutes. Check the app and network.
+[2026-09-22 13:31:23] STALE: last successful sync was 158 minute(s) ago (threshold 45).
+[2026-09-22 13:31:23] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 158 minutes. Check the app and network.
+[2026-09-22 13:34:23] STALE: last successful sync was 161 minute(s) ago (threshold 45).
+[2026-09-22 13:34:23] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 161 minutes. Check the app and network.
+[2026-09-22 13:37:24] STALE: last successful sync was 164 minute(s) ago (threshold 45).
+[2026-09-22 13:37:24] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 164 minutes. Check the app and network.
+[2026-09-22 13:40:27] STALE: last successful sync was 167 minute(s) ago (threshold 45).
+[2026-09-22 13:40:28] Toast suppressed (cooldown active): EnQuote Sync Stale - No successful Base44 sync in 167 minutes. Check the app and network.
+[2026-09-22 13:43:38] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-22 13:46:21] OK: relay healthy, last successful sync 3 minute(s) ago.
+[2026-09-22 13:49:38] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-22 13:52:21] OK: relay healthy, last successful sync 9 minute(s) ago.
+[2026-09-22 13:55:22] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-22 13:58:21] OK: relay healthy, last successful sync 15 minute(s) ago.
+[2026-09-22 14:01:24] OK: relay healthy, last successful sync 19 minute(s) ago.
+[2026-09-22 14:04:22] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-22 14:07:23] OK: relay healthy, last successful sync 3 minute(s) ago.
+[2026-09-22 14:10:23] OK: relay healthy, last successful sync 6 minute(s) ago.
+[2026-09-22 14:13:26] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-22 14:16:22] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-22 14:19:24] OK: relay healthy, last successful sync 2 minute(s) ago.
+[2026-09-22 14:22:21] OK: relay healthy, last successful sync 5 minute(s) ago.
+[2026-09-22 14:25:21] OK: relay healthy, last successful sync 2 minute(s) ago.
+[2026-09-22 14:28:21] OK: relay healthy, last successful sync 5 minute(s) ago.
+[2026-09-22 14:31:22] OK: relay healthy, last successful sync 8 minute(s) ago.
+[2026-09-22 14:34:22] OK: relay healthy, last successful sync 11 minute(s) ago.
+[2026-09-22 14:37:20] OK: relay healthy, last successful sync 14 minute(s) ago.
+[2026-09-22 14:40:20] OK: relay healthy, last successful sync 0 minute(s) ago.
+[2026-09-22 14:43:19] OK: relay healthy, last successful sync 3 minute(s) ago.
+[2026-09-22 14:46:20] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-22 14:49:20] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-22 14:52:20] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-22 14:55:19] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-22 14:58:20] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-22 15:01:18] OK: relay healthy, last successful sync 3 minute(s) ago.
+[2026-09-22 15:04:19] OK: relay healthy, last successful sync 6 minute(s) ago.
+[2026-09-22 15:07:18] OK: relay healthy, last successful sync 2 minute(s) ago.
+[2026-09-22 15:10:18] OK: relay healthy, last successful sync 2 minute(s) ago.
+[2026-09-22 15:13:20] OK: relay healthy, last successful sync 0 minute(s) ago.
+[2026-09-22 15:16:19] OK: relay healthy, last successful sync 3 minute(s) ago.
+[2026-09-22 15:19:19] OK: relay healthy, last successful sync 0 minute(s) ago.
+[2026-09-22 15:22:19] OK: relay healthy, last successful sync 3 minute(s) ago.
+[2026-09-22 15:25:18] OK: relay healthy, last successful sync 1 minute(s) ago.
+[2026-09-22 15:28:18] OK: relay healthy, last successful sync 4 minute(s) ago.
+[2026-09-22 15:31:19] OK: relay healthy, last successful sync 7 minute(s) ago.
+[2026-09-22 15:34:19] OK: relay healthy, last successful sync 10 minute(s) ago.
+[2026-09-22 15:37:19] OK: relay healthy, last successful sync 13 minute(s) ago.
+[2026-09-22 15:40:19] OK: relay healthy, last successful sync 2 minute(s) ago.
+[2026-09-22 15:43:19] OK: relay healthy, last successful sync 5 minute(s) ago.
+[2026-09-22 15:46:19] OK: relay healthy, last successful sync 8 minute(s) ago.
+[2026-09-22 15:49:18] OK: relay healthy, last successful sync 11 minute(s) ago.
+[2026-09-22 15:52:20] OK: relay healthy, last successful sync 14 minute(s) ago.
+[2026-09-22 15:55:19] OK: relay healthy, last successful sync 17 minute(s) ago.

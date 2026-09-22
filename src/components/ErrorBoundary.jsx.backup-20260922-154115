@@ -1,7 +1,6 @@
-import { Component } from "react";
+﻿import { Component } from "react";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle } from "lucide-react";
-import { recordError } from "@/features/developerConsole/errorLog";
 
 // Catches render-time errors anywhere below it so a single broken component/page (e.g.
 // data shaped differently than a component expects, right after a sync) shows a
@@ -20,7 +19,6 @@ export default class ErrorBoundary extends Component {
 
  componentDidCatch(error, info) {
  console.error("[ErrorBoundary] Caught a render error:", error, info?.componentStack);
- recordError({ source: "ErrorBoundary", message: error?.message, stack: error?.stack, componentStack: info?.componentStack });
  }
 
  handleReload = () => {

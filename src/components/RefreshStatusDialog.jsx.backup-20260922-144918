@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useAuth } from "@/lib/AuthContext";
 import {
   Dialog,
   DialogContent,
@@ -45,33 +44,6 @@ export default function RefreshStatusDialog({ open, onOpenChange, phase, lastAtt
     if (open) fetchOutboundStatus?.();
   }, [open, fetchOutboundStatus]);
 
-  // Diagnostic report sending -- gathers real sync health on the main process side
-  // (see main.cjs's "diagnostics:send" handler) and sends it to the configured host,
-  // so troubleshooting can start from real, pre-analyzed data instead of manually
-  // pasted terminal output.
-  const { user } = useAuth();
-  const [sendingReport, setSendingReport] = useState(false);
-  const [reportSent, setReportSent] = useState(false);
-
-  async function handleSendDiagnosticReport() {
-    setSendingReport(true);
-    try {
-      const bridge = globalThis.window?.enquoteLocal?.diagnostics;
-      if (!bridge?.sendReport) throw new Error("Diagnostic reporting is only available in the desktop app.");
-      const result = await bridge.sendReport(user?.email || "unknown");
-      if (result?.ok) {
-        setReportSent(true);
-        setTimeout(() => setReportSent(false), 3000);
-      }
-    } catch {
-      // Silent failure is acceptable here -- this is a best-effort troubleshooting
-      // aid, not a critical path; the button simply stops showing "Sending..." and
-      // never shows "Sent!" if it didn't succeed.
-    } finally {
-      setSendingReport(false);
-    }
-  }
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
@@ -96,16 +68,16 @@ export default function RefreshStatusDialog({ open, onOpenChange, phase, lastAtt
           <div className="rounded-lg border border-border bg-secondary p-3 text-sm space-y-1">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Quotes on disk</span>
-              <span className="font-medium text-foreground">{lastAttempt?.storedQuoteCount ?? "â€”"}</span>
+              <span className="font-medium text-foreground">{lastAttempt?.storedQuoteCount ?? "—"}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Products on disk</span>
-              <span className="font-medium text-foreground">{lastAttempt?.storedProductCount ?? "â€”"}</span>
+              <span className="font-medium text-foreground">{lastAttempt?.storedProductCount ?? "—"}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Last import attempt</span>
               <span className="font-medium text-foreground">
-                {lastAttempt?.finishedAt ? new Date(lastAttempt.finishedAt).toLocaleTimeString() : "â€”"}
+                {lastAttempt?.finishedAt ? new Date(lastAttempt.finishedAt).toLocaleTimeString() : "—"}
               </span>
             </div>
           </div>
@@ -166,14 +138,6 @@ export default function RefreshStatusDialog({ open, onOpenChange, phase, lastAtt
         )}
 
         <div className="flex justify-end gap-2 pt-1">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSendDiagnosticReport}
-            disabled={sendingReport}
-          >
-            {sendingReport ? "Sending..." : reportSent ? "Sent!" : "Send Diagnostic Report"}
-          </Button>
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
             Close
           </Button>
