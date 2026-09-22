@@ -105,3 +105,4 @@ git add -A
 git commit -m "**notes go here**"
 git push origin master  
 npm run build
+npx electron-builder --publish always
