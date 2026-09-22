@@ -269,3 +269,26 @@ t=2026-09-22T09:28:41-0600 lvl=info msg="INFO received stop request obj=app stop
 t=2026-09-22T09:28:41-0600 lvl=info msg="ERROR terminating with error obj=app err=\"failed to start tunnel: The endpoint 'https://refold-frisk-scarce.ngrok-free.dev' is already online. Either\\n1. stop your existing endpoint first, or\\n2. start both endpoints with `--pooling-enabled` to load balance between them.\\r\\n\\r\\nERR_NGROK_334\\r\\n\""
 t=2026-09-22T09:28:41-0600 lvl=warn msg="failed to check for update" obj=updater err="Post \"https://update.ngrok-agent.com/check\": context canceled"
 t=2026-09-22T09:28:41-0600 lvl=crit msg="command failed" err="failed to start tunnel: The endpoint 'https://refold-frisk-scarce.ngrok-free.dev' is already online. Either\n1. stop your existing endpoint first, or\n2. start both endpoints with `--pooling-enabled` to load balance between them.\r\n\r\nERR_NGROK_334\r\n"
+t=2026-09-22T09:33:12-0600 lvl=info msg="join connections" obj=join id=29cdf149581d l=127.0.0.1:3001 r=52.123.191.108:26971
+t=2026-09-22T09:41:14-0600 lvl=info msg="join connections" obj=join id=56a02637fe8a l=127.0.0.1:3001 r=12.168.148.130:9261
+t=2026-09-22T09:41:58-0600 lvl=info msg="join connections" obj=join id=d590ad93e829 l=127.0.0.1:3001 r=12.168.148.130:30588
+t=2026-09-22T09:42:16-0600 lvl=info msg="join connections" obj=join id=9a69868ea726 l=127.0.0.1:3001 r=12.168.148.130:50706
+t=2026-09-22T09:44:46-0600 lvl=info msg="join connections" obj=join id=4f973a4fd444 l=127.0.0.1:3001 r=12.168.148.130:6625
+t=2026-09-22T09:45:23-0600 lvl=info msg="join connections" obj=join id=a61144c9d0e0 l=127.0.0.1:3001 r=12.168.148.130:29365
+t=2026-09-22T09:50:21-0600 lvl=info msg="join connections" obj=join id=e640399e103c l=127.0.0.1:3001 r=12.168.148.130:48733
+t=2026-09-22T09:51:22-0600 lvl=info msg="join connections" obj=join id=a7b98454e626 l=127.0.0.1:3001 r=12.168.148.130:30604
+t=2026-09-22T09:53:46-0600 lvl=info msg="join connections" obj=join id=b402b97952cc l=127.0.0.1:3001 r=12.168.148.130:43385
+t=2026-09-22T10:00:44-0600 lvl=info msg="join connections" obj=join id=b8294260dcdb l=127.0.0.1:3001 r=12.168.148.130:15707
+t=2026-09-22T10:01:15-0600 lvl=info msg="join connections" obj=join id=358ab6e37d8f l=127.0.0.1:3001 r=12.168.148.130:1152
+t=2026-09-22T10:03:24-0600 lvl=info msg="join connections" obj=join id=b98e32e300ae l=127.0.0.1:3001 r=172.68.174.92:10812
+t=2026-09-22T10:03:57-0600 lvl=info msg="join connections" obj=join id=5476c4664429 l=127.0.0.1:3001 r=104.23.160.137:12906
+t=2026-09-22T10:05:28-0600 lvl=info msg="join connections" obj=join id=13eaeecd8af6 l=127.0.0.1:3001 r=12.168.148.130:50543
+t=2026-09-22T10:21:00-0600 lvl=info msg="join connections" obj=join id=e6dac6165c9d l=127.0.0.1:3001 r=12.168.148.130:37264
+t=2026-09-22T10:34:05-0600 lvl=info msg="join connections" obj=join id=d60040f1328f l=127.0.0.1:3001 r=12.168.148.130:29218
+t=2026-09-22T10:38:41-0600 lvl=info msg="join connections" obj=join id=1cc2f577d4b2 l=127.0.0.1:3001 r=172.68.174.188:13148
+t=2026-09-22T10:38:47-0600 lvl=info msg="join connections" obj=join id=007aaeab447b l=127.0.0.1:3001 r=104.23.160.136:12147
+t=2026-09-22T10:39:24-0600 lvl=info msg="join connections" obj=join id=26f2d5f2b861 l=127.0.0.1:3001 r=172.68.174.5:9238
+t=2026-09-22T10:44:20-0600 lvl=info msg="join connections" obj=join id=3f7248470b5d l=127.0.0.1:3001 r=104.23.160.244:9542
+t=2026-09-22T10:45:59-0600 lvl=info msg="join connections" obj=join id=b5d5f69de85b l=127.0.0.1:3001 r=104.23.160.244:13206
+t=2026-09-22T10:52:54-0600 lvl=info msg="join connections" obj=join id=30e25f8db89c l=127.0.0.1:3001 r=104.23.160.136:10116
+t=2026-09-22T10:52:55-0600 lvl=info msg="join connections" obj=join id=dacb8be09af9 l=127.0.0.1:3001 r=172.68.174.189:13422
