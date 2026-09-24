@@ -1,0 +1,188 @@
+[2026-09-24T17:46:51.565Z] INFO: Webhook receiver listening on http://localhost:3001/api/base44/webhook 
+[2026-09-24T17:46:51.568Z] INFO: Secret loaded: configured (2 encoding candidate(s)) 
+[2026-09-24T17:46:51.568Z] INFO: Encryption key loaded: configured (AES-256-GCM) 
+[2026-09-24T17:47:00.964Z] INFO: Presence: croeschberger@enphaseenergy.com signed in. 
+[2026-09-24T17:47:37.228Z] INFO: Webhook delivery received: 11161299 bytes 
+Signature valid (secret encoding: utf8, signature encoding: hex)
+[2026-09-24T17:47:37.250Z] INFO: Encrypted payload detected - decrypting with AES-256-GCM... {
+  mode: 'snapshot',
+  hasNestedEncryption: true,
+  nestedEncryptionKeys: [ 'algorithm', 'encoding', 'iv', 'ciphertext' ]
+}
+[2026-09-24T17:47:37.292Z] INFO: Payload decrypted successfully. 
+[2026-09-24T17:47:37.317Z] INFO: Processing payload (decrypted size approx: 8315955 chars) 
+[2026-09-24T17:47:37.318Z] INFO: Resolved target directory: C:\Users\croeschberger\AppData\Roaming\base44-app 
+[2026-09-24T17:47:37.475Z] INFO: Current data loaded: 679 quotes on disk 
+[2026-09-24T17:47:37.476Z] INFO: Time since last import: 228775ms (threshold: 60000ms) 
+[2026-09-24T17:47:37.477Z] INFO: Importing new snapshot data... 
+[2026-09-24T17:47:37.598Z] INFO: Normalized snapshot contains 665 quotes, 546 products 
+[2026-09-24T17:47:37.598Z] INFO: [DIAGNOSTIC] MaterialOrder sync check - raw payload entities.MaterialOrder count: 55, normalized materialOrders count: 55, most recent timestamp seen in raw payload: 2026-09-22T22:45:28.384Z 
+[2026-09-24T17:47:38.135Z] SUCCESS: Import complete - stored 679 quotes 
+[2026-09-24T17:47:39.225Z] INFO: Webhook delivery received: 11161299 bytes 
+Signature valid (secret encoding: utf8, signature encoding: hex)
+[2026-09-24T17:47:39.246Z] INFO: Encrypted payload detected - decrypting with AES-256-GCM... {
+  mode: 'snapshot',
+  hasNestedEncryption: true,
+  nestedEncryptionKeys: [ 'algorithm', 'encoding', 'iv', 'ciphertext' ]
+}
+[2026-09-24T17:47:39.297Z] INFO: Payload decrypted successfully. 
+[2026-09-24T17:47:39.325Z] INFO: Processing payload (decrypted size approx: 8315955 chars) 
+[2026-09-24T17:47:39.326Z] INFO: Resolved target directory: C:\Users\croeschberger\AppData\Roaming\base44-app 
+[2026-09-24T17:47:39.436Z] INFO: Current data loaded: 679 quotes on disk 
+[2026-09-24T17:47:39.436Z] INFO: Time since last import: 1631ms (threshold: 60000ms) 
+[2026-09-24T17:47:39.796Z] INFO: Webhook delivery received: 11165863 bytes 
+Signature valid (secret encoding: utf8, signature encoding: hex)
+[2026-09-24T17:47:39.813Z] INFO: Encrypted payload detected - decrypting with AES-256-GCM... {
+  mode: 'snapshot',
+  hasNestedEncryption: true,
+  nestedEncryptionKeys: [ 'algorithm', 'encoding', 'iv', 'ciphertext' ]
+}
+[2026-09-24T17:47:39.844Z] INFO: Payload decrypted successfully. 
+[2026-09-24T17:47:39.864Z] INFO: Processing payload (decrypted size approx: 8319388 chars) 
+[2026-09-24T17:47:39.865Z] INFO: Resolved target directory: C:\Users\croeschberger\AppData\Roaming\base44-app 
+[2026-09-24T17:47:39.970Z] INFO: Current data loaded: 679 quotes on disk 
+[2026-09-24T17:47:39.970Z] INFO: Time since last import: 2165ms (threshold: 60000ms) 
+[2026-09-24T17:47:40.246Z] INFO: Webhook delivery received: 11161947 bytes 
+Signature valid (secret encoding: utf8, signature encoding: hex)
+[2026-09-24T17:47:40.262Z] INFO: Encrypted payload detected - decrypting with AES-256-GCM... {
+  mode: 'snapshot',
+  hasNestedEncryption: true,
+  nestedEncryptionKeys: [ 'algorithm', 'encoding', 'iv', 'ciphertext' ]
+}
+[2026-09-24T17:47:40.291Z] INFO: Payload decrypted successfully. 
+[2026-09-24T17:47:40.314Z] INFO: Processing payload (decrypted size approx: 8316441 chars) 
+[2026-09-24T17:47:40.315Z] INFO: Resolved target directory: C:\Users\croeschberger\AppData\Roaming\base44-app 
+[2026-09-24T17:47:40.405Z] INFO: Current data loaded: 679 quotes on disk 
+[2026-09-24T17:47:40.406Z] INFO: Time since last import: 2601ms (threshold: 60000ms) 
+[2026-09-24T17:48:37.896Z] INFO: Applying a previously queued (throttled) snapshot before continuing... 
+[2026-09-24T17:48:38.370Z] SUCCESS: Queued snapshot applied successfully (679 quotes on disk now). 
+[2026-09-24T17:48:38.372Z] INFO: Throttle window has cleared - the queued snapshot was applied automatically, no data was lost. 
+[2026-09-24T17:55:27.201Z] INFO: Refresh button clicked - checking for latest imported data (2 bytes received, ignored). 
+[2026-09-24T17:55:27.301Z] SUCCESS: Refresh check complete - 679 quotes currently on disk (last imported: 2026-09-24T17:48:38.051Z) 
+[2026-09-24T17:55:44.272Z] INFO: Refresh button clicked - checking for latest imported data (2 bytes received, ignored). 
+[2026-09-24T17:55:44.377Z] SUCCESS: Refresh check complete - 679 quotes currently on disk (last imported: 2026-09-24T17:48:38.051Z) 
+[2026-09-24T17:56:11.597Z] INFO: Webhook delivery received: 11166855 bytes 
+Signature valid (secret encoding: utf8, signature encoding: hex)
+[2026-09-24T17:56:11.616Z] INFO: Encrypted payload detected - decrypting with AES-256-GCM... {
+  mode: 'snapshot',
+  hasNestedEncryption: true,
+  nestedEncryptionKeys: [ 'algorithm', 'encoding', 'iv', 'ciphertext' ]
+}
+[2026-09-24T17:56:11.656Z] INFO: Payload decrypted successfully. 
+[2026-09-24T17:56:11.688Z] INFO: Processing payload (decrypted size approx: 8320131 chars) 
+[2026-09-24T17:56:11.688Z] INFO: Resolved target directory: C:\Users\croeschberger\AppData\Roaming\base44-app 
+[2026-09-24T17:56:11.790Z] INFO: Current data loaded: 679 quotes on disk 
+[2026-09-24T17:56:11.791Z] INFO: Time since last import: 453740ms (threshold: 60000ms) 
+[2026-09-24T17:56:11.791Z] INFO: Importing new snapshot data... 
+[2026-09-24T17:56:11.837Z] INFO: Normalized snapshot contains 665 quotes, 546 products 
+[2026-09-24T17:56:11.838Z] INFO: [DIAGNOSTIC] MaterialOrder sync check - raw payload entities.MaterialOrder count: 55, normalized materialOrders count: 55, most recent timestamp seen in raw payload: 2026-09-22T22:45:28.384Z 
+[2026-09-24T17:56:12.219Z] INFO: Webhook delivery received: 11162851 bytes 
+Signature valid (secret encoding: utf8, signature encoding: hex)
+[2026-09-24T17:56:12.249Z] INFO: Encrypted payload detected - decrypting with AES-256-GCM... {
+  mode: 'snapshot',
+  hasNestedEncryption: true,
+  nestedEncryptionKeys: [ 'algorithm', 'encoding', 'iv', 'ciphertext' ]
+}
+[2026-09-24T17:56:12.299Z] INFO: Payload decrypted successfully. 
+[2026-09-24T17:56:12.330Z] INFO: Processing payload (decrypted size approx: 8317121 chars) 
+[2026-09-24T17:56:12.331Z] INFO: Resolved target directory: C:\Users\croeschberger\AppData\Roaming\base44-app 
+[2026-09-24T17:56:12.441Z] INFO: Current data loaded: 679 quotes on disk 
+[2026-09-24T17:56:12.442Z] INFO: Time since last import: 454391ms (threshold: 60000ms) 
+[2026-09-24T17:56:12.443Z] INFO: Importing new snapshot data... 
+[2026-09-24T17:56:12.493Z] INFO: Normalized snapshot contains 665 quotes, 546 products 
+[2026-09-24T17:56:12.494Z] INFO: [DIAGNOSTIC] MaterialOrder sync check - raw payload entities.MaterialOrder count: 55, normalized materialOrders count: 55, most recent timestamp seen in raw payload: 2026-09-22T22:45:28.384Z 
+[2026-09-24T17:56:12.764Z] SUCCESS: Import complete - stored 679 quotes 
+[2026-09-24T17:56:13.311Z] SUCCESS: Import complete - stored 679 quotes 
+[2026-09-24T17:57:00.648Z] INFO: Refresh button clicked - checking for latest imported data (2 bytes received, ignored). 
+[2026-09-24T17:57:00.802Z] SUCCESS: Refresh check complete - 679 quotes currently on disk (last imported: 2026-09-24T17:56:12.750Z) 
+[2026-09-24T17:57:26.310Z] INFO: Refresh button clicked - checking for latest imported data (2 bytes received, ignored). 
+[2026-09-24T17:57:26.406Z] SUCCESS: Refresh check complete - 679 quotes currently on disk (last imported: 2026-09-24T17:56:12.750Z) 
+[2026-09-24T18:01:08.484Z] INFO: Refresh button clicked - checking for latest imported data (2 bytes received, ignored). 
+[2026-09-24T18:01:08.594Z] SUCCESS: Refresh check complete - 679 quotes currently on disk (last imported: 2026-09-24T17:56:12.750Z) 
+[2026-09-24T18:01:11.494Z] INFO: Presence: croeschberger@enphaseenergy.com signed in. 
+[2026-09-24T18:02:12.373Z] INFO: Presence: croeschberger@enphaseenergy.com signed in. 
+[2026-09-24T18:03:54.810Z] INFO: Presence: croeschberger@enphaseenergy.com signed in. 
+[2026-09-24T18:08:51.767Z] INFO: Presence: croeschberger@enphaseenergy.com signed in. 
+[2026-09-24T18:09:11.907Z] INFO: Webhook delivery received: 11193043 bytes 
+Signature valid (secret encoding: utf8, signature encoding: hex)
+[2026-09-24T18:09:11.926Z] INFO: Encrypted payload detected - decrypting with AES-256-GCM... {
+  mode: 'snapshot',
+  hasNestedEncryption: true,
+  nestedEncryptionKeys: [ 'algorithm', 'encoding', 'iv', 'ciphertext' ]
+}
+[2026-09-24T18:09:11.968Z] INFO: Payload decrypted successfully. 
+[2026-09-24T18:09:11.990Z] INFO: Processing payload (decrypted size approx: 8339439 chars) 
+[2026-09-24T18:09:11.991Z] INFO: Resolved target directory: C:\Users\croeschberger\AppData\Roaming\base44-app 
+[2026-09-24T18:09:12.009Z] INFO: Webhook delivery received: 11195567 bytes 
+Signature valid (secret encoding: utf8, signature encoding: hex)
+[2026-09-24T18:09:12.030Z] INFO: Encrypted payload detected - decrypting with AES-256-GCM... {
+  mode: 'snapshot',
+  hasNestedEncryption: true,
+  nestedEncryptionKeys: [ 'algorithm', 'encoding', 'iv', 'ciphertext' ]
+}
+[2026-09-24T18:09:12.079Z] INFO: Payload decrypted successfully. 
+[2026-09-24T18:09:12.107Z] INFO: Processing payload (decrypted size approx: 8341330 chars) 
+[2026-09-24T18:09:12.108Z] INFO: Resolved target directory: C:\Users\croeschberger\AppData\Roaming\base44-app 
+[2026-09-24T18:09:12.223Z] INFO: Current data loaded: 680 quotes on disk 
+[2026-09-24T18:09:12.225Z] INFO: Time since last import: 779475ms (threshold: 60000ms) 
+[2026-09-24T18:09:12.225Z] INFO: Importing new snapshot data... 
+[2026-09-24T18:09:12.265Z] INFO: Normalized snapshot contains 667 quotes, 546 products 
+[2026-09-24T18:09:12.266Z] INFO: [DIAGNOSTIC] MaterialOrder sync check - raw payload entities.MaterialOrder count: 55, normalized materialOrders count: 55, most recent timestamp seen in raw payload: 2026-09-22T22:45:28.384Z 
+[2026-09-24T18:09:12.369Z] INFO: Current data loaded: 680 quotes on disk 
+[2026-09-24T18:09:12.370Z] INFO: Time since last import: 779620ms (threshold: 60000ms) 
+[2026-09-24T18:09:12.371Z] INFO: Importing new snapshot data... 
+[2026-09-24T18:09:12.397Z] INFO: Normalized snapshot contains 667 quotes, 546 products 
+[2026-09-24T18:09:12.398Z] INFO: [DIAGNOSTIC] MaterialOrder sync check - raw payload entities.MaterialOrder count: 55, normalized materialOrders count: 55, most recent timestamp seen in raw payload: 2026-09-22T22:45:28.384Z 
+[2026-09-24T18:09:12.786Z] INFO: Webhook delivery received: 11195103 bytes 
+Signature valid (secret encoding: utf8, signature encoding: hex)
+[2026-09-24T18:09:12.810Z] INFO: Encrypted payload detected - decrypting with AES-256-GCM... {
+  mode: 'snapshot',
+  hasNestedEncryption: true,
+  nestedEncryptionKeys: [ 'algorithm', 'encoding', 'iv', 'ciphertext' ]
+}
+[2026-09-24T18:09:12.848Z] INFO: Payload decrypted successfully. 
+[2026-09-24T18:09:12.869Z] INFO: Processing payload (decrypted size approx: 8340984 chars) 
+[2026-09-24T18:09:12.870Z] INFO: Resolved target directory: C:\Users\croeschberger\AppData\Roaming\base44-app 
+[2026-09-24T18:09:13.089Z] INFO: Current data loaded: 680 quotes on disk 
+[2026-09-24T18:09:13.089Z] INFO: Time since last import: 780339ms (threshold: 60000ms) 
+[2026-09-24T18:09:13.090Z] INFO: Importing new snapshot data... 
+[2026-09-24T18:09:13.116Z] INFO: Normalized snapshot contains 667 quotes, 546 products 
+[2026-09-24T18:09:13.117Z] INFO: [DIAGNOSTIC] MaterialOrder sync check - raw payload entities.MaterialOrder count: 55, normalized materialOrders count: 55, most recent timestamp seen in raw payload: 2026-09-22T22:45:28.384Z 
+[2026-09-24T18:09:13.349Z] SUCCESS: Import complete - stored 681 quotes 
+[2026-09-24T18:09:13.418Z] SUCCESS: Import complete - stored 681 quotes 
+[2026-09-24T18:09:13.712Z] SUCCESS: Import complete - stored 681 quotes 
+[2026-09-24T18:09:38.781Z] INFO: Refresh button clicked - checking for latest imported data (2 bytes received, ignored). 
+[2026-09-24T18:09:38.932Z] SUCCESS: Refresh check complete - 680 quotes currently on disk (last imported: 2026-09-24T18:09:13.271Z) 
+[2026-09-24T18:10:25.371Z] INFO: Webhook delivery received: 11193055 bytes 
+Signature valid (secret encoding: utf8, signature encoding: hex)
+[2026-09-24T18:10:25.396Z] INFO: Encrypted payload detected - decrypting with AES-256-GCM... {
+  mode: 'snapshot',
+  hasNestedEncryption: true,
+  nestedEncryptionKeys: [ 'algorithm', 'encoding', 'iv', 'ciphertext' ]
+}
+[2026-09-24T18:10:25.442Z] INFO: Payload decrypted successfully. 
+[2026-09-24T18:10:25.464Z] INFO: Processing payload (decrypted size approx: 8339447 chars) 
+[2026-09-24T18:10:25.465Z] INFO: Resolved target directory: C:\Users\croeschberger\AppData\Roaming\base44-app 
+[2026-09-24T18:10:25.610Z] INFO: Current data loaded: 680 quotes on disk 
+[2026-09-24T18:10:25.611Z] INFO: Time since last import: 72340ms (threshold: 60000ms) 
+[2026-09-24T18:10:25.612Z] INFO: Importing new snapshot data... 
+[2026-09-24T18:10:25.643Z] INFO: Normalized snapshot contains 667 quotes, 546 products 
+[2026-09-24T18:10:25.644Z] INFO: [DIAGNOSTIC] MaterialOrder sync check - raw payload entities.MaterialOrder count: 55, normalized materialOrders count: 55, most recent timestamp seen in raw payload: 2026-09-22T22:45:28.384Z 
+[2026-09-24T18:10:26.073Z] SUCCESS: Import complete - stored 681 quotes 
+[2026-09-24T18:11:04.507Z] INFO: Webhook delivery received: 11188743 bytes 
+Signature valid (secret encoding: utf8, signature encoding: hex)
+[2026-09-24T18:11:04.525Z] INFO: Encrypted payload detected - decrypting with AES-256-GCM... {
+  mode: 'snapshot',
+  hasNestedEncryption: true,
+  nestedEncryptionKeys: [ 'algorithm', 'encoding', 'iv', 'ciphertext' ]
+}
+[2026-09-24T18:11:04.570Z] INFO: Payload decrypted successfully. 
+[2026-09-24T18:11:04.591Z] INFO: Processing payload (decrypted size approx: 8336215 chars) 
+[2026-09-24T18:11:04.591Z] INFO: Resolved target directory: C:\Users\croeschberger\AppData\Roaming\base44-app 
+[2026-09-24T18:11:04.688Z] INFO: Current data loaded: 680 quotes on disk 
+[2026-09-24T18:11:04.689Z] INFO: Time since last import: 38898ms (threshold: 60000ms) 
+[2026-09-24T18:11:25.874Z] INFO: Applying a previously queued (throttled) snapshot before continuing... 
+[2026-09-24T18:11:26.304Z] SUCCESS: Queued snapshot applied successfully (680 quotes on disk now). 
+[2026-09-24T18:11:26.305Z] INFO: Throttle window has cleared - the queued snapshot was applied automatically, no data was lost. 
+[2026-09-24T18:13:26.009Z] INFO: Refresh button clicked - checking for latest imported data (2 bytes received, ignored). 
+[2026-09-24T18:13:26.117Z] SUCCESS: Refresh check complete - 680 quotes currently on disk (last imported: 2026-09-24T18:11:26.031Z) 

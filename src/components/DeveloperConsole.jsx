@@ -7,7 +7,7 @@ import {
   DialogTitle
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, AlertOctagon, Info, RefreshCw, Trash2 } from "lucide-react";
+import { AlertTriangle, AlertOctagon, Info, RefreshCw, Trash2, Users } from "lucide-react";
 import { listErrors, clearErrors } from "@/features/developerConsole/errorLog";
 
 const REPORT_SEVERITY_ORDER = { critical: 0, known_issue: 1, needs_investigation: 2, warning: 3, info: 4 };
@@ -64,18 +64,21 @@ function SeverityBadge({ severity }) {
 export default function DeveloperConsole({ open, onOpenChange, syncEvents = [] }) {
   const [appErrors, setAppErrors] = useState([]);
   const [reports, setReports] = useState([]);
+  const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("errors");
 
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [errors, reportsRes] = await Promise.all([
+      const [errors, reportsRes, presenceRes] = await Promise.all([
         listErrors(),
-        globalThis.window?.enquoteLocal?.diagnostics?.listReports?.() ?? Promise.resolve({ ok: false, reports: [] })
+        globalThis.window?.enquoteLocal?.diagnostics?.listReports?.() ?? Promise.resolve({ ok: false, reports: [] }),
+        globalThis.window?.enquoteLocal?.presence?.list?.() ?? Promise.resolve({ ok: false, sessions: [] })
       ]);
       setAppErrors(errors);
       setReports(reportsRes?.ok ? (reportsRes.reports || []) : []);
+      setSessions(presenceRes?.ok ? (presenceRes.sessions || []) : []);
     } finally {
       setLoading(false);
     }
@@ -121,7 +124,8 @@ export default function DeveloperConsole({ open, onOpenChange, syncEvents = [] }
           {[
             { key: "errors", label: `App Errors (${appErrors.length})` },
             { key: "sync", label: `Sync Events (${syncEvents.length})` },
-            { key: "reports", label: `Teammate Reports (${flattenedFindings.length})` }
+            { key: "reports", label: `Teammate Reports (${flattenedFindings.length})` },
+            { key: "presence", label: `Who's Online (${sessions.length})` }
           ].map((tab) => (
             <button
               key={tab.key}
@@ -208,6 +212,27 @@ export default function DeveloperConsole({ open, onOpenChange, syncEvents = [] }
                   <p className="text-foreground">{finding.summary}</p>
                 </div>
               ))
+            )
+          )}
+
+          {activeTab === "presence" && (
+            sessions.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic p-4 text-center">No one else is currently signed in.</p>
+            ) : (
+              sessions
+                .slice()
+                .sort((a, b) => new Date(b.signedInAt) - new Date(a.signedInAt))
+                .map((session) => (
+                  <div key={session.email} className="flex items-center gap-3 rounded-lg border border-border bg-card p-3 text-sm">
+                    <Users className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-foreground truncate">{session.name || session.email}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        Signed in {new Date(session.signedInAt).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                ))
             )
           )}
         </div>

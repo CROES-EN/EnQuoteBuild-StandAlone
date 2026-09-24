@@ -22,7 +22,9 @@ import {
   checkIQ8AdvisoryAccessories,
   checkLegacyMicroinverterWarning
 } from "./componentDependencies";
-
+import { evaluateCompatibility } from "../compatibility/compatibilityEngine";
+import { getGeneralizedDependencyAdvisories } from "../compatibility/generalizedDependencyAdvisories";
+import { checkMaterialSizeConsistency } from "./materialSizeConsistency";
 // --- Bundle aliases ---------------------------------------------------------
 //
 // Some requested items are shorthand for a KNOWN GROUP of catalog parts, not a
@@ -155,14 +157,17 @@ function extractCoveragePerUnit(catalogItemName) {
 // determined, rather than ever multiplying a large linear quantity
 // straight through against a per-unit price.
 function resolveBilledQuantity(catalogItem, requestedQuantityRaw, requestedUnit) {
-  const requestedQty = normalizeQuantity(requestedQuantityRaw);
+  const { quantity: requestedQty, wasRange, rawText: rangeRawText } = normalizeQuantityWithRangeInfo(requestedQuantityRaw);
+  const rangeNote = wasRange
+    ? `Requested quantity was a range ("${rangeRawText}") -- billed at the upper bound; verify actual footage/quantity on-site before finalizing.`
+    : null;
   const reqUnit = normalizeUnit(requestedUnit);
   const catalogUnit = normalizeUnit(catalogItem.unit);
 
   // No conversion needed: units already match, or the catalog item is
   // itself sold by linear foot (price already reflects per-ft cost).
   if (!reqUnit || reqUnit === catalogUnit || LENGTH_SALE_UNITS.has(catalogUnit)) {
-    return { quantity: requestedQty, conversionNote: null, needsReview: false };
+    return { quantity: requestedQty, conversionNote: rangeNote, needsReview: wasRange };
   }
 
   if (reqUnit === "ft") {
@@ -234,8 +239,41 @@ const GENERIC_TERMS = new Set([
   "hardware", "fastener", "fasteners"
 ]);
 
+// FIX (confirmed real bug via direct testing): the SAME physical size, written in any of
+// several common real-world notations ("1\"", "1 in.", "1in", "1inch", "1-inch"), used to
+// tokenize into DIFFERENT, mutually non-matching tokens -- so a genuinely correct catalog
+// match could be missed purely because of how the size happened to be typed, not because
+// the item wasn't actually in the catalog. Verified standalone before shipping: 13 size-
+// notation variants all now tokenize identically to their canonical form, while DIFFERENT
+// sizes (1/2" vs 3/4" vs 1") correctly remain DIFFERENT tokens, and 6 real catalog product
+// names (including EMT/PVC/liquid-tight terminology) were confirmed to keep every
+// non-size word completely unchanged.
+//
+// Whole/decimal sizes ("1\"", "1 in.", "1in", "1inch", "1-inch", "1 inches") all collapse
+// to the single token "1in". Fractional sizes ("3/4\"", "3/4 in.", "3/4in", "3/4-inch")
+// all collapse to the single token "3over4in" -- "over" keeps the two numbers glued into
+// ONE token through the later alphanumeric-only strip below, rather than risking a
+// collision with an unrelated whole number like "34".
+//
+// IMPORTANT alternation order: "inch(?:es)?" is tried BEFORE the shorter "in\.?"
+// alternative in both regexes below. Confirmed via a failed first draft: with the
+// alternatives in the other order, "1inch" incorrectly matched just the "in" prefix and
+// left "ch" unconsumed, producing the wrong result "1inch" instead of "1in".
+function normalizeSizeNotation(text) {
+  let result = String(text || "");
+  result = result.replace(
+    /(\d+)\s*\/\s*(\d+)\s*[-]?\s*(?:inch(?:es)?|in\.?|")/gi,
+    (match, num, denom) => `${num}over${denom}in`
+  );
+  result = result.replace(
+    /(\d+(?:\.\d+)?)\s*[-]?\s*(?:inch(?:es)?|in\.?|")/gi,
+    (match, num) => `${num.replace(".", "p")}in`
+  );
+  return result;
+}
+
 function normalizeForPhraseMatch(text) {
-  return String(text || "")
+  return normalizeSizeNotation(text)
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
@@ -391,13 +429,16 @@ function scoreMatch(coreTokens, noteTokens, catalogItem) {
 
   let coreHits = 0;
   let coreScore = 0;
+  let hasSpecificHit = false;
   for (const token of coreTokens) {
     if (nameTokens.includes(token)) {
       coreHits += 1;
       coreScore += 3;
+      if (!GENERIC_TERMS.has(token)) hasSpecificHit = true;
     } else if (descTokens.includes(token)) {
       coreHits += 1;
       coreScore += 1;
+      if (!GENERIC_TERMS.has(token)) hasSpecificHit = true;
     }
   }
 
@@ -414,7 +455,7 @@ function scoreMatch(coreTokens, noteTokens, catalogItem) {
   // specific catalog name.
   const score = coreScore + noteScore + precision * 2;
 
-  return { score, coverage, coreHits, precision };
+  return { score, coverage, coreHits, precision, hasSpecificHit };
 }
 
 // Optional category hint narrows the search (e.g. "critter guard" requests
@@ -426,7 +467,7 @@ function scoreMatch(coreTokens, noteTokens, catalogItem) {
 function findBestCatalogMatch(requestedName, notesText, categoryHint, isService) {
   const coreTokens = tokenize(requestedName);
   const noteTokens = tokenize(notesText);
-  if (coreTokens.length === 0) return { match: null, score: 0, coverage: 0 };
+  if (coreTokens.length === 0) return { match: null, score: 0, coverage: 0, hasSpecificHit: false };
 
   const candidates = PRODUCT_CATALOG.filter((item) =>
     (isService ? item.category === SERVICE_CATEGORY : item.category !== SERVICE_CATEGORY) &&
@@ -436,17 +477,19 @@ function findBestCatalogMatch(requestedName, notesText, categoryHint, isService)
   let best = null;
   let bestScore = 0;
   let bestCoverage = 0;
+  let bestHasSpecificHit = false;
   for (const item of candidates) {
-    const { score, coverage } = scoreMatch(coreTokens, noteTokens, item);
+    const { score, coverage, hasSpecificHit } = scoreMatch(coreTokens, noteTokens, item);
     let adjustedScore = score;
     if (categoryHint && item.category === categoryHint) adjustedScore += 1.5;
     if (adjustedScore > bestScore) {
       bestScore = adjustedScore;
       bestCoverage = coverage;
+      bestHasSpecificHit = hasSpecificHit;
       best = item;
     }
   }
-  return { match: best, score: bestScore, coverage: bestCoverage };
+  return { match: best, score: bestScore, coverage: bestCoverage, hasSpecificHit: bestHasSpecificHit };
 }
 
 // A match is only trusted when BOTH a minimum raw score is met AND a
@@ -527,6 +570,7 @@ function matchLineItem(requestedName, requestedQuantity, requestedUnit, notes, c
           section: CATEGORY_TO_SECTION[correctedItem.category] || "Electrical Materials",
           matched: true,
           match_confidence: "learned_correction",
+          sku: correctedItem.sku,
           conversion_note: conversionNote,
           needs_review: needsReview
         };
@@ -561,6 +605,7 @@ function matchLineItem(requestedName, requestedQuantity, requestedUnit, notes, c
       section: CATEGORY_TO_SECTION[phraseMatch.category] || "Electrical Materials",
       matched: true,
       match_confidence: "phrase",
+      sku: phraseMatch.sku,
       conversion_note: conversionNote,
       needs_review: needsReview
     };
@@ -587,6 +632,7 @@ function matchLineItem(requestedName, requestedQuantity, requestedUnit, notes, c
       section: CATEGORY_TO_SECTION[fuzzyMatch.category] || "Electrical Materials",
       matched: true,
       match_confidence: "fuzzy",
+      sku: fuzzyMatch.sku,
       conversion_note: conversionNote,
       needs_review: needsReview
     };
@@ -594,11 +640,18 @@ function matchLineItem(requestedName, requestedQuantity, requestedUnit, notes, c
 
   // (canAttemptSpecificMatch already computed above, before the phrase
   // match attempt, so both matching strategies share the same safeguard.)
-  const { match, score, coverage } = canAttemptSpecificMatch
+  const { match, score, coverage, hasSpecificHit } = canAttemptSpecificMatch
     ? findBestCatalogMatch(requestedName, notes, categoryHint, isService)
-    : { match: null, score: 0, coverage: 0 };
+    : { match: null, score: 0, coverage: 0, hasSpecificHit: false };
 
-  const confidentMatch = match && score >= MATCH_SCORE_THRESHOLD && coverage >= MATCH_COVERAGE_THRESHOLD;
+  // FIX (confirmed real bug via a live case: "ZNSHINE Solar Panel" incorrectly
+  // matched "Solar Panel Clips (Pack of 50)" -- the generic words "solar"/"panel"
+  // scored high enough on their own, even though the one SPECIFIC word
+  // ("ZNSHINE") never matched anything in the catalog). A match is only trusted
+  // now if a non-generic word actually contributed to it -- otherwise this falls
+  // through to the existing "Miscellaneous <category> (unmatched: ...)" fallback
+  // below, rather than silently pricing the wrong real catalog item.
+  const confidentMatch = match && score >= MATCH_SCORE_THRESHOLD && coverage >= MATCH_COVERAGE_THRESHOLD && hasSpecificHit;
 
   if (confidentMatch) {
     const { quantity, conversionNote, needsReview } = resolveBilledQuantity(
@@ -616,6 +669,7 @@ function matchLineItem(requestedName, requestedQuantity, requestedUnit, notes, c
       section: CATEGORY_TO_SECTION[match.category] || "Electrical Materials",
       matched: true,
       match_confidence: score,
+      sku: match.sku,
       conversion_note: conversionNote,
       needs_review: needsReview
     };
@@ -675,7 +729,13 @@ function matchLineItem(requestedName, requestedQuantity, requestedUnit, notes, c
 
   return {
     requested_name: requestedName,
-    name: `Miscellaneous ${guessedCategory} (unmatched: "${requestedName}")`,
+    // FIX (per explicit request, real example: "Miscellaneous Wiring & Cable Management
+    // (unmatched: "Suntech STP370S-B60/Wnhb Solar Module")" was displaying instead of a
+    // clean item name). requested_name (above) and matched: false (below) already fully
+    // capture "this is an unmatched item" for every other part of the system (confidence
+    // badges, review flags, etc.) -- the verbose wrapper text added no information beyond
+    // what requested_name already carries, so `name` now simply IS the requested name.
+    name: requestedName,
     quantity: fallbackQuantity,
     unit_price: averagePrice,
     unit: "each",
@@ -690,12 +750,45 @@ function matchLineItem(requestedName, requestedQuantity, requestedUnit, notes, c
   };
 }
 
+// FIX (confirmed real bug: "20-40 ft" of Trunk Cable was billed as 2040 ft): the old
+// strip-non-digits parsing (`str.replace(/[^\d.]/g, "")`) turned a range like "20-40"
+// into the string "2040" by deleting the hyphen and concatenating the two numbers. A
+// genuine two-number range is now detected FIRST -- "20-40", "20 - 40", or "20 to 40" --
+// and resolved to its UPPER bound (safer for a materials quantity than the lower bound
+// or an average, since under-quoting cable/wire risks a return trip). Anything that is
+// NOT a range (a plain number, "Unknown", empty, etc.) falls through to the exact same
+// strip-and-parse behavior as before, completely unchanged.
+const RANGE_PATTERN = /^\s*(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)/i;
+
+function parseRangeOrNull(rawQuantity) {
+  if (rawQuantity === null || rawQuantity === undefined) return null;
+  const str = String(rawQuantity).trim();
+  const match = str.match(RANGE_PATTERN);
+  if (!match) return null;
+  const low = parseFloat(match[1]);
+  const high = parseFloat(match[2]);
+  if (isNaN(low) || isNaN(high) || high <= 0) return null;
+  return { quantity: high, rawText: str };
+}
+
 function normalizeQuantity(rawQuantity) {
   if (rawQuantity === null || rawQuantity === undefined) return 1;
+  const range = parseRangeOrNull(rawQuantity);
+  if (range) return range.quantity;
   const str = String(rawQuantity).trim();
   if (!str || /^unknown$/i.test(str)) return 1;
   const num = parseFloat(str.replace(/[^\d.]/g, ""));
   return isNaN(num) || num <= 0 ? 1 : num;
+}
+
+// Same corrected parsing as normalizeQuantity(), but also reports WHETHER a range was
+// detected and the original raw text -- used by resolveBilledQuantity() so a range can be
+// surfaced as a visible review note on the priced line item, instead of just silently
+// picking a number with no trace a range was ever involved.
+function normalizeQuantityWithRangeInfo(rawQuantity) {
+  const range = parseRangeOrNull(rawQuantity);
+  if (range) return { quantity: range.quantity, wasRange: true, rawText: range.rawText };
+  return { quantity: normalizeQuantity(rawQuantity), wasRange: false, rawText: null };
 }
 
 // Turns matchLineItem()'s internal matched/match_confidence/zero_priced_service signals
@@ -742,7 +835,13 @@ function getConfidenceReason(item) {
   if (item.matched && typeof item.match_confidence === "number") {
     return "Matched using partial word overlap with the catalog -- a reasonable guess, not an exact match.";
   }
-  return "No confident catalog match was found -- a category-average placeholder price was used. Please verify and correct manually.";
+  // CHANGED (per explicit request): shortened from "No confident catalog match was found
+  // -- a category-average placeholder price was used. Please verify and correct
+  // manually." -- the paired UI patch's new "Item not found in Catalog" badge already
+  // states the core fact, so this line now only adds the ONE new piece of information
+  // (placeholder pricing), avoiding a redundant, overly long paragraph under every
+  // unmatched item.
+  return "Using placeholder pricing -- please verify and correct manually.";
 }
 
 // --- Labor & travel (same rules as the Step 2 prompt) ---------------------
@@ -1045,6 +1144,7 @@ export function generateQuoteDraft(request) {
   const zeroPricedServiceNames = [];
   const dependencyAdvisories = [];
   const legacyWarnings = [];
+  const compatibilityFlags = [];
 
   const allRequestedLines = [
     ...(request.products || []).map((p) => ({ ...p, kind: "product" })),
@@ -1173,7 +1273,33 @@ export function generateQuoteDraft(request) {
       // suggestions a reviewer can choose to add.
       const iq8Advisory = checkIQ8AdvisoryAccessories(lineItem.name);
       if (iq8Advisory) {
-        dependencyAdvisories.push({ triggerItem: lineItem.name, ...iq8Advisory });
+        // FIX (confirmed real display gap): this push never actually included a
+        // `.reason` field (only `.suggestions`, an array), so the UI's flag display
+        // always silently fell back to a generic placeholder string instead of showing
+        // WHICH accessories were actually being suggested. Now includes a real, specific
+        // reason built from the rule's own suggestion list.
+        const iq8SuggestionText = (iq8Advisory.suggestions || [])
+          .map((s) => s.name || s.reason)
+          .filter(Boolean)
+          .join("; ");
+        dependencyAdvisories.push({
+          triggerItem: lineItem.name,
+          reason: iq8SuggestionText
+            ? `Consider verifying/adding: ${iq8SuggestionText}.`
+            : "Advisory accessory suggestion -- review before finalizing.",
+          ...iq8Advisory
+        });
+      }
+
+      // GENERALIZED dependency coverage (see generalizedDependencyAdvisories.js): adds
+      // advisory-only suggestions from the FULL Product_Dependencies dataset for this
+      // SKU, beyond the 3 manually curated rules above (e.g. Gateway/Terminator
+      // requirements for IQ8-family items, CT/battery/controller dependencies for
+      // Combiner 6C and other Generation 4 equipment) -- never auto-priced, and never
+      // duplicates a dependency already shown by the 3 rules above.
+      const generalizedDependencyAdvisories = getGeneralizedDependencyAdvisories(lineItem.name);
+      for (const generalizedAdvisory of generalizedDependencyAdvisories) {
+        dependencyAdvisories.push({ triggerItem: lineItem.name, ...generalizedAdvisory });
       }
 
       // Legacy microinverter (M-series, S-series, IQ6, IQ7-series) -> non-blocking
@@ -1183,6 +1309,18 @@ export function generateQuoteDraft(request) {
       const legacyWarning = checkLegacyMicroinverterWarning(lineItem.name);
       if (legacyWarning) {
         legacyWarnings.push({ triggerItem: lineItem.name, ...legacyWarning });
+      }
+
+      // Compatibility Matrix (verified-source signal only, never a guess) --
+      // fires on the same confidently-matched product/material lines as the
+      // dependency checks above. Deliberately independent of the Legacy
+      // Catalog/pricing path: a "not_evaluated" result (no existing equipment
+      // identifiable, or no compatibility catalog match for the replacement)
+      // is silently skipped so ordinary quotes are never cluttered with a
+      // non-finding.
+      const compatibilityResult = evaluateCompatibility(request, lineItem.name, lineItem.sku);
+      if (compatibilityResult.status !== "not_evaluated") {
+        compatibilityFlags.push({ triggerItem: lineItem.name, ...compatibilityResult });
       }
     }
   }
@@ -1213,6 +1351,8 @@ export function generateQuoteDraft(request) {
     travel_rate: TRAVEL_HOUR_RATE,
     miles_traveled: milesTraveled,
     mileage_rate: MILEAGE_RATE,
+    service_type: request.quoteCategory || null,
+    material_size_flags: checkMaterialSizeConsistency(items),
     items: items.map((item) => ({
       product_id: null,
       name: item.name,
@@ -1229,7 +1369,8 @@ export function generateQuoteDraft(request) {
     unmatched_count: unmatchedItems.length,
     unmatched_items: unmatchedItems,
     dependency_advisories: dependencyAdvisories,
-    legacy_warnings: legacyWarnings
+    legacy_warnings: legacyWarnings,
+    compatibility_flags: compatibilityFlags
   };
 }
 

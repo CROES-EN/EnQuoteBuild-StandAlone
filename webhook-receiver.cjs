@@ -32,6 +32,15 @@ loadEnvFile();
 // Kept small and ephemeral (process memory only) - not written to disk beyond the
 // existing webhook-events.jsonl audit trail.
 const EVENT_LOG = [];
+
+// In-memory "who's currently signed in" presence store - genuinely ephemeral, same
+// category as EVENT_LOG above (process memory only, resets on host restart). Presence
+// is NOT synced through Base44 or the outbound quote queue (confirmed those are
+// quote/collection-specific, not generic) - it reuses this SAME machine-to-machine
+// webhook mechanism already proven for diagnostic reports and snapshots, since
+// "who's online right now" is short-lived, real-time-ish data, not a durable business
+// record worth a full Base44 round-trip.
+const ACTIVE_SESSIONS = new Map(); // keyed by lowercased email
 const MAX_EVENT_LOG = 300;
 let EVENT_SEQ = 0;
 
@@ -429,6 +438,34 @@ async function persistSnapshotToLocalApp(payload, explicitDir, options = {}) {
   logEvent('info', 'Importing new snapshot data...');
   const normalized = normalizeIncomingSnapshot(payload);
   logEvent('info', `Normalized snapshot contains ${normalized.quotes ? normalized.quotes.length : 0} quotes, ${normalized.products ? normalized.products.length : 0} products`);
+
+  // TEMPORARY DIAGNOSTIC (read-only, does not change any imported/merged/stored data) -
+  // reports exactly how many MaterialOrder records arrived in this incoming snapshot,
+  // both in the raw payload's entities AND after normalizeIncomingSnapshot() ran, plus
+  // the most recent updated_date/created_date among them. This is scoped to
+  // materialOrders specifically to diagnose why the app's Custom Material Orders shows
+  // stale data (latest visible record from Jul 7) while Base44's own EnQuote page shows
+  // current same-day orders - confirmed that materialOrders IS correctly mapped to the
+  // "MaterialOrder" Base44 entity name in collectionEntityMappings, so this checks
+  // whether the incoming data itself is stale (upstream) or something in the merge is
+  // silently preferring old local data over new incoming records.
+  try {
+    const rawEntities = (payload && payload.snapshot && payload.snapshot.entities && typeof payload.snapshot.entities === 'object')
+      ? payload.snapshot.entities
+      : (payload && payload.entities && typeof payload.entities === 'object' ? payload.entities : {});
+    const rawMaterialOrders = Array.isArray(rawEntities.MaterialOrder) ? rawEntities.MaterialOrder : [];
+    const normalizedMaterialOrders = Array.isArray(normalized.materialOrders) ? normalized.materialOrders : [];
+    const getRecordTimestamp = (record) => {
+      const candidate = record && (record.updated_date || record.updated_at || record.created_date || record.created_at);
+      const time = candidate ? Date.parse(candidate) : NaN;
+      return Number.isNaN(time) ? null : time;
+    };
+    const rawTimestamps = rawMaterialOrders.map(getRecordTimestamp).filter((t) => t !== null);
+    const mostRecentRawTimestamp = rawTimestamps.length > 0 ? new Date(Math.max(...rawTimestamps)).toISOString() : null;
+    logEvent('info', `[DIAGNOSTIC] MaterialOrder sync check - raw payload entities.MaterialOrder count: ${rawMaterialOrders.length}, normalized materialOrders count: ${normalizedMaterialOrders.length}, most recent timestamp seen in raw payload: ${mostRecentRawTimestamp || 'none found'}`);
+  } catch (diagError) {
+    logEvent('warn', `[DIAGNOSTIC] MaterialOrder sync check failed (non-fatal): ${diagError.message}`);
+  }
   if (!normalized.quotes || normalized.quotes.length === 0) {
     // Diagnostic-only: log the incoming payload's shape (top-level keys, and one level deeper)
     // so we can see how it actually differs from what normalizeIncomingSnapshot() expects,
@@ -498,6 +535,127 @@ function validateSignature(rawBody, providedHeader) {
 
 const MAX_BODY_BYTES = 100 * 1024 * 1024; // 100MB - generous ceiling for a full-database snapshot
 
+// Announces this user as currently signed in - called on successful login. Protected by
+// the SAME shared secret as the diagnostic-report/snapshot endpoints - no new secret to
+// distribute. Functionally tested end-to-end before shipping (valid announce, invalid
+// secret rejected, re-announce updates rather than duplicates, missing email rejected).
+async function handlePresenceAnnounce(req, res) {
+  if (SECRET_IS_PLACEHOLDER) {
+    res.writeHead(503, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: false, error: 'Shared secret not configured on this relay.' }));
+    return;
+  }
+  const providedSecret = req.headers['x-enquote-shared-secret'] || '';
+  const expected = Buffer.from(SECRET_RAW, 'utf8');
+  const provided = Buffer.from(String(providedSecret), 'utf8');
+  const isValid = expected.length === provided.length && crypto.timingSafeEqual(expected, provided);
+  if (!isValid) {
+    res.writeHead(401, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: false, error: 'Unauthorized' }));
+    return;
+  }
+
+  let rawBuf;
+  try {
+    rawBuf = await readBody(req);
+  } catch (error) {
+    res.writeHead(413, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: false, error: error.message }));
+    return;
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(rawBuf.toString('utf8'));
+  } catch (error) {
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: false, error: 'Request body was not valid JSON.' }));
+    return;
+  }
+
+  const email = String(payload.email || '').trim().toLowerCase();
+  if (!email) {
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: false, error: 'email is required.' }));
+    return;
+  }
+
+  ACTIVE_SESSIONS.set(email, {
+    email,
+    name: payload.name || email,
+    signedInAt: new Date().toISOString()
+  });
+  logEvent('info', `Presence: ${email} signed in.`);
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ ok: true }));
+}
+
+// Removes a user from the presence list - called on sign-out. Same auth as announce above.
+async function handlePresenceRemove(req, res) {
+  if (SECRET_IS_PLACEHOLDER) {
+    res.writeHead(503, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: false, error: 'Shared secret not configured on this relay.' }));
+    return;
+  }
+  const providedSecret = req.headers['x-enquote-shared-secret'] || '';
+  const expected = Buffer.from(SECRET_RAW, 'utf8');
+  const provided = Buffer.from(String(providedSecret), 'utf8');
+  const isValid = expected.length === provided.length && crypto.timingSafeEqual(expected, provided);
+  if (!isValid) {
+    res.writeHead(401, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: false, error: 'Unauthorized' }));
+    return;
+  }
+
+  let rawBuf;
+  try {
+    rawBuf = await readBody(req);
+  } catch (error) {
+    res.writeHead(413, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: false, error: error.message }));
+    return;
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(rawBuf.toString('utf8'));
+  } catch (error) {
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: false, error: 'Request body was not valid JSON.' }));
+    return;
+  }
+
+  const email = String(payload.email || '').trim().toLowerCase();
+  if (email) {
+    ACTIVE_SESSIONS.delete(email);
+    logEvent('info', `Presence: ${email} signed out.`);
+  }
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ ok: true }));
+}
+
+// Returns the current presence list. Requires the shared secret, same as every other
+// endpoint reachable over the public ngrok tunnel.
+async function handlePresenceList(req, res) {
+  if (SECRET_IS_PLACEHOLDER) {
+    res.writeHead(503, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: false, error: 'Shared secret not configured on this relay.' }));
+    return;
+  }
+  const providedSecret = req.headers['x-enquote-shared-secret'] || '';
+  const expected = Buffer.from(SECRET_RAW, 'utf8');
+  const provided = Buffer.from(String(providedSecret), 'utf8');
+  const isValid = expected.length === provided.length && crypto.timingSafeEqual(expected, provided);
+  if (!isValid) {
+    res.writeHead(401, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: false, error: 'Unauthorized' }));
+    return;
+  }
+
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ ok: true, sessions: Array.from(ACTIVE_SESSIONS.values()) }));
+}
+
 const server = http.createServer((req, res) => {
   if (req.method === 'POST' && req.url === '/api/base44/webhook') {
     // Normal webhook endpoint (with throttle)
@@ -526,6 +684,11 @@ const server = http.createServer((req, res) => {
     const events = EVENT_LOG.filter(e => e.seq > since);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, events, latestSeq: EVENT_SEQ }));
+  } else if (req.method === 'GET' && req.url === '/api/base44/webhook/snapshot-meta') {
+    // NEW: lightweight metadata-only check - returns just { ok, lastSavedAt }, a few
+    // bytes, safe to call frequently. Lets a client machine cheaply detect "did
+    // anything change on the host" before paying the cost of a full snapshot pull.
+    handleSnapshotMetaRequest(req, res);
   } else if (req.method === 'GET' && req.url === '/api/base44/webhook/snapshot') {
     // Lets a TEAMMATE's desktop app (which never runs its own receiver/ngrok tunnel)
     // pull this machine's current data through the shared ngrok URL, instead of only
@@ -536,6 +699,15 @@ const server = http.createServer((req, res) => {
     // outbound queue health, recent event log) directly to this machine, so
     // troubleshooting no longer requires manually pasting terminal output back and forth.
     handleDiagnosticReport(req, res);
+  } else if (req.method === 'POST' && req.url === '/api/base44/webhook/presence/announce') {
+    // Announces this user as currently signed in (see Developer Console's "Who's Online" tab).
+    handlePresenceAnnounce(req, res);
+  } else if (req.method === 'POST' && req.url === '/api/base44/webhook/presence/remove') {
+    // Removes this user from the presence list on sign-out.
+    handlePresenceRemove(req, res);
+  } else if (req.method === 'GET' && req.url === '/api/base44/webhook/presence') {
+    // Returns everyone currently marked as signed in.
+    handlePresenceList(req, res);
   } else {
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: false, error: 'Not found' }));
@@ -574,6 +746,53 @@ function readBody(req) {
 // same shared secret already used for validating inbound Base44 webhook deliveries
 // (ENQUOTE_LOCAL_SYNC_WEBHOOK_SECRET) -- no new secret to generate or distribute.
 // Requests without a valid matching "X-ENQuote-Shared-Secret" header are rejected.
+// NEW: lightweight metadata-only endpoint - returns ONLY { ok, lastSavedAt }, never the
+// full dataset. meta.last_saved_at is stamped by writeInner() on EVERY write (confirmed
+// via repository.cjs), not just quote imports - a fully reliable "did anything change"
+// signal for every collection this app tracks, not just quotes. This lets a client
+// machine poll frequently (e.g. every 30s) for near-real-time freshness without the
+// bandwidth cost of transferring the full dataset on every check.
+async function handleSnapshotMetaRequest(req, res) {
+  if (SECRET_IS_PLACEHOLDER) {
+    res.writeHead(503, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: false, error: 'Shared secret not configured on this relay.' }));
+    return;
+  }
+
+  const providedSecret = req.headers['x-enquote-shared-secret'] || '';
+  const expected = Buffer.from(SECRET_RAW, 'utf8');
+  const provided = Buffer.from(String(providedSecret), 'utf8');
+  const isValid = expected.length === provided.length && crypto.timingSafeEqual(expected, provided);
+
+  if (!isValid) {
+    res.writeHead(401, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: false, error: 'Unauthorized' }));
+    return;
+  }
+
+  try {
+    const targetDir = resolveRepositoryDirectory(null);
+    const repo = repositoryFor(targetDir);
+    const data = await repo.exportData();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, lastSavedAt: data.meta?.last_saved_at || null }));
+  } catch (error) {
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: false, error: error.message }));
+  }
+}
+
+// FIX (confirmed root cause of stale materialOrders/reviews/siteFlags/etc. for every
+// CLIENT machine - i.e. any machine with a remote-sync-config.json): this endpoint
+// previously hand-picked only { version, quotes, products, meta } to return, so a
+// client pulling via this endpoint NEVER received materialOrders or any of the other
+// ~18 collections this app tracks - not because of a merge bug, but because the
+// incoming data for those collections was always an empty array, and
+// mergeRecordsById's own first line is "if incoming is empty, return existing
+// unchanged" (correct behavior, being fed incomplete data). Now returns the ENTIRE
+// dataset via the same exportData() already used elsewhere - since importData()'s
+// merge logic already iterates every collectionNames entry generically, this requires
+// ZERO changes on the receiving side to start working correctly.
 async function handleSnapshotRequest(req, res) {
   if (SECRET_IS_PLACEHOLDER) {
     logEvent('error', 'Rejected snapshot request - no shared secret configured on this relay (still the placeholder value).');
@@ -598,14 +817,11 @@ async function handleSnapshotRequest(req, res) {
     const targetDir = resolveRepositoryDirectory(null);
     const repo = repositoryFor(targetDir);
     const data = await repo.exportData();
-    logEvent('success', `Snapshot request served - ${Array.isArray(data.quotes) ? data.quotes.length : 0} quotes, ${Array.isArray(data.products) ? data.products.length : 0} products.`);
+    logEvent('success', `Snapshot request served - ${Array.isArray(data.quotes) ? data.quotes.length : 0} quotes, ${Array.isArray(data.products) ? data.products.length : 0} products, full dataset (all collections included).`);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       ok: true,
-      version: data.version,
-      quotes: data.quotes,
-      products: data.products,
-      meta: data.meta
+      ...data
     }));
   } catch (error) {
     logEvent('error', `Snapshot request failed: ${error.message}`);

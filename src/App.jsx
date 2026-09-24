@@ -1,4 +1,4 @@
-﻿import {
+import {
   HashRouter,
   Routes,
   Route
@@ -25,6 +25,7 @@ import PVPanelRMAsPage from "./pages/PVPanelRMAs";
 import InactiveRevenueDashboardPage from "./pages/InactiveRevenueDashboard";
 import InactiveCollectionsPage from "./pages/InactiveCollections";
 import WorkloadPage from "./pages/Workload";
+import AutoDrafterPage from "./pages/AutoDrafter";
 
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import UserNotRegisteredError from "@/components/UserNotRegisteredError";
@@ -132,6 +133,11 @@ const AuthenticatedApp = () => {
       <Route path="/InactiveCollections" element={
         <LayoutWrapper currentPageName="InactiveRevenueDashboard">
           <InactiveCollectionsPage />
+        </LayoutWrapper>
+      } />
+      <Route path="/AutoDrafter" element={
+        <LayoutWrapper currentPageName="AutoDrafter">
+          <AutoDrafterPage />
         </LayoutWrapper>
       } />
       <Route path="*" element={<PageNotFound />} />

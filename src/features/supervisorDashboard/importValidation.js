@@ -24,7 +24,13 @@ const REQUIRED_COLUMNS_BY_TYPE = {
   care_cases: ["Case Number"],
   om_cs_cases: ["Case Number"],
   incorta_input: ["Case Number"],
-  care_subscriptions: ["Enlighten Site Id"]
+  care_subscriptions: ["Enlighten Site Id"],
+  // Optional safety-net entry for the new Auto-Drafter [beta] tab's "Quote Request Cases
+  // with Case Comments" import - a small "does this even look like the right kind of
+  // file" check, matching the same convention as every other case-based report type
+  // above. Not required for the import to function (an unlisted reportType simply skips
+  // this specific check), but catches an obviously-wrong file early with a clear message.
+  quoteRequestCases: ["Case Number"]
 };
 
 // For these specific report types, ANY file whose name CONTAINS the given substring is

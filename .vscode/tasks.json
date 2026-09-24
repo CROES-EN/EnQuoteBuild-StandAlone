@@ -1,17 +1,75 @@
-﻿{
+{
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Run Latest Downloaded Script",
+      "label": "Kill EnQuote/Electron processes",
       "type": "shell",
-      "command": "powershell",
-      "args": [
-        "-NoProfile",
-        "-ExecutionPolicy", "Bypass",
-        "-File", "C:\\EnQuoteBuild\\_scripts\\_run-latest-download.ps1"
-      ],
+      "command": "Get-Process | Where-Object { $_.ProcessName -like '*electron*' -or $_.ProcessName -like '*EnQuote*' } | Stop-Process -Force -ErrorAction SilentlyContinue; exit 0",
       "problemMatcher": [],
-      "presentation": { "reveal": "always", "panel": "shared" }
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Kill webhook-receiver.cjs",
+      "type": "shell",
+      "command": "Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -like '*webhook-receiver.cjs*' } | ForEach-Object { Write-Host \"Stopping PID $($_.ProcessId)\"; Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }; exit 0",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Start webhook-receiver.cjs (silent)",
+      "type": "shell",
+      "command": "Start-Process -FilePath 'node' -ArgumentList 'webhook-receiver.cjs' -WorkingDirectory '${workspaceFolder}' -WindowStyle Hidden -RedirectStandardOutput '${workspaceFolder}\\webhook-receiver.log' -RedirectStandardError '${workspaceFolder}\\webhook-receiver-error.log'",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Check webhook-receiver health",
+      "type": "shell",
+      "command": "Invoke-RestMethod -Uri 'http://localhost:3001/health'",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "FULL RESTART: kill everything + relaunch dev",
+      "type": "shell",
+      "command": "Write-Host '--- Killing EnQuote/Electron ---'; Get-Process | Where-Object { $_.ProcessName -like '*electron*' -or $_.ProcessName -like '*EnQuote*' } | ForEach-Object { try { Stop-Process -Id $_.Id -Force -ErrorAction Stop; Write-Host \"Stopped $($_.ProcessName) (PID $($_.Id))\" } catch { Write-Host \"Could not stop PID $($_.Id): $($_.Exception.Message)\" } }; Write-Host '--- Killing webhook-receiver.cjs ---'; Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -like '*webhook-receiver.cjs*' } | ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop; Write-Host \"Stopped PID $($_.ProcessId)\" } catch { Write-Host \"Could not stop PID $($_.ProcessId): $($_.Exception.Message)\" } }; Start-Sleep -Seconds 1; Write-Host '--- Starting webhook-receiver.cjs (silent) ---'; Start-Process -FilePath 'node' -ArgumentList 'webhook-receiver.cjs' -WorkingDirectory '${workspaceFolder}' -WindowStyle Hidden -RedirectStandardOutput '${workspaceFolder}\\webhook-receiver.log' -RedirectStandardError '${workspaceFolder}\\webhook-receiver-error.log'; Start-Sleep -Seconds 1; Write-Host '--- Launching npm run desktop:dev ---'; npm run desktop:dev",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Run desktop:dev",
+      "type": "shell",
+      "command": "npm run desktop:dev",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Tail webhook-receiver log",
+      "type": "shell",
+      "command": "Get-Content '${workspaceFolder}\\webhook-receiver.log' -Tail 20",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
     }
   ]
 }

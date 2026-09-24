@@ -135,22 +135,7 @@ function SupervisorDashboardContent() {
           </p>
         </CardContent>
       </Card>
-
-      {activeTab !== "dashboard" && (
-        <div className="flex items-center gap-3">
-          <Label htmlFor="supervisor-viewing-day" className="flex items-center gap-1.5 text-sm text-muted-foreground whitespace-nowrap">
-            <CalendarDays className="w-4 h-4" /> Viewing day:
-          </Label>
-          <Input
-            id="supervisor-viewing-day"
-            type="date"
-            className="w-48"
-            value={selectedDate || ""}
-            onChange={(e) => setSelectedDate(e.target.value)}
-          />
-          <p className="text-xs text-muted-foreground">Every tab below reads and saves this same day's record.</p>
-        </div>
-      )}
+      {}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="h-auto flex-wrap justify-start gap-1">
           <TabsTrigger value="dashboard" className="flex items-center gap-1.5"><Gauge className="w-4 h-4" /> Executive Overview</TabsTrigger>

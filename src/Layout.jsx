@@ -1,3 +1,4 @@
+import { Sparkles } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import UpdateStatusBadge from "@/components/UpdateStatusBadge";
 import RemoteSyncSecretDialog from "@/components/auth/RemoteSyncSecretDialog";
@@ -50,6 +51,7 @@ import appPackage from "../package.json";
 import enquoteLogo from "@/assets/enquote-logo.png";
 import SidebarLogoAnimation from "@/components/SidebarLogoAnimation";
 import DeveloperConsole from "@/components/DeveloperConsole";
+import NotificationBell from "@/components/NotificationBell";
 import { recordError } from "@/features/developerConsole/errorLog";
 
 const isDemoMode = ["mock", "local", "salesforce-mock"].includes(import.meta.env.VITE_DATA_SOURCE);
@@ -122,6 +124,7 @@ export default function Layout({ children, currentPageName }) {
     { name: "Dashboard", icon: LayoutDashboard, page: "Dashboard", roles: ["submitter", "approver", "admin", "invoicer"] },
     { name: "Workload", icon: Briefcase, page: "Workload", roles: ["submitter", "approver", "admin", "invoicer"] },
     { name: "Quotes", icon: FileText, page: "Quotes", roles: ["submitter", "approver", "admin", "invoicer"] },
+    { name: "Auto-Drafter", icon: Sparkles, page: "AutoDrafter", roles: ["submitter", "approver", "admin", "invoicer"], badge: "beta" },
     { name: "Products & Services", icon: Package, page: "Products", roles: ["submitter", "approver", "admin", "invoicer"] },
     { name: "Material Orders", icon: ShoppingCart, page: "MaterialOrders", roles: ["submitter", "approver", "admin", "invoicer"] },
     { name: "PV Panel RMA Tracker", icon: Recycle, page: "PVPanelRMAs", roles: ["submitter", "approver", "admin", "invoicer"] },
@@ -199,7 +202,15 @@ export default function Layout({ children, currentPageName }) {
       invalidateDataQueries(queryClient);
       recordDataRefresh(payload?.at ? new Date(payload.at) : new Date());
       if (Date.now() - recentManualSettleRef.current > REFRESH_SETTLE_DISPLAY_MS) {
-        toast.success("New quote data synced from Base44.");
+        const changedQuoteNumbers = Array.isArray(payload?.changedQuoteNumbers) ? payload.changedQuoteNumbers : [];
+        if (changedQuoteNumbers.length === 1) {
+          toast.success(`Quote #${changedQuoteNumbers[0]} has been updated`);
+        } else if (changedQuoteNumbers.length > 1) {
+          toast.success(`${changedQuoteNumbers.length} quotes updated`);
+        }
+        // If changedQuoteNumbers is empty (a routine sync with nothing genuinely new),
+        // deliberately show no toast at all - silence is correct here, not a fallback
+        // generic message, since there's nothing worth announcing.
       }
     });
     return unsubscribe;
@@ -723,7 +734,9 @@ export default function Layout({ children, currentPageName }) {
         onOpenChange={setDevConsoleOpen}
         syncEvents={events}
       />
+      <NotificationBell />
       <UpdateStatusBadge />
+
       <RemoteSyncSecretDialog
         open={needsRemoteSyncSecret}
         syncUrl={remoteSyncPromptUrl}

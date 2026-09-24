@@ -354,7 +354,31 @@ function createOutboundSync({ repository, config, logger = console, onAfterWrite
       const results = [];
       for (const entry of eligible) {
         try {
-          results.push(await pushOne(entry));
+          const result = await pushOne(entry);
+          results.push(result);
+          // Notifies "Q-xxxx sent to Base44" ONLY on genuine success (result.error is
+          // falsy) - verified via a standalone test that a failed push or a thrown
+          // exception both correctly do NOT notify. Fire-and-forget (never awaited into
+          // the main flow, errors swallowed) - reuses the EXISTING, already-proven
+          // repository.createCollectionRecord() method rather than a second write path.
+          // A notification-write failure can never block or fail the actual sync itself
+          // (also verified via a standalone test).
+          if (!result.error && entry.quote_number && repository?.createCollectionRecord) {
+            // Stores RAW data (quoteId, quoteNumber, occurredAt) rather than a pre-baked
+            // message string - formatting happens at RENDER time in NotificationBell.jsx
+            // using the VIEWING user's own browser locale, same reasoning as the
+            // importData() notifications above. entry.local_id IS the quote's own id
+            // (confirmed from enqueueOutboundUpdate's real code), matching exactly what
+            // QuoteDetails.jsx reads via ?id=<id> - so this notification can link
+            // straight to the real quote too.
+            repository.createCollectionRecord("appNotifications", {
+              type: "quote_synced",
+              quoteId: entry.local_id,
+              quoteNumber: entry.quote_number,
+              occurredAt: new Date().toISOString(),
+              read: false
+            }).catch(() => {});
+          }
         } catch (error) {
           results.push({ local_id: entry.local_id, error: error.message });
         }

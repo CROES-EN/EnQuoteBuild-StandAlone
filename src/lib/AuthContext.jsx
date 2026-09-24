@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import { recordError } from '@/features/developerConsole/errorLog';
 import { base44 } from '@/api/base44Client';
 import { appParams } from '@/lib/app-params';
 import { getUsers } from '@/api/dataClient';
@@ -179,6 +180,24 @@ export const AuthProvider = ({ children }) => {
     setNeedsLocalLogin(false);
     setPendingPasswordChange(null);
     setPersistedLocalSessionEmail(email);
+    // Announces this user as currently signed in, for the Developer Console's "Who's
+    // Online" tab. Still fire-and-forget and non-blocking (sign-in never waits on or
+    // fails because of this - confirmed via a standalone test covering success,
+    // rejection, a missing bridge entirely, and a malformed return value). The ONE
+    // change here: a failure is now captured via recordError() (the same mechanism
+    // already powering the Developer Console's App Errors tab) instead of vanishing
+    // completely silently - closing a real diagnostic blind spot that made it
+    // impossible to tell "presence failed" from "presence never ran" for a teammate
+    // whose sign-in status wasn't appearing correctly.
+    globalThis.window?.enquoteLocal?.presence?.announce?.({
+      email,
+      name: record?.full_name || record?.name || email
+    })?.catch?.((presenceError) => {
+      recordError({
+        source: "presence.announce",
+        message: presenceError?.message || String(presenceError)
+      });
+    });
     checkRemoteSyncStatus(email);
   }, [checkRemoteSyncStatus]);
 
@@ -316,6 +335,15 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = (shouldRedirect = true) => {
+    // Removes this user from the "Who's Online" presence list, captured BEFORE user
+    // state is cleared below (user?.email would be null after setUser(null)).
+    // Fire-and-forget, same reasoning as activateUser's announce call above - a
+    // sign-out must never be blocked or fail due to presence cleanup.
+    const signedOutEmail = user?.email || null;
+    if (signedOutEmail) {
+      globalThis.window?.enquoteLocal?.presence?.remove?.({ email: signedOutEmail })?.catch?.(() => {});
+    }
+
     if (isLocalDemo) {
       setUser(null);
       setIsAuthenticated(false);

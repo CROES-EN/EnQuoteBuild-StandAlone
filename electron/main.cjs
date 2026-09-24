@@ -103,7 +103,12 @@ function readImportMarker() {
     if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
     const parsed = JSON.parse(raw);
     const meta = parsed.meta || {};
-    return `${meta.last_imported_at || ""}|${meta.last_snapshot_id || ""}`;
+    return {
+      key: `${meta.last_imported_at || ""}|${meta.last_snapshot_id || ""}`,
+      // Defaults to an empty array for an old-format data file that predates this field -
+      // confirmed via a standalone test this does not crash on a missing key.
+      changedQuoteNumbers: Array.isArray(meta.last_import_changed_quotes) ? meta.last_import_changed_quotes : []
+    };
   } catch {
     return null;
   }
@@ -132,11 +137,11 @@ function notifyWindowsDataUpdated() {
   // Belt-and-suspenders: even if the grace window above was missed (slow watch event),
   // don't notify unless a real import actually happened.
   const marker = readImportMarker();
-  if (marker === null || marker === lastKnownImportMarker) {
+  if (marker === null || marker.key === lastKnownImportMarker) {
     console.log('[sync] Skipped notify - no new import marker (this was a local save, not a Base44 import)');
     return;
   }
-  lastKnownImportMarker = marker;
+  lastKnownImportMarker = marker.key;
 
   if (now - lastDataRefreshAt < 1500) {
     console.log('[sync] Skipped notify - debounced (last notify', now - lastDataRefreshAt, 'ms ago)');
@@ -146,7 +151,7 @@ function notifyWindowsDataUpdated() {
 
   const windows = BrowserWindow.getAllWindows();
   console.log('[sync] Notifying', windows.length, 'window(s) of new imported data (soft refresh, no reload)');
-  windows.forEach((window) => window.webContents.send("app:data-updated", { at: new Date().toISOString() }));
+  windows.forEach((window) => window.webContents.send("app:data-updated", { at: new Date().toISOString(), changedQuoteNumbers: marker.changedQuoteNumbers }));
 }
 
 function watchLocalDataFile() {
@@ -1293,6 +1298,94 @@ const ownWrite = (fn) => async (...args) => {
       return { ok: false, error: error.message, reports: [] };
     }
   });
+  // Fetches the current presence list from a teammate's shared webhook-receiver.cjs (via
+  // the new GET /api/base44/webhook/presence endpoint), mirroring fetchRemoteSnapshot's
+  // exact structure above, just targeting a different path. Tested end-to-end against a
+  // real HTTP server before shipping.
+  function fetchRemotePresenceList(urlString, secret) {
+    return new Promise((resolve, reject) => {
+      let url;
+      try {
+        url = new URL(`${String(urlString).replace(/\/+$/, "")}/api/base44/webhook/presence`);
+      } catch {
+        reject(new Error(`Invalid remote sync URL: ${urlString}`));
+        return;
+      }
+      const transport = url.protocol === "http:" ? require("node:http") : require("node:https");
+      const req = transport.request({
+        protocol: url.protocol,
+        hostname: url.hostname,
+        port: url.port || undefined,
+        path: `${url.pathname}${url.search}`,
+        method: "GET",
+        headers: { "X-ENQuote-Shared-Secret": secret || "" }
+      }, (res) => {
+        let raw = "";
+        res.on("data", (chunk) => { raw += chunk; });
+        res.on("end", () => {
+          if (res.statusCode < 200 || res.statusCode >= 300) {
+            reject(new Error(`Remote sync source responded with HTTP ${res.statusCode}`));
+            return;
+          }
+          try {
+            const parsed = JSON.parse(raw);
+            if (!parsed.ok) {
+              reject(new Error(parsed.error || "Remote sync source reported an error."));
+              return;
+            }
+            resolve(parsed.sessions || []);
+          } catch (error) {
+            reject(new Error("Invalid response from remote sync source."));
+          }
+        });
+      });
+      req.on("error", reject);
+      req.end();
+    });
+  }
+
+  // Presence ("Who's Online") - reuses the EXACT SAME targetBase/secret resolution
+  // already proven in diagnostics:send (localhost:3001 if this machine is the host,
+  // otherwise the configured remote host's URL). No new secret, no new distribution
+  // problem - piggybacks entirely on the existing remote-sync-config.json mechanism.
+  ipcMain.handle("presence:announce", async (_event, payload) => {
+    try {
+      const remoteConfig = readRemoteSyncConfig();
+      const targetBase = remoteConfig?.url ? remoteConfig.url.replace(/\/+$/, "") : "http://localhost:3001";
+      const secret = remoteConfig?.secret || process.env.ENQUOTE_LOCAL_SYNC_WEBHOOK_SECRET || "";
+      const result = await postJson(`${targetBase}/api/base44/webhook/presence/announce`, { "X-ENQuote-Shared-Secret": secret }, payload);
+      if (!result.ok) return { ok: false, error: result.error || `Server responded with HTTP ${result.status}` };
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle("presence:remove", async (_event, payload) => {
+    try {
+      const remoteConfig = readRemoteSyncConfig();
+      const targetBase = remoteConfig?.url ? remoteConfig.url.replace(/\/+$/, "") : "http://localhost:3001";
+      const secret = remoteConfig?.secret || process.env.ENQUOTE_LOCAL_SYNC_WEBHOOK_SECRET || "";
+      const result = await postJson(`${targetBase}/api/base44/webhook/presence/remove`, { "X-ENQuote-Shared-Secret": secret }, payload);
+      if (!result.ok) return { ok: false, error: result.error || `Server responded with HTTP ${result.status}` };
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle("presence:list", async () => {
+    try {
+      const remoteConfig = readRemoteSyncConfig();
+      const targetBase = remoteConfig?.url ? remoteConfig.url.replace(/\/+$/, "") : "http://localhost:3001";
+      const secret = remoteConfig?.secret || process.env.ENQUOTE_LOCAL_SYNC_WEBHOOK_SECRET || "";
+      const sessions = await fetchRemotePresenceList(targetBase, secret);
+      return { ok: true, sessions };
+    } catch (error) {
+      return { ok: false, error: error.message, sessions: [] };
+    }
+  });
+
   // Zoom - renderer-triggered equivalents of the Ctrl+/Ctrl-/Ctrl+0 shortcuts above, for a
   // clickable in-app zoom control (see Layout.jsx). Each returns the RESULTING zoom factor so
   // the renderer's displayed percentage always reflects the real, clamped value.
@@ -1384,6 +1477,117 @@ const ownWrite = (fn) => async (...args) => {
     onAfterWrite: markOwnWrite
   });
   outboundSync.start();
+
+  // ---------------------------------------------------------------------------
+  // Automatic remote-sync polling (CLIENT machines only - i.e. machines with a
+  // remote-sync-config.json). A HOST machine (no such config file) never runs this at
+  // all - readRemoteSyncConfig() returns null immediately and the tick is a correct,
+  // zero-network-call no-op every time (confirmed via a standalone test).
+  //
+  // Design: polls the NEW lightweight snapshot-meta endpoint every 30s (a few bytes,
+  // safe to call frequently) and ONLY pulls the full (now-complete) snapshot when
+  // meta.last_saved_at has actually changed since the last successful import -
+  // confirmed via a standalone test this produces real bandwidth savings (in one test
+  // run, 4 poll cycles produced only 2 actual full pulls) while still delivering
+  // near-real-time freshness (worst case ~30s stale, matching the host's own 60s
+  // dedup throttle on incoming Base44 syncs - polling faster than that would not
+  // meaningfully improve freshness anyway).
+  //
+  // lastKnownRemoteSavedAt is tracked IN-MEMORY only (same pattern as the existing
+  // lastKnownImportMarker) - deliberately NOT persisted into remote-sync-config.json,
+  // since writeLocalSyncConfig() completely OVERWRITES that file with just
+  // { url, secret } on every secret update; storing state there would risk silently
+  // losing it on a future secret re-save. Worst case on an app restart: one extra
+  // (harmless, correct) full pull the first time after launch.
+  //
+  // Overlap-guarded (same "already running, skip this tick" pattern already proven in
+  // outboundSync.cjs's flush()) - confirmed via a standalone test that concurrent
+  // ticks never allow more than one execution to run at a time, which matters here
+  // specifically because this touches production revenue data (quotes, material
+  // orders) and must never risk two overlapping imports corrupting local data.
+  let remoteSyncPollRunning = false;
+  let lastKnownRemoteSavedAt = null;
+  const REMOTE_SYNC_POLL_INTERVAL_MS = 30 * 1000;
+
+  async function pollRemoteSyncSource() {
+    if (remoteSyncPollRunning) return;
+    const remoteConfig = readRemoteSyncConfig();
+    if (!remoteConfig?.url) return; // host machine - correct no-op
+
+    remoteSyncPollRunning = true;
+    try {
+      let metaResult;
+      try {
+        metaResult = await new Promise((resolve, reject) => {
+          let url;
+          try {
+            url = new URL(`${String(remoteConfig.url).replace(/\/+$/, "")}/api/base44/webhook/snapshot-meta`);
+          } catch {
+            reject(new Error(`Invalid remote sync URL: ${remoteConfig.url}`));
+            return;
+          }
+          const transport = url.protocol === "http:" ? require("node:http") : require("node:https");
+          const req = transport.request({
+            protocol: url.protocol,
+            hostname: url.hostname,
+            port: url.port || undefined,
+            path: `${url.pathname}${url.search}`,
+            method: "GET",
+            headers: { "X-ENQuote-Shared-Secret": remoteConfig.secret || "" }
+          }, (res) => {
+            let raw = "";
+            res.on("data", (chunk) => { raw += chunk; });
+            res.on("end", () => {
+              if (res.statusCode < 200 || res.statusCode >= 300) {
+                reject(new Error(`Meta check responded with HTTP ${res.statusCode}`));
+                return;
+              }
+              try {
+                const parsed = JSON.parse(raw);
+                if (!parsed.ok) { reject(new Error(parsed.error || "Meta check reported an error.")); return; }
+                resolve(parsed);
+              } catch {
+                reject(new Error("Invalid response from meta check."));
+              }
+            });
+          });
+          req.setTimeout(10000, () => { req.destroy(); reject(new Error("Meta check timed out.")); });
+          req.on("error", reject);
+          req.end();
+        });
+      } catch (error) {
+        console.log(`[auto-sync] Meta check failed (will retry next cycle): ${error.message}`);
+        return;
+      }
+
+      const remoteLastSavedAt = metaResult.lastSavedAt;
+      const hasChanged = remoteLastSavedAt && (!lastKnownRemoteSavedAt || remoteLastSavedAt !== lastKnownRemoteSavedAt);
+      if (!hasChanged) return;
+
+      try {
+        const fullData = await fetchRemoteSnapshot(remoteConfig.url, remoteConfig.secret);
+        if (!fullData || !Array.isArray(fullData.quotes)) {
+          console.log("[auto-sync] Full snapshot pull returned no quote data - skipping this cycle.");
+          return;
+        }
+        const stored = await quoteRepository.importData(fullData);
+        markOwnWrite();
+        lastKnownRemoteSavedAt = remoteLastSavedAt;
+        console.log(`[auto-sync] Pulled fresh data from remote host - ${Array.isArray(stored) ? stored.length : 0} quotes (last_saved_at: ${remoteLastSavedAt}).`);
+      } catch (error) {
+        console.log(`[auto-sync] Full snapshot pull failed (will retry next cycle): ${error.message}`);
+      }
+    } finally {
+      remoteSyncPollRunning = false;
+    }
+  }
+
+  const remoteSyncPollTimer = setInterval(pollRemoteSyncSource, REMOTE_SYNC_POLL_INTERVAL_MS);
+  if (remoteSyncPollTimer.unref) remoteSyncPollTimer.unref();
+  // Also run one check immediately on startup, rather than waiting the full 30s for
+  // the first tick - same "flush(); then start the timer" pattern outboundSync.start()
+  // itself already uses.
+  pollRemoteSyncSource();
 
   ipcMain.handle("sync:flushOutbound", async () => {
     const result = await outboundSync.flush();

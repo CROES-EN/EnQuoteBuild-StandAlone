@@ -66,6 +66,11 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
     sendReport: (senderEmail) => invoke("diagnostics:send", senderEmail),
     listReports: () => invoke("diagnostics:listReports")
   },
+    presence: {
+    announce: (payload) => invoke("presence:announce", payload),
+    remove: (payload) => invoke("presence:remove", payload),
+    list: () => invoke("presence:list")
+  },
   sync: {
     flushOutbound: () => invoke("sync:flushOutbound"),
     outboundStatus: () => invoke("sync:outboundStatus")

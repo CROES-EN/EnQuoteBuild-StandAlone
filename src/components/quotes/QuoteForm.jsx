@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,8 +42,20 @@ export default function QuoteForm({ quote, products = [], onSave, onSaveDraft, o
     valid_until: ""
   });
 
+  // FIX (confirmed real bug: editing a quote could get silently reset mid-edit, "almost
+  // like it reimported or refreshed"). ROOT CAUSE: this effect previously re-ran and
+  // OVERWROTE formData every time the `quote` prop's IDENTITY changed -- which happens on
+  // ANY background refetch of the underlying useQuery in EditQuote.jsx (e.g. on window
+  // refocus, or after any invalidateQueries(["quotes"]) call elsewhere in the app), not
+  // just on the true initial load. hasInitializedForQuoteId ensures formData is populated
+  // from `quote` exactly ONCE per quote.id -- a background refetch producing a new
+  // `quote` OBJECT REFERENCE (but the SAME id) no longer touches formData at all, so
+  // in-progress edits are preserved. Navigating to a genuinely DIFFERENT quote (a new
+  // quote.id) still correctly re-initializes the form, since the ref is keyed by id.
+  const hasInitializedForQuoteId = useRef(null);
   useEffect(() => {
-    if (quote) {
+    if (quote && hasInitializedForQuoteId.current !== quote.id) {
+      hasInitializedForQuoteId.current = quote.id;
       setFormData({
         site_id: quote.site_id || "",
         quote_requester: quote.quote_requester || "",
@@ -453,7 +465,7 @@ export default function QuoteForm({ quote, products = [], onSave, onSaveDraft, o
             </div>
             {laborCharge > 0 && (
               <div className="flex justify-between text-muted-foreground">
-                <span>{isFlat ? "Labor (Flat Fee)" : `Labor (${formData.fst_count} FSTs Ã— ${formData.labor_hours} hrs @ $125)`}</span>
+                <span>{isFlat ? "Labor (Flat Fee)" : `Labor (${formData.fst_count} FSTs × ${formData.labor_hours} hrs @ $125)`}</span>
                 <span>${laborCharge.toFixed(2)}</span>
               </div>
             )}

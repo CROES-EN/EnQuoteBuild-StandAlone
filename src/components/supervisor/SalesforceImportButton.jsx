@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Pencil } from "lucide-react";
-import { getSalesforceReportUrl, setSalesforceReportUrl } from "@/features/supervisorDashboard/workloadSalesforceSettings";
+import { getSalesforceReportUrl as getWorkloadSalesforceReportUrl, setSalesforceReportUrl as setWorkloadSalesforceReportUrl } from "@/features/supervisorDashboard/workloadSalesforceSettings";
 import { readWorkbookFromBytes, guessHeaderRowIndex, buildColumnOptions } from "@/features/supervisorDashboard/reportParsing";
 import { saveReportTableWithRetry } from "@/features/supervisorDashboard/saveReportTableWithRetry";
 import { validateImport } from "@/features/supervisorDashboard/importValidation";
@@ -45,7 +45,13 @@ function base64ToBytes(base64) {
  * The report URL is saved once (first use) and reused afterward - "Change Report URL" lets the
  * user update it later if their report link ever changes.
  */
-export default function SalesforceImportButton({ reportType, reportLabel, onImported }) {
+export default function SalesforceImportButton({
+  reportType,
+  reportLabel,
+  onImported,
+  getSavedUrl = getWorkloadSalesforceReportUrl,
+  setSavedUrl = setWorkloadSalesforceReportUrl
+}) {
   const [urlDialogOpen, setUrlDialogOpen] = useState(false);
   const [urlDraft, setUrlDraft] = useState("");
   const [importing, setImporting] = useState(false);
@@ -105,7 +111,7 @@ export default function SalesforceImportButton({ reportType, reportLabel, onImpo
   }, [reportType, reportLabel]);
 
   function handleClick() {
-    const savedUrl = getSalesforceReportUrl();
+    const savedUrl = getSavedUrl();
     if (!savedUrl) {
       setUrlDraft("");
       setUrlDialogOpen(true);
@@ -117,13 +123,13 @@ export default function SalesforceImportButton({ reportType, reportLabel, onImpo
   function handleSaveUrl() {
     const trimmed = urlDraft.trim();
     if (!trimmed) return;
-    setSalesforceReportUrl(trimmed);
+    setSavedUrl(trimmed);
     setUrlDialogOpen(false);
     bridge.openReport(trimmed);
   }
 
   function handleChangeUrl() {
-    setUrlDraft(getSalesforceReportUrl());
+    setUrlDraft(getSavedUrl());
     setUrlDialogOpen(true);
   }
 
@@ -147,7 +153,7 @@ export default function SalesforceImportButton({ reportType, reportLabel, onImpo
           <SalesforceCloudIcon className="h-4 w-4" />
           {importing ? "Importing..." : "Salesforce"}
         </Button>
-        {getSalesforceReportUrl() && (
+        {getSavedUrl() && (
           <Button
             size="icon"
             variant="outline"

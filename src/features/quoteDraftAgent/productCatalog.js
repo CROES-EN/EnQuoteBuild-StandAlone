@@ -1,3 +1,15 @@
+// productCatalog.js
+//
+// == "Legacy Catalog" ==
+// This is EnQuote's original, priced product catalog -- the SINGLE source of truth for
+// matching and pricing every quote line item (see draftEngine.js's matchLineItem()).
+// Nothing in this file's data or behavior has changed as part of introducing the new
+// Compatibility Matrix system (see src/features/compatibility/). The two are
+// deliberately SEPARATE, unreconciled catalogs with no shared key -- this file keeps
+// driving pricing exactly as before; the Compatibility Matrix answers a different
+// question (is this equipment pairing verified-compatible), using its own independently-
+// sourced SKU data. See compatibility_and_schema_design.md for the full rationale.
+//
 ﻿export const PRODUCT_CATALOG = [
   { name: "60 Amp Brass 1-Time Fuse Cartridges (2-Pack)", category: "Breakers", unit_price: 8.55, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
   { name: "FRN Series 40 Amp Brass Time-Delay Cartridge Fuses (2-Pack)", category: "Breakers", unit_price: 27.97, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
@@ -30,26 +42,26 @@
   { name: "Engage Replacement Cable Adapter - Single (ETD With Field connectors Included)", category: "Enphase Products", unit_price: 290.0, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
   { name: "Consumption Clamp Current Transformer (CT-200-CLAMP)", category: "Enphase Products", unit_price: 34.0, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
   { name: "IQ Battery 3 Cover & Mounting Bracket", category: "Enphase Products", unit_price: 156.0, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
-  { name: "IQ Combiner 5 HDK", category: "Enphase Products", unit_price: 733.5, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
+  { name: "IQ Combiner 5 HDK", category: "Enphase Products", unit_price: 733.5, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589", sku: "IQ-COMBINER-5" },
   { name: "Replacement IQ Gateway PCB for IQ Combiner 4", category: "Enphase Products", unit_price: 419.5, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
-  { name: "PCT - Production Current Transformer (Meter)", category: "Enphase Products", unit_price: 30.84, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
+  { name: "PCT - Production Current Transformer (Meter)", category: "Enphase Products", unit_price: 30.84, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589", sku: "CT-PRODUCTION" },
   { name: "IQ Field Wireable (socket) Ea. SKU: Q-CONN-10F", category: "Enphase Products", unit_price: 12.9, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
   { name: "IQ Field Wireable (plug) Ea. SKU: Q-CONN-10M", category: "Enphase Products", unit_price: 12.9, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
   { name: "IQ Battery 3 (R1)", category: "Enphase Products", unit_price: 1499.0, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
-  { name: "Enphase Control Cable 1 Foot", category: "Enphase Products", unit_price: 1.35, unit: "ft", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
-  { name: "CCT - Consumption Current Transformer (Meter)", category: "Enphase Products", unit_price: 56.54, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
+  { name: "Enphase Control Cable 1 Foot", category: "Enphase Products", unit_price: 1.35, unit: "ft", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589", sku: "CTRL-SC3-NA-01" },
+  { name: "CCT - Consumption Current Transformer (Meter)", category: "Enphase Products", unit_price: 56.54, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589", sku: "CT-CONSUMPTION" },
   { name: "IQ Cable (Q-12-RAW-300)", category: "Enphase Products", unit_price: 1.43, unit: "ft", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
   { name: "IQ Field Wireable (socket) 10 pack SKU: Q-CONN-10F", category: "Enphase Products", unit_price: 129.0, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
   { name: "IQ Field Wireable (plug) 10 pack SKU:Q-CONN-10M", category: "Enphase Products", unit_price: 129.0, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
-  { name: "IQ Load Controller", category: "Enphase Products", unit_price: 431.0, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
+  { name: "IQ Load Controller", category: "Enphase Products", unit_price: 431.0, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589", sku: "IQ-LOAD-CONTROLLER" },
   { name: "Enphase Connector Clip (pack of 12)", category: "Enphase Products", unit_price: 36.0, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
   { name: "Engage Cable Clips (pack of 100)", category: "Enphase Products", unit_price: 44.0, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
   { name: "IQ Terminator Cap - Single cap", category: "Enphase Products", unit_price: 18.3, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
-  { name: "IQ7PD-72 Microinverter", category: "Enphase Products", unit_price: 79.0, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
+  { name: "IQ7PD-72 Microinverter", category: "Enphase Products", unit_price: 79.0, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589", sku: "IQ7PD-72" },
   { name: "Mobile Connect CELLMODEM-07", category: "Enphase Products", unit_price: 499.0, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
   { name: "IQ Cable Single Drop (portrait)", category: "Enphase Products", unit_price: 18.0, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
   { name: "IQ Relay Kit", category: "Enphase Products", unit_price: 471.5, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
-  { name: "IQ Sealing Cap (Q-SEAL-10) (10pk)", category: "Enphase Products", unit_price: 33.5, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
+  { name: "IQ Sealing Cap (Q-SEAL-10) (10pk)", category: "Enphase Products", unit_price: 33.5, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589", sku: "IQ-SEALING-CAP" },
   { name: "IQ Field Wireable (socket/female) (single)", category: "Enphase Products", unit_price: 12.9, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
   { name: "IQ Field Wireable (plug/male) (single)", category: "Enphase Products", unit_price: 12.9, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
   { name: "Termination Cap (Q-TERM-10)", category: "Enphase Products", unit_price: 183.0, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
@@ -57,24 +69,24 @@
   { name: "IQ Field Wireable (plug/male) 10-pack (Q-CONN-10M)", category: "Enphase Products", unit_price: 129.0, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
   { name: "IQ-Cable per foot", category: "Enphase Products", unit_price: 1.46, unit: "ft", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
   { name: "Enphase Q Cable Landscape (Q-12-17-240)", category: "Enphase Products", unit_price: 654.5, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
-  { name: "Enphase IQ Battery 5P", category: "Enphase Products", unit_price: 3640.25, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
+  { name: "Enphase IQ Battery 5P", category: "Enphase Products", unit_price: 3640.25, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589", sku: "IQ-BATTERY-5P" },
   { name: "Enphase Envoy Gateway", category: "Enphase Products", unit_price: 485.0, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
-  { name: "Enphase IQ Battery 10T", category: "Enphase Products", unit_price: 5097.0, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
+  { name: "Enphase IQ Battery 10T", category: "Enphase Products", unit_price: 5097.0, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589", sku: "IQ-BATTERY-10T" },
   { name: "Enphase IQ8+ Microinverter", category: "Enphase Products", unit_price: 171.0, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
-  { name: "Enphase IQ8M Microinverter", category: "Enphase Products", unit_price: 214.99, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
+  { name: "Enphase IQ8M Microinverter", category: "Enphase Products", unit_price: 214.99, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589", sku: "IQ8M" },
   { name: "Enphase IQ8 Microinverter (60-cell)", category: "Enphase Products", unit_price: 177.14, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
   { name: "Enphase DC Adapter Cable (EN4 to MC4)", category: "Enphase Products", unit_price: 93.15, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
   { name: "Enphase Q Terminator Cap", category: "Enphase Products", unit_price: 5.5, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
   { name: "Portrait IQ Cable Single drop (Q-12-10-240)", category: "Enphase Products", unit_price: 18.0, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
   { name: "Enphase Consumption Current Transformers", category: "Enphase Products", unit_price: 51.4, unit: "pair", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
-  { name: "Enphase IQ EV Charger 2 (9.6 kW)", category: "Enphase Products", unit_price: 999.0, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
+  { name: "Enphase IQ EV Charger 2 (9.6 kW)", category: "Enphase Products", unit_price: 999.0, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589", sku: "IQ-EV-CHARGER-2" },
   { name: "Enphase IQ Portable Panel", category: "Enphase Products", unit_price: 369.0, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
   { name: "Enphase IQ PowerPack 1500", category: "Enphase Products", unit_price: 999.0, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
   { name: "Landscape IQ Cable Single Drop (Q-12-17-240)", category: "Enphase Products", unit_price: 21.0, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
-  { name: "Enphase IQ EV Charger 2 (11.5 kW)", category: "Enphase Products", unit_price: 1124.0, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
-  { name: "Enphase Control Cable", category: "Enphase Products", unit_price: 2.79, unit: "foot", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
+  { name: "Enphase IQ EV Charger 2 (11.5 kW)", category: "Enphase Products", unit_price: 1124.0, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589", sku: "IQ-EV-CHARGER-2" },
+  { name: "Enphase Control Cable", category: "Enphase Products", unit_price: 2.79, unit: "foot", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589", sku: "CTRL-SC3-NA-01" },
   { name: "Enphase Solar Extension Cables (10m)", category: "Enphase Products", unit_price: 95.0, unit: "set", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
-  { name: "Enphase IQ Combiner 6C", category: "Enphase Products", unit_price: 1754.0, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
+  { name: "Enphase IQ Combiner 6C", category: "Enphase Products", unit_price: 1754.0, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589", sku: "X-IQ-AM1-240-6C" },
   { name: "Eaton 30 Amp Non-Fusible Safety Switch (DG221URB)", category: "Junction Box", unit_price: 108.61, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
   { name: "Soladeck-Type Roof Junction Boxes", category: "Junction Box", unit_price: 42.14, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
   { name: "Cantex 6 in. x 6 in. x 4 in. Junction Box", category: "Junction Box", unit_price: 20.9, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
@@ -90,12 +102,12 @@
   { name: "4x4 Metal Box Cover (Blank)", category: "Junction Box", unit_price: 0.95, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
   { name: "PVC Junction Box (6x6x4)", category: "Junction Box", unit_price: 12.5, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
   { name: "Q.PEAK DUO BLK", category: "Microinverters", unit_price: 286.05, unit: "each", tax_category: "MICROINVERTER", tax_code: "TTR146714" },
-  { name: "Enphase IQ8M Microinverter", category: "Microinverters", unit_price: 218.21, unit: "each", tax_category: "MICROINVERTER", tax_code: "TTR146714" },
+  { name: "Enphase IQ8M Microinverter", category: "Microinverters", unit_price: 218.21, unit: "each", tax_category: "MICROINVERTER", tax_code: "TTR146714", sku: "IQ8M" },
   { name: "Enphase IQ8+ Microinverter", category: "Microinverters", unit_price: 189.0, unit: "each", tax_category: "MICROINVERTER", tax_code: "TTR146714" },
   { name: "Enphase IQ8A Microinverter", category: "Microinverters", unit_price: 221.78, unit: "each", tax_category: "MICROINVERTER", tax_code: "TTR146714" },
-  { name: "Enphase M215 Microinverter", category: "Microinverters", unit_price: 181.0, unit: "each", tax_category: "MICROINVERTER", tax_code: "TTR146714" },
-  { name: "Enphase IQ7A Microinverter", category: "Microinverters", unit_price: 192.0, unit: "each", tax_category: "MICROINVERTER", tax_code: "TTR146714" },
-  { name: "Enphase IQ8X Microinverter", category: "Microinverters", unit_price: 228.5, unit: "each", tax_category: "MICROINVERTER", tax_code: "TTR146714" },
+  { name: "Enphase M215 Microinverter", category: "Microinverters", unit_price: 181.0, unit: "each", tax_category: "MICROINVERTER", tax_code: "TTR146714", sku: "M215" },
+  { name: "Enphase IQ7A Microinverter", category: "Microinverters", unit_price: 192.0, unit: "each", tax_category: "MICROINVERTER", tax_code: "TTR146714", sku: "IQ7A-72-2-US" },
+  { name: "Enphase IQ8X Microinverter", category: "Microinverters", unit_price: 228.5, unit: "each", tax_category: "MICROINVERTER", tax_code: "TTR146714", sku: "IQ8X-80-M-US" },
   { name: "Enphase IQ7+ Microinverter", category: "Microinverters", unit_price: 176.96, unit: "each", tax_category: "MICROINVERTER", tax_code: "TTR146714" },
   { name: "Enphase IQ8H-240 Microinverter", category: "Microinverters", unit_price: 245.88, unit: "each", tax_category: "MICROINVERTER", tax_code: "TTR146714" },
   { name: "8pcs SunPower 518636 End Clamp, Wedge, InvisiMount, Two Boxes", category: "Mounting / Racking", unit_price: 40.0, unit: "each", tax_category: "SOLAR_ACCESSORY", tax_code: "TTR146718" },
@@ -164,7 +176,7 @@
   { name: "60 Amp 240-Volt 2-Pole Fused Outdoor General Duty Safety Switch", category: "Wiring & Cable Management", unit_price: 190.72, unit: "each", tax_category: "SOLAR_CABLES_CONNECTORS", tax_code: "TTR146716" },
   { name: "1/2\" Heat Shrink Tubing", category: "Wiring & Cable Management", unit_price: 2.99, unit: "each", tax_category: "SOLAR_CABLES_CONNECTORS", tax_code: "TTR146716" },
   { name: "3/8\" Heat Shrink Tubing", category: "Wiring & Cable Management", unit_price: 2.99, unit: "each", tax_category: "SOLAR_CABLES_CONNECTORS", tax_code: "TTR146716" },
-  { name: "IQ Sealing Cap (Q-BA-CAP-10) Ea", category: "Wiring & Cable Management", unit_price: 3.35, unit: "each", tax_category: "SOLAR_CABLES_CONNECTORS", tax_code: "TTR146716" },
+  { name: "IQ Sealing Cap (Q-BA-CAP-10) Ea", category: "Wiring & Cable Management", unit_price: 3.35, unit: "each", tax_category: "SOLAR_CABLES_CONNECTORS", tax_code: "TTR146716", sku: "IQ-SEALING-CAP" },
   { name: "3M Electrical Tape - 60 ft", category: "Wiring & Cable Management", unit_price: 2.98, unit: "each", tax_category: "SOLAR_CABLES_CONNECTORS", tax_code: "TTR146716" },
   { name: "1/4 in. Coaxial Cable Clamp RG-6 (20-Pack)", category: "Wiring & Cable Management", unit_price: 5.23, unit: "each", tax_category: "SOLAR_CABLES_CONNECTORS", tax_code: "TTR146716" },
   { name: "Water Proof/Weather Proof Wire Nuts - 15 pk", category: "Wiring & Cable Management", unit_price: 27.22, unit: "each", tax_category: "SOLAR_CABLES_CONNECTORS", tax_code: "TTR146716" },
@@ -199,3 +211,8 @@
   { name: "POLARIS Multitap Connector: 2 Port, Double-Sided Entry, 14 AWG - 4 AWG Wire Size, Black", category: "Wiring & Cable Management", unit_price: 24.39, unit: "each", tax_category: "SOLAR_CABLES_CONNECTORS", tax_code: "TTR146716" }
 ];
 
+
+
+// Alias only -- does NOT replace or modify PRODUCT_CATALOG above. Exists so future code
+// can refer to "the Legacy Catalog" by name; nothing currently imports this.
+export const LEGACY_PRODUCT_CATALOG = PRODUCT_CATALOG;

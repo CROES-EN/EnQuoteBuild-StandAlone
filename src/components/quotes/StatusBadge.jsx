@@ -1,4 +1,4 @@
-﻿import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 const statusConfig = {
   draft_without_internal: {
@@ -84,6 +84,14 @@ const statusConfig = {
     text: "text-amber-800",
     dot: "bg-amber-500",
     label: "On Hold (Boneyard)"
+  },
+  // Used ONLY by Auto-Drafter (src/components/autoDrafter/AutoDrafterCaseTile.jsx) for
+  // AI-generated drafts saved via autoDrafterDraftsStore.js. Never a real quote status.
+  ai_generated_quote_needs_review: {
+    bg: "bg-violet-50",
+    text: "text-violet-700",
+    dot: "bg-violet-500",
+    label: "AI Generated Quote - Needs Review"
   }
 };
 
