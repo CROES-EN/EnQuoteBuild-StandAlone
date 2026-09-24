@@ -150,6 +150,88 @@ function verifyPassword(password, salt, expectedHash) {
   return hash.length === expected.length && crypto.timingSafeEqual(hash, expected);
 }
 
+// Generates a fresh, cryptographically random one-time password. Used any time a user
+// needs a new temporary credential - both first-time account setup and admin-triggered
+// resets. Never reused, never predictable, never shared across accounts.
+function generateTempPassword() {
+  // crypto.randomBytes(9) -> 9 cryptographically secure random bytes.
+  // .toString("base64url") -> readable, URL-safe text (no spaces/quotes/symbols).
+  // .slice(0, 12) -> short enough to read/type, still strong enough for a one-time password.
+  return crypto.randomBytes(9).toString("base64url").slice(0, 12);
+}
+
+// Checks whether an email is marked "admin" in the locally-synced Base44 users
+// collection (data.users, kept fresh by the existing sync process) - the same app_role
+// field Base44 itself uses to grant admin access. No network call happens here; this
+// only reads whatever was most recently synced to disk on this machine. Fails CLOSED:
+// any lookup miss or missing/stale sync data returns false, never true.
+function isLocalAdmin(data, email) {
+  const key = normalizeEmail(email);
+  if (!key) return false;
+  const users = Array.isArray(data.users) ? data.users : [];
+  const match = users.find(user => normalizeEmail(user?.email) === key);
+  return !!match && match.app_role === "admin";
+}
+
+// Accounts intentionally excluded from the one-time "Enquote1" migration below, per
+// explicit request. Everyone else still sitting on the old shared temporary password
+// gets force-reset to a unique random one.
+const MIGRATION_EXEMPT_EMAILS = new Set([
+  "smosley@enphaseenergy.com",
+  "shawkins@enphaseenergy.com",
+  "croeschberger@enphaseenergy.com"
+]);
+
+// One-time migration: any local credential still flagged mustChangePassword === true
+// (provisioned with the old shared DEFAULT_TEMP_PASSWORD, never replaced) gets a fresh,
+// unique random temporary password instead. Mutates `data` in place and returns the
+// list of { email, tempPassword } that changed, so the caller can decide how to
+// persist/disclose them. Does NOT call write() itself - that is the caller's job.
+function migrateSharedTempPasswords(data) {
+  data.userCredentials = data.userCredentials || {};
+  data.passwordResetAudit = Array.isArray(data.passwordResetAudit) ? data.passwordResetAudit : [];
+
+  // Returns true if this account's most recent audit entry shows a REAL admin
+  // (not the automatic migration itself) already reset it - meaning this credential
+  // was deliberately, individually issued and must never be silently rotated again,
+  // even during the one-time sweep below. Entries are appended chronologically, so
+  // the last matching one is the most recent.
+  function wasIndividuallyProvisioned(email) {
+    for (let i = data.passwordResetAudit.length - 1; i >= 0; i--) {
+      if (data.passwordResetAudit[i].targetEmail === email) {
+        return data.passwordResetAudit[i].resetBy !== "system-migration";
+      }
+    }
+    return false;
+  }
+
+  const migratedAccounts = [];
+
+  for (const [email, credential] of Object.entries(data.userCredentials)) {
+    if (!credential?.mustChangePassword) continue;
+    if (MIGRATION_EXEMPT_EMAILS.has(email)) continue;
+    if (wasIndividuallyProvisioned(email)) continue;
+
+    const tempPassword = generateTempPassword();
+    data.userCredentials[email] = {
+      ...hashPassword(tempPassword),
+      mustChangePassword: true,
+      updatedAt: new Date().toISOString()
+    };
+
+    data.passwordResetAudit.push({
+      id: makeId("pwreset"),
+      targetEmail: email,
+      resetBy: "system-migration",
+      at: new Date().toISOString()
+    });
+
+    migratedAccounts.push({ email, tempPassword });
+  }
+
+  return migratedAccounts;
+}
+
 const seedQuotes = [
   { id: "demo-q-1001", quote_number: "DEMO-1001", site_id: "DEMO-SITE-01", case_number: "DEMO-CASE-01", status: "draft_without_internal", total: 1240, materials_total: 620, labor_total: 480, travel_total: 140, sales_tax: 0, created_by: "demo.coordinator.one", created_date: "2026-08-20T14:00:00.000Z", updated_date: "2026-08-20T14:00:00.000Z", is_current_version: true, version_number: 1, scope_of_work: "Replace damaged disconnect enclosure", homeowner_summary: "Repair solar equipment enclosure" },
   { id: "demo-q-1002", quote_number: "DEMO-1002", site_id: "DEMO-SITE-02", case_number: "DEMO-CASE-02", status: "submitted", total: 2160, materials_total: 910, labor_total: 980, travel_total: 270, sales_tax: 0, created_by: "demo.coordinator.two", created_date: "2026-08-18T14:00:00.000Z", updated_date: "2026-08-19T14:00:00.000Z", is_current_version: true, version_number: 1, scope_of_work: "Replace rooftop wiring and conduit", homeowner_summary: "Repair rooftop wiring" },
@@ -353,7 +435,27 @@ function repositoryFor(userDataPath) {
       parsed.outboundQueue = Array.isArray(parsed.outboundQueue) ? parsed.outboundQueue : [];
       parsed.outboundDismissalQueue = Array.isArray(parsed.outboundDismissalQueue) ? parsed.outboundDismissalQueue : [];
       parsed.outboundMentionQueue = Array.isArray(parsed.outboundMentionQueue) ? parsed.outboundMentionQueue : [];
-      collectionNames.forEach(name => { parsed[name] = parsed[name] || structuredClone(collectionDefaults[name]); });
+                  collectionNames.forEach(name => { parsed[name] = parsed[name] || structuredClone(collectionDefaults[name]); });
+
+      // BUGFIX: this sweep must run AT MOST ONCE, EVER - not on every read() (which
+      // happens on nearly every IPC action). Without this completion flag, any account
+      // sitting at mustChangePassword: true - including one an admin just deliberately
+      // reset via resetUserPassword() - was being silently re-rotated to a brand-new
+      // random password moments later, before anyone could actually use the one they
+      // were shown. wasIndividuallyProvisioned() inside migrateSharedTempPasswords()
+      // is a second, independent layer of protection against the same class of bug.
+      if (!parsed.meta.sharedPasswordMigrationCompleted) {
+        const migratedAccounts = migrateSharedTempPasswords(parsed);
+        parsed.meta.sharedPasswordMigrationCompleted = true;
+        if (migratedAccounts.length > 0) {
+          parsed.meta.pendingMigrationDisclosures = [
+            ...(Array.isArray(parsed.meta.pendingMigrationDisclosures) ? parsed.meta.pendingMigrationDisclosures : []),
+            ...migratedAccounts
+          ];
+        }
+        await write(parsed);
+      }
+
       return parsed;
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
@@ -1075,20 +1177,12 @@ function repositoryFor(userDataPath) {
       const data = await read();
       data.userCredentials = data.userCredentials || {};
 
+            // SECURITY FIX: accounts are no longer auto-provisioned with a shared temporary
+      // password on first login. An admin must explicitly set the account's first
+      // temporary password via resetUserPassword() below - first-time setup and
+      // password reset are now the same operation.
       if (!data.userCredentials[key]) {
-        const isKnownAccount =
-          KNOWN_ENQUOTE_USERS.some(candidate => normalizeEmail(candidate.email) === key) ||
-          (data.users || []).some(candidate => normalizeEmail(candidate.email) === key);
-        if (!isKnownAccount) {
-          throw new Error("This email isn't registered for EnQuote access yet. Contact an admin to be added.");
-        }
-
-        data.userCredentials[key] = {
-          ...hashPassword(DEFAULT_TEMP_PASSWORD),
-          mustChangePassword: true,
-          updatedAt: new Date().toISOString()
-        };
-        await write(data);
+        throw new Error("Your account hasn't been set up on this PC yet. Ask an admin to set your temporary password.");
       }
 
       const credential = data.userCredentials[key];
@@ -1115,15 +1209,72 @@ function repositoryFor(userDataPath) {
         throw new Error("Current password is incorrect.");
       }
 
-      data.userCredentials[key] = {
+            data.userCredentials[key] = {
         ...hashPassword(newPassword),
         mustChangePassword: false,
         updatedAt: new Date().toISOString()
       };
       await write(data);
       return { email: key };
+    },
+    // Resets (or performs first-time provisioning of) a user's local password. Only
+    // callable by someone whose LOCAL, already-synced record has app_role "admin" -
+    // re-checked here even though the UI should already hide this action from
+    // non-admins, since a UI-only check can never be trusted alone (defense in depth).
+    async resetUserPassword(actingAdminEmail, targetEmail) {
+      const data = await read();
+
+      if (!isLocalAdmin(data, actingAdminEmail)) {
+        throw new Error("Only admins can reset a user's password.");
+      }
+
+      const targetKey = normalizeEmail(targetEmail);
+      if (!targetKey) throw new Error("No user specified.");
+
+      const isKnownAccount =
+        KNOWN_ENQUOTE_USERS.some(candidate => normalizeEmail(candidate.email) === targetKey) ||
+        (data.users || []).some(candidate => normalizeEmail(candidate.email) === targetKey);
+      if (!isKnownAccount) {
+        throw new Error("This email isn't registered for EnQuote access.");
+      }
+
+      const tempPassword = generateTempPassword();
+      data.userCredentials = data.userCredentials || {};
+      data.userCredentials[targetKey] = {
+        ...hashPassword(tempPassword),
+        mustChangePassword: true,
+        updatedAt: new Date().toISOString()
+      };
+
+      // Local audit trail: records WHO reset WHOSE password and WHEN. Never records
+      // the password itself, in any form.
+      data.passwordResetAudit = Array.isArray(data.passwordResetAudit) ? data.passwordResetAudit : [];
+      data.passwordResetAudit.push({
+        id: makeId("pwreset"),
+        targetEmail: targetKey,
+        resetBy: normalizeEmail(actingAdminEmail),
+        at: new Date().toISOString()
+      });
+
+      await write(data);
+
+      // Returned exactly once, held in memory only by the caller - never written to
+      // disk in plaintext, never logged, never returned again after this call.
+      return { email: targetKey, tempPassword };
     }
   };
 }
 
-module.exports = { repositoryFor, fileName, DATA_VERSION, normalizeIncomingSnapshot, mergeRecordsById };
+module.exports = {
+  repositoryFor,
+  fileName,
+  DATA_VERSION,
+  normalizeIncomingSnapshot,
+  mergeRecordsById,
+  generateTempPassword,
+  isLocalAdmin,
+  migrateSharedTempPasswords,
+  MIGRATION_EXEMPT_EMAILS,
+  hashPassword,
+  verifyPassword
+};

@@ -9,6 +9,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, AlertOctagon, Info, RefreshCw, Trash2, Users } from "lucide-react";
 import { listErrors, clearErrors } from "@/features/developerConsole/errorLog";
+import { AdminResetPasswordButton } from "@/features/developerConsole/AdminPasswordReset.jsx";
+import { KeyRound } from "lucide-react";
 
 const REPORT_SEVERITY_ORDER = { critical: 0, known_issue: 1, needs_investigation: 2, warning: 3, info: 4 };
 const REPORT_SEVERITY_LABEL = {
@@ -61,24 +63,43 @@ function SeverityBadge({ severity }) {
  *      something this component works around silently - flagged here so it isn't
  *      forgotten if `report.analysis` is ever fixed and someone wants to switch to it later.
  */
-export default function DeveloperConsole({ open, onOpenChange, syncEvents = [] }) {
+export default function DeveloperConsole({
+  open,
+  onOpenChange,
+  syncEvents = [],
+  // Who is currently signed in, and whether they're an admin - passed down
+  // from wherever <DeveloperConsole /> is rendered (per this file's own
+  // comments, that's Layout.jsx). Defaults keep this component safe even if
+  // the caller hasn't been updated yet: the Manage Users tab simply won't
+  // show up until isCurrentUserAdmin is actually wired to a real value.
+  currentUserEmail = null,
+  isCurrentUserAdmin = false
+}) {
   const [appErrors, setAppErrors] = useState([]);
   const [reports, setReports] = useState([]);
   const [sessions, setSessions] = useState([]);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("errors");
 
-  const loadAll = useCallback(async () => {
+    const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [errors, reportsRes, presenceRes] = await Promise.all([
+      const [errors, reportsRes, presenceRes, usersRes] = await Promise.all([
         listErrors(),
         globalThis.window?.enquoteLocal?.diagnostics?.listReports?.() ?? Promise.resolve({ ok: false, reports: [] }),
-        globalThis.window?.enquoteLocal?.presence?.list?.() ?? Promise.resolve({ ok: false, sessions: [] })
+        globalThis.window?.enquoteLocal?.presence?.list?.() ?? Promise.resolve({ ok: false, sessions: [] }),
+        // ASSUMPTION (verify against your real preload.cjs): collections:list
+        // exposed as window.enquoteLocal.collections.list(name), matching the
+        // same namespaced convention as diagnostics/presence above. Defensive
+        // optional-chaining means this silently returns [] instead of
+        // crashing if the bridge method doesn't exist under this exact name.
+        globalThis.window?.enquoteLocal?.collections?.list?.("users") ?? Promise.resolve([])
       ]);
       setAppErrors(errors);
       setReports(reportsRes?.ok ? (reportsRes.reports || []) : []);
       setSessions(presenceRes?.ok ? (presenceRes.sessions || []) : []);
+      setUsers(Array.isArray(usersRes) ? usersRes : []);
     } finally {
       setLoading(false);
     }
@@ -121,11 +142,14 @@ export default function DeveloperConsole({ open, onOpenChange, syncEvents = [] }
         </DialogHeader>
 
         <div className="flex items-center gap-2 border-b border-border pb-2">
-          {[
+                    {[
             { key: "errors", label: `App Errors (${appErrors.length})` },
             { key: "sync", label: `Sync Events (${syncEvents.length})` },
             { key: "reports", label: `Teammate Reports (${flattenedFindings.length})` },
-            { key: "presence", label: `Who's Online (${sessions.length})` }
+            { key: "presence", label: `Who's Online (${sessions.length})` },
+            // Hidden entirely (not just disabled) for non-admins - matches
+            // the "hide, don't just disable" requirement discussed earlier.
+            ...(isCurrentUserAdmin ? [{ key: "admin", label: `Manage Users (${users.length})` }] : [])
           ].map((tab) => (
             <button
               key={tab.key}
@@ -215,7 +239,7 @@ export default function DeveloperConsole({ open, onOpenChange, syncEvents = [] }
             )
           )}
 
-          {activeTab === "presence" && (
+                    {activeTab === "presence" && (
             sessions.length === 0 ? (
               <p className="text-sm text-muted-foreground italic p-4 text-center">No one else is currently signed in.</p>
             ) : (
@@ -231,6 +255,35 @@ export default function DeveloperConsole({ open, onOpenChange, syncEvents = [] }
                         Signed in {new Date(session.signedInAt).toLocaleString()}
                       </p>
                     </div>
+                  </div>
+                ))
+            )
+          )}
+
+          {activeTab === "admin" && isCurrentUserAdmin && (
+            users.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic p-4 text-center">No local users found.</p>
+            ) : (
+              users
+                .slice()
+                .sort((a, b) => String(a.name || a.email).localeCompare(String(b.name || b.email)))
+                .map((user) => (
+                  <div key={user.email} className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-3 text-sm">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <KeyRound className="w-4 h-4 text-indigo-500 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="font-medium text-foreground truncate">{user.name || user.email}</p>
+                        <p className="text-[11px] text-muted-foreground truncate">
+                          {user.email} - {user.app_role || "no role set"}
+                        </p>
+                      </div>
+                    </div>
+                    <AdminResetPasswordButton
+                      targetEmail={user.email}
+                      targetName={user.name}
+                      currentUserEmail={currentUserEmail}
+                      isCurrentUserAdmin={isCurrentUserAdmin}
+                    />
                   </div>
                 ))
             )

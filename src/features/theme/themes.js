@@ -171,39 +171,7 @@ export const THEMES = {
     }
   },
 
-  "solarized-light": {
-    id: "solarized-light",
-    name: "Solarized Light",
-    description: "The warm cream-toned counterpart to Solarized Dark.",
-    isDark: false,
-    previewColors: ["#fdf6e3", "#eee8d5", "#268bd2"],
-    variables: {
-      "--background": "44 87% 94%",
-      "--foreground": "192 81% 14%",
-      "--card": "44 46% 90%",
-      "--card-foreground": "192 81% 14%",
-      "--popover": "44 46% 90%",
-      "--popover-foreground": "192 81% 14%",
-      "--primary": "205 69% 49%",
-      "--primary-foreground": "44 87% 94%",
-      "--secondary": "45 30% 85%",
-      "--secondary-foreground": "192 81% 14%",
-      "--muted": "45 30% 85%",
-      "--muted-foreground": "186 8% 45%",
-      "--accent": "45 30% 82%",
-      "--accent-foreground": "192 81% 14%",
-      "--destructive": "1 71% 52%",
-      "--destructive-foreground": "44 87% 94%",
-      "--border": "45 25% 78%",
-      "--input": "45 25% 78%",
-      "--ring": "205 69% 49%",
-      "--sidebar-background": "44 60% 92%",
-      "--sidebar-foreground": "192 81% 14%",
-      "--sidebar-primary": "205 69% 49%",
-      "--sidebar-primary-foreground": "44 87% 94%",
-      "--sidebar-accent": "45 30% 85%",
-      "--sidebar-accent-foreground": "192 81% 14%",
-      "--sidebar-border": "45 25% 78%", "--sidebar-ring": "205 69% 49%" } },
+  
   "purple": {
     id: "purple",
     name: "Mackey Purple",
@@ -381,8 +349,21 @@ export const THEMES = {
       "--sidebar-accent": "88 95% 50%",
       "--sidebar-accent-foreground": "320 70% 12%",
       "--sidebar-border": "322 80% 35%",
-      "--sidebar-ring": "48 100% 55%"
+            "--sidebar-ring": "48 100% 55%"
     }
+  },
+
+  "custom": {
+    id: "custom",
+    name: "Custom",
+    description: "Pick your own 3 colors - everything else is generated to stay readable.",
+    // isDark/variables here are placeholder defaults only - ThemeContext.jsx computes the
+    // REAL values at apply-time from whatever colors are currently saved (see
+    // buildCustomTheme() in customThemeBuilder.js), since those can change at any moment
+    // (via ThemeSwitcher's color pickers) independently of ever re-selecting this theme.
+    isDark: false,
+    previewColors: ["#f8fafc", "#1e1e2e", "#4f46e5"],
+    variables: {}
   }
 };
 

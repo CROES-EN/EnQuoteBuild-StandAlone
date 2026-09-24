@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
 import { getUsers } from "@/api/dataClient";
@@ -188,8 +188,7 @@ function CredentialsStep({ onError }) {
  {/* FIX (per explicit request): removed the em dash after "Enquote1" - now two plain,
      complete sentences instead of one run-on sentence joined by a dash. */}
  <p className="text-muted-foreground mb-6 text-center text-sm">
- New here? Sign in with the temporary password <strong>Enquote1</strong>. You'll be asked to set your
- own password right after.
+ New here? Sign in with the temporary password your admin gave you. You'll be asked to set your own password right after.
  </p>
  <form onSubmit={handleSubmit} className="space-y-4">
  <NameField candidates={candidates} selectedEmail={selectedEmail} onSelect={setSelectedEmail} />

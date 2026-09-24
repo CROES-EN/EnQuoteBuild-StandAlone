@@ -1,7 +1,8 @@
-﻿import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { DEFAULT_THEME_ID, THEMES, getTheme } from "@/features/theme/themes";
-import { getSavedThemeId, saveThemeId } from "@/features/theme/themeStore";
+import { getSavedThemeId, saveThemeId, getSavedCustomColors } from "@/features/theme/themeStore";
 import { onUserSessionChanged } from "@/lib/userScopedStorage";
+import { buildCustomTheme } from "@/features/theme/customThemeBuilder";
 
 const ThemeContext = createContext(null);
 
@@ -16,10 +17,23 @@ function applyThemeToDocument(themeId) {
   const theme = getTheme(themeId);
   const root = document.documentElement;
 
-  root.setAttribute("data-theme", theme.id);
-  root.classList.toggle("dark", Boolean(theme.isDark));
+  // The "custom" theme has no static `variables`/`isDark` (both are empty placeholders in
+  // themes.js) - both are computed here, live, from whatever 3 colors the user has
+  // currently picked (see buildCustomTheme() in customThemeBuilder.js). This matters
+  // because those colors can change at any time via ThemeSwitcher's color pickers, not
+  // just when the user re-selects the "custom" theme itself.
+  let variables = theme.variables;
+  let isDark = theme.isDark;
+  if (themeId === "custom") {
+    const built = buildCustomTheme(getSavedCustomColors());
+    variables = built.variables;
+    isDark = built.isDark;
+  }
 
-  Object.entries(theme.variables).forEach(([property, value]) => {
+  root.setAttribute("data-theme", theme.id);
+  root.classList.toggle("dark", Boolean(isDark));
+
+  Object.entries(variables).forEach(([property, value]) => {
     root.style.setProperty(property, value);
   });
 }
@@ -58,11 +72,17 @@ export function ThemeProvider({ children }) {
     return unsubscribe;
   }, []);
 
-  const value = {
+    const value = {
     themeId,
     theme: getTheme(themeId),
     setThemeId,
-    themes: Object.values(THEMES)
+    themes: Object.values(THEMES),
+    // Re-applies the currently-active theme immediately using whatever custom colors are
+    // NOW saved. Needed because changing a custom color while "custom" is already the
+    // active theme does not change `themeId` itself (it is still "custom"), so the effect
+    // above (which only re-runs when themeId changes) would not otherwise notice the
+    // update - ThemeSwitcher calls this after saving a new color.
+    refreshCustomTheme: () => applyThemeToDocument(themeId)
   };
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

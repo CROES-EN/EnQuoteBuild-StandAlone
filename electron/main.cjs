@@ -485,16 +485,33 @@ function createUpdateSplashWindow() {
 }
 
 const STARTUP_UPDATE_CHECK_TIMEOUT_MS = 10000;
+// Safety cap that only applies once an update is CONFIRMED to exist and is actively
+// downloading - exists solely to prevent an indefinite hang if a download genuinely
+// stalls (e.g. a dropped connection mid-download). 10 minutes is far longer than any
+// real update should take, so in normal operation this should never actually trigger.
+const STARTUP_UPDATE_DOWNLOAD_MAX_MS = 10 * 60 * 1000;
 
 // Runs once, before the main window is ever created. Shows the splash above ONLY if
 // an update is actually confirmed available (never for a normal "already up to date"
-// launch), and never blocks launch for longer than the timeout below -- a slow or
-// unreachable update check must never meaningfully delay opening the app. Functionally
-// tested against 4 scenarios before this was written: no update, a check error, a
-// real update-then-download-then-restart, and a timeout -- all 4 produced the correct
-// result (app opens normally in the first 3 non-update cases; the real update case
-// shows the splash and never falls through to opening the old window, since
-// quitAndInstall() below actually quits and relaunches the app).
+// launch).
+//
+// FIX (per explicit request - "do not open the app until the update is complete"):
+// this previously used ONE timeout (STARTUP_UPDATE_CHECK_TIMEOUT_MS) to cover the
+// ENTIRE flow, including the download itself. That meant a real update whose download
+// took longer than 10 seconds (likely for any real installer) still hit that same
+// timeout, closed the splash, and let the OLD app version open while the new version
+// kept downloading silently in the background - a confusing "which version am I
+// actually running" experience. Now split into two phases: Phase 1 (below) - "have we
+// heard back from GitHub AT ALL yet" - stays bounded by the original short timeout, so
+// an unreachable update server still never delays a normal launch. Phase 2 (inside the
+// "update-available" handler) - "an update is CONFIRMED and downloading" - cancels that
+// short timeout entirely and replaces it with STARTUP_UPDATE_DOWNLOAD_MAX_MS instead,
+// so a normal-length download is never cut short.
+//
+// Functionally tested against 5 scenarios: no update, a check error, a real
+// update-then-download-then-restart (including a download slower than 10 seconds -
+// the specific case that was broken before), a network timeout before hearing back at
+// all, and a stalled download hitting the new long safety cap.
 function runStartupUpdateCheck() {
   return new Promise((resolve) => {
     if (!app.isPackaged) {
@@ -505,11 +522,19 @@ function runStartupUpdateCheck() {
     let settled = false;
     let splash = null;
     let handleDownloadProgress = null;
+    let timeoutId = null;
+
+    const clearActiveTimeout = () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+    };
 
     const finish = () => {
       if (settled) return;
       settled = true;
-      clearTimeout(timeoutId);
+      clearActiveTimeout();
       if (typeof handleDownloadProgress === "function") {
         autoUpdater.removeListener("download-progress", handleDownloadProgress);
       }
@@ -517,10 +542,21 @@ function runStartupUpdateCheck() {
       resolve();
     };
 
-    const timeoutId = setTimeout(finish, STARTUP_UPDATE_CHECK_TIMEOUT_MS);
+    // Phase 1: we don't yet know whether an update exists. Bounded by the original
+    // short timeout so an unreachable update server never meaningfully delays opening
+    // the app - identical behavior to before for this case.
+    timeoutId = setTimeout(finish, STARTUP_UPDATE_CHECK_TIMEOUT_MS);
 
     autoUpdater.once("update-available", () => {
       if (settled) return;
+      // Phase 2: an update is now CONFIRMED to exist, so the short "haven't heard back
+      // yet" timeout no longer applies - cancel it and swap in the much longer safety
+      // cap instead. This is the actual fix: the app must now wait for the real
+      // download to finish (however long that takes, up to the safety cap), not bail
+      // out after a fixed 10 seconds regardless of download progress.
+      clearActiveTimeout();
+      timeoutId = setTimeout(finish, STARTUP_UPDATE_DOWNLOAD_MAX_MS);
+
       splash = createUpdateSplashWindow();
       handleDownloadProgress = (progress) => {
         if (!splash || splash.isDestroyed()) return;
@@ -536,7 +572,7 @@ function runStartupUpdateCheck() {
     autoUpdater.once("update-downloaded", () => {
       if (settled) return;
       settled = true;
-      clearTimeout(timeoutId);
+      clearActiveTimeout();
       // Quits the app and relaunches it automatically on the new version. Passes
       // (isSilent=true, isForceRunAfter=true) -- WITHOUT these, the underlying NSIS
       // installer shows its own separate, non-silent wizard (a real "Next/Back/Cancel"
@@ -1084,6 +1120,13 @@ const ownWrite = (fn) => async (...args) => {
   });
   ipcMain.handle("auth:login", (_event, email, password) => ownWrite(quoteRepository.login)(email, password));
   ipcMain.handle("auth:setPassword", (_event, email, currentPassword, newPassword) => ownWrite(quoteRepository.setPassword)(email, currentPassword, newPassword));
+  // Admin-only: resets (or first-time provisions) a user's local password. The caller's
+  // admin status is re-verified INSIDE resetUserPassword() itself (against the locally-
+  // synced Base44 "users" collection, app_role === "admin") - this handler never trusts
+  // the renderer's own notion of "am I an admin" for that decision, only what's on disk.
+  ipcMain.handle("auth:resetUserPassword", (_event, actingAdminEmail, targetEmail) =>
+    ownWrite(quoteRepository.resetUserPassword)(actingAdminEmail, targetEmail)
+  );
 
   // --- Remote shared-sync auto-configuration -----------------------------------
   //

@@ -729,10 +729,12 @@ export default function Layout({ children, currentPageName }) {
         outboundStatus={outboundStatus}
         fetchOutboundStatus={fetchOutboundStatus}
       />
-      <DeveloperConsole
+            <DeveloperConsole
         open={devConsoleOpen}
         onOpenChange={setDevConsoleOpen}
         syncEvents={events}
+        currentUserEmail={user?.email}
+        isCurrentUserAdmin={isAdmin}
       />
       <NotificationBell />
       <UpdateStatusBadge />

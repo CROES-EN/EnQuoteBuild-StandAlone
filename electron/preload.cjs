@@ -54,9 +54,14 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
   onedrive: {
     getSharedReportTables: () => invoke("onedrive:get-shared-report-tables")
   },
-  auth: {
+    auth: {
     login: (email, password) => invoke("auth:login", email, password),
-    setPassword: (email, currentPassword, newPassword) => invoke("auth:setPassword", email, currentPassword, newPassword)
+    setPassword: (email, currentPassword, newPassword) => invoke("auth:setPassword", email, currentPassword, newPassword),
+    // Admin-only: the actual admin-status check happens on the main-process side
+    // (repository.cjs's resetUserPassword re-verifies app_role === "admin" against the
+    // locally-synced users collection) - this bridge method just forwards the call, it
+    // enforces nothing itself.
+    resetUserPassword: (actingAdminEmail, targetEmail) => invoke("auth:resetUserPassword", actingAdminEmail, targetEmail)
   },
   remoteSync: {
     checkStatus: (signedInEmail) => invoke("remoteSync:checkStatus", signedInEmail),

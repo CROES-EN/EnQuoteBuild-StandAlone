@@ -94,14 +94,14 @@ Then re-check to confirm it's actually gone (should return nothing):
 - [x] DevTools auto-open fix — confirmed correct in code, but only verifiable via Tier 2/3 testing (a Tier 1 run will always still show it)
 - [x] Fix ICON for APP
 - [x] Specific Quote Notifications
-- [ ] Auto-Quote Drafter - Pulls from Quote Request Cases with Case Comments and builds Quotes and places them in "AI Generated Quote - Needs Review" status *INPROGRESS*
+- [x] Auto-Quote Drafter - Pulls from Quote Request Cases with Case Comments and builds Quotes and places them in "AI Generated Quote - Needs Review" status.
 - [ ] Add another status for On-Demand Quotes for Shane Mosley which integrates the Material Orders tab & allows Shane to order the purchased quote materials before we schedule.
 - [ ] ANIMATED THEMES??
 - [ ] Hyperlinks for Case Numbers & Site ID's in Workload
 - [ ] Add a new status page after H/O Approved which pulls Material Order window page to allow for bulk material orders for the quote.
 - [ ] Fix the Resource Planner for mapping FST's to SV's
-
-
+- [ ] Fix updater so that it does not open the app until the download is complete. Provides a cleaner outlook on the application while we move between versions.
+ 
 Remove-Item -Recurse -Force "C:\EnQuoteBuild\release" -ErrorAction SilentlyContinue
 Remove-Item -Recurse -Force "C:\EnQuoteBuild\dist" -ErrorAction SilentlyContinue
 git status

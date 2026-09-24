@@ -8,3 +8,12 @@ webhook-events.jsonl
 *.bak
 *.before-*
 *.backup-*
+
+# --- EnQuote runtime logs (added by cleanup script) ---
+sync-watchdog.log
+ngrok.log
+webhook-receiver.log
+webhook-receiver-error.log
+.watchdog-last-toast
+*.PREVIEW.*
+*.bak-*
