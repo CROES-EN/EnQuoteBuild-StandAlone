@@ -17,3 +17,5 @@ webhook-receiver-error.log
 .watchdog-last-toast
 *.PREVIEW.*
 *.bak-*
+
+sync-secret.json

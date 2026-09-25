@@ -34,7 +34,7 @@
     {
       "label": "Check webhook-receiver health",
       "type": "shell",
-      "command": "Invoke-RestMethod -Uri 'http://localhost:3001/health'",
+      "command": "Invoke-RestMethod -Uri 'https://enquote-sync.enphase-enquote.com/health'",
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",

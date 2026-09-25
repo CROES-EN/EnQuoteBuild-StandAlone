@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, dialog } = require("electron");
+﻿const { app, BrowserWindow, ipcMain, shell, dialog } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -1139,6 +1139,38 @@ const ownWrite = (fn) => async (...args) => {
   // needs to auto-update again after that -- the secret is never re-asked.
   const SYNC_CONFIG_GITHUB_URL = "https://raw.githubusercontent.com/CROES-EN/EnQuoteBuild-StandAlone/master/sync-config.json";
 
+  // Reads a secret bundled into the packaged app itself (via electron-builder's
+  // extraResources), so a fresh install never needs the user to type anything.
+  // This file is NOT committed to git - it's only added to the build output at
+  // package time. Falls back to null if this build wasn't packaged with one
+  // (e.g. a dev-mode run), in which case the existing manual-prompt flow below
+  // is completely unchanged and still works exactly as before.
+  function readBundledSyncSecret() {
+    try {
+      const bundledPath = path.join(process.resourcesPath || "", "sync-secret.json");
+      if (!fs.existsSync(bundledPath)) return null;
+      const parsed = JSON.parse(fs.readFileSync(bundledPath, "utf8"));
+      return typeof parsed.secret === "string" && parsed.secret.trim() ? parsed.secret.trim() : null;
+    } catch {
+      return null;
+    }
+  }
+  // Reads a secret bundled into the packaged app itself (via electron-builder's
+  // extraResources), so a fresh install never needs the user to type anything.
+  // This file is NOT committed to git - it's only added to the build output at
+  // package time. Falls back to null if this build wasn't packaged with one
+  // (e.g. a dev-mode run), in which case the existing manual-prompt flow below
+  // is completely unchanged and still works exactly as before.
+function readBundledSyncSecret() {
+try {
+const bundledPath = path.join(process.resourcesPath || "", "sync-secret.json");
+if (!fs.existsSync(bundledPath)) return null;
+const parsed = JSON.parse(fs.readFileSync(bundledPath, "utf8"));
+return typeof parsed.secret === "string" && parsed.secret.trim() ? parsed.secret.trim() : null;
+} catch {
+return null;
+}
+}
   function remoteSyncConfigPath() {
     return path.join(app.getPath("userData"), "remote-sync-config.json");
   }
@@ -1215,7 +1247,20 @@ const ownWrite = (fn) => async (...args) => {
       writeLocalSyncConfig(hostConfig.sync_url, existingSecret);
       return { ok: true, isHost: false, needsSecret: false };
     }
-    // First time on this machine - the renderer should show the one-time prompt.
+
+    // NEW: no local secret yet - check if this build was packaged with one
+    // baked in via extraResources. If so, save it silently and skip the
+    // one-time prompt entirely - this is what lets a brand-new install go
+    // straight from "download" to "sign in with email + password" with
+    // nothing else to configure.
+    const bundledSecret = readBundledSyncSecret();
+    if (bundledSecret) {
+      writeLocalSyncConfig(hostConfig.sync_url, bundledSecret);
+      return { ok: true, isHost: false, needsSecret: false };
+    }
+
+    // Still no secret anywhere (e.g. a dev build with no bundled secret) -
+    // fall back to the existing one-time manual prompt, completely unchanged.
     return { ok: true, isHost: false, needsSecret: true, syncUrl: hostConfig.sync_url };
   });
 
