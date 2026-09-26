@@ -1,8 +1,8 @@
-import { createContext, useContext, useEffect, useState } from "react";
-import { DEFAULT_THEME_ID, THEMES, getTheme } from "@/features/theme/themes";
-import { getSavedThemeId, saveThemeId, getSavedCustomColors } from "@/features/theme/themeStore";
-import { onUserSessionChanged } from "@/lib/userScopedStorage";
-import { buildCustomTheme } from "@/features/theme/customThemeBuilder";
+import {createContext, useContext, useEffect, useState} from "react";
+import {DEFAULT_THEME_ID, getTheme, THEMES} from "@/features/theme/themes";
+import {getSavedCustomColors, getSavedThemeId, saveThemeId} from "@/features/theme/themeStore";
+import {onUserSessionChanged} from "@/lib/userScopedStorage";
+import {buildCustomTheme} from "@/features/theme/customThemeBuilder";
 
 const ThemeContext = createContext(null);
 

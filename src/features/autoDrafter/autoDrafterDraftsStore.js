@@ -17,7 +17,7 @@
  * matching saveReportTable()'s REPLACE strategy for "current state" data.
  */
 
-import { retryBridgeCall } from "@/features/supervisorDashboard/retryBridgeCall";
+import {retryBridgeCall} from "@/features/supervisorDashboard/retryBridgeCall";
 
 const COLLECTION = "autoDrafterGeneratedDrafts";
 const BROWSER_STORAGE_KEY = "enquote_autodrafter_generated_drafts_v1";

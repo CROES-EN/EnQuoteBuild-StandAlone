@@ -21,9 +21,9 @@
  * one-click action, and a small price for eliminating a real identity-leak bug.
  */
 
-import { DEFAULT_THEME_ID, THEMES } from "@/features/theme/themes";
-import { scopedKey } from "@/lib/userScopedStorage";
-import { DEFAULT_CUSTOM_COLORS } from "@/features/theme/customThemeBuilder";
+import {DEFAULT_THEME_ID, THEMES} from "@/features/theme/themes";
+import {scopedKey} from "@/lib/userScopedStorage";
+import {DEFAULT_CUSTOM_COLORS} from "@/features/theme/customThemeBuilder";
 
 const STORAGE_KEY = "enquote_selected_theme_v1";
 

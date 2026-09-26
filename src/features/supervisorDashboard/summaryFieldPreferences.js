@@ -23,7 +23,7 @@
  * from the built-in default until they personally customize it via "Configure Fields".
  */
 
-import { scopedKey } from "@/lib/userScopedStorage";
+import {scopedKey} from "@/lib/userScopedStorage";
 
 const STORAGE_KEY_PREFIX = "enquote_report_table_summary_fields_v1_";
 

@@ -1,4 +1,4 @@
-﻿import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+﻿import {DragDropContext, Draggable, Droppable} from "@hello-pangea/dnd";
 
 /**
  * Drag-and-drop grid for the Executive Overview's unified tile system. Each

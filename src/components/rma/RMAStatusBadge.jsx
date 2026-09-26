@@ -1,4 +1,4 @@
-﻿import { cn } from "@/lib/utils";
+﻿import {cn} from "@/lib/utils";
 
 const statusConfig = {
   "New": { bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500" },

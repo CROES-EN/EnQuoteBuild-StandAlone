@@ -1,9 +1,9 @@
-import { useEffect, useState, useCallback } from "react";
-import { Link } from "react-router-dom";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { Bell, ArrowUpRight, X } from "lucide-react";
-import { createPageUrl } from "@/utils";
-import { listNotifications, markAllRead, clearNotification } from "@/features/notifications/appNotifications";
+import {useCallback, useEffect, useState} from "react";
+import {Link} from "react-router-dom";
+import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
+import {ArrowUpRight, Bell, X} from "lucide-react";
+import {createPageUrl} from "@/utils";
+import {clearNotification, listNotifications, markAllRead} from "@/features/notifications/appNotifications";
 
 // Formats a notification's timestamp using the VIEWING user's own browser locale -
 // matches Layout.jsx's existing formatLastUpdated pattern exactly (date part follows

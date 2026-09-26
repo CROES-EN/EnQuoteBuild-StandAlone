@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import {useEffect, useState} from "react";
 
 // Small, fixed-position badge that surfaces electron-updater activity in the app itself.
 // Listens to the "updater:status" events relayed from main.cjs -> preload.cjs (added via

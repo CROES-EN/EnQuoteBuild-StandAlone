@@ -5,8 +5,7 @@ const crypto = require('crypto');
 const os = require('os');
 const { repositoryFor, normalizeIncomingSnapshot } = require('./electron/repository.cjs');
 const { analyzeAll } = require('./electron/diagnosticReportAnalyzer.cjs');
-
-const PORT = 3001;
+const PORT = 3001``
 const ENV_PATH = path.join(__dirname, '.env');
 
 function loadEnvFile() {
@@ -122,7 +121,7 @@ function buildSecretCandidates(raw) {
 
 const SECRET_CANDIDATES = buildSecretCandidates(SECRET_RAW);
 // Kept for any legacy code paths that only need a truthy/placeholder check.
-const SECRET = SECRET_IS_PLACEHOLDER ? SECRET_RAW : (SECRET_CANDIDATES[0] && SECRET_CANDIDATES[0].buf);
+
 
 const ENCRYPTION_KEY_RAW = process.env.ENQUOTE_LOCAL_SYNC_ENCRYPTION_KEY || '';
 let ENCRYPTION_KEY = null;
@@ -985,7 +984,7 @@ async function handleWebhookPost(req, res) {
   logEvent('info', `Webhook delivery received: ${rawBuf.length} bytes`);
 
   const raw = rawBuf.toString('utf8');
-  let body = {};
+  let body;
   try {
     body = JSON.parse(raw) || {};
   } catch {

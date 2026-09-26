@@ -934,7 +934,7 @@ function resolveOneDriveSharedFolder() {
   return path.join(base, "EnQuote Shared Data");
 }
 
-async function exportSupervisorReportTablesToOneDrive() {
+const exportSupervisorReportTablesToOneDrive = async () => {
   try {
     const sharedFolder = resolveOneDriveSharedFolder();
     if (!sharedFolder) {
@@ -960,7 +960,7 @@ async function exportSupervisorReportTablesToOneDrive() {
     // local save that triggered this call.
     console.warn("[onedrive-export] Export failed (local save was NOT affected):", error.message);
   }
-}
+};
 
 const ownWrite = (fn) => async (...args) => {
     const result = await fn(...args);

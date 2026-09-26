@@ -1,8 +1,13 @@
-﻿@tailwind base;
+﻿/*noinspection ALL*/
+@tailwind base;
+/*noinspection ALL*/
 @tailwind components;
+/*noinspection ALL*/
 @tailwind utilities;
 
+/*noinspection CssBrowserCompatibilityForProperties*/
 @layer base {
+  /*noinspection CssBrowserCompatibilityForProperties*/
   :root {
   color-scheme: light;
   --warning: 35 55% 45%;
@@ -42,8 +47,10 @@
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
+  /*noinspection ALL*/
   .dark {
-  color-scheme: dark;
+    /*noinspection CssBrowserCompatibilityForProperties*/
+    color-scheme: dark;
   --warning: 38 45% 55%;
   --warning-foreground: 210 20% 95%;
     --background: 0 0% 3.9%;
@@ -85,10 +92,12 @@
 
 @layer base {
   * {
+    /*noinspection ALL*/
     @apply border-border outline-ring/50;
   }
 
   body {
+    /*noinspection ALL*/
     @apply bg-background text-foreground;
   }
 }

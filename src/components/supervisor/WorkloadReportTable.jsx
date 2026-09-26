@@ -1,34 +1,48 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
-import { createPageUrl } from "@/utils";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ArrowUpDown, GripVertical, Search, ChevronRight, Pencil, Settings2, FileText, User, Users, Filter } from "lucide-react";
-import { cn } from "@/lib/utils";
-import StatusBadge from "@/components/quotes/StatusBadge";
-import { buildQuoteMatchIndex, findMatchingQuotes } from "@/features/supervisorDashboard/quoteMatchLookup";
-import { getOMStatusBadgeClasses, getProjectPicklistBadgeClasses, calcOpenDays } from "@/features/supervisorDashboard/workloadStatusColors";
-import { getWorkloadGoal, setWorkloadGoal } from "@/features/supervisorDashboard/workloadGoal";
+import {useEffect, useLayoutEffect, useMemo, useRef, useState} from "react";
+import {Link} from "react-router-dom";
+import {createPageUrl} from "@/utils";
+import {Input} from "@/components/ui/input";
+import {Button} from "@/components/ui/button";
+import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import {
-  getTiles,
-  getTileForStatus,
-  getTileForRow,
-  getColumnOrder,
-  setColumnOrder as saveColumnOrderPref,
-  getHiddenWorkloadColumns,
-  getDefaultSortColumn,
-  getRowDensity,
-  getManagementReviewNames,
-  isManagementReviewMatch,
-  getMyCaseOwnerName,
-  setMyCaseOwnerName as saveMyCaseOwnerName,
-  isMyCaseMatch,
-  markRowsSeen,
-  isRowSeen
+    ArrowUpDown,
+    ChevronRight,
+    FileText,
+    Filter,
+    GripVertical,
+    Pencil,
+    Search,
+    Settings2,
+    User,
+    Users
+} from "lucide-react";
+import {cn} from "@/lib/utils";
+import StatusBadge from "@/components/quotes/StatusBadge";
+import {buildQuoteMatchIndex, findMatchingQuotes} from "@/features/supervisorDashboard/quoteMatchLookup";
+import {
+    calcOpenDays,
+    getOMStatusBadgeClasses,
+    getProjectPicklistBadgeClasses
+} from "@/features/supervisorDashboard/workloadStatusColors";
+import {getWorkloadGoal, setWorkloadGoal} from "@/features/supervisorDashboard/workloadGoal";
+import {
+    getColumnOrder,
+    getDefaultSortColumn,
+    getHiddenWorkloadColumns,
+    getManagementReviewNames,
+    getMyCaseOwnerName,
+    getRowDensity,
+    getTileForRow,
+    getTiles,
+    isManagementReviewMatch,
+    isMyCaseMatch,
+    isRowSeen,
+    markRowsSeen,
+    setColumnOrder as saveColumnOrderPref,
+    setMyCaseOwnerName as saveMyCaseOwnerName
 } from "@/features/supervisorDashboard/workloadPreferences";
 import WorkloadSettingsPanel from "@/components/supervisor/WorkloadSettingsPanel";
-import { getCurrentUser } from "@/api/dataClient";
+import {getCurrentUser} from "@/api/dataClient";
 
 // Safety cap for the drag-and-drop column reorder's sliding (FLIP) animation - if a reorder
 // would touch an unreasonably large number of cells (e.g. a future much-larger import), skip

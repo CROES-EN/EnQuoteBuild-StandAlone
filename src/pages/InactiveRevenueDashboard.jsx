@@ -1,8 +1,7 @@
-﻿import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
-import { getQuotes, getReviews, listLocalCollection } from "@/api/dataClient";
-import { Card } from "@/components/ui/card";
+﻿import {useState} from "react";
+import {useQuery} from "@tanstack/react-query";
+import {getQuotes, getReviews, listLocalCollection} from "@/api/dataClient";
+import {Card} from "@/components/ui/card";
 import RoleGuard from "@/components/auth/RoleGuard";
 import DateRangeFilters from "@/components/inactive-dashboard/DateRangeFilters";
 import OverviewMetrics from "@/components/inactive-dashboard/OverviewMetrics";

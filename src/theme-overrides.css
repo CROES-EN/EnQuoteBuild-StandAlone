@@ -25,18 +25,18 @@
   /* Fallback values in case a theme somehow fails to apply its variables via JS (e.g. before
      React has hydrated) - matches light-plus, so the very first paint before hydration is never
      jarring or broken-looking, regardless of which theme was last selected. */
-  --theme-bg-primary: #ffffff;
-  --theme-bg-secondary: #f8fafc;
-  --theme-bg-tertiary: #f1f5f9;
-  --theme-border: #e2e8f0;
-  --theme-border-subtle: #f1f5f9;
-  --theme-text-primary: #0f172a;
-  --theme-text-secondary: #475569;
-  --theme-text-muted: #94a3b8;
-  --theme-accent: #4f46e5;
-  --theme-accent-bg: #eef2ff;
-  --theme-input-bg: #ffffff;
-  --theme-scrollbar: #cbd5e1;
+  --theme-bg-primary: rgb(255 255 255);
+  --theme-bg-secondary: rgb(248 250 252);
+  --theme-bg-tertiary: rgb(241 245 249);
+  --theme-border: rgb(226 232 240);
+  --theme-border-subtle: rgb(241 245 249);
+  --theme-text-primary: rgb(15 23 42);
+  --theme-text-secondary: rgb(71 85 105);
+  --theme-text-muted: rgb(148 163 184);
+  --theme-accent: rgb(79 70 229);
+  --theme-accent-bg: rgb(238 242 255);
+  --theme-input-bg: rgb(255 255 255);
+  --theme-scrollbar: rgb(203 213 225);
 }
 
 /* Smooth, non-jarring transition when switching themes - applied broadly but only affects

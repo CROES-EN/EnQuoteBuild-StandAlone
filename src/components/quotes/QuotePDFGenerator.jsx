@@ -1,8 +1,8 @@
 ﻿import jsPDF from "jspdf";
-import { format } from "date-fns";
-import { base44 } from "@/api/base44Client";
-import { listLocalCollection } from "@/api/dataClient";
-import { calculateQuoteTotals } from "@/utils/quoteCalculations";
+import {format} from "date-fns";
+import {base44} from "@/api/base44Client";
+import {listLocalCollection} from "@/api/dataClient";
+import {calculateQuoteTotals} from "@/utils/quoteCalculations";
 
 function formatCurrency(value) {
   return "$" + (value || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });

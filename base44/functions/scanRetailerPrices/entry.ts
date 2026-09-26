@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+import {createClientFromRequest} from 'npm:@base44/sdk@0.8.40';
 
 const retailers = [
   ['homedepot.com', 'The Home Depot'], ['greentechrenewables.com', 'CED GreenTech Renewables'], ['enphase.com', 'Enphase Store'], ['standardelectricsupply.com', 'Standard Electric Supply'], ['soligent.net', 'Soligent'], ['baywa-re.com', 'BayWa r.e. Solar Distribution'], ['solarelectricsupply.com', 'Solar Electric Supply'], ['a1solarstore.com', 'A1 SolarStore'], ['sunsuppv.com', 'Sun Supply PV']

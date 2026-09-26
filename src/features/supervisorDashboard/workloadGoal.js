@@ -17,7 +17,7 @@
  * from DEFAULT_WORKLOAD_GOAL until they personally set their own goal.
  */
 
-import { scopedKey } from "@/lib/userScopedStorage";
+import {scopedKey} from "@/lib/userScopedStorage";
 
 const STORAGE_KEY = "enquote_workload_important_goal";
 

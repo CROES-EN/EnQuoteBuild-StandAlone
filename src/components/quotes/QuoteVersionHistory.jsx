@@ -1,12 +1,11 @@
-﻿import { base44 } from "@/api/base44Client";
-import { getQuotes } from "@/api/dataClient";
-import { useQuery } from "@tanstack/react-query";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { format } from "date-fns";
-import { Link } from "react-router-dom";
-import { createPageUrl } from "@/utils";
-import { Clock, FileText, ArchiveRestore } from "lucide-react";
+﻿import {getQuotes} from "@/api/dataClient";
+import {useQuery} from "@tanstack/react-query";
+import {Card} from "@/components/ui/card";
+import {Button} from "@/components/ui/button";
+import {format} from "date-fns";
+import {Link} from "react-router-dom";
+import {createPageUrl} from "@/utils";
+import {ArchiveRestore, Clock, FileText} from "lucide-react";
 import StatusBadge from "./StatusBadge";
 
 export default function QuoteVersionHistory({ quote, canRestore = false, onRestore }) {

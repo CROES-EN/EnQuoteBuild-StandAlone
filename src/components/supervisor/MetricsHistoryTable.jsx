@@ -1,12 +1,21 @@
-﻿import { useState } from "react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Pencil, Trash2 } from "lucide-react";
-import { deleteDailyMetric } from "@/features/supervisorDashboard/opsMetricsStore";
-import { formatSecondsAsClock, formatDateLabel, formatNumber } from "@/features/supervisorDashboard/format";
+﻿import {useState} from "react";
+import {toast} from "sonner";
+import {Button} from "@/components/ui/button";
+import {Badge} from "@/components/ui/badge";
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle
+} from "@/components/ui/alert-dialog";
+import {Pencil, Trash2} from "lucide-react";
+import {deleteDailyMetric} from "@/features/supervisorDashboard/opsMetricsStore";
+import {formatDateLabel, formatNumber, formatSecondsAsClock} from "@/features/supervisorDashboard/format";
 
 const SOURCE_LABELS = {
   cxone: "CXONE",

@@ -1,10 +1,6 @@
-import {
-  base44Adapter
-} from "./base44Adapter";
+import {base44Adapter} from "./base44Adapter";
 
-import {
-  salesforceMockAdapter
-} from "./salesforceMockAdapter";
+import {salesforceMockAdapter} from "./salesforceMockAdapter";
 
 const SYNC_LOG_KEY =
   "enquote_salesforce_mock_sync_log";

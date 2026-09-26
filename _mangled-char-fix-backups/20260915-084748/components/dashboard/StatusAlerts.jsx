@@ -1,14 +1,14 @@
-﻿import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
-import { Link } from "react-router-dom";
-import { createPageUrl } from "@/utils";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { AlertCircle, Clock, X, CheckCheck, Loader2, ChevronDown, ChevronUp, MessageSquarePlus } from "lucide-react";
-import { differenceInDays, parseISO } from "date-fns";
+﻿import {useState} from "react";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {base44} from "@/api/base44Client";
+import {Link} from "react-router-dom";
+import {createPageUrl} from "@/utils";
+import {Card} from "@/components/ui/card";
+import {Button} from "@/components/ui/button";
+import {AlertCircle, CheckCheck, ChevronDown, ChevronUp, Clock, Loader2, MessageSquarePlus, X} from "lucide-react";
+import {differenceInDays, parseISO} from "date-fns";
 import LogFollowUpDialog from "@/components/quotes/LogFollowUpDialog";
-import { INVOICE_PAID_ALERT_CUTOFF } from "@/utils/quoteSLA";
+import {INVOICE_PAID_ALERT_CUTOFF} from "@/utils/quoteSLA";
 
 const STATUS_THRESHOLDS = {
   draft_without_internal: 3,

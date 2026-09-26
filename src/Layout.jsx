@@ -1,58 +1,61 @@
-import { Sparkles } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
-import UpdateStatusBadge from "@/components/UpdateStatusBadge";
-import RemoteSyncSecretDialog from "@/components/auth/RemoteSyncSecretDialog";
-import { createPageUrl } from "@/utils";
-import { cn } from "@/lib/utils";
 import {
-  LayoutDashboard,
-  FileText,
-  Package,
-  Users,
-  Menu,
-  X,
-  Mail,
-  Bell,
-  FileOutput,
-  Trash2,
-  ShoppingCart,
-  BarChart3,
   AlertTriangle,
-  Route,
-  Siren,
   Archive,
-  LineChart,
-  Recycle,
-  Wallet,
-  RefreshCw,
-  Headset,
+  BarChart3,
+  Bell,
   Briefcase,
   ChevronsLeft,
   ChevronsRight,
+  FileOutput,
+  FileText,
+  Headset,
+  LayoutDashboard,
+  LineChart,
+  Mail,
+  Menu,
+  Package,
+  Recycle,
+  RefreshCw,
+  Route,
+  ShoppingCart,
+  Siren,
+  Sparkles,
+  Trash2,
+  Users,
+  Wallet,
+  X,
   ZoomIn,
   ZoomOut
 } from "lucide-react";
-import { useState, useEffect, useCallback, useRef } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { useUserRole } from "@/components/auth/RoleGuard";
-import { useAuth } from "@/lib/AuthContext";
+import {Link} from "react-router-dom";
+import UpdateStatusBadge from "@/components/UpdateStatusBadge";
+import RemoteSyncSecretDialog from "@/components/auth/RemoteSyncSecretDialog";
+import {createPageUrl} from "@/utils";
+import {cn} from "@/lib/utils";
+import {useCallback, useEffect, useRef, useState} from "react";
+import {useQueryClient} from "@tanstack/react-query";
+import {toast} from "sonner";
+import {Button} from "@/components/ui/button";
+import {useUserRole} from "@/components/auth/RoleGuard";
+import {useAuth} from "@/lib/AuthContext";
 import AutoAssignRole from "@/components/auth/AutoAssignRole";
 import RefreshStatusDialog from "@/components/RefreshStatusDialog";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { useLocalSyncStatus, REFRESH_REASON_LABELS } from "@/hooks/useLocalSyncStatus";
-import { startEodbEmailAutoImportWatcher, stopEodbEmailAutoImportWatcher } from "@/features/supervisorDashboard/eodbEmailAutoImportWatcher";
-import { getAutoImportSettings } from "@/features/supervisorDashboard/autoImportSettings";
-import { getReportTable } from "@/features/supervisorDashboard/importedTableStore";
-import { getTiles, getUnseenImportantCount, onSeenChanged } from "@/features/supervisorDashboard/workloadPreferences";
+import {REFRESH_REASON_LABELS, useLocalSyncStatus} from "@/hooks/useLocalSyncStatus";
+import {
+  startEodbEmailAutoImportWatcher,
+  stopEodbEmailAutoImportWatcher
+} from "@/features/supervisorDashboard/eodbEmailAutoImportWatcher";
+import {getAutoImportSettings} from "@/features/supervisorDashboard/autoImportSettings";
+import {getReportTable} from "@/features/supervisorDashboard/importedTableStore";
+import {getTiles, getUnseenImportantCount, onSeenChanged} from "@/features/supervisorDashboard/workloadPreferences";
 import appPackage from "../package.json";
 import enquoteLogo from "@/assets/enquote-logo.png";
 import SidebarLogoAnimation from "@/components/SidebarLogoAnimation";
 import DeveloperConsole from "@/components/DeveloperConsole";
 import NotificationBell from "@/components/NotificationBell";
-import { recordError } from "@/features/developerConsole/errorLog";
+import {recordError} from "@/features/developerConsole/errorLog";
 
 const isDemoMode = ["mock", "local", "salesforce-mock"].includes(import.meta.env.VITE_DATA_SOURCE);
 const appVersion = appPackage?.version || "0.0.0";

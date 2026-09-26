@@ -1,9 +1,9 @@
-﻿import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Package, Wrench, Pencil, Trash2, ExternalLink, CircleAlert } from "lucide-react";
-import { motion } from "framer-motion";
-import { cn } from "@/lib/utils";
+﻿import {Card} from "@/components/ui/card";
+import {Button} from "@/components/ui/button";
+import {Badge} from "@/components/ui/badge";
+import {CircleAlert, ExternalLink, Package, Pencil, Trash2, Wrench} from "lucide-react";
+import {motion} from "framer-motion";
+import {cn} from "@/lib/utils";
 
 export default function ProductCard({ product, onEdit, onDelete, onReview, pendingReview, index = 0, canEdit = true, canDelete = true }) {
   const isService = product.type === "service";

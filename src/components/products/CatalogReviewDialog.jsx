@@ -1,6 +1,6 @@
-﻿import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
+﻿import {Button} from "@/components/ui/button";
+import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
+import {Badge} from "@/components/ui/badge";
 
 export default function CatalogReviewDialog({ open, onOpenChange, incompleteProducts, priceReviews, onEditProduct, onOpenReview }) {
   const accessAlerts = priceReviews.filter(review => review.availability === "OutOfStock" || review.availability?.startsWith("Web access") || review.availability === "Price unavailable");

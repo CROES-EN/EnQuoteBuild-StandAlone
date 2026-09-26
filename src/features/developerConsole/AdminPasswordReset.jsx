@@ -19,16 +19,16 @@
 // itself and will reject the call even if this component's check were
 // somehow bypassed. Never remove that server-side check to "simplify" this.
 
-import { useState } from "react";
+import {useState} from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import {Button} from "@/components/ui/button";
 
 /**
  * Renders a "Reset Password" button for a single user row. Only actually

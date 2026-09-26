@@ -1,55 +1,69 @@
-﻿import { useState } from "react";
-import { base44 } from "@/api/base44Client";
-import { bulkUpdateQuotes, createLocalRecord, createQuote, createReview, deleteQuote, getCurrentUser, getQuoteById, getQuotes, getReviews, getUsers, isLocalDataSource, listLocalCollection, updateQuote, updateReview } from "@/api/dataClient";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate, useLocation} from "react-router-dom";
-import { createPageUrl } from "@/utils";
-import { calculateQuoteTotals } from "@/utils/quoteCalculations";
-import { format } from "date-fns";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Link } from "react-router-dom";
-import { toast } from "sonner";
+﻿import {useState} from "react";
+import {base44} from "@/api/base44Client";
 import {
- Dialog,
- DialogContent,
- DialogHeader,
- DialogTitle,
- DialogDescription,
- DialogFooter
+    bulkUpdateQuotes,
+    createLocalRecord,
+    createQuote,
+    createReview,
+    deleteQuote,
+    getCurrentUser,
+    getQuoteById,
+    getQuotes,
+    getReviews,
+    getUsers,
+    isLocalDataSource,
+    listLocalCollection,
+    updateQuote,
+    updateReview
+} from "@/api/dataClient";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {Link, useLocation, useNavigate} from "react-router-dom";
+import {createPageUrl} from "@/utils";
+import {calculateQuoteTotals} from "@/utils/quoteCalculations";
+import {format} from "date-fns";
+import {Card} from "@/components/ui/card";
+import {Button} from "@/components/ui/button";
+import {Textarea} from "@/components/ui/textarea";
+import {Input} from "@/components/ui/input";
+import {Label} from "@/components/ui/label";
+import {toast} from "sonner";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
 } from "@/components/ui/dialog";
-import { 
- ArrowLeft, 
- Pencil, 
- Send, 
- CheckCircle, 
- XCircle,
- Calendar,
- Hash,
- Trash2,
- Download,
- FileText,
- Users,
- Receipt,
- EyeOff,
- UserCog,
- MessageSquarePlus,
- Archive,
- ArchiveRestore,
- CalendarCheck,
- ClipboardList,
- CopyPlus
+import {
+    Archive,
+    ArchiveRestore,
+    ArrowLeft,
+    Calendar,
+    CalendarCheck,
+    CheckCircle,
+    ClipboardList,
+    CopyPlus,
+    Download,
+    EyeOff,
+    FileText,
+    Hash,
+    MessageSquarePlus,
+    Pencil,
+    Receipt,
+    Send,
+    Trash2,
+    UserCog,
+    Users,
+    XCircle
 } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Checkbox } from "@/components/ui/checkbox";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
+import {Switch} from "@/components/ui/switch";
+import {Checkbox} from "@/components/ui/checkbox";
 import StatusBadge from "@/components/quotes/StatusBadge";
-import { motion } from "framer-motion";
-import RoleGuard, { useUserRole } from "@/components/auth/RoleGuard";
-import { generateQuotePDF, generateCustomerQuotePDF } from "@/components/quotes/QuotePDFGenerator";
+import {motion} from "framer-motion";
+import RoleGuard, {useUserRole} from "@/components/auth/RoleGuard";
+import {generateCustomerQuotePDF, generateQuotePDF} from "@/components/quotes/QuotePDFGenerator";
 import QuoteVersionHistory from "@/components/quotes/QuoteVersionHistory";
 import FollowUpHistory from "@/components/quotes/FollowUpHistory";
 import QuoteActivityLog from "@/components/quotes/QuoteActivityLog";

@@ -1,11 +1,10 @@
-﻿import { useState } from "react";
-import { base44 } from "@/api/base44Client";
-import { getQuotes } from "@/api/dataClient";
-import { useQuery } from "@tanstack/react-query";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { subDays, parseISO, isAfter } from "date-fns";
-import { BarChart3, DollarSign, Download, Users } from "lucide-react";
+﻿import {useState} from "react";
+import {getQuotes} from "@/api/dataClient";
+import {useQuery} from "@tanstack/react-query";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
+import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
+import {isAfter, parseISO, subDays} from "date-fns";
+import {BarChart3, DollarSign, Download, Users} from "lucide-react";
 import RoleGuard from "@/components/auth/RoleGuard";
 import CoordinatorBreakdown from "@/components/sla/CoordinatorBreakdown";
 import WeeklyInflow from "@/components/sla/WeeklyInflow.jsx";
@@ -16,8 +15,8 @@ import WeeklyRevenue from "@/components/sla/WeeklyRevenue.jsx";
 import QuarterlyRevenueSummary from "@/components/sla/QuarterlyRevenueSummary.jsx";
 import QuarterlySLASummary from "@/components/sla/QuarterlySLASummary.jsx";
 import QuotePipelineFunnel from "@/components/sla/QuotePipelineFunnel.jsx";
-import { Button } from "@/components/ui/button";
-import { exportQuoteSLAToExcel } from "@/utils/quoteSLAExport";
+import {Button} from "@/components/ui/button";
+import {exportQuoteSLAToExcel} from "@/utils/quoteSLAExport";
 
 function SLAReportingContent() {
  const [dateRange, setDateRange] = useState("90");

@@ -1,19 +1,19 @@
-﻿import { useEffect, useState } from "react";
-import { CalendarRange, RotateCcw } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+﻿import {useEffect, useState} from "react";
+import {CalendarRange, RotateCcw} from "lucide-react";
+import {Button} from "@/components/ui/button";
+import {Card, CardContent} from "@/components/ui/card";
+import {Input} from "@/components/ui/input";
+import {Label} from "@/components/ui/label";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import {
-  RANGE_PRESETS,
-  RANGE_PRESET_OPTIONS,
-  describeRangeCoverage,
-  getPresetLabel,
-  resolveDateRange,
-  resolveDefaultPreset
+    describeRangeCoverage,
+    getPresetLabel,
+    RANGE_PRESET_OPTIONS,
+    RANGE_PRESETS,
+    resolveDateRange,
+    resolveDefaultPreset
 } from "@/features/supervisorDashboard/dateRanges";
-import { formatDateLabel } from "@/features/supervisorDashboard/format";
+import {formatDateLabel} from "@/features/supervisorDashboard/format";
 
 const CUSTOM = RANGE_PRESETS.CUSTOM_RANGE;
 const ALL_HISTORY = RANGE_PRESETS.ALL_HISTORY;

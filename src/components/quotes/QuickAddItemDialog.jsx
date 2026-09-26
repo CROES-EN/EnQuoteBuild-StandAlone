@@ -1,15 +1,9 @@
-import { useState } from "react";
-import { base44 } from "@/api/base44Client";
-import { createProduct } from "@/api/dataClient";
-import { useQueryClient } from "@tanstack/react-query";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import {useState} from "react";
+import {createProduct} from "@/api/dataClient";
+import {useQueryClient} from "@tanstack/react-query";
+import {Dialog, DialogContent, DialogHeader, DialogTitle,} from "@/components/ui/dialog";
 import ProductForm from "@/components/products/ProductForm";
-import { useUserRole } from "@/components/auth/RoleGuard";
+import {useUserRole} from "@/components/auth/RoleGuard";
 
 /**
  * Dialog that lets a user create a new catalog item mid-quote.

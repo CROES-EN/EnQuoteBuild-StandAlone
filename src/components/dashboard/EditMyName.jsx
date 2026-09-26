@@ -1,12 +1,12 @@
-﻿import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { UserCircle, Pencil, Check, X } from "lucide-react";
-import { toast } from "sonner";
+﻿import {useState} from "react";
+import {useMutation, useQueryClient} from "@tanstack/react-query";
+import {base44} from "@/api/base44Client";
+import {Card} from "@/components/ui/card";
+import {Button} from "@/components/ui/button";
+import {Input} from "@/components/ui/input";
+import {Label} from "@/components/ui/label";
+import {Check, Pencil, UserCircle, X} from "lucide-react";
+import {toast} from "sonner";
 
 export default function EditMyName({ currentUser }) {
   const [editing, setEditing] = useState(false);

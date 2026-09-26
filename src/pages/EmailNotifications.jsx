@@ -1,28 +1,16 @@
-﻿import { useState } from "react";
-import { base44 } from "@/api/base44Client";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import {
- Select,
- SelectContent,
- SelectItem,
- SelectTrigger,
- SelectValue,
-} from "@/components/ui/select";
-import {
- Sheet,
- SheetContent,
- SheetHeader,
- SheetTitle,
- SheetDescription,
-} from "@/components/ui/sheet";
-import { Plus, Mail, Trash2, AlertCircle } from "lucide-react";
-import { motion } from "framer-motion";
+﻿import {useState} from "react";
+import {base44} from "@/api/base44Client";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {Card} from "@/components/ui/card";
+import {Button} from "@/components/ui/button";
+import {Label} from "@/components/ui/label";
+import {Switch} from "@/components/ui/switch";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue,} from "@/components/ui/select";
+import {Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle,} from "@/components/ui/sheet";
+import {AlertCircle, Mail, Plus, Trash2} from "lucide-react";
+import {motion} from "framer-motion";
 import RoleGuard from "@/components/auth/RoleGuard";
-import { getUsers } from "@/api/dataClient";
+import {getUsers} from "@/api/dataClient";
 
 const emailTypeLabels = {
  quote_submitted: {

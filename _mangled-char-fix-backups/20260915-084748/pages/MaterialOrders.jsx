@@ -1,22 +1,42 @@
-﻿import { useState } from "react";
-import { base44 } from "@/api/base44Client";
-import { createLocalRecord, deleteLocalRecord, getCurrentUser, listLocalCollection, updateLocalRecord } from "@/api/dataClient";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+﻿import {useState} from "react";
 import {
- Dialog, DialogContent, DialogHeader, DialogTitle,
- DialogDescription, DialogFooter
+    createLocalRecord,
+    deleteLocalRecord,
+    getCurrentUser,
+    listLocalCollection,
+    updateLocalRecord
+} from "@/api/dataClient";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {Card} from "@/components/ui/card";
+import {Button} from "@/components/ui/button";
+import {Input} from "@/components/ui/input";
+import {Textarea} from "@/components/ui/textarea";
+import {Sheet, SheetContent} from "@/components/ui/sheet";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { toast } from "sonner";
-import { format } from "date-fns";
-import { Plus, Search, ShoppingCart, ExternalLink, Pencil, CheckCircle, Package, Truck, XCircle, Trash2 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import RoleGuard, { useUserRole } from "@/components/auth/RoleGuard";
+import {Label} from "@/components/ui/label";
+import {toast} from "sonner";
+import {format} from "date-fns";
+import {
+    CheckCircle,
+    ExternalLink,
+    Package,
+    Pencil,
+    Plus,
+    Search,
+    ShoppingCart,
+    Trash2,
+    Truck,
+    XCircle
+} from "lucide-react";
+import {cn} from "@/lib/utils";
+import RoleGuard, {useUserRole} from "@/components/auth/RoleGuard";
 import MaterialOrderForm from "@/components/materials/MaterialOrderForm";
 import MaterialStatusBadge from "@/components/materials/MaterialStatusBadge";
 

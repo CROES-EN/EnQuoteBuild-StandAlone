@@ -10,8 +10,8 @@
 // No LLM involved anywhere in this file -- pure, deterministic, auditable logic, same
 // style as draftEngine.js.
 
-import { COMPATIBILITY_CATALOG, findMentionedProducts, findBySku } from "./compatibilityCatalog";
-import { findCompatibilityRule } from "./compatibilityMatrix";
+import {findBySku, findMentionedProducts} from "./compatibilityCatalog";
+import {findCompatibilityRule} from "./compatibilityMatrix";
 
 /**
  * Scans a Quote Request's free-text fields (problemDescription, rootCause,

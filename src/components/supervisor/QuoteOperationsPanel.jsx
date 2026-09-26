@@ -1,20 +1,20 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { toast } from "sonner";
-import { FileText, Info } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { getQuotes } from "@/api/dataClient";
-import { saveDailyMetric } from "@/features/supervisorDashboard/opsMetricsStore";
-import { formatNumber } from "@/features/supervisorDashboard/format";
+﻿import {useEffect, useMemo, useRef, useState} from "react";
+import {useQuery} from "@tanstack/react-query";
+import {toast} from "sonner";
+import {FileText, Info} from "lucide-react";
+import {Button} from "@/components/ui/button";
+import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
+import {Input} from "@/components/ui/input";
+import {Label} from "@/components/ui/label";
+import {Checkbox} from "@/components/ui/checkbox";
+import {getQuotes} from "@/api/dataClient";
+import {saveDailyMetric} from "@/features/supervisorDashboard/opsMetricsStore";
+import {formatNumber} from "@/features/supervisorDashboard/format";
 import {
-  computeQuoteOpsMetrics,
-  computeQuoteIntakeGap,
-  isReportableQuote,
-  DEFAULT_COMPLETED_STATUSES
+    computeQuoteIntakeGap,
+    computeQuoteOpsMetrics,
+    DEFAULT_COMPLETED_STATUSES,
+    isReportableQuote
 } from "@/features/supervisorDashboard/quoteOpsMetrics";
 
 // A curated subset of the full quote status vocabulary (see StatusBadge.jsx) offered as

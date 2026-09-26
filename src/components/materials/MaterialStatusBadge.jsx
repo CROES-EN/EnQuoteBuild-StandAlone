@@ -1,4 +1,4 @@
-﻿import { cn } from "@/lib/utils";
+﻿import {cn} from "@/lib/utils";
 
 const statusConfig = {
   draft:     { bg: "bg-muted",   text: "text-muted-foreground",  dot: "bg-slate-400",  label: "Draft" },

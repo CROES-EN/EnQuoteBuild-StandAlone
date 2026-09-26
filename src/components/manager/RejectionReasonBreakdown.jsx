@@ -1,6 +1,6 @@
-﻿import { useMemo } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import { subDays } from "date-fns";
+﻿import {useMemo} from "react";
+import {Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis} from "recharts";
+import {subDays} from "date-fns";
 
 // Map free-text themes → canonical buckets
 const THEME_MAP = [

@@ -6,7 +6,6 @@ const { KNOWN_ENQUOTE_USERS } = require("./knownEnquoteUsers.cjs");
 
 const DATA_VERSION = 1;
 const DEFAULT_SYNC_TTL_MS = 5 * 60 * 1000;
-const DEFAULT_TEMP_PASSWORD = "Enquote1";
 const fileName = "enquote-demo-data-v1.json";
 // Gates the verbose [write-timing] diagnostic logging added this week while chasing the
 // concurrency race + the write() self-deadlock, behind an explicit opt-in env var. Now

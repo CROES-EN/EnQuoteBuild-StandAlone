@@ -1,12 +1,12 @@
-﻿import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RMA_STATUSES } from "@/components/rma/rmaUtils";
-import { format } from "date-fns";
-import { Plus, X, History } from "lucide-react";
+﻿import {useState} from "react";
+import {Button} from "@/components/ui/button";
+import {Input} from "@/components/ui/input";
+import {Label} from "@/components/ui/label";
+import {Textarea} from "@/components/ui/textarea";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
+import {RMA_STATUSES} from "@/components/rma/rmaUtils";
+import {format} from "date-fns";
+import {History, Plus, X} from "lucide-react";
 
 export default function RMAForm({ rma, users, manufacturers, defaultOwner, onSave, onCancel, isLoading }) {
   const [formData, setFormData] = useState({

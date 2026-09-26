@@ -1,8 +1,7 @@
-﻿import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
-import { getQuoteActivities } from "@/api/dataClient";
-import { Card } from "@/components/ui/card";
-import { Clock } from "lucide-react";
+﻿import {useQuery} from "@tanstack/react-query";
+import {getQuoteActivities} from "@/api/dataClient";
+import {Card} from "@/components/ui/card";
+import {Clock} from "lucide-react";
 
 export default function QuoteActivityLog({ quoteId }) {
   const { data: activities = [] } = useQuery({

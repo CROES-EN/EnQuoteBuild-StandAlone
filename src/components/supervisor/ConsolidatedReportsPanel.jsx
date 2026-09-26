@@ -1,5 +1,5 @@
-﻿import { useState } from "react";
-import { Table2, Settings as SettingsIcon } from "lucide-react";
+﻿import {useState} from "react";
+import {Settings as SettingsIcon, Table2} from "lucide-react";
 import AutoImportSettingsPanel from "@/components/supervisor/AutoImportSettingsPanel";
 import ReportDataTablesPanel from "@/components/supervisor/ReportDataTablesPanel";
 

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="DoNotAskProjectManager">
+    <option name="idToDisplayName">
+      <map>
+        <entry key="System Clipboard" value="System clipboard unavailable" />
+        <entry key="Vite" value="Vite configuration analysis failed" />
+      </map>
+    </option>
+  </component>
+</project>

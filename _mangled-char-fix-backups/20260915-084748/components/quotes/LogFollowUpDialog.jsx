@@ -1,21 +1,21 @@
-﻿import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
-import { getCurrentUser, updateQuote } from "@/api/dataClient";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+﻿import {useState} from "react";
+import {useMutation, useQueryClient} from "@tanstack/react-query";
+import {base44} from "@/api/base44Client";
+import {getCurrentUser, updateQuote} from "@/api/dataClient";
+import {Button} from "@/components/ui/button";
+import {Textarea} from "@/components/ui/textarea";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
 } from "@/components/ui/dialog";
-import { MessageSquarePlus, Loader2, AtSign } from "lucide-react";
-import { toast } from "sonner";
-import { parseMentions } from "@/utils/quoteSLA";
+import {AtSign, Loader2, MessageSquarePlus} from "lucide-react";
+import {toast} from "sonner";
+import {parseMentions} from "@/utils/quoteSLA";
 
 export default function LogFollowUpDialog({ quote, open, onOpenChange, onLogged }) {
   const queryClient = useQueryClient();

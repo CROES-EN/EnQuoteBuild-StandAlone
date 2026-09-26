@@ -14,7 +14,7 @@
  * rejects every call with "Unsupported local collection: autoImportSettings".
  */
 
-import { retryBridgeCall } from "@/features/supervisorDashboard/retryBridgeCall";
+import {retryBridgeCall} from "@/features/supervisorDashboard/retryBridgeCall";
 
 const COLLECTION = "autoImportSettings";
 const BROWSER_STORAGE_KEY = "enquote_auto_import_settings_v1";

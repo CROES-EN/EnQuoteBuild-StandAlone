@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+import {createClientFromRequest} from 'npm:@base44/sdk@0.8.40';
 
 // Direct client-side writes to another user's User record are blocked by the platform
 // (a user can only update their own record via base44.auth.updateMe). Admins need a

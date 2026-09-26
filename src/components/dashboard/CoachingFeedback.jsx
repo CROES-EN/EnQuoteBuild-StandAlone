@@ -1,12 +1,10 @@
-﻿import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
-import { getQuotes } from "@/api/dataClient";
-import { getReviews, updateReview } from "@/api/dataClient";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { GraduationCap, CheckCircle, ChevronDown, ChevronRight, Clock, X, CheckCheck } from "lucide-react";
+﻿import {useState} from "react";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {getQuotes, getReviews, updateReview} from "@/api/dataClient";
+import {Card} from "@/components/ui/card";
+import {Button} from "@/components/ui/button";
+import {Badge} from "@/components/ui/badge";
+import {CheckCheck, CheckCircle, ChevronDown, ChevronRight, Clock, GraduationCap, X} from "lucide-react";
 
 /**
  * A review is considered "cleared" (hidden from dashboard) when the

@@ -1,6 +1,6 @@
-﻿import { useMemo } from "react";
-import { Phone, PhoneOff } from "lucide-react";
-import { formatNumber } from "@/features/supervisorDashboard/format";
+﻿import {useMemo} from "react";
+import {Phone, PhoneOff} from "lucide-react";
+import {formatNumber} from "@/features/supervisorDashboard/format";
 
 /**
  * Total Call Volume + Abandoned Calls tiles for Executive Overview, sourced from

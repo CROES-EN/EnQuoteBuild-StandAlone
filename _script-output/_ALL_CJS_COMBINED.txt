@@ -491,7 +491,7 @@ module.exports = { repositoryFor, fileName, DATA_VERSION, normalizeIncomingSnaps
 
 #!/usr/bin/env node
 /**
- * ENquote Webhook Integration - Comprehensive Verification Test
+ * Enquote Webhook Integration - Comprehensive Verification Test
  * 
  * This script verifies all key components of the webhook integration are working:
  * 1. Webhook receiver can start
@@ -505,7 +505,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-console.log('\n=== ENquote Webhook Integration Verification ===\n');
+console.log('\n=== Enquote Webhook Integration Verification ===\n');
 
 const checks = [];
 
@@ -856,10 +856,10 @@ function decryptPayload(envelope) {
   const encoding = (nested && nested.encoding) || 'base64';
   const ivB64 = pickField(envelope, ['iv', 'nonce']) || (nested && pickField(nested, ['iv', 'nonce']));
   const explicitTagB64 = pickField(envelope, ['tag', 'authTag', 'auth_tag']) || (nested && pickField(nested, ['tag', 'authTag', 'auth_tag']));
-  const dataB64 = pickField(envelope, ['ciphertext', 'data', 'payload', 'encrypted_data', 'encryptedData'])
+  const datab64 = pickField(envelope, ['ciphertext', 'data', 'payload', 'encrypted_data', 'encryptedData'])
     || (nested && pickField(nested, ['ciphertext', 'data', 'payload', 'encrypted_data', 'encryptedData']));
 
-  if (!ivB64 || !dataB64) {
+  if (!ivB64 || !datab64) {
     const envelopeKeys = envelope && typeof envelope === 'object' ? Object.keys(envelope) : [];
     const nestedKeys = nested ? Object.keys(nested) : null;
     logEvent('error', 'Encrypted payload is missing iv/ciphertext fields - logging shape for diagnosis.', {
@@ -873,7 +873,7 @@ function decryptPayload(envelope) {
   }
 
   const iv = Buffer.from(ivB64, encoding);
-  let ciphertext = Buffer.from(dataB64, encoding);
+  let ciphertext = Buffer.from(datab64, encoding);
   let authTag;
 
   if (explicitTagB64) {
@@ -902,7 +902,7 @@ function decryptPayload(envelope) {
  * Detection checks (in order): an explicit `encrypted: true` flag, iv/ciphertext fields
  * at the envelope's own top level, a `mode` field indicating encryption (e.g. "encrypted"
  * / "aes-256-gcm"), or a nested `encryption` object - Base44's real delivery shape is
- * `{ schema_version, delivery_id, sent_at, mode, encryption: {...} }` with no top-level
+ * `{ schema_version, delivery_id, sent_at, mode, encryption: {...} ` with no top-level
  * `encrypted` flag at all, which the original version of this function never recognized.
  */
 function resolvePayload(body) {
@@ -1416,38 +1416,38 @@ server.listen(PORT, '127.0.0.1', () => {
 // a given PC - the live, synced Base44 "User" records remain the source of truth for
 // everything else (role, display name, etc.).
 const KNOWN_ENQUOTE_USERS = [
-  { name: "abermudez", email: "abermudez@enphaseenergy.com" },
+  { name: "Bermuda", email: "abermudez@enphaseenergy.com" },
   { name: "ajennings", email: "ajennings@enphaseenergy.com" },
   { name: "Denice Ankenman", email: "REDACTED-USER4@example.invalid" },
   { name: "aschilling", email: "aschilling@enphaseenergy.com" },
-  { name: "asharma", email: "asharma@enphaseenergy.com" },
+  { name: "as harm", email: "asharma@enphaseenergy.com" },
   { name: "bkittelmann", email: "bkittelmann@enphaseenergy.com" },
   { name: "clmorrow", email: "clmorrow@enphaseenergy.com" },
-  { name: "cmckenna", email: "cmckenna@enphaseenergy.com" },
+  { name: "Mckenna", email: "cmckenna@enphaseenergy.com" },
   { name: "croeschberger", email: "croeschberger@enphaseenergy.com" },
   { name: "cwilson", email: "cwilson@enphaseenergy.com" },
   { name: "dankenman", email: "dankenman@enphaseenergy.com" },
-  { name: "dtorchy", email: "dtorchy@enphaseenergy.com" },
+  { name: "touch", email: "dtorchy@enphaseenergy.com" },
   { name: "dudavis", email: "dudavis@enphaseenergy.com" },
-  { name: "hmackey", email: "hmackey@enphaseenergy.com" },
-  { name: "isison", email: "isison@enphaseenergy.com" },
+  { name: "make", email: "hmackey@enphaseenergy.com" },
+  { name: "vision", email: "isison@enphaseenergy.com" },
   { name: "jlasley", email: "jlasley@enphase.com" },
   { name: "jlasley", email: "jlasley@enphaseenergy.com" },
   { name: "Joey Wood", email: "jwood@enphaseenergy.com" },
-  { name: "khaumann", email: "khaumann@enphaseenergy.com" },
+  { name: "human", email: "khaumann@enphaseenergy.com" },
   { name: "mjb", email: "mjb@enphaseenergy.com" },
-  { name: "mkuriakose", email: "mkuriakose@enphaseenergy.com" },
-  { name: "mmccullough", email: "mmccullough@enphaseenergy.com" },
-  { name: "mosley196", email: "REDACTED-USER2@example.invalid" },
-  { name: "nchoudhary", email: "nchoudhary@enphaseenergy.com" },
+  { name: "Kyriakos", email: "mkuriakose@enphaseenergy.com" },
+  { name: "McCullough", email: "mmccullough@enphaseenergy.com" },
+  { name: "Mosley196", email: "REDACTED-USER2@example.invalid" },
+  { name: "Cloudinary", email: "nchoudhary@enphaseenergy.com" },
   { name: "semani", email: "semani@enphaseenergy.com" },
   { name: "sfrederick", email: "sfrederick@enphaseenergy.com" },
   { name: "shawkins", email: "shawkins@enphaseenergy.com" },
   { name: "smosley", email: "smosley@enphaseenergy.com" },
   { name: "Todd Meyer", email: "REDACTED-USER1@example.invalid" },
   { name: "tmeyer", email: "tmeyer@enphaseenergy.com" },
-  { name: "virginiaenphase", email: "REDACTED-USER3@example.invalid" },
-  { name: "vseganos", email: "vseganos@enphaseenergy.com" }
+  { name: "virginities", email: "REDACTED-USER3@example.invalid" },
+  { name: "nosegays", email: "vseganos@enphaseenergy.com" }
 ];
 
 module.exports = { KNOWN_ENQUOTE_USERS };
@@ -1485,7 +1485,7 @@ function loadEnvFile() {
       }
     } catch {
       // A missing/unreadable .env just means outbound sync stays disabled.
-    }
+
   }
 }
 
@@ -1625,7 +1625,7 @@ function watchLocalDataFile() {
   }
 }
 
-// --- O&M Reports Inbox: zero-click auto-import for the Supervisor Dashboard ---
+// --- O'M Reports Inbox: zero-click auto-import for the Supervisor Dashboard ---
 //
 // No live API access exists to Incorta/NICE CXONE/Salesforce/SharePoint (no credentials, no
 // client code anywhere in this app) - so "automatic import" is implemented as a watched local
@@ -2171,7 +2171,7 @@ app.whenReady().then(() => {
   // this for a folder that already exists is always safe, not just on first use.
   ipcMain.handle("reports-folder:create", async (_event, folderPath) => {
     if (typeof folderPath !== "string" || !folderPath.trim()) {
-      return { ok: false, error: "No folder path was provided." };
+      return { ok: false, error: "No folder path was provided." ;
     }
     try {
       fs.mkdirSync(folderPath, { recursive: true });
@@ -2188,7 +2188,7 @@ app.whenReady().then(() => {
   // folders?" prompt can be skipped entirely instead of asking again unnecessarily.
   ipcMain.handle("reports-folder:exists", async (_event, folderPath) => {
     if (typeof folderPath !== "string" || !folderPath.trim()) {
-      return { ok: false, error: "No folder path was provided." };
+      return { ok: false, error: "No folder path was provided." ;
     }
     try {
       const stats = fs.statSync(folderPath);
@@ -2201,10 +2201,10 @@ app.whenReady().then(() => {
 
   ipcMain.handle("reports-folder:read-files", async (_event, folderPath) => {
     if (typeof folderPath !== "string" || !folderPath.trim()) {
-      return { ok: false, error: "No folder path was provided." };
+      return { ok: false, error: "No folder path was provided." ;
     }
     if (!fs.existsSync(folderPath)) {
-      return { ok: false, error: "That folder no longer exists at its original location." };
+      return { ok: false, error: "That folder no longer exists at its original location." ;
     }
     const IMPORT_FOLDER_EXTENSIONS = new Set([".xlsx", ".xls", ".csv", ".html", ".htm"]);
     let entries;
@@ -2252,7 +2252,7 @@ app.whenReady().then(() => {
   // the CSV/XLSX download automatically instead of requiring a manual Downloads-folder import).
   ipcMain.handle("salesforce:open-report", (_event, reportUrl, userEmail) => {
     if (typeof reportUrl !== "string" || !reportUrl.trim()) {
-      return { ok: false, error: "No Salesforce report URL was provided." };
+      return { ok: false, error: "No Salesforce report URL was provided." ;
     }
     openSalesforceReportWindow(reportUrl, (result) => {
       BrowserWindow.getAllWindows().forEach((win) => win.webContents.send("salesforce:file-downloaded", result));
@@ -2264,7 +2264,7 @@ app.whenReady().then(() => {
     return { ok: true };
   });
 
-  // O&M Reports Inbox - zero-click auto-import (see watchReportsInbox()/processReportsInboxFile()
+  // O'M Reports Inbox - zero-click auto-import (see watchReportsInbox()/processReportsInboxFile()
   // above for the watcher itself). These handlers let the renderer discover/open the watched
   // folder, ask for an immediate re-scan (e.g. right after it registers its "new-file" listener,
   // to pick up anything dropped in before the app/listener was ready), and report back whether an
@@ -2504,7 +2504,7 @@ function createOutboundSync({ repository, config, logger = console, onAfterWrite
   async function fetchRemoteQuote(remoteId) {
     const response = await requestJson(`${entityUrl()}/${remoteId}`, { headers: authHeaders() });
     if (!response.ok || !response.body || typeof response.body !== "object") {
-      return { ok: false, error: response.error || "Could not read Base44's current copy of this quote." };
+      return { ok: false, error: response.error || "Could not read Base44's current copy of this quote." ;
     }
     return { ok: true, quote: response.body };
   }
@@ -3295,7 +3295,7 @@ function repositoryFor(userDataPath) {
         // the marker WITHIN the message (see EditQuote.jsx), not an exact prefix/property.
         const conflict = new Error(
           "CONFLICT: This quote was changed elsewhere since you opened it. Reload to see the latest version before saving your changes."
-        );
+        ;
         conflict.code = "CONFLICT";
         conflict.currentQuote = current;
         throw conflict;

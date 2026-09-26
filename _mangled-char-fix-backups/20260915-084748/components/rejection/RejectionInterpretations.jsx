@@ -1,9 +1,9 @@
-﻿import { useState } from "react";
-import { base44 } from "@/api/base44Client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { AlertTriangle, Brain, RefreshCw, TrendingDown, ChevronDown, ChevronUp, Lightbulb, Target } from "lucide-react";
+﻿import {useState} from "react";
+import {base44} from "@/api/base44Client";
+import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
+import {Badge} from "@/components/ui/badge";
+import {Button} from "@/components/ui/button";
+import {AlertTriangle, Brain, ChevronDown, ChevronUp, Lightbulb, RefreshCw, Target, TrendingDown} from "lucide-react";
 
 const severityColors = {
  critical: "bg-red-100 text-red-700 border-red-200",

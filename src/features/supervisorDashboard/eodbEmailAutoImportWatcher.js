@@ -25,8 +25,8 @@
  * or imported, exactly like a genuinely unrecognized file.
  */
 
-import { readWorkbookFromBytes } from "@/features/supervisorDashboard/reportParsing";
-import { saveReportTableWithRetry } from "@/features/supervisorDashboard/saveReportTableWithRetry";
+import {readWorkbookFromBytes} from "@/features/supervisorDashboard/reportParsing";
+import {saveReportTableWithRetry} from "@/features/supervisorDashboard/saveReportTableWithRetry";
 
 const EODB_WIDGET_RULES = [
   { match: /total call volume/i, reportType: "eodb_total_call_volume" },

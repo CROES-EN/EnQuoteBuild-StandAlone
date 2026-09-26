@@ -1,8 +1,8 @@
-﻿import { useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { TrendingDown, TrendingUp, Minus, AlertCircle, CheckCircle2, Clock } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
+﻿import {useMemo} from "react";
+import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
+import {Badge} from "@/components/ui/badge";
+import {Minus, TrendingDown, TrendingUp} from "lucide-react";
+import {Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis} from "recharts";
 
 export default function RejectionOverview({ allQuotes = [], users = [] }) {
   // Build a map from user ID -> display name

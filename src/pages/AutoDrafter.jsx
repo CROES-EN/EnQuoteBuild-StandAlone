@@ -1,26 +1,26 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
+import {useCallback, useEffect, useRef, useState} from "react";
+import {Button} from "@/components/ui/button";
+import {Card} from "@/components/ui/card";
+import {Badge} from "@/components/ui/badge";
+import {Input} from "@/components/ui/input";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle
 } from "@/components/ui/alert-dialog";
-import { Upload, Trash2, Search, Sparkles, FileText } from "lucide-react";
-import { getReportTable, deleteReportTable } from "@/features/supervisorDashboard/importedTableStore";
-import { listGeneratedDrafts, clearAllGeneratedDrafts } from "@/features/autoDrafter/autoDrafterDraftsStore";
+import {FileText, Search, Sparkles, Trash2, Upload} from "lucide-react";
+import {deleteReportTable, getReportTable} from "@/features/supervisorDashboard/importedTableStore";
+import {clearAllGeneratedDrafts, listGeneratedDrafts} from "@/features/autoDrafter/autoDrafterDraftsStore";
 import ImportAsTableDialog from "@/components/supervisor/ImportAsTableDialog";
 import SalesforceImportButton from "@/components/supervisor/SalesforceImportButton";
 import {
-  getSalesforceReportUrl,
-  setSalesforceReportUrl
+    getSalesforceReportUrl,
+    setSalesforceReportUrl
 } from "@/features/quoteRequestIntake/autoDrafterSalesforceSettings";
 import AutoDrafterCaseTile from "@/components/autoDrafter/AutoDrafterCaseTile";
 import AutoDrafterDraftDetails from "@/components/autoDrafter/AutoDrafterDraftDetails";

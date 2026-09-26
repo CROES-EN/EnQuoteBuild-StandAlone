@@ -1,7 +1,7 @@
-﻿import { Card } from "@/components/ui/card";
-import { motion } from "framer-motion";
-import { ArrowUp, ArrowDown, Minus } from "lucide-react";
-import { Link } from "react-router-dom";
+﻿import {Card} from "@/components/ui/card";
+import {motion} from "framer-motion";
+import {ArrowDown, ArrowUp, Minus} from "lucide-react";
+import {Link} from "react-router-dom";
 
 export default function MetricCard({ title, value, subtitle, icon: Icon, trend, index = 0, href, iconBg }) {
   const getTrendIcon = () => {

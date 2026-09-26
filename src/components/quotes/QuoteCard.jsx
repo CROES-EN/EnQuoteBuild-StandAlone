@@ -1,14 +1,14 @@
-﻿import { Card } from "@/components/ui/card";
-import { format } from "date-fns";
-import { FileText, Calendar, User } from "lucide-react";
-import { Link } from "react-router-dom";
-import { createPageUrl } from "@/utils";
-import { calculateQuoteTotals } from "@/utils/quoteCalculations";
-import { getEffectiveLevel } from "@/utils/quoteSLA";
+﻿import {Card} from "@/components/ui/card";
+import {format} from "date-fns";
+import {Calendar, FileText, User} from "lucide-react";
+import {Link} from "react-router-dom";
+import {createPageUrl} from "@/utils";
+import {calculateQuoteTotals} from "@/utils/quoteCalculations";
+import {getEffectiveLevel} from "@/utils/quoteSLA";
 import StatusBadge from "./StatusBadge";
-import { SLAAlertBadge, MentionBadge } from "./AlertBadge";
-import { motion } from "framer-motion";
-import { Checkbox } from "@/components/ui/checkbox";
+import {MentionBadge, SLAAlertBadge} from "./AlertBadge";
+import {motion} from "framer-motion";
+import {Checkbox} from "@/components/ui/checkbox";
 
 export default function QuoteCard({ quote, index = 0, selectable = false, isSelected = false, onToggleSelect, alert = null, hasMention = false, mentionPriority, mentionMessage, mentionedBy, onClearAlert }) {
   const { total: calculatedTotal } = calculateQuoteTotals(quote);

@@ -22,7 +22,7 @@
  *      other "default until customized" preference in this app).
  */
 
-import { scopedKey } from "@/lib/userScopedStorage";
+import {scopedKey} from "@/lib/userScopedStorage";
 
 const STORAGE_KEY = "enquote_workload_salesforce_report_url";
 

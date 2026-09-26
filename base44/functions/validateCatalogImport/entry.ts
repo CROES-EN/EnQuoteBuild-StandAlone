@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+import {createClientFromRequest} from 'npm:@base44/sdk@0.8.40';
 
 const retailers = [
   { name: 'The Home Depot', url: 'https://www.homedepot.com/', domains: ['homedepot.com'] },

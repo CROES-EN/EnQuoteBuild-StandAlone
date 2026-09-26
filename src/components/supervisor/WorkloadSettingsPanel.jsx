@@ -1,36 +1,35 @@
-import { useEffect, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trash2, Plus, ChevronUp, ChevronDown, GripVertical, X } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { ALL_OM_STATUS_VALUES } from "@/features/supervisorDashboard/workloadStatusColors";
-import { getCurrentUser } from "@/api/dataClient";
+import {useEffect, useState} from "react";
+import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from "@/components/ui/dialog";
+import {Button} from "@/components/ui/button";
+import {Input} from "@/components/ui/input";
+import {Checkbox} from "@/components/ui/checkbox";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
+import {ChevronDown, ChevronUp, GripVertical, Plus, Trash2, X} from "lucide-react";
+import {cn} from "@/lib/utils";
+import {ALL_OM_STATUS_VALUES} from "@/features/supervisorDashboard/workloadStatusColors";
+import {getCurrentUser} from "@/api/dataClient";
 import {
-  TILE_COLOR_OPTIONS,
-  getTiles,
-  setTiles as saveTiles,
-  resetTiles,
-  DEFAULT_COLUMN_ORDER,
-  getColumnOrder,
-  setColumnOrder as saveColumnOrder,
-  resetColumnOrder,
-  getHiddenWorkloadColumns,
-  setColumnHidden,
-  resetHiddenColumns,
-  SORTABLE_COLUMNS,
-  getDefaultSortColumn,
-  setDefaultSortColumn as saveDefaultSortColumn,
-  getRowDensity,
-  setRowDensity as saveRowDensity,
-  getManagementReviewNames,
-  setManagementReviewNames as saveManagementReviewNames,
-  resetManagementReviewNames,
-  getMyCaseOwnerName,
-  setMyCaseOwnerName as saveMyCaseOwnerName,
-  resetMyCaseOwnerName
+    getColumnOrder,
+    getDefaultSortColumn,
+    getHiddenWorkloadColumns,
+    getManagementReviewNames,
+    getMyCaseOwnerName,
+    getRowDensity,
+    getTiles,
+    resetColumnOrder,
+    resetHiddenColumns,
+    resetManagementReviewNames,
+    resetMyCaseOwnerName,
+    resetTiles,
+    setColumnHidden,
+    setColumnOrder as saveColumnOrder,
+    setDefaultSortColumn as saveDefaultSortColumn,
+    setManagementReviewNames as saveManagementReviewNames,
+    setMyCaseOwnerName as saveMyCaseOwnerName,
+    setRowDensity as saveRowDensity,
+    setTiles as saveTiles,
+    SORTABLE_COLUMNS,
+    TILE_COLOR_OPTIONS
 } from "@/features/supervisorDashboard/workloadPreferences";
 
 let tileIdCounter = 0;

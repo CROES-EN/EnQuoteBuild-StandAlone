@@ -1,22 +1,15 @@
-﻿import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/lib/AuthContext";
-import { getUsers } from "@/api/dataClient";
-import { KNOWN_ENQUOTE_USERS } from "@/lib/knownEnquoteUsers";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import {
- Command,
- CommandInput,
- CommandList,
- CommandEmpty,
- CommandGroup,
- CommandItem
-} from "@/components/ui/command";
-import { Lock, LogIn, ShieldCheck, ChevronsUpDown, KeyRound } from "lucide-react";
+﻿import {useMemo, useState} from "react";
+import {useQuery} from "@tanstack/react-query";
+import {useAuth} from "@/lib/AuthContext";
+import {getUsers} from "@/api/dataClient";
+import {KNOWN_ENQUOTE_USERS} from "@/lib/knownEnquoteUsers";
+import {Card} from "@/components/ui/card";
+import {Button} from "@/components/ui/button";
+import {Input} from "@/components/ui/input";
+import {Label} from "@/components/ui/label";
+import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
+import {Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList} from "@/components/ui/command";
+import {ChevronsUpDown, KeyRound, Lock, LogIn, ShieldCheck} from "lucide-react";
 import appPackage from "../../../package.json";
 
 const appVersion = appPackage?.version || "0.0.0";

@@ -1,6 +1,6 @@
-﻿import { Card } from "@/components/ui/card";
-import { User, FileText, Clock, DollarSign } from "lucide-react";
-import { differenceInHours, parseISO } from "date-fns";
+﻿import {Card} from "@/components/ui/card";
+import {Clock, DollarSign, FileText, User} from "lucide-react";
+import {differenceInHours, parseISO} from "date-fns";
 
 export default function CoordinatorPerformance({ quotes }) {
   // Group by coordinator (created_by)

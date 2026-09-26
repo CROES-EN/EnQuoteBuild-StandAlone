@@ -25,7 +25,7 @@
  * are ever wanted, this is a well-contained place to add a separate revisions table later.
  */
 
-import { retryBridgeCall } from "@/features/supervisorDashboard/retryBridgeCall";
+import {retryBridgeCall} from "@/features/supervisorDashboard/retryBridgeCall";
 
 const COLLECTION = "supervisorReportTables";
 const BROWSER_STORAGE_KEY = "enquote_supervisor_report_tables_v1";

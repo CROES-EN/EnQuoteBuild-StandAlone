@@ -1,25 +1,19 @@
-﻿import { useState, useMemo } from "react";
-import { base44 } from "@/api/base44Client";
-import { createLocalRecord, getCurrentUser, getUsers, listLocalCollection, updateLocalRecord } from "@/api/dataClient";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import {
- DropdownMenu,
- DropdownMenuContent,
- DropdownMenuItem,
- DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Search, Download, LayoutDashboard, List } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { toast } from "sonner";
-import RoleGuard, { useUserRole } from "@/components/auth/RoleGuard";
+﻿import {useMemo, useState} from "react";
+import {createLocalRecord, getCurrentUser, getUsers, listLocalCollection, updateLocalRecord} from "@/api/dataClient";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {Button} from "@/components/ui/button";
+import {Input} from "@/components/ui/input";
+import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog";
+import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
+import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
+import {Download, LayoutDashboard, List, Plus, Search} from "lucide-react";
+import {cn} from "@/lib/utils";
+import {toast} from "sonner";
+import RoleGuard, {useUserRole} from "@/components/auth/RoleGuard";
 import RMAForm from "@/components/rma/RMAForm";
 import RMADashboard from "@/components/rma/RMADashboard";
 import RMAList from "@/components/rma/RMAList";
-import { getDaysOpen, getDaysInCurrentStatus } from "@/components/rma/rmaUtils";
+import {getDaysInCurrentStatus, getDaysOpen} from "@/components/rma/rmaUtils";
 
 const QUICK_FILTERS = [
  { value: "all", label: "All RMAs" },

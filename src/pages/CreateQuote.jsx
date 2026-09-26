@@ -1,16 +1,15 @@
-﻿import { useState } from "react";
-import { base44 } from "@/api/base44Client";
-import { createQuote, getCurrentUser, getProducts, getQuotes, isLocalDataSource } from "@/api/dataClient";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
-import { createPageUrl } from "@/utils";
-import { ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Link } from "react-router-dom";
+﻿import {useState} from "react";
+import {base44} from "@/api/base44Client";
+import {createQuote, getCurrentUser, getProducts, getQuotes, isLocalDataSource} from "@/api/dataClient";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {Link, useNavigate} from "react-router-dom";
+import {createPageUrl} from "@/utils";
+import {ArrowLeft} from "lucide-react";
+import {Button} from "@/components/ui/button";
+import {Card} from "@/components/ui/card";
 import QuoteForm from "@/components/quotes/QuoteForm";
-import RoleGuard, { useUserRole } from "@/components/auth/RoleGuard";
-import { toast } from "sonner";
+import RoleGuard, {useUserRole} from "@/components/auth/RoleGuard";
+import {toast} from "sonner";
 
 function CreateQuoteContent() {
  const { isAdmin } = useUserRole();

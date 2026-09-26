@@ -25,7 +25,7 @@
 // SheetJS's real ESM build (xlsx.mjs, what Vite/Rollup resolve for the browser bundle) only
 // exposes named exports (read/utils/SSF/etc.) with no default export - verified against the
 // installed node_modules/xlsx/xlsx.mjs. Named imports are required here for the build to work.
-import { read, utils, SSF } from "xlsx";
+import {read, SSF, utils} from "xlsx";
 
 export const FIELD_DEFINITIONS = [
   {

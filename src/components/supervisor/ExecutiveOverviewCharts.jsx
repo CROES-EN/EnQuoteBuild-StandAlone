@@ -1,11 +1,9 @@
-﻿import { useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import {
-  ResponsiveContainer, ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend
-} from "recharts";
-import { Activity } from "lucide-react";
-import { formatDateLabel } from "@/features/supervisorDashboard/format";
+﻿import {useMemo, useState} from "react";
+import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
+import {ToggleGroup, ToggleGroupItem} from "@/components/ui/toggle-group";
+import {Bar, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis} from "recharts";
+import {Activity} from "lucide-react";
+import {formatDateLabel} from "@/features/supervisorDashboard/format";
 
 function isFiniteNumber(value) {
   return typeof value === "number" && Number.isFinite(value);

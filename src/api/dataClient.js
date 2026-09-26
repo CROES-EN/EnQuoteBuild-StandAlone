@@ -1,25 +1,13 @@
-import {
-  base44DualAdapter
-} from "./adapters/base44DualAdapter";
-import {
-  base44Adapter
-} from "./adapters/base44Adapter";
+import {base44DualAdapter} from "./adapters/base44DualAdapter";
+import {base44Adapter} from "./adapters/base44Adapter";
 
-import {
-  mockAdapter
-} from "./adapters/mockAdapter";
+import {mockAdapter} from "./adapters/mockAdapter";
 
-import {
-  localAdapter
-} from "./adapters/localAdapter";
+import {localAdapter} from "./adapters/localAdapter";
 
-import {
-  salesforceAdapter
-} from "./adapters/salesforceAdapter";
+import {salesforceAdapter} from "./adapters/salesforceAdapter";
 
-import {
-  salesforceMockAdapter
-} from "./adapters/salesforceMockAdapter";
+import {salesforceMockAdapter} from "./adapters/salesforceMockAdapter";
 
 const DATA_SOURCE =
   import.meta.env.VITE_DATA_SOURCE ||

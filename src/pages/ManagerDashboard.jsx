@@ -1,15 +1,13 @@
-﻿import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
-import { getCurrentUser, getQuotes, getReviews } from "@/api/dataClient";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+﻿import {useEffect, useState} from "react";
+import {useQuery} from "@tanstack/react-query";
+import {getCurrentUser, getQuotes, getReviews} from "@/api/dataClient";
+import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
 import RejectionRateChart from "@/components/manager/RejectionRateChart";
 import CommonRejectionReasons from "@/components/manager/CommonRejectionReasons";
 import FeedbackThemes from "@/components/manager/FeedbackThemes";
 import TurnaroundByTeam from "@/components/manager/TurnaroundByTeam";
 import RejectionReasonBreakdown from "@/components/manager/RejectionReasonBreakdown";
-import { TrendingDown, AlertCircle, MessageSquare, Timer, Lock, PieChart } from "lucide-react";
+import {AlertCircle, Lock, MessageSquare, PieChart, Timer, TrendingDown} from "lucide-react";
 
 const ALLOWED_USERS = ["tjm8189", "vseganos"];
 

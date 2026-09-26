@@ -28,7 +28,7 @@
  * they personally customize it.
  */
 
-import { scopedKey } from "@/lib/userScopedStorage";
+import {scopedKey} from "@/lib/userScopedStorage";
 
 const STORAGE_KEY_PREFIX = "enquote_report_table_hidden_columns_";
 const STORAGE_KEY_SHOWN_PREFIX = "enquote_report_table_shown_columns_";

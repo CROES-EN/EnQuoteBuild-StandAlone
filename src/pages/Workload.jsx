@@ -1,19 +1,19 @@
-import { useCallback, useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {useCallback, useEffect, useState} from "react";
+import {Button} from "@/components/ui/button";
+import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle
 } from "@/components/ui/alert-dialog";
-import { Upload, Trash2 } from "lucide-react";
+import {Trash2, Upload} from "lucide-react";
 import RoleGuard from "@/components/auth/RoleGuard";
-import { getReportTable, deleteReportTable } from "@/features/supervisorDashboard/importedTableStore";
+import {deleteReportTable, getReportTable} from "@/features/supervisorDashboard/importedTableStore";
 import ImportAsTableDialog from "@/components/supervisor/ImportAsTableDialog";
 import WorkloadReportTable from "@/components/supervisor/WorkloadReportTable";
 import SalesforceImportButton from "@/components/supervisor/SalesforceImportButton";

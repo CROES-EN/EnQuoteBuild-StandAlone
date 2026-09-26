@@ -1,18 +1,24 @@
-﻿import { useState } from "react";
-import { base44 } from "@/api/base44Client";
-import { getCurrentUser, getQuotes, updateQuote } from "@/api/dataClient";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Link, useLocation} from "react-router-dom";
-import { createPageUrl } from "@/utils";
-import { Search, ArchiveRestore, Archive, Calendar, DollarSign, User, MessageSquare } from "lucide-react";
-import { format, formatDistanceToNow } from "date-fns";
-import { toast } from "sonner";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import RoleGuard, { useUserRole } from "@/components/auth/RoleGuard";
+﻿import {useState} from "react";
+import {getCurrentUser, getQuotes, updateQuote} from "@/api/dataClient";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {Input} from "@/components/ui/input";
+import {Button} from "@/components/ui/button";
+import {Card} from "@/components/ui/card";
+import {Link, useLocation} from "react-router-dom";
+import {createPageUrl} from "@/utils";
+import {Archive, ArchiveRestore, DollarSign, MessageSquare, Search, User} from "lucide-react";
+import {format, formatDistanceToNow} from "date-fns";
+import {toast} from "sonner";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
+} from "@/components/ui/dialog";
+import {Textarea} from "@/components/ui/textarea";
+import RoleGuard, {useUserRole} from "@/components/auth/RoleGuard";
 import StatusBadge from "@/components/quotes/StatusBadge";
 
 function BoneyardContent() {

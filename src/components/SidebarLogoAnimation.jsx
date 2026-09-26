@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { cn } from "@/lib/utils";
+import {useEffect, useRef, useState} from "react";
+import {cn} from "@/lib/utils";
 import markBuildSprite from "@/assets/mark-build-sprite.png";
 import markSettled from "@/assets/mark-settled.png";
 

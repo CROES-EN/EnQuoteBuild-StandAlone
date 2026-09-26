@@ -38,8 +38,8 @@
 // same "never invent, reduce confidence instead" discipline used everywhere else in this
 // codebase.
 
-import { findMentionedProducts, findBySku } from "./compatibilityCatalog";
-import { findDependencies } from "./productDependencyMatrix";
+import {findBySku, findMentionedProducts} from "./compatibilityCatalog";
+import {findDependencies} from "./productDependencyMatrix";
 
 // childSkus already surfaced by componentDependencies.js's own hardcoded rules -- skipped
 // here to avoid showing the same dependency twice under two different advisory entries.

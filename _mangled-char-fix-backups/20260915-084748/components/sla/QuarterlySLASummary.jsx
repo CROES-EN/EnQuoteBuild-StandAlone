@@ -1,6 +1,6 @@
-﻿import { Card } from "@/components/ui/card";
-import { parseISO, getYear, getQuarter, differenceInHours } from "date-fns";
-import { Clock } from "lucide-react";
+﻿import {Card} from "@/components/ui/card";
+import {differenceInHours, getQuarter, getYear, parseISO} from "date-fns";
+import {Clock} from "lucide-react";
 
 function getQuarterKey(date) {
   return `${getYear(date)} Q${getQuarter(date)}`;

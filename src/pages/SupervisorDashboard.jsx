@@ -1,10 +1,8 @@
-﻿import { useEffect, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+﻿import {useEffect, useState} from "react";
+import {useQuery, useQueryClient} from "@tanstack/react-query";
+import {Button} from "@/components/ui/button";
+import {Card, CardContent} from "@/components/ui/card";
+import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
 import RoleGuard from "@/components/auth/RoleGuard";
 import ImportReportDialog from "@/components/supervisor/ImportReportDialog";
 import DailyMetricsForm from "@/components/supervisor/DailyMetricsForm";
@@ -17,14 +15,17 @@ import CareSubscriptionsTabPanel from "@/components/supervisor/CareSubscriptions
 import SfdcQuotesTabPanel from "@/components/supervisor/SfdcQuotesTabPanel";
 import ReportInventory from "@/components/supervisor/ReportInventory";
 import ConsolidatedReportsPanel from "@/components/supervisor/ConsolidatedReportsPanel";
-import { listDailyMetrics, isElectronBacked } from "@/features/supervisorDashboard/opsMetricsStore";
-import { getPriorBusinessDate } from "@/features/supervisorDashboard/omSnapshotCalculations";
-import { DEFAULT_COMPLETED_STATUSES } from "@/features/supervisorDashboard/quoteOpsMetrics";
-import { getLastImportedFile, canOpenLocalFiles, openLastImportedFile } from "@/features/supervisorDashboard/lastImportedFile";
-import { toast } from "sonner";
+import {isElectronBacked, listDailyMetrics} from "@/features/supervisorDashboard/opsMetricsStore";
+import {getPriorBusinessDate} from "@/features/supervisorDashboard/omSnapshotCalculations";
+import {DEFAULT_COMPLETED_STATUSES} from "@/features/supervisorDashboard/quoteOpsMetrics";
 import {
-  Upload, Plus, HardDrive, Info, Gauge, BookMarked, CalendarDays, NotebookText, FileSpreadsheet, FolderInput, Table2, Grid3x3
-} from "lucide-react";
+    canOpenLocalFiles,
+    getLastImportedFile,
+    openLastImportedFile
+} from "@/features/supervisorDashboard/lastImportedFile";
+import {toast} from "sonner";
+import {BookMarked, FileSpreadsheet, Gauge, Grid3x3, HardDrive, Info, NotebookText, Table2} from "lucide-react";
+
 const QUERY_KEY = ["supervisor-daily-metrics"];
 function SupervisorDashboardContent() {
   const queryClient = useQueryClient();

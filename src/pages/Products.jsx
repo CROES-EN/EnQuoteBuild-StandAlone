@@ -1,36 +1,31 @@
-﻿import { useState } from "react";
-import { base44 } from "@/api/base44Client";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+﻿import {useState} from "react";
+import {base44} from "@/api/base44Client";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {Input} from "@/components/ui/input";
+import {Button} from "@/components/ui/button";
+import {Card} from "@/components/ui/card";
+import {Sheet, SheetContent,} from "@/components/ui/sheet";
 import {
- Sheet,
- SheetContent,
-} from "@/components/ui/sheet";
-import {
- Dialog,
- DialogContent,
- DialogHeader,
- DialogTitle,
- DialogDescription,
- DialogFooter
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
 } from "@/components/ui/dialog";
-import { Search, Plus, Package, Settings2, Info, Download, Upload, ClipboardCheck } from "lucide-react";
-import { exportProductsToExcel } from "@/utils/productExport";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Switch } from "@/components/ui/switch";
-import { cn } from "@/lib/utils";
+import {ClipboardCheck, Download, Info, Package, Plus, Search, Settings2, Upload} from "lucide-react";
+import {exportProductsToExcel} from "@/utils/productExport";
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from "@/components/ui/tooltip";
+import {Switch} from "@/components/ui/switch";
+import {cn} from "@/lib/utils";
 import ProductCard from "@/components/products/ProductCard";
 import ProductForm from "@/components/products/ProductForm";
 import CategoryManager from "@/components/products/CategoryManager";
 import ImportValidateDialog from "@/components/products/ImportValidateDialog";
 import PriceReviewDialog from "@/components/products/PriceReviewDialog";
 import CatalogReviewDialog from "@/components/products/CatalogReviewDialog";
-import RoleGuard from "@/components/auth/RoleGuard";
-import { useUserRole } from "@/components/auth/RoleGuard";
-import { createProduct, deleteProduct, getProducts, updateProduct } from "@/api/dataClient";
-
+import RoleGuard, {useUserRole} from "@/components/auth/RoleGuard";
+import {createProduct, deleteProduct, getProducts, updateProduct} from "@/api/dataClient";
 
 
 function ProductsContent() {

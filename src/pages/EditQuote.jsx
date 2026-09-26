@@ -1,18 +1,24 @@
-﻿import { useState } from "react";
-import { base44 } from "@/api/base44Client";
-import { createQuote, getCurrentUser, getProducts, getQuoteById, getQuotes, isLocalDataSource, updateQuote } from "@/api/dataClient";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate, useLocation} from "react-router-dom";
-import { createPageUrl } from "@/utils";
-import { ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+﻿import {useState} from "react";
+import {base44} from "@/api/base44Client";
+import {
+    createQuote,
+    getCurrentUser,
+    getProducts,
+    getQuoteById,
+    getQuotes,
+    isLocalDataSource,
+    updateQuote
+} from "@/api/dataClient";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {Link, useLocation, useNavigate} from "react-router-dom";
+import {createPageUrl} from "@/utils";
+import {AlertTriangle, ArrowLeft} from "lucide-react";
+import {Button} from "@/components/ui/button";
 import QuoteForm from "@/components/quotes/QuoteForm";
 import QuoteVersionHistory from "@/components/quotes/QuoteVersionHistory";
-import RoleGuard, { useUserRole } from "@/components/auth/RoleGuard";
-import { toast } from "sonner";
-import { AlertTriangle } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import RoleGuard, {useUserRole} from "@/components/auth/RoleGuard";
+import {toast} from "sonner";
+import {Card} from "@/components/ui/card";
 
 function EditQuoteContent() {
  const { isApprover, isAdmin, roles, user, isLoading: loadingUser } = useUserRole();

@@ -12,8 +12,8 @@
 // Quote record. It is designed to be saved ONLY onto its originating Auto-Drafter case row
 // (see autoDrafterCaseDrafts.js), never into Quotes storage.
 
-import { parseQuoteRequestOutput, hasQuoteRequestEvidence } from "@/features/quoteDraftAgent/quoteRequestTextParser";
-import { generateQuoteDraft, detectQuoteBlockingIssues } from "@/features/quoteDraftAgent/draftEngine";
+import {hasQuoteRequestEvidence, parseQuoteRequestOutput} from "@/features/quoteDraftAgent/quoteRequestTextParser";
+import {detectQuoteBlockingIssues, generateQuoteDraft} from "@/features/quoteDraftAgent/draftEngine";
 
 /**
  * Attempts to generate a Quote Draft directly from a raw Auto-Drafter case comment (the

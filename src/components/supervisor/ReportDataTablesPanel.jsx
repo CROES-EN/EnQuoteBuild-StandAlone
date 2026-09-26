@@ -1,18 +1,18 @@
-﻿import { useCallback, useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+﻿import {useCallback, useEffect, useState} from "react";
+import {Button} from "@/components/ui/button";
+import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle
 } from "@/components/ui/alert-dialog";
-import { Upload, Table2, Trash2 } from "lucide-react";
-import { listReportTables, deleteReportTable } from "@/features/supervisorDashboard/importedTableStore";
+import {Table2, Trash2, Upload} from "lucide-react";
+import {deleteReportTable, listReportTables} from "@/features/supervisorDashboard/importedTableStore";
 import ImportAsTableDialog from "@/components/supervisor/ImportAsTableDialog";
 import ReportDataTable from "@/components/supervisor/ReportDataTable";
 import CareDataHygieneReport from "@/components/supervisor/CareDataHygieneReport";

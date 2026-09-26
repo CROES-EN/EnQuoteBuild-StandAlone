@@ -1,6 +1,6 @@
-﻿import { useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
-import { useAuth } from '@/lib/AuthContext';
+﻿import {useEffect} from 'react';
+import {Outlet} from 'react-router-dom';
+import {useAuth} from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 
 const DefaultFallback = () => (

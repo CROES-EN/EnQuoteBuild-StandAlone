@@ -1,22 +1,10 @@
-import { base44 } from "@/api/base44Client";
-import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/lib/AuthContext";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { ShieldAlert, LogIn } from "lucide-react";
+import {base44} from "@/api/base44Client";
+import {useQuery} from "@tanstack/react-query";
+import {useAuth} from "@/lib/AuthContext";
+import {Card} from "@/components/ui/card";
+import {Button} from "@/components/ui/button";
+import {LogIn, ShieldAlert} from "lucide-react";
 import appPackage from "../../../package.json";
-
-const isLocalDemo = ["mock", "local", "salesforce-mock"].includes(import.meta.env.VITE_DATA_SOURCE);
-const appVersion = appPackage?.version || "0.0.0";
-
-function AppVersionBadge() {
- return (
- <div className="fixed bottom-4 left-4 z-10 rounded-md border border-border bg-card/90 px-2.5 py-1 text-[10px] font-medium tracking-wide text-muted-foreground shadow-sm backdrop-blur-sm">
- v{appVersion}
- </div>
- );
-}
-
 // Shared hook: fetches the current Base44 user, and -- critically -- surfaces
 // an explicit "needs login" state instead of hanging forever when the
 // session is missing or expired. Base44 remains the required source of
@@ -39,7 +27,18 @@ function AppVersionBadge() {
 // invalidation-triggered refetch happens silently in the background, and `children` stays
 // mounted and visible the entire time, exactly like the Workload/Report Data non-flicker fix
 // applied earlier tonight.
-import { useRef, useState, useEffect } from "react";
+import {useEffect, useRef, useState} from "react";
+
+const isLocalDemo = ["mock", "local", "salesforce-mock"].includes(import.meta.env.VITE_DATA_SOURCE);
+const appVersion = appPackage?.version || "0.0.0";
+
+function AppVersionBadge() {
+ return (
+ <div className="fixed bottom-4 left-4 z-10 rounded-md border border-border bg-card/90 px-2.5 py-1 text-[10px] font-medium tracking-wide text-muted-foreground shadow-sm backdrop-blur-sm">
+ v{appVersion}
+ </div>
+ );
+}
 
 function useCurrentUserQuery() {
  const { isAuthenticated, user: authUser, navigateToLogin } = useAuth();

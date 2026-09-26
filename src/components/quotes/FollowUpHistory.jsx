@@ -1,16 +1,16 @@
-﻿import { useState } from "react";
-import { base44 } from "@/api/base44Client";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Clock, Send, User } from "lucide-react";
-import { format } from "date-fns";
-import { toast } from "sonner";
-import { createFollowUp, getFollowUps, isLocalDataSource } from "@/api/dataClient";
+﻿import {useState} from "react";
+import {base44} from "@/api/base44Client";
+import {useMutation, useQuery} from "@tanstack/react-query";
+import {Button} from "@/components/ui/button";
+import {Card} from "@/components/ui/card";
+import {Input} from "@/components/ui/input";
+import {Label} from "@/components/ui/label";
+import {Textarea} from "@/components/ui/textarea";
+import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from "@/components/ui/dialog";
+import {Clock, Send, User} from "lucide-react";
+import {format} from "date-fns";
+import {toast} from "sonner";
+import {createFollowUp, getFollowUps, isLocalDataSource} from "@/api/dataClient";
 
 export default function FollowUpHistory({ quoteId }) {
   const [showManualDialog, setShowManualDialog] = useState(false);

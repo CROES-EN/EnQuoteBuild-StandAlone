@@ -1,14 +1,14 @@
-import { useState } from "react";
+import {useState} from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import {Button} from "@/components/ui/button";
+import {Input} from "@/components/ui/input";
 
 // Shown exactly ONCE per machine, the first time a non-host teammate signs in and no
 // local remote-sync secret has ever been saved (see AuthContext.jsx's

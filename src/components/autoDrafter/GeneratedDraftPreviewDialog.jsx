@@ -1,12 +1,6 @@
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription
-} from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, ShieldAlert, ShieldCheck, Info } from "lucide-react";
+import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
+import {Badge} from "@/components/ui/badge";
+import {AlertTriangle, Info, ShieldAlert, ShieldCheck} from "lucide-react";
 
 /**
  * GeneratedDraftPreviewDialog - read-only preview of a single Auto-Drafter

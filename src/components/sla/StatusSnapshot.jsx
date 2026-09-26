@@ -1,8 +1,7 @@
-﻿import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Link } from "react-router-dom";
-import { createPageUrl } from "@/utils";
-import { LayoutGrid } from "lucide-react";
+﻿import {Card} from "@/components/ui/card";
+import {Link} from "react-router-dom";
+import {createPageUrl} from "@/utils";
+import {LayoutGrid} from "lucide-react";
 
 const STATUS_CONFIG = [
   { key: "draft_without_internal", label: "Quote Draft", color: "bg-muted text-foreground", dot: "bg-slate-400" },

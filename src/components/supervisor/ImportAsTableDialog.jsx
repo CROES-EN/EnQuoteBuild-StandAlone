@@ -1,15 +1,32 @@
-﻿import { useMemo, useState } from "react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Upload, AlertTriangle, FileSpreadsheet } from "lucide-react";
-import { peekReportFile, readPeekedSheet, readPeekedSheets, guessHeaderRowIndex, buildColumnOptions, isHtmlReportFile, readHtmlSectionRows, peekHtmlSectionNames, readWorkbookFromBytes } from "@/features/supervisorDashboard/reportParsing";
-import { saveStaffingSnapshot } from "@/features/supervisorDashboard/importedTableStore";
-import { saveReportTableWithRetry } from "@/features/supervisorDashboard/saveReportTableWithRetry";
-import { parseOMStaffingRawRows } from "@/features/supervisorDashboard/parseOMStaffingReport";
-import { validateImport } from "@/features/supervisorDashboard/importValidation";
+﻿import {useMemo, useState} from "react";
+import {toast} from "sonner";
+import {Button} from "@/components/ui/button";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
+} from "@/components/ui/dialog";
+import {Checkbox} from "@/components/ui/checkbox";
+import {Alert, AlertDescription, AlertTitle} from "@/components/ui/alert";
+import {AlertTriangle, FileSpreadsheet, Upload} from "lucide-react";
+import {
+    buildColumnOptions,
+    guessHeaderRowIndex,
+    isHtmlReportFile,
+    peekHtmlSectionNames,
+    peekReportFile,
+    readHtmlSectionRows,
+    readPeekedSheet,
+    readPeekedSheets,
+    readWorkbookFromBytes
+} from "@/features/supervisorDashboard/reportParsing";
+import {saveStaffingSnapshot} from "@/features/supervisorDashboard/importedTableStore";
+import {saveReportTableWithRetry} from "@/features/supervisorDashboard/saveReportTableWithRetry";
+import {parseOMStaffingRawRows} from "@/features/supervisorDashboard/parseOMStaffingReport";
+import {validateImport} from "@/features/supervisorDashboard/importValidation";
 
 /**
  * Imports a spreadsheet tab AS-IS into a browsable table (no daily aggregation) - for row-level

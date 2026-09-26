@@ -1,6 +1,6 @@
-﻿import { CheckCircle2, FileSpreadsheet, Loader2, AlertTriangle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+﻿import {AlertTriangle, CheckCircle2, FileSpreadsheet, Loader2} from "lucide-react";
+import {Button} from "@/components/ui/button";
+import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
 
 /**
  * ImportProgressScreen - shows the real (not simulated) stages of committing an

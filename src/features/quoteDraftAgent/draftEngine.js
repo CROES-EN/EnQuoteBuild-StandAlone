@@ -14,17 +14,17 @@
 // produces. This engine's job stops at producing accurate, tax-coded line
 // items and labor/travel figures.
 
-import { PRODUCT_CATALOG } from "./productCatalog";
-import { findLearnedCorrection } from "./learnedCorrections";
-import { findProductAlias } from "./productAliases";
+import {PRODUCT_CATALOG} from "./productCatalog";
+import {findLearnedCorrection} from "./learnedCorrections";
+import {findProductAlias} from "./productAliases";
 import {
-  checkCombiner6CDependency,
-  checkIQ8AdvisoryAccessories,
-  checkLegacyMicroinverterWarning
+    checkCombiner6CDependency,
+    checkIQ8AdvisoryAccessories,
+    checkLegacyMicroinverterWarning
 } from "./componentDependencies";
-import { evaluateCompatibility } from "../compatibility/compatibilityEngine";
-import { getGeneralizedDependencyAdvisories } from "../compatibility/generalizedDependencyAdvisories";
-import { checkMaterialSizeConsistency } from "./materialSizeConsistency";
+import {evaluateCompatibility} from "../compatibility/compatibilityEngine";
+import {getGeneralizedDependencyAdvisories} from "../compatibility/generalizedDependencyAdvisories";
+import {checkMaterialSizeConsistency} from "./materialSizeConsistency";
 // --- Bundle aliases ---------------------------------------------------------
 //
 // Some requested items are shorthand for a KNOWN GROUP of catalog parts, not a

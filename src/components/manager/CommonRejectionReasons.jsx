@@ -1,5 +1,5 @@
-﻿import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
+﻿import {useState} from "react";
+import {Badge} from "@/components/ui/badge";
 
 const KEYWORDS = [
   "pricing", "price", "cost", "labor", "rate", "hours", "scope", "detail", "description",

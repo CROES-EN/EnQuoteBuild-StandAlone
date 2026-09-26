@@ -1,20 +1,17 @@
-﻿import { useState, useMemo, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+﻿import {useEffect, useMemo, useState} from "react";
+import {Button} from "@/components/ui/button";
+import {Card} from "@/components/ui/card";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-  DropdownMenuCheckboxItem
+    DropdownMenu,
+    DropdownMenuCheckboxItem,
+    DropdownMenuContent,
+    DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import RMAStatusBadge from "@/components/rma/RMAStatusBadge";
-import { getDaysOpen, getDaysInCurrentStatus } from "@/components/rma/rmaUtils";
-import {
-  ChevronUp, ChevronDown, ExternalLink, Pencil, Columns3,
-  ChevronLeft, ChevronRight, Inbox
-} from "lucide-react";
-import { format } from "date-fns";
-import { cn } from "@/lib/utils";
+import {getDaysInCurrentStatus, getDaysOpen} from "@/components/rma/rmaUtils";
+import {ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Columns3, ExternalLink, Inbox, Pencil} from "lucide-react";
+import {format} from "date-fns";
+import {cn} from "@/lib/utils";
 
 const COLUMNS = [
   { key: "case_owner", label: "Case Owner", visible: true },

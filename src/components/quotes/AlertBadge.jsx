@@ -1,5 +1,5 @@
-import { AlertCircle, AtSign, CheckCircle } from "lucide-react";
-import { cn } from "@/lib/utils";
+import {AlertCircle, AtSign, CheckCircle} from "lucide-react";
+import {cn} from "@/lib/utils";
 
 const LEVEL_STYLES = {
   green: "bg-emerald-50 border-emerald-300 text-emerald-700",

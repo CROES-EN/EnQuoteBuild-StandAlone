@@ -1,7 +1,7 @@
-﻿import { useMemo } from "react";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { FIELD_DEFINITIONS } from "@/features/supervisorDashboard/reportParsing";
+﻿import {useMemo} from "react";
+import {Button} from "@/components/ui/button";
+import {Checkbox} from "@/components/ui/checkbox";
+import {FIELD_DEFINITIONS} from "@/features/supervisorDashboard/reportParsing";
 
 /**
  * Lets a user hide metrics they never map for a given report type, from the FULL field list (not

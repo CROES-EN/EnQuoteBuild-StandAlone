@@ -21,7 +21,7 @@
  * (useLocalSyncStatus.js's events log slices to -200, main.cjs's rawQueueSample slices to 20).
  */
 
-import { retryBridgeCall } from "@/features/supervisorDashboard/retryBridgeCall";
+import {retryBridgeCall} from "@/features/supervisorDashboard/retryBridgeCall";
 
 const COLLECTION = "appErrorLog";
 const BROWSER_STORAGE_KEY = "enquote_app_error_log_v1";

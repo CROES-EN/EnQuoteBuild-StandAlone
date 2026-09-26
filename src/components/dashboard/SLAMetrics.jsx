@@ -1,6 +1,6 @@
-﻿import { Card } from "@/components/ui/card";
-import { Clock, CheckCircle, AlertCircle, TrendingUp } from "lucide-react";
-import { differenceInHours, differenceInMinutes, parseISO } from "date-fns";
+﻿import {Card} from "@/components/ui/card";
+import {AlertCircle, CheckCircle, Clock, TrendingUp} from "lucide-react";
+import {differenceInHours, parseISO} from "date-fns";
 
 export default function SLAMetrics({ quotes }) {
   // Calculate average time to approval

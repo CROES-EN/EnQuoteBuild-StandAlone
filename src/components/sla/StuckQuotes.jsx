@@ -1,9 +1,9 @@
-﻿import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Link } from "react-router-dom";
-import { createPageUrl } from "@/utils";
-import { AlertTriangle, Clock, ArrowRight } from "lucide-react";
-import { differenceInDays, differenceInHours, parseISO, format } from "date-fns";
+﻿import {Card} from "@/components/ui/card";
+import {Badge} from "@/components/ui/badge";
+import {Link} from "react-router-dom";
+import {createPageUrl} from "@/utils";
+import {AlertTriangle, ArrowRight, Clock} from "lucide-react";
+import {differenceInHours, format, parseISO} from "date-fns";
 
 const STUCK_STATUSES = [
   { key: "submitted", label: "Quote Pending Approval", color: "bg-blue-100 text-blue-700" },

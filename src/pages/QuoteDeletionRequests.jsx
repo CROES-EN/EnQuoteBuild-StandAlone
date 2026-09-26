@@ -1,25 +1,25 @@
-﻿import { useState } from "react";
-import { base44 } from "@/api/base44Client";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
+﻿import {useState} from "react";
+import {base44} from "@/api/base44Client";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {Card} from "@/components/ui/card";
+import {Button} from "@/components/ui/button";
+import {Textarea} from "@/components/ui/textarea";
+import {Badge} from "@/components/ui/badge";
 import {
- Dialog,
- DialogContent,
- DialogHeader,
- DialogTitle,
- DialogDescription,
- DialogFooter
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
 } from "@/components/ui/dialog";
-import { format } from "date-fns";
-import { Trash2, CheckCircle, XCircle, Clock, Archive, ArchiveRestore, Eye } from "lucide-react";
-import { toast } from "sonner";
-import { getQuoteById, getQuotes, listLocalCollection, updateLocalRecord, updateQuote } from "@/api/dataClient";
+import {format} from "date-fns";
+import {Archive, ArchiveRestore, Clock, Eye, XCircle} from "lucide-react";
+import {toast} from "sonner";
+import {getQuoteById, getQuotes, listLocalCollection, updateLocalRecord, updateQuote} from "@/api/dataClient";
 import RoleGuard from "@/components/auth/RoleGuard";
-import { Link } from "react-router-dom";
-import { createPageUrl } from "@/utils";
+import {Link} from "react-router-dom";
+import {createPageUrl} from "@/utils";
 
 function QuoteDeletionRequestsContent() {
  const queryClient = useQueryClient();

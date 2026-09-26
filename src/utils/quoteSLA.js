@@ -1,4 +1,4 @@
-import { parseISO } from "date-fns";
+import {parseISO} from "date-fns";
 
 export const APPROVER_EMAILS = [
   "smosley@enphaseenergy.com",

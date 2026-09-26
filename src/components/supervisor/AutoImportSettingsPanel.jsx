@@ -1,21 +1,21 @@
-﻿import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
+﻿import {useEffect, useState} from "react";
+import {Button} from "@/components/ui/button";
+import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
+import {Switch} from "@/components/ui/switch";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle
 } from "@/components/ui/alert-dialog";
-import { FolderOpen, FolderCog } from "lucide-react";
-import { toast } from "sonner";
-import { useUserRole } from "@/components/auth/RoleGuard";
-import { getAutoImportSettings, saveAutoImportSettings } from "@/features/supervisorDashboard/autoImportSettings";
+import {FolderCog, FolderOpen} from "lucide-react";
+import {toast} from "sonner";
+import {useUserRole} from "@/components/auth/RoleGuard";
+import {getAutoImportSettings, saveAutoImportSettings} from "@/features/supervisorDashboard/autoImportSettings";
 
 /**
  * Settings panel replacing the old "Daily Metrics Import" tab (see ConsolidatedReportsPanel.jsx) -

@@ -1,7 +1,7 @@
-﻿import { Card } from "@/components/ui/card";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Line, ComposedChart } from "recharts";
-import { startOfWeek, format, subWeeks, parseISO, isAfter, isBefore } from "date-fns";
-import { DollarSign } from "lucide-react";
+﻿import {Card} from "@/components/ui/card";
+import {Bar, CartesianGrid, ComposedChart, ResponsiveContainer, Tooltip, XAxis, YAxis} from "recharts";
+import {format, isAfter, isBefore, parseISO, startOfWeek, subWeeks} from "date-fns";
+import {DollarSign} from "lucide-react";
 
 function formatCurrency(v) {
   if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;

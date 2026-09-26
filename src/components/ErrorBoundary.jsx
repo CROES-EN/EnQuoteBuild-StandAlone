@@ -1,7 +1,7 @@
-import { Component } from "react";
-import { Button } from "@/components/ui/button";
-import { AlertTriangle } from "lucide-react";
-import { recordError } from "@/features/developerConsole/errorLog";
+import {Component} from "react";
+import {Button} from "@/components/ui/button";
+import {AlertTriangle} from "lucide-react";
+import {recordError} from "@/features/developerConsole/errorLog";
 
 // Catches render-time errors anywhere below it so a single broken component/page (e.g.
 // data shaped differently than a component expects, right after a sync) shows a

@@ -1,7 +1,7 @@
-﻿import { useMemo, useState } from "react";
-import { Table2 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { formatNumber } from "@/features/supervisorDashboard/format";
+﻿import {useMemo, useState} from "react";
+import {Table2} from "lucide-react";
+import {Badge} from "@/components/ui/badge";
+import {formatNumber} from "@/features/supervisorDashboard/format";
 
 // Matches the exact 7 report types defined in ReportDataTablesPanel.jsx's
 // REPORT_TYPES array - kept as a separate constant here (rather than imported)

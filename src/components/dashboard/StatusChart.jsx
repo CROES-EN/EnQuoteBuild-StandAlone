@@ -1,5 +1,5 @@
-﻿import { Card } from "@/components/ui/card";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
+﻿import {Card} from "@/components/ui/card";
+import {Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis} from "recharts";
 
 const statusColors = {
   draft: "#94a3b8",

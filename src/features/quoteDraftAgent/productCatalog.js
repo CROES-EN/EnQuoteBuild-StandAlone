@@ -1,4 +1,4 @@
-// productCatalog.js
+/* productCatalog.js */
 //
 // == "Legacy Catalog" ==
 // This is EnQuote's original, priced product catalog -- the SINGLE source of truth for
@@ -10,7 +10,7 @@
 // question (is this equipment pairing verified-compatible), using its own independently-
 // sourced SKU data. See compatibility_and_schema_design.md for the full rationale.
 //
-﻿export const PRODUCT_CATALOG = [
+export const PRODUCT_CATALOG = [
   { name: "60 Amp Brass 1-Time Fuse Cartridges (2-Pack)", category: "Breakers", unit_price: 8.55, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
   { name: "FRN Series 40 Amp Brass Time-Delay Cartridge Fuses (2-Pack)", category: "Breakers", unit_price: 27.97, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },
   { name: "Square D HOM215 Homeline 15A 2-Pole 120/240V Circuit Breaker", category: "Breakers", unit_price: 18.24, unit: "each", tax_category: "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: "TTR152589" },

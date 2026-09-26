@@ -1,13 +1,12 @@
-﻿import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
-import { getQuotes } from "@/api/dataClient";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
-import { ChevronDown, ChevronUp, AlertCircle, RefreshCw, CheckCircle2, Clock, Search } from "lucide-react";
-import { format } from "date-fns";
+﻿import {useState} from "react";
+import {useQuery} from "@tanstack/react-query";
+import {getQuotes} from "@/api/dataClient";
+import {Card, CardContent} from "@/components/ui/card";
+import {Badge} from "@/components/ui/badge";
+import {Input} from "@/components/ui/input";
+import {cn} from "@/lib/utils";
+import {CheckCircle2, ChevronDown, ChevronUp, RefreshCw, Search} from "lucide-react";
+import {format} from "date-fns";
 
 const STATUS_LABEL = {
   draft_without_internal: "Draft",

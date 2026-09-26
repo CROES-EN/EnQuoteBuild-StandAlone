@@ -1,8 +1,8 @@
-﻿import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Phone, Mail, FileText, Users, TrendingUp, TrendingDown, Minus } from "lucide-react";
-import { formatSecondsAsClock, formatDateLabel, formatNumber, computeDelta } from "@/features/supervisorDashboard/format";
+﻿import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
+import {Badge} from "@/components/ui/badge";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
+import {FileText, Mail, Minus, Phone, TrendingDown, TrendingUp, Users} from "lucide-react";
+import {computeDelta, formatDateLabel, formatNumber, formatSecondsAsClock} from "@/features/supervisorDashboard/format";
 
 const SOURCE_LABELS = {
   cxone: "CXONE",

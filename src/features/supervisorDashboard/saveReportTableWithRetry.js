@@ -12,7 +12,7 @@
  * (a real validation failure, a genuinely malformed file, etc.) fails immediately on the
  * first attempt, exactly as before, with no added delay.
  */
-import { saveReportTable } from "@/features/supervisorDashboard/importedTableStore";
+import {saveReportTable} from "@/features/supervisorDashboard/importedTableStore";
 
 const RETRYABLE_ERROR_PATTERN = /reply was never sent/i;
 const MAX_ATTEMPTS = 4;

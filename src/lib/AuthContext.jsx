@@ -1,8 +1,8 @@
-import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
-import { recordError } from '@/features/developerConsole/errorLog';
-import { base44 } from '@/api/base44Client';
-import { appParams } from '@/lib/app-params';
-import { getUsers } from '@/api/dataClient';
+import React, {createContext, useCallback, useContext, useEffect, useState} from 'react';
+import {recordError} from '@/features/developerConsole/errorLog';
+import {base44} from '@/api/base44Client';
+import {appParams} from '@/lib/app-params';
+import {getUsers} from '@/api/dataClient';
 
 const AuthContext = createContext();
 const isLocalDemo = ["mock", "local", "salesforce-mock"].includes(import.meta.env.VITE_DATA_SOURCE);

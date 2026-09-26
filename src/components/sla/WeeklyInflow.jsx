@@ -1,7 +1,7 @@
-﻿import { Card } from "@/components/ui/card";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
-import { startOfWeek, format, subWeeks, parseISO, isAfter, isBefore } from "date-fns";
-import { TrendingUp } from "lucide-react";
+﻿import {Card} from "@/components/ui/card";
+import {Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis} from "recharts";
+import {format, isAfter, isBefore, parseISO, startOfWeek, subWeeks} from "date-fns";
+import {TrendingUp} from "lucide-react";
 
 export default function WeeklyInflow({ quotes, dateRange }) {
   const weeksBack = Math.min(Math.ceil(parseInt(dateRange) / 7), 26);

@@ -1,5 +1,12 @@
-﻿import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+﻿import {Button} from "@/components/ui/button";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
+} from "@/components/ui/dialog";
 
 export default function PriceReviewDialog({ review, canReview, onClose, onDecision, processing }) {
   const hasPriceChange = review && Math.abs(review.catalog_price - review.retailer_price) >= 0.01;

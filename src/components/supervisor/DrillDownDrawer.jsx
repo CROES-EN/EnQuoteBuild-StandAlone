@@ -1,7 +1,7 @@
-﻿import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatDateLabel, formatNumber } from "@/features/supervisorDashboard/format";
+﻿import {Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle} from "@/components/ui/sheet";
+import {Badge} from "@/components/ui/badge";
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
+import {formatDateLabel, formatNumber} from "@/features/supervisorDashboard/format";
 
 const SOURCE_LABELS = {
   cxone: "CXONE import",

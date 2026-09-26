@@ -1,23 +1,12 @@
-﻿import { useState } from "react";
-import { base44 } from "@/api/base44Client";
-import { getQuotes, listLocalCollection, exportLocalData } from "@/api/dataClient";
-import { toast } from "sonner";
-import { useAuth } from "@/lib/AuthContext";
-import { useQuery } from "@tanstack/react-query";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { 
-  FileText, 
-  CheckCircle, 
-  XCircle,
-  TrendingUp,
-  Filter,
-  FolderOpen,
-  FolderCheck,
-  Download
-} from "lucide-react";
+﻿import {useState} from "react";
+import {exportLocalData, getQuotes, listLocalCollection} from "@/api/dataClient";
+import {toast} from "sonner";
+import {useAuth} from "@/lib/AuthContext";
+import {useQuery} from "@tanstack/react-query";
+import {Card} from "@/components/ui/card";
+import {Button} from "@/components/ui/button";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
+import {CheckCircle, Download, FileText, Filter, FolderCheck, FolderOpen, TrendingUp, XCircle} from "lucide-react";
 import MetricCard from "@/components/dashboard/MetricCard";
 import StatusChart from "@/components/dashboard/StatusChart";
 import TrendChart from "@/components/dashboard/TrendChart";
@@ -28,8 +17,7 @@ import SiteFlagBanner from "@/components/flags/SiteFlagBanner";
 import CoachingFeedback from "@/components/dashboard/CoachingFeedback";
 
 import RoleGuard from "@/components/auth/RoleGuard";
-import { parseISO } from "date-fns";
-import { createPageUrl } from "@/utils";
+import {createPageUrl} from "@/utils";
 
 function DashboardContent() {
   const [statusFilter, setStatusFilter] = useState("all");

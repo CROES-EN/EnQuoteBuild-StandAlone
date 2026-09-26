@@ -1,0 +1,14 @@
+{
+  "name":"EnQuote",
+  "short_name": "EnQuote",
+  "description": "EnQuote desktop application for O&M Enphase Energy",
+  "start_url": "/",
+  "display": "standalone",
+  "icons": [
+    {
+    "src": "/icon.png",
+    "sizes": "225x225",
+    "type": "image/png"
+  }
+    ]
+}

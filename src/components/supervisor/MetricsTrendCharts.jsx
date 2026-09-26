@@ -1,11 +1,9 @@
-﻿import { useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  ResponsiveContainer, ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend
-} from "recharts";
-import { Activity } from "lucide-react";
-import { formatSecondsAsClock, formatDateLabel } from "@/features/supervisorDashboard/format";
+﻿import {useMemo, useState} from "react";
+import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
+import {Bar, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis} from "recharts";
+import {Activity} from "lucide-react";
+import {formatDateLabel, formatSecondsAsClock} from "@/features/supervisorDashboard/format";
 
 const RANGE_OPTIONS = [
   { value: "14", label: "Last 14 days" },

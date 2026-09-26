@@ -1,22 +1,25 @@
-﻿import { getQuotes } from "@/api/dataClient";
-import { base44 } from "@/api/base44Client";
-import { useQuery } from "@tanstack/react-query";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
-import { createPageUrl } from "@/utils";
-import { 
- ArrowLeft, 
- TrendingUp, 
- DollarSign, 
- Calendar,
- FileText,
- CheckCircle,
- Clock,
- Receipt
-} from "lucide-react";
-import { format, startOfMonth, endOfMonth, subMonths, parseISO } from "date-fns";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
+﻿import {getQuotes} from "@/api/dataClient";
+import {useQuery} from "@tanstack/react-query";
+import {Card} from "@/components/ui/card";
+import {Button} from "@/components/ui/button";
+import {Link} from "react-router-dom";
+import {createPageUrl} from "@/utils";
+import {ArrowLeft, CheckCircle, Clock, DollarSign, FileText, TrendingUp} from "lucide-react";
+import {endOfMonth, format, parseISO, startOfMonth, subMonths} from "date-fns";
+import {
+    Bar,
+    BarChart,
+    CartesianGrid,
+    Cell,
+    Line,
+    LineChart,
+    Pie,
+    PieChart,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis
+} from "recharts";
 import RoleGuard from "@/components/auth/RoleGuard";
 
 function RevenueAnalyticsContent() {

@@ -15,8 +15,8 @@
  */
 
 import {
-  isImportantOMStatus as _isImportantOMStatus,
-  getImportantRowEmphasis as _getImportantRowEmphasis
+    getImportantRowEmphasis as _getImportantRowEmphasis,
+    isImportantOMStatus as _isImportantOMStatus
 } from "@/features/supervisorDashboard/workloadPreferences";
 
 const OM_STATUS_COLORS = {

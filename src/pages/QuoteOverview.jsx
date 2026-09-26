@@ -1,17 +1,16 @@
-﻿import { useState } from "react";
-import { base44 } from "@/api/base44Client";
-import { getQuotes } from "@/api/dataClient";
-import { useQuery } from "@tanstack/react-query";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Link, useLocation} from "react-router-dom";
-import { createPageUrl } from "@/utils";
-import { ArrowLeft, Search, FolderOpen, FolderCheck, FileText } from "lucide-react";
-import { cn } from "@/lib/utils";
+﻿import {useState} from "react";
+import {getQuotes} from "@/api/dataClient";
+import {useQuery} from "@tanstack/react-query";
+import {Card} from "@/components/ui/card";
+import {Button} from "@/components/ui/button";
+import {Input} from "@/components/ui/input";
+import {Link, useLocation} from "react-router-dom";
+import {createPageUrl} from "@/utils";
+import {ArrowLeft, FileText, FolderCheck, FolderOpen, Search} from "lucide-react";
+import {cn} from "@/lib/utils";
 import StatusBadge from "@/components/quotes/StatusBadge";
 import RoleGuard from "@/components/auth/RoleGuard";
-import { format } from "date-fns";
+import {format} from "date-fns";
 
 const OPEN_STATUSES = [
  { value: "draft_without_internal", label: "Draft w/o Internal", color: "bg-muted" },

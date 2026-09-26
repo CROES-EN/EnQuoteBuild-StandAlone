@@ -1,9 +1,16 @@
-﻿import { useRef, useState } from "react";
-import { base44 } from "@/api/base44Client";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Upload, CheckCircle2, AlertTriangle } from "lucide-react";
-import { createProduct, getProducts, isLocalDataSource, updateProduct } from "@/api/dataClient";
+﻿import {useRef, useState} from "react";
+import {base44} from "@/api/base44Client";
+import {Button} from "@/components/ui/button";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
+} from "@/components/ui/dialog";
+import {AlertTriangle, CheckCircle2, Upload} from "lucide-react";
+import {createProduct, getProducts, isLocalDataSource, updateProduct} from "@/api/dataClient";
 
 const schema = { type: "object", properties: { name: { type: "string" }, description: { type: "string" }, type: { type: "string" }, category: { type: "string" }, unit_price: { type: "number" }, unit: { type: "string" }, product_link: { type: "string" }, is_active: { type: "string" }, id: { type: "string" } } };
 const editable = ["name", "description", "type", "category", "unit_price", "unit", "product_link", "is_active"];

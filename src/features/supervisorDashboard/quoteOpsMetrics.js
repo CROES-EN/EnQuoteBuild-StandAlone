@@ -18,7 +18,7 @@
  *     surfaced wherever this is displayed.
  */
 
-import { getQuotes } from "@/api/dataClient";
+import {getQuotes} from "@/api/dataClient";
 
 export const TERMINAL_STATUSES = ["invoice_paid", "scheduled", "rejected", "ho_rejected"];
 export const DEFAULT_COMPLETED_STATUSES = ["invoice_paid", "scheduled"];

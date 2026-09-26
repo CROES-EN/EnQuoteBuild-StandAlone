@@ -1,25 +1,10 @@
-import { useEffect, useState } from "react";
-import { useAuth } from "@/lib/AuthContext";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import {
-  Loader2,
-  CheckCircle2,
-  XCircle,
-  AlertTriangle,
-  ChevronDown,
-  ChevronUp,
-  Info,
-  CloudOff
-} from "lucide-react";
-import { cn } from "@/lib/utils";
-import { REFRESH_REASON_LABELS } from "@/hooks/useLocalSyncStatus";
+import {useEffect, useState} from "react";
+import {useAuth} from "@/lib/AuthContext";
+import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
+import {Button} from "@/components/ui/button";
+import {AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, CloudOff, Info, Loader2, XCircle} from "lucide-react";
+import {cn} from "@/lib/utils";
+import {REFRESH_REASON_LABELS} from "@/hooks/useLocalSyncStatus";
 
 const LEVEL_ICON = {
   info: <Info className="w-3.5 h-3.5 text-muted-foreground shrink-0" />,

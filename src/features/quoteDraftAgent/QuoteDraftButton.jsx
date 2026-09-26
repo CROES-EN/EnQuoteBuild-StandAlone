@@ -1,11 +1,18 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Sparkles, Check, AlertTriangle, ExternalLink } from "lucide-react";
-import { toast } from "sonner";
-import { parseQuoteRequestOutput, hasQuoteRequestEvidence } from "./quoteRequestTextParser";
-import { generateQuoteDraft, detectQuoteBlockingIssues } from "./draftEngine";
+import {useState} from "react";
+import {Button} from "@/components/ui/button";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
+} from "@/components/ui/dialog";
+import {Textarea} from "@/components/ui/textarea";
+import {AlertTriangle, Check, ExternalLink, Sparkles} from "lucide-react";
+import {toast} from "sonner";
+import {hasQuoteRequestEvidence, parseQuoteRequestOutput} from "./quoteRequestTextParser";
+import {detectQuoteBlockingIssues, generateQuoteDraft} from "./draftEngine";
 
 // Quote Draft Agent (Step 2) -- LOCAL, in-app replacement.
 //

@@ -1,43 +1,37 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription
-} from "@/components/ui/dialog";
+import {useState} from "react";
+import {useNavigate} from "react-router-dom";
+import {Button} from "@/components/ui/button";
+import {Card} from "@/components/ui/card";
+import {Input} from "@/components/ui/input";
+import {Textarea} from "@/components/ui/textarea";
+import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import StatusBadge from "@/components/quotes/StatusBadge";
-import { calculateQuoteTotals } from "@/utils/quoteCalculations";
-import { createQuote, getCurrentUser } from "@/api/dataClient";
-import { saveGeneratedDraft } from "@/features/autoDrafter/autoDrafterDraftsStore";
-import { createPageUrl } from "@/utils";
-import { PRODUCT_CATALOG } from "@/features/quoteDraftAgent/productCatalog";
-import { toast } from "sonner";
-import { format } from "date-fns";
+import {calculateQuoteTotals} from "@/utils/quoteCalculations";
+import {createQuote, getCurrentUser} from "@/api/dataClient";
+import {saveGeneratedDraft} from "@/features/autoDrafter/autoDrafterDraftsStore";
+import {createPageUrl} from "@/utils";
+import {PRODUCT_CATALOG} from "@/features/quoteDraftAgent/productCatalog";
+import {toast} from "sonner";
+import {format} from "date-fns";
 import {
-  ArrowLeft,
-  Hash,
-  FileText,
-  Calendar,
-  Users,
-  MapPin,
-  User,
-  AlertTriangle,
-  ShieldAlert,
-  ShieldCheck,
-  Info,
-  Pencil,
-  Trash2,
-  Plus,
-  Send,
-  Loader2,
-  ExternalLink,
-  Search
+    AlertTriangle,
+    ArrowLeft,
+    Calendar,
+    ExternalLink,
+    FileText,
+    Hash,
+    Info,
+    Loader2,
+    MapPin,
+    Pencil,
+    Plus,
+    Search,
+    Send,
+    ShieldAlert,
+    ShieldCheck,
+    Trash2,
+    User,
+    Users
 } from "lucide-react";
 
 // FIX (per explicit request: "properly use this type of search to add items" in

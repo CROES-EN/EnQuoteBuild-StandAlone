@@ -1,23 +1,9 @@
-﻿import { useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import {
-  Loader2,
-  CheckCircle2,
-  XCircle,
-  AlertTriangle,
-  ChevronDown,
-  ChevronUp,
-  Info
-} from "lucide-react";
-import { cn } from "@/lib/utils";
-import { REFRESH_REASON_LABELS } from "@/hooks/useLocalSyncStatus";
+﻿import {useState} from "react";
+import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
+import {Button} from "@/components/ui/button";
+import {AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Info, Loader2, XCircle} from "lucide-react";
+import {cn} from "@/lib/utils";
+import {REFRESH_REASON_LABELS} from "@/hooks/useLocalSyncStatus";
 
 const LEVEL_ICON = {
   info: <Info className="w-3.5 h-3.5 text-muted-foreground shrink-0" />,

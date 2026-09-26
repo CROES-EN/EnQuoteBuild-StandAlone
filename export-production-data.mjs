@@ -16,8 +16,8 @@
 // (from your EnQuote project root, after `npm install @base44/sdk` if you
 // haven't already)
 
-import { createClient } from "@base44/sdk";
-import { writeFileSync, mkdirSync, existsSync } from "fs";
+import {createClient} from "@base44/sdk";
+import {existsSync, mkdirSync, writeFileSync} from "fs";
 import path from "path";
 
 // IMPORTANT: This script reads credentials from environment variables --

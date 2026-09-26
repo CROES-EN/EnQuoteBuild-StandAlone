@@ -1,6 +1,6 @@
-﻿import { Card } from "@/components/ui/card";
-import { Clock, ArrowRight } from "lucide-react";
-import { differenceInHours, parseISO } from "date-fns";
+﻿import {Card} from "@/components/ui/card";
+import {ArrowRight, Clock} from "lucide-react";
+import {differenceInHours, parseISO} from "date-fns";
 
 function avg(arr) {
   if (!arr.length) return null;

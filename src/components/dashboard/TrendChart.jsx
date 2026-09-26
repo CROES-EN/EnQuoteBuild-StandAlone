@@ -1,6 +1,6 @@
-﻿import { Card } from "@/components/ui/card";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { format, parseISO, startOfDay, differenceInDays } from "date-fns";
+﻿import {Card} from "@/components/ui/card";
+import {CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis} from "recharts";
+import {format, parseISO, startOfDay} from "date-fns";
 
 export default function TrendChart({ quotes, dateRange }) {
   // Group quotes by date

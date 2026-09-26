@@ -1,13 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/lib/AuthContext";
-import { getUsers } from "@/api/dataClient";
-import { KNOWN_ENQUOTE_USERS } from "@/lib/knownEnquoteUsers";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Lock, LogIn, ShieldCheck, KeyRound, ChevronDown } from "lucide-react";
+import {useEffect, useMemo, useRef, useState} from "react";
+import {useQuery} from "@tanstack/react-query";
+import {useAuth} from "@/lib/AuthContext";
+import {getUsers} from "@/api/dataClient";
+import {KNOWN_ENQUOTE_USERS} from "@/lib/knownEnquoteUsers";
+import {Card} from "@/components/ui/card";
+import {Button} from "@/components/ui/button";
+import {Input} from "@/components/ui/input";
+import {Label} from "@/components/ui/label";
+import {ChevronDown, KeyRound, Lock, LogIn, ShieldCheck} from "lucide-react";
 import appPackage from "../../../package.json";
 
 const appVersion = appPackage?.version || "0.0.0";

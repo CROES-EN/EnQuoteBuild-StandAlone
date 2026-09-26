@@ -13,7 +13,7 @@
  * report types' saved URLs stay fully independent.
  */
 
-import { scopedKey } from "@/lib/userScopedStorage";
+import {scopedKey} from "@/lib/userScopedStorage";
 
 const STORAGE_KEY = "enquote_autodrafter_salesforce_report_url";
 

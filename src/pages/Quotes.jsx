@@ -1,4 +1,22 @@
-import { useState, useEffect } from "react";
+import {useEffect, useState} from "react";
+import {bulkUpdateQuotes, createLocalRecord, getQuotes, listLocalCollection} from "@/api/dataClient";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {Input} from "@/components/ui/input";
+import {Button} from "@/components/ui/button";
+import {Card} from "@/components/ui/card";
+import {Link, useLocation} from "react-router-dom";
+import {createPageUrl} from "@/utils";
+import {AlertCircle, ChevronDown, ChevronUp, Download, FileText, ListChecks, Plus, Search, User} from "lucide-react";
+import {cn} from "@/lib/utils";
+import QuoteCard from "@/components/quotes/QuoteCard";
+import QuoteStatusSnapshot from "@/components/quotes/QuoteStatusSnapshot";
+import StatusAlerts from "@/components/dashboard/StatusAlerts";
+import {computeQuoteAlert, userHasAlertAccess} from "@/utils/quoteSLA";
+import BulkActionBar from "@/components/quotes/BulkActionBar";
+import {Checkbox} from "@/components/ui/checkbox";
+import {useToast} from "@/components/ui/use-toast";
+import RoleGuard, {useUserRole} from "@/components/auth/RoleGuard";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 
 const FILTERS_STORAGE_KEY = "quotes_filters";
 
@@ -10,26 +28,6 @@ function loadSavedFilters() {
     return {};
   }
 }
-import { base44 } from "@/api/base44Client";
-import { bulkUpdateQuotes, getQuotes, listLocalCollection, createLocalRecord } from "@/api/dataClient";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Link, useLocation} from "react-router-dom";
-import { createPageUrl } from "@/utils";
-import { Search, Plus, FileText, SlidersHorizontal, Download, User, ChevronDown, ChevronUp, ListChecks, AlertCircle } from "lucide-react";
-import { cn } from "@/lib/utils";
-import QuoteCard from "@/components/quotes/QuoteCard";
-import QuoteStatusSnapshot from "@/components/quotes/QuoteStatusSnapshot";
-import StatusAlerts from "@/components/dashboard/StatusAlerts";
-import { computeQuoteAlert, userHasAlertAccess } from "@/utils/quoteSLA";
-import BulkActionBar from "@/components/quotes/BulkActionBar";
-import { Checkbox } from "@/components/ui/checkbox";
-import { useToast } from "@/components/ui/use-toast";
-import { motion } from "framer-motion";
-import RoleGuard, { useUserRole } from "@/components/auth/RoleGuard";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const statusFilters = [
   { value: "all", label: "All Quotes" },

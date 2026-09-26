@@ -1,6 +1,6 @@
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, X, CheckCheck } from "lucide-react";
+import {Button} from "@/components/ui/button";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
+import {CheckCheck, Loader2, X} from "lucide-react";
 
 export default function BulkActionBar({
   selectedCount,

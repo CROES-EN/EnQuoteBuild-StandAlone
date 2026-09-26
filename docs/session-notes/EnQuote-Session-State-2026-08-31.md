@@ -47,14 +47,15 @@ getQuotes: async () => {
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.quotes)) return data.quotes;
   return [];
-},
+}
+
 getProducts: async () => {
   const response = await base44.functions.invoke("getAllProducts");
   const data = response?.data;
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.products)) return data.products;
   return [];
-},
+}
 ```
 **CONFIRMED RESTORED AND LIVE as of this session's final fix.**
 
@@ -72,7 +73,7 @@ query string of the real path -- NOT the part after `#` -- so it was always empt
 **CONFIRMED working (quotes create/open correctly).**
 
 ### 5. Mojibake encoding fixes
-Corrupted UTF-8-as-Latin-1 sequences (mojibake rendering of the multiplication sign,
+Corrupted UTF-8-as-Latin-1 sequences (Mojibake rendering of the multiplication sign,
 em dash, and ellipsis) fixed across `AuthContext.jsx`, `Boneyard.jsx`,
 `QuoteDetails.jsx`, `QuoteOverview.jsx`, `Quotes.jsx`.
 
@@ -82,8 +83,7 @@ A real quote request for 297 ft of critter guard wire priced at **$91,146.50** i
 picking the same expensive roll-kit SKU twice, (c) a runaway miscellaneous-service fallback
 multiplying 297 x $265 with no cap.
 
-Fix written and applied earlier today (added `extractCoveragePerUnit`, precision-based tie
-breaker, linear-unit fallback cap, `deduplicateItems`) -- but during later troubleshooting of an
+Fix written and applied earlier today (added `extractCoveragePerUnit`, precision-based tiebreaker, linear-unit fallback cap, `deduplicateItems`) -- but during later troubleshooting of an
 unrelated Electron desktop-app caching issue, **`draftEngine.js` was rolled back to its
 pre-fix `.bak` version, then restored again from a preserved timestamped copy**
 (`draftEngine.js.before-rollback-<timestamp>`). The LAST build+deploy in this session restored
@@ -188,4 +188,4 @@ and `base44 deploy --app-id 6a91e7bce36dd777fa88cf04 --no-build --yes`.
    the browser as the primary interface, given the unresolved Electron caching mystery.
 3. Consider setting up a proper git repository for this project if one doesn't already exist --
    today's session relied entirely on manual `.bak` file copies for version safety, which is
-   fragile (as demonstrated by the rollback confusion) compared to real version control.
+   fragile (as demonstrated by the rollback confusion) compared to real version.

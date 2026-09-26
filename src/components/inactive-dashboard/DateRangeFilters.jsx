@@ -1,4 +1,13 @@
-﻿import { addDays, endOfMonth, endOfQuarter, format, startOfMonth, startOfQuarter, subMonths, subQuarters } from "date-fns";
+﻿import {
+    addDays,
+    endOfMonth,
+    endOfQuarter,
+    format,
+    startOfMonth,
+    startOfQuarter,
+    subMonths,
+    subQuarters
+} from "date-fns";
 
 const presets = ["Past Week", "Past 2 Weeks", "Past 4 Weeks", "Prior Month", "Last 30 Days", "Current Month", "Current Quarter", "Past Quarter", "Custom"];
 const dateValue = value => format(value, "yyyy-MM-dd");

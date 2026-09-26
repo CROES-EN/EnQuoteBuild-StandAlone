@@ -1,7 +1,7 @@
-﻿import { Card } from "@/components/ui/card";
-import { getYear, getQuarter, parseISO } from "date-fns";
-import { ArrowRight, TrendingUp, TrendingDown } from "lucide-react";
-import { cn } from "@/lib/utils";
+﻿import {Card} from "@/components/ui/card";
+import {getQuarter, getYear, parseISO} from "date-fns";
+import {ArrowRight, TrendingUp} from "lucide-react";
+import {cn} from "@/lib/utils";
 
 function formatCurrency(v) {
   if (!v) return "$0";

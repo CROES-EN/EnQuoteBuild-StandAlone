@@ -1,22 +1,36 @@
-﻿import { useState } from "react";
-import { base44 } from "@/api/base44Client";
-import { createLocalRecord, deleteLocalRecord, getCurrentUser, listLocalCollection, updateLocalRecord } from "@/api/dataClient";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+﻿import {useState} from "react";
 import {
-  Siren, ShieldAlert, AlertTriangle, CheckCircle2, RefreshCw,
-  Upload, Plus, Trash2, User, Calendar, Filter, Clock } from
-"lucide-react";
-import { format, subDays, isAfter, parseISO } from "date-fns";
-import { cn } from "@/lib/utils";
+    createLocalRecord,
+    deleteLocalRecord,
+    getCurrentUser,
+    listLocalCollection,
+    updateLocalRecord
+} from "@/api/dataClient";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
+import {Button} from "@/components/ui/button";
+import {Input} from "@/components/ui/input";
+import {Textarea} from "@/components/ui/textarea";
+import {Badge} from "@/components/ui/badge";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
+import {Label} from "@/components/ui/label";
+import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
+import {
+    AlertTriangle,
+    Calendar,
+    CheckCircle2,
+    Clock,
+    Filter,
+    Plus,
+    RefreshCw,
+    ShieldAlert,
+    Siren,
+    Trash2,
+    Upload,
+    User
+} from "lucide-react";
+import {format, isAfter, parseISO, subDays} from "date-fns";
+import {cn} from "@/lib/utils";
 import RoleGuard from "@/components/auth/RoleGuard";
 import SiteQuoteTracker from "@/components/flags/SiteQuoteTracker";
 

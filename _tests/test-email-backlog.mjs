@@ -1,6 +1,10 @@
 ﻿// Real assertions, matching what was manually verified tonight against actual uploaded files.
 // Run this any time parseEmailBacklogReport.js changes, to confirm nothing broke.
-import { parseEmailBacklogRawData, parseEmailBacklogDailyRows, computeEmailBacklogTotals } from "../src/features/supervisorDashboard/parseEmailBacklogReport.js";
+import {
+    computeEmailBacklogTotals,
+    parseEmailBacklogDailyRows,
+    parseEmailBacklogRawData
+} from "../src/features/supervisorDashboard/parseEmailBacklogReport.js";
 
 let passed = 0;
 let failed = 0;

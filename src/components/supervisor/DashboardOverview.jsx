@@ -1,72 +1,77 @@
-﻿import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+﻿import {useMemo, useState} from "react";
+import {useQuery} from "@tanstack/react-query";
 import {
-  AlertCircle,
-  CheckCircle2,
-  Clock,
-  FileText,
-  HeartHandshake,
-  Layers,
-  Minus,
-  Phone,
-  PhoneOff,
-  TrendingDown,
-  TrendingUp,
-  TriangleAlert,
-  Users,
-  ArrowRight,
-  Mail
+    AlertCircle,
+    ArrowRight,
+    CheckCircle2,
+    Clock,
+    FileText,
+    HeartHandshake,
+    Layers,
+    Mail,
+    Minus,
+    Phone,
+    PhoneOff,
+    TrendingDown,
+    TrendingUp,
+    TriangleAlert,
+    Users
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { getQuotes } from "@/api/dataClient";
+import {Badge} from "@/components/ui/badge";
+import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
+import {Label} from "@/components/ui/label";
+import {Switch} from "@/components/ui/switch";
+import {ToggleGroup, ToggleGroupItem} from "@/components/ui/toggle-group";
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
+import {Button} from "@/components/ui/button";
+import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
+import {Checkbox} from "@/components/ui/checkbox";
+import {getQuotes} from "@/api/dataClient";
+import {formatDateLabel, formatNumber, formatRate, formatSecondsAsClock} from "@/features/supervisorDashboard/format";
 import {
-  formatDateLabel,
-  formatNumber,
-  formatRate,
-  formatSecondsAsClock
-} from "@/features/supervisorDashboard/format";
-import {
-  describeRangeCoverage,
-  filterRecordsInRange,
-  getPreviousPeriodRange,
-  resolveDateRange,
-  resolveDefaultPreset
+    describeRangeCoverage,
+    filterRecordsInRange,
+    getPreviousPeriodRange,
+    resolveDateRange,
+    resolveDefaultPreset
 } from "@/features/supervisorDashboard/dateRanges";
 import {
-  AGGREGATION_MODES,
-  AGGREGATION_MODE_OPTIONS,
-  aggregateMetric,
-  comparePeriods,
-  computeNetBacklogMovement,
-  computeRateFromTotals,
-  resolveClosingBacklog,
-  resolveOpeningBacklog
+    aggregateMetric,
+    AGGREGATION_MODE_OPTIONS,
+    AGGREGATION_MODES,
+    comparePeriods,
+    computeNetBacklogMovement,
+    computeRateFromTotals,
+    resolveClosingBacklog,
+    resolveOpeningBacklog
 } from "@/features/supervisorDashboard/periodAggregation";
 import {
-  computeOverallCoverage,
-  computeSourceCoverage,
-  getRecordsForGroup
+    computeOverallCoverage,
+    computeSourceCoverage,
+    getRecordsForGroup
 } from "@/features/supervisorDashboard/sourceCoverage";
 import {
-  computeQuoteOpsMetrics,
-  DEFAULT_COMPLETED_STATUSES,
-  isReportableQuote
+    computeQuoteOpsMetrics,
+    DEFAULT_COMPLETED_STATUSES,
+    isReportableQuote
 } from "@/features/supervisorDashboard/quoteOpsMetrics";
-import { computeQuoteAlert } from "@/utils/quoteSLA";
-import { listReportTables } from "@/features/supervisorDashboard/importedTableStore";
-import { getRecordsFromStoredRowsV2, computeStaffingTeamTotalsV2 } from "@/features/supervisorDashboard/parseOMStaffingReport";
-import { parseEmailBacklogDailyRows, getEmailBacklogRecordsFromStoredRows, computeEmailBacklogTotals } from "@/features/supervisorDashboard/parseEmailBacklogReport";
-import { getEodbWidgetRecordsFromStoredRows, computeEodbWidgetTotal } from "@/features/supervisorDashboard/parseEodbWidget";
-import { computeCallVolumeOverridesByDate } from "@/features/supervisorDashboard/callVolumeRawOverrides";
+import {computeQuoteAlert} from "@/utils/quoteSLA";
+import {listReportTables} from "@/features/supervisorDashboard/importedTableStore";
+import {
+    computeStaffingTeamTotalsV2,
+    getRecordsFromStoredRowsV2
+} from "@/features/supervisorDashboard/parseOMStaffingReport";
+import {
+    computeEmailBacklogTotals,
+    getEmailBacklogRecordsFromStoredRows,
+    parseEmailBacklogDailyRows
+} from "@/features/supervisorDashboard/parseEmailBacklogReport";
+import {
+    computeEodbWidgetTotal,
+    getEodbWidgetRecordsFromStoredRows
+} from "@/features/supervisorDashboard/parseEodbWidget";
+import {computeCallVolumeOverridesByDate} from "@/features/supervisorDashboard/callVolumeRawOverrides";
 import DashboardDateRange from "@/components/supervisor/DashboardDateRange";
 import ExecutiveOverviewCharts from "@/components/supervisor/ExecutiveOverviewCharts";
 import RequiresAttentionTable from "@/components/supervisor/RequiresAttentionTable";
@@ -74,12 +79,12 @@ import DrillDownDrawer from "@/components/supervisor/DrillDownDrawer";
 import HourlyWaitTimeChart from "@/components/supervisor/HourlyWaitTimeChart";
 import TileGrid from "@/components/supervisor/TileGrid";
 import {
-  getTileOrder,
-  setTileOrder,
-  orderTiles,
-  applyPartialReorder,
-  getHiddenTileIds,
-  setTileVisibility
+    applyPartialReorder,
+    getHiddenTileIds,
+    getTileOrder,
+    orderTiles,
+    setTileOrder,
+    setTileVisibility
 } from "@/features/supervisorDashboard/tilePreferences";
 
 import MetricsTrendCharts from "@/components/supervisor/MetricsTrendCharts";

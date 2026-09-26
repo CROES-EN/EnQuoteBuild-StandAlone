@@ -14,7 +14,7 @@
  * metrics record.
  */
 
-import { computeDelta } from "@/features/supervisorDashboard/format";
+import {computeDelta} from "@/features/supervisorDashboard/format";
 
 function isFiniteNumber(value) {
   return typeof value === "number" && Number.isFinite(value);

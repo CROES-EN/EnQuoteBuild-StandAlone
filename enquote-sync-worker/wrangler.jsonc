@@ -1,0 +1,37 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "enquote-sync",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-25",
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "BASE44_API_URL": "https://enquote.base44.app"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "enquote-sync",
+      "database_id": "05a146fb-bba9-43a3-a2fe-40473037d19f"
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "OUTBOUND_QUEUE",
+        "queue": "enquote-outbound"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "enquote-outbound",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "retry_delay": 60,
+        "dead_letter_queue": "enquote-outbound-dlq"
+      }
+    ]
+  }
+}

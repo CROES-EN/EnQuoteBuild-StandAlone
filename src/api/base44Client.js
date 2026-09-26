@@ -1,5 +1,5 @@
-﻿import { createClient } from "@base44/sdk";
-import { appParams } from "@/lib/app-params";
+﻿import {createClient} from "@base44/sdk";
+import {appParams} from "@/lib/app-params";
 
 const isBase44Runtime =
   ["base44", "base44-dual"].includes(import.meta.env.VITE_DATA_SOURCE);

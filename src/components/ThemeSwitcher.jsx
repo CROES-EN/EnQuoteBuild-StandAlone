@@ -1,10 +1,17 @@
-import { useState } from "react";
-import { Palette, Check, Pencil } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
-import { useTheme } from "@/features/theme/ThemeContext";
-import { getSavedCustomColors, saveCustomColors } from "@/features/theme/themeStore";
+import {useState} from "react";
+import {Check, Palette, Pencil} from "lucide-react";
+import {Button} from "@/components/ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
+import {cn} from "@/lib/utils";
+import {useTheme} from "@/features/theme/ThemeContext";
+import {getSavedCustomColors, saveCustomColors} from "@/features/theme/themeStore";
 
 /**
  * Theme picker dropdown, styled after VS Code's own "Preferences: Color Theme" quick-pick list -

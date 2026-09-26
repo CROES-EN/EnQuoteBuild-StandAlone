@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import {useCallback, useRef, useState} from "react";
 
 // Human-readable labels for the webhook receiver's "reason" field, shared by the inline
 // slim progress bar (Layout) and the deeper diagnostic dialog (RefreshStatusDialog) so

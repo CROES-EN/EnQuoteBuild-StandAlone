@@ -15,7 +15,7 @@
  * administrator configures their real columns.
  */
 
-import { FIELD_DEFINITIONS } from "./reportParsing";
+import {FIELD_DEFINITIONS} from "./reportParsing";
 
 export const REPORT_DEFINITIONS = [
   {

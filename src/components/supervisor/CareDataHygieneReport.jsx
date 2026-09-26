@@ -1,11 +1,10 @@
-﻿import { useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertTriangle, CheckCircle2, RefreshCcw, ShieldAlert, Users } from "lucide-react";
-import { computeCareDataHygieneSummary } from "@/features/supervisorDashboard/careEligibility";
+﻿import {useMemo, useState} from "react";
+import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
+import {Badge} from "@/components/ui/badge";
+import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog";
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
+import {AlertTriangle, CheckCircle2, RefreshCcw, ShieldAlert, Users} from "lucide-react";
+import {computeCareDataHygieneSummary} from "@/features/supervisorDashboard/careEligibility";
 
 /**
  * Data Hygiene view for the imported Care Subscriptions report - shows exactly how many rows

@@ -1,7 +1,7 @@
-﻿import { Card } from "@/components/ui/card";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
-import { parseISO, getYear, getQuarter, format } from "date-fns";
-import { TrendingUp } from "lucide-react";
+﻿import {Card} from "@/components/ui/card";
+import {Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis} from "recharts";
+import {getQuarter, getYear, parseISO} from "date-fns";
+import {TrendingUp} from "lucide-react";
 
 function formatCurrency(v) {
   if (v >= 1000000) return `$${(v / 1000000).toFixed(2)}M`;

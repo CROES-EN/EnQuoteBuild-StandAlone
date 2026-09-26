@@ -1,5 +1,8 @@
+/*noinspection ALL*/
 @tailwind base;
+/*noinspection ALL*/
 @tailwind components;
+/*noinspection ALL*/
 @tailwind utilities;
 
 @layer base {
@@ -79,10 +82,12 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+      /*noinspection ALL*/
+      @apply border-border outline-ring/50;
   }
 
   body {
-    @apply bg-background text-foreground;
+      /*noinspection ALL*/
+      @apply bg-background text-foreground;
   }
 }

@@ -1,10 +1,10 @@
-﻿import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Mail, Briefcase, Pencil, Shield, ShieldCheck, ShieldAlert, MoreVertical, KeyRound } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { motion } from "framer-motion";
-import { cn } from "@/lib/utils";
+﻿import {Card} from "@/components/ui/card";
+import {Button} from "@/components/ui/button";
+import {Badge} from "@/components/ui/badge";
+import {Briefcase, KeyRound, MoreVertical, Pencil, Shield, ShieldAlert, ShieldCheck} from "lucide-react";
+import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
+import {motion} from "framer-motion";
+import {cn} from "@/lib/utils";
 
 const roleConfig = {
   submitter: {

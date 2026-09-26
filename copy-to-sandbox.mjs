@@ -22,8 +22,8 @@
 //      before the full products run, so a missing entity schema fails
 //      fast with a clear message.
 
-import { createClient } from "@base44/sdk";
-import { readFileSync, writeFileSync, existsSync } from "fs";
+import {createClient} from "@base44/sdk";
+import {existsSync, readFileSync, writeFileSync} from "fs";
 
 const SOURCE_APP_ID = process.env.BASE44_SOURCE_APP_ID || "";
 const SOURCE_API_KEY = process.env.BASE44_SOURCE_API_KEY || "";

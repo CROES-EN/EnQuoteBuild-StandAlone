@@ -1,9 +1,13 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, Settings2 } from "lucide-react";
-import { getHiddenColumns, setColumnVisibility, resetColumnVisibility } from "@/features/supervisorDashboard/tableColumnPreferences";
-import { useVirtualizer } from "@tanstack/react-virtual";
+﻿import {useEffect, useMemo, useRef, useState} from "react";
+import {Input} from "@/components/ui/input";
+import {Checkbox} from "@/components/ui/checkbox";
+import {ArrowDown, ArrowUp, ArrowUpDown, Search, Settings2} from "lucide-react";
+import {
+    getHiddenColumns,
+    resetColumnVisibility,
+    setColumnVisibility
+} from "@/features/supervisorDashboard/tableColumnPreferences";
+import {useVirtualizer} from "@tanstack/react-virtual";
 
 /**
  * A true spreadsheet-style grid for browsing one imported report table AS-IS - every column

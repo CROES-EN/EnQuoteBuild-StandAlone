@@ -1,10 +1,19 @@
-﻿import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
-import { getQuotes } from "@/api/dataClient";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { AlertCircle, CheckCircle2, Clock, FileText, MessageSquare, Wrench, TrendingUp, Pencil, ClipboardList } from "lucide-react";
+﻿import {useQuery} from "@tanstack/react-query";
+import {getQuotes} from "@/api/dataClient";
+import {Card, CardContent} from "@/components/ui/card";
+import {Badge} from "@/components/ui/badge";
+import {Button} from "@/components/ui/button";
+import {
+    AlertCircle,
+    CheckCircle2,
+    ClipboardList,
+    Clock,
+    FileText,
+    MessageSquare,
+    Pencil,
+    TrendingUp,
+    Wrench
+} from "lucide-react";
 
 const formatDate = (d) => d ? new Date(d).toLocaleDateString() : "—";
 const formatCurrency = (v) => `$${(v || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

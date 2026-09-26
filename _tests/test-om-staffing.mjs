@@ -1,4 +1,7 @@
-﻿import { parseOMStaffingV2Csv, computeStaffingTeamTotalsV2 } from "../src/features/supervisorDashboard/parseOMStaffingReport.js";
+﻿import {
+    computeStaffingTeamTotalsV2,
+    parseOMStaffingV2Csv
+} from "../src/features/supervisorDashboard/parseOMStaffingReport.js";
 
 let passed = 0;
 let failed = 0;

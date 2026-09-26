@@ -1,5 +1,5 @@
-﻿import { LayoutGrid } from "lucide-react";
-import { cn } from "@/lib/utils";
+﻿import {LayoutGrid} from "lucide-react";
+import {cn} from "@/lib/utils";
 
 const STATUS_CARDS = [
   { label: "Quote Draft", status: "draft_without_internal", color: "bg-slate-400" },

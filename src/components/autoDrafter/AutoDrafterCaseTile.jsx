@@ -1,16 +1,16 @@
-import { useState } from "react";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { FileText, MapPin, ClipboardList, Package, Sparkles, Loader2, Calendar, User } from "lucide-react";
-import { format } from "date-fns";
-import { motion } from "framer-motion";
-import { toast } from "sonner";
+import {useState} from "react";
+import {Card} from "@/components/ui/card";
+import {Badge} from "@/components/ui/badge";
+import {Button} from "@/components/ui/button";
+import {Calendar, ClipboardList, FileText, Loader2, MapPin, Package, Sparkles, User} from "lucide-react";
+import {format} from "date-fns";
+import {motion} from "framer-motion";
+import {toast} from "sonner";
 import StatusBadge from "@/components/quotes/StatusBadge";
-import { calculateQuoteTotals } from "@/utils/quoteCalculations";
-import { parseQuoteRequestCase } from "@/features/autoDrafter/parseQuoteRequestCase";
-import { generateQuoteDraft } from "@/features/quoteDraftAgent/draftEngine";
-import { saveGeneratedDraft } from "@/features/autoDrafter/autoDrafterDraftsStore";
+import {calculateQuoteTotals} from "@/utils/quoteCalculations";
+import {parseQuoteRequestCase} from "@/features/autoDrafter/parseQuoteRequestCase";
+import {generateQuoteDraft} from "@/features/quoteDraftAgent/draftEngine";
+import {saveGeneratedDraft} from "@/features/autoDrafter/autoDrafterDraftsStore";
 
 /**
  * AutoDrafterCaseTile - a quote-page-style tile for a single raw Salesforce case row,

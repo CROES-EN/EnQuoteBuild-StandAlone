@@ -1,8 +1,8 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { createPageUrl } from "@/utils";
-import { AlertTriangle, ShieldAlert, Siren, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
-import { cn } from "@/lib/utils";
+import {useState} from "react";
+import {Link} from "react-router-dom";
+import {createPageUrl} from "@/utils";
+import {AlertTriangle, ChevronDown, ChevronUp, ExternalLink, ShieldAlert, Siren} from "lucide-react";
+import {cn} from "@/lib/utils";
 
 const FLAG_CONFIG = {
   red: {

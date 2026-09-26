@@ -14,7 +14,7 @@
 // and write the whole table back -- the exact same pattern importedTableStore.js's own
 // saveStaffingSnapshot() already uses internally for the same reason.
 
-import { getReportTable, saveReportTable } from "@/features/supervisorDashboard/importedTableStore";
+import {getReportTable, saveReportTable} from "@/features/supervisorDashboard/importedTableStore";
 
 // Hidden fields added to a case row once a draft exists. Prefixed with "__" so they never
 // collide with a real Salesforce export column, and are easy to recognize/strip if this

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="JAVA_MODULE" version="4">
+  <component name="NewModuleRootManager" inherit-compiler-output="true">
+    <exclude-output />
+    <content url="file://$MODULE_DIR$">
+      <excludeFolder url="file://$MODULE_DIR$/_build-logs" />
+      <excludeFolder url="file://$MODULE_DIR$/_calm-warning-backups" />
+      <excludeFolder url="file://$MODULE_DIR$/_mangled-char-fix-backups" />
+      <excludeFolder url="file://$MODULE_DIR$/_script-output/_ALL_CJS_COMBINED.txt" />
+      <excludeFolder url="file://$MODULE_DIR$/_script-output/anchor1-base64.txt" />
+      <excludeFolder url="file://$MODULE_DIR$/_script-output/anchor1-exact.txt" />
+      <excludeFolder url="file://$MODULE_DIR$/_script-output/anchor1-full.txt" />
+      <excludeFolder url="file://$MODULE_DIR$/_script-output/broken-import-dialog.txt" />
+      <excludeFolder url="file://$MODULE_DIR$/_script-output/combined-dump.txt" />
+      <excludeFolder url="file://$MODULE_DIR$/_script-output/dashboard-fresh.txt" />
+      <excludeFolder url="file://$MODULE_DIR$/_script-output/dashboard-full-base64.txt" />
+      <excludeFolder url="file://$MODULE_DIR$/_script-output/draftEngine-head.txt" />
+      <excludeFolder url="file://$MODULE_DIR$/_script-output/draftEngine-tail.txt" />
+      <excludeFolder url="file://$MODULE_DIR$/_script-output/dump.txt" />
+      <excludeFolder url="file://$MODULE_DIR$/_script-output/full-dump.txt" />
+      <excludeFolder url="file://$MODULE_DIR$/_script-output/import-dialog-fresh.txt" />
+      <excludeFolder url="file://$MODULE_DIR$/_script-output/import-dialog-latest.txt" />
+      <excludeFolder url="file://$MODULE_DIR$/_script-output/import-dialog-latest2.txt" />
+      <excludeFolder url="file://$MODULE_DIR$/_script-output/import-dialog-with-validation.txt" />
+      <excludeFolder url="file://$MODULE_DIR$/_script-output/json-error-diagnosis.txt" />
+      <excludeFolder url="file://$MODULE_DIR$/_script-output/latest-output.txt" />
+      <excludeFolder url="file://$MODULE_DIR$/_script-output/main-cjs-dump.txt" />
+      <excludeFolder url="file://$MODULE_DIR$/_script-output/patch-quote-confidence-20260918-114821-engine-confidence-function.txt" />
+      <excludeFolder url="file://$MODULE_DIR$/_script-output/patch-quote-confidence-20260918-114929-engine-confidence-function.txt" />
+      <excludeFolder url="file://$MODULE_DIR$/_script-output/patch-quote-confidence-20260918-115008-engine-confidence-function.txt" />
+      <excludeFolder url="file://$MODULE_DIR$/_script-output/project-discovery-20260909-105237.txt" />
+      <excludeFolder url="file://$MODULE_DIR$/_script-output/repository-cjs-dump.txt" />
+      <excludeFolder url="file://$MODULE_DIR$/_script-output/repository-cjs-latest.txt" />
+      <excludeFolder url="file://$MODULE_DIR$/_script-output/repository-full-dump.txt" />
+      <excludeFolder url="file://$MODULE_DIR$/_script-output/repository.cjs.txt" />
+      <excludeFolder url="file://$MODULE_DIR$/_script-output/scripts" />
+      <excludeFolder url="file://$MODULE_DIR$/_script-output/staffing-section-fresh.txt" />
+      <excludeFolder url="file://$MODULE_DIR$/_script-output/tile-registry-lines.txt" />
+      <excludeFolder url="file://$MODULE_DIR$/_script-output/verify-webhook-setup.cjs.txt" />
+      <excludeFolder url="file://$MODULE_DIR$/_script-output/webhook-receiver.cjs.txt" />
+      <excludeFolder url="file://$MODULE_DIR$/_tests" />
+    </content>
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+  </component>
+</module>

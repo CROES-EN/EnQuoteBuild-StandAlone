@@ -1,14 +1,29 @@
-﻿import { useState, useEffect, useMemo } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
-import { createReview, getCurrentUser, getQuotes, getReviews, getUsers, updateReview } from "@/api/dataClient";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, Search, CheckCircle2, Clock, FileText, BarChart2, Brain, Layers, ArrowUpDown, EyeOff, ShieldCheck, CheckSquare, Square, X, Loader2 } from "lucide-react";
+﻿import {useEffect, useMemo, useState} from "react";
+import {useQuery, useQueryClient} from "@tanstack/react-query";
+import {createReview, getCurrentUser, getQuotes, getReviews, getUsers, updateReview} from "@/api/dataClient";
+import {Card, CardContent} from "@/components/ui/card";
+import {Badge} from "@/components/ui/badge";
+import {Button} from "@/components/ui/button";
+import {Input} from "@/components/ui/input";
+import {Sheet, SheetContent, SheetHeader, SheetTitle} from "@/components/ui/sheet";
+import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
+import {
+    AlertCircle,
+    ArrowUpDown,
+    BarChart2,
+    Brain,
+    CheckCircle2,
+    CheckSquare,
+    Clock,
+    EyeOff,
+    FileText,
+    Layers,
+    Loader2,
+    Search,
+    ShieldCheck,
+    Square,
+    X
+} from "lucide-react";
 import QuoteReviewPanel from "@/components/quotes/QuoteReviewPanel";
 import RejectionOverview from "@/components/rejection/RejectionOverview";
 import RejectionInterpretations from "@/components/rejection/RejectionInterpretations";

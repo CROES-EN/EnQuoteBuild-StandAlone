@@ -1,24 +1,12 @@
-﻿import { useState } from "react";
-import { base44 } from "@/api/base44Client";
-import { getQuotes } from "@/api/dataClient";
-import { useQuery } from "@tanstack/react-query";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { GitCompare, XCircle, AlertCircle } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+﻿import {useState} from "react";
+import {getQuotes} from "@/api/dataClient";
+import {useQuery} from "@tanstack/react-query";
+import {Card} from "@/components/ui/card";
+import {Button} from "@/components/ui/button";
+import {Dialog, DialogContent, DialogHeader, DialogTitle,} from "@/components/ui/dialog";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue,} from "@/components/ui/select";
+import {AlertCircle, GitCompare, XCircle} from "lucide-react";
+import {Badge} from "@/components/ui/badge";
 
 function FieldComparison({ label, oldValue, newValue }) {
   const hasChanged = JSON.stringify(oldValue) !== JSON.stringify(newValue);

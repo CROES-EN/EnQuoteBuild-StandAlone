@@ -1,7 +1,7 @@
-﻿import { Card } from "@/components/ui/card";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import { getDaysOpen, getDaysInCurrentStatus, RMA_STATUSES, STATUS_COLORS } from "@/components/rma/rmaUtils";
-import { FolderOpen, CheckCircle2, Clock, Timer } from "lucide-react";
+﻿import {Card} from "@/components/ui/card";
+import {Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis} from "recharts";
+import {getDaysInCurrentStatus, getDaysOpen, RMA_STATUSES, STATUS_COLORS} from "@/components/rma/rmaUtils";
+import {CheckCircle2, Clock, FolderOpen, Timer} from "lucide-react";
 
 function MetricCard({ icon: Icon, label, value, color }) {
   return (

@@ -1,16 +1,9 @@
-import { useEffect, useState, useCallback } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { AlertTriangle, AlertOctagon, Info, RefreshCw, Trash2, Users } from "lucide-react";
-import { listErrors, clearErrors } from "@/features/developerConsole/errorLog";
-import { AdminResetPasswordButton } from "@/features/developerConsole/AdminPasswordReset.jsx";
-import { KeyRound } from "lucide-react";
+import {useCallback, useEffect, useState} from "react";
+import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
+import {Button} from "@/components/ui/button";
+import {AlertOctagon, AlertTriangle, Info, KeyRound, RefreshCw, Trash2, Users} from "lucide-react";
+import {clearErrors, listErrors} from "@/features/developerConsole/errorLog";
+import {AdminResetPasswordButton} from "@/features/developerConsole/AdminPasswordReset.jsx";
 
 const REPORT_SEVERITY_ORDER = { critical: 0, known_issue: 1, needs_investigation: 2, warning: 3, info: 4 };
 const REPORT_SEVERITY_LABEL = {

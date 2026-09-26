@@ -1,12 +1,20 @@
-﻿import { useEffect, useMemo, useState } from "react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowUpDown, Search, Settings2, SlidersHorizontal, ChevronRight } from "lucide-react";
-import { getHiddenColumns, setColumnVisibility, resetColumnVisibility } from "@/features/supervisorDashboard/tableColumnPreferences";
-import { getSummaryFields, setSummaryFields, resetSummaryFields } from "@/features/supervisorDashboard/summaryFieldPreferences";
+﻿import {useMemo, useState} from "react";
+import {Input} from "@/components/ui/input";
+import {Button} from "@/components/ui/button";
+import {Checkbox} from "@/components/ui/checkbox";
+import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
+import {ArrowUpDown, ChevronRight, Search, Settings2, SlidersHorizontal} from "lucide-react";
+import {
+    getHiddenColumns,
+    resetColumnVisibility,
+    setColumnVisibility
+} from "@/features/supervisorDashboard/tableColumnPreferences";
+import {
+    getSummaryFields,
+    resetSummaryFields,
+    setSummaryFields
+} from "@/features/supervisorDashboard/summaryFieldPreferences";
 
 const NONE_VALUE = "__none__";
 const SUMMARY_SLOT_COUNT = 4;

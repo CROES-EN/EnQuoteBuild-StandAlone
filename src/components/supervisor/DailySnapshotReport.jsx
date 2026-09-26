@@ -1,42 +1,42 @@
-﻿import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { toast } from "sonner";
-import { ClipboardCopy, Download, FileDown, RefreshCw, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { getQuotes } from "@/api/dataClient";
+﻿import {useEffect, useMemo, useState} from "react";
+import {useQuery} from "@tanstack/react-query";
+import {toast} from "sonner";
+import {ClipboardCopy, Download, FileDown, RefreshCw, Sparkles} from "lucide-react";
+import {Button} from "@/components/ui/button";
+import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
+import {Textarea} from "@/components/ui/textarea";
+import {Badge} from "@/components/ui/badge";
+import {getQuotes} from "@/api/dataClient";
 import {
-  formatNumber,
-  formatSecondsAsClock,
-  formatRate,
-  formatDateLabel,
-  formatOrFallback
+    formatDateLabel,
+    formatNumber,
+    formatOrFallback,
+    formatRate,
+    formatSecondsAsClock
 } from "@/features/supervisorDashboard/format";
 import {
-  computeAbandonRate,
-  computeHandleRate,
-  computeStaffingAvailabilityRate,
-  computeNetBacklogChange,
-  computeExpectedEndingBacklog,
-  computeBacklogReconciliationVariance,
-  resolveReportingTimeZone,
-  deriveUnavailableMetrics,
-  deriveReconciliationExceptions,
-  deriveManualInputsUsed,
-  draftExecutiveSummaryBullets
+    computeAbandonRate,
+    computeBacklogReconciliationVariance,
+    computeExpectedEndingBacklog,
+    computeHandleRate,
+    computeNetBacklogChange,
+    computeStaffingAvailabilityRate,
+    deriveManualInputsUsed,
+    deriveReconciliationExceptions,
+    deriveUnavailableMetrics,
+    draftExecutiveSummaryBullets,
+    resolveReportingTimeZone
 } from "@/features/supervisorDashboard/omSnapshotCalculations";
 import {
-  computeQuoteOpsMetrics,
-  computeQuoteIntakeGap,
-  DEFAULT_COMPLETED_STATUSES
+    computeQuoteIntakeGap,
+    computeQuoteOpsMetrics,
+    DEFAULT_COMPLETED_STATUSES
 } from "@/features/supervisorDashboard/quoteOpsMetrics";
 import {
-  buildSnapshotMarkdown,
-  downloadSnapshotMarkdown,
-  copySnapshotMarkdown,
-  downloadSnapshotPDF
+    buildSnapshotMarkdown,
+    copySnapshotMarkdown,
+    downloadSnapshotMarkdown,
+    downloadSnapshotPDF
 } from "@/features/supervisorDashboard/omSnapshotExport";
 
 // A source's data is flagged "stale" only when it was recorded more than 5 calendar days after

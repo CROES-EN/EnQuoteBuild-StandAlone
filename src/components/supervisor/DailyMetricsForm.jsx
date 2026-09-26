@@ -1,14 +1,21 @@
-﻿import { useEffect, useState } from "react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { PenLine } from "lucide-react";
-import { saveDailyMetric } from "@/features/supervisorDashboard/opsMetricsStore";
-import { parseDurationToSeconds } from "@/features/supervisorDashboard/reportParsing";
-import { formatSecondsAsClock } from "@/features/supervisorDashboard/format";
+﻿import {useEffect, useState} from "react";
+import {toast} from "sonner";
+import {Button} from "@/components/ui/button";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
+} from "@/components/ui/dialog";
+import {Input} from "@/components/ui/input";
+import {Label} from "@/components/ui/label";
+import {Textarea} from "@/components/ui/textarea";
+import {PenLine} from "lucide-react";
+import {saveDailyMetric} from "@/features/supervisorDashboard/opsMetricsStore";
+import {parseDurationToSeconds} from "@/features/supervisorDashboard/reportParsing";
+import {formatSecondsAsClock} from "@/features/supervisorDashboard/format";
 
 function blankForm(date) {
   return {

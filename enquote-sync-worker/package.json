@@ -1,0 +1,14 @@
+{
+  "name": "enquote-sync",
+  "version": "1.0.0",
+  "private": true,
+  "description": "EnQuote <-> Base44 sync layer on Cloudflare Workers",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:migrate": "wrangler d1 execute enquote-sync --file=./schema.sql"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

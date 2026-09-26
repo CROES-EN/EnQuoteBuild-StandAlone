@@ -1,4 +1,5 @@
-﻿import { Link } from "react-router-dom";
-import { Card } from "@/components/ui/card";
+﻿import {Link} from "react-router-dom";
+import {Card} from "@/components/ui/card";
+
 const labels = { no_customer_response: "No customer response", cost: "Cost", scheduling: "Scheduling", homeowner_cancelled: "Homeowner cancelled", homeowner_declined: "Homeowner declined", other: "Other / uncategorized" };
 export default function DecisionReasons({ reasons, range }) { const dates = `start=${range.start}&end=${range.end}`; return <Card className="border-border p-5"><h2 className="font-semibold text-foreground">Homeowner decision reasons</h2><p className="mb-4 text-sm text-muted-foreground">Boneyard and homeowner-declined quotes in the selected period.</p><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{Object.entries(labels).map(([key, label]) => <Link key={key} to={`/InactiveCollections?category=homeowner_decisions&reason=${key}&${dates}`} className="rounded-lg bg-secondary p-3 transition-colors hover:bg-indigo-50"><p className="text-sm text-muted-foreground">{label}</p><p className="text-xl font-bold text-foreground">{reasons[key] || 0}</p></Link>)}</div></Card>; }

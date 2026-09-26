@@ -1,4 +1,4 @@
-﻿import { base44 } from "../base44Client";
+﻿import {base44} from "../base44Client";
 
 const ENTITY_ALIASES = {
   quotes: "Quote",

@@ -1,31 +1,31 @@
-﻿import { useMemo, useState } from "react";
+﻿import {useMemo, useState} from "react";
 import {
-  CalendarClock,
-  Download,
-  ExternalLink,
-  FileSpreadsheet,
-  FolderInput,
-  Info,
-  Settings2,
-  Upload
+    CalendarClock,
+    Download,
+    ExternalLink,
+    FileSpreadsheet,
+    FolderInput,
+    Info,
+    Settings2,
+    Upload
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {Badge} from "@/components/ui/badge";
+import {Button} from "@/components/ui/button";
+import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
+import {Alert, AlertDescription, AlertTitle} from "@/components/ui/alert";
+import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import {
-  REPORT_DEFINITIONS,
-  getFieldsForDefinition,
-  getImportStatsForSource,
-  downloadBlankTemplate,
-  downloadSyntheticSample
+    downloadBlankTemplate,
+    downloadSyntheticSample,
+    getFieldsForDefinition,
+    getImportStatsForSource,
+    REPORT_DEFINITIONS
 } from "@/features/supervisorDashboard/reportDefinitions";
-import { formatDateLabel } from "@/features/supervisorDashboard/format";
+import {formatDateLabel} from "@/features/supervisorDashboard/format";
 import {
-  getHiddenFieldKeys,
-  setFieldVisibility,
-  resetFieldVisibility
+    getHiddenFieldKeys,
+    resetFieldVisibility,
+    setFieldVisibility
 } from "@/features/supervisorDashboard/columnPreferences";
 import ColumnCustomizer from "@/components/supervisor/ColumnCustomizer";
 

@@ -1,12 +1,11 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Search, Package, Wrench, Plus, X, ExternalLink } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
+import {useState} from "react";
+import {Button} from "@/components/ui/button";
+import {Input} from "@/components/ui/input";
+import {Card} from "@/components/ui/card";
+import {Checkbox} from "@/components/ui/checkbox";
+import {ExternalLink, Package, Plus, Search, Wrench, X} from "lucide-react";
+import {cn} from "@/lib/utils";
+import {AnimatePresence, motion} from "framer-motion";
 import QuickAddItemDialog from "./QuickAddItemDialog";
 
 // FIX (per explicit request: "having trouble finding items because of all the spelling

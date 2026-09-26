@@ -1,10 +1,10 @@
-﻿import { useEffect, useState } from "react";
-import { base44 } from "@/api/base44Client";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/lib/AuthContext";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { ShieldAlert, Loader2, LogIn } from "lucide-react";
+﻿import {useEffect, useState} from "react";
+import {base44} from "@/api/base44Client";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {useAuth} from "@/lib/AuthContext";
+import {Card} from "@/components/ui/card";
+import {Button} from "@/components/ui/button";
+import {Loader2, LogIn, ShieldAlert} from "lucide-react";
 import LoginScreen from "@/components/auth/LoginScreen";
 import appPackage from "../../../package.json";
 

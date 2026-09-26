@@ -45,7 +45,7 @@
  * root cause of a full session's worth of bugs fixed earlier tonight.
  */
 
-import { scopedKey } from "@/lib/userScopedStorage";
+import {scopedKey} from "@/lib/userScopedStorage";
 
 const TILES_KEY = "enquote_workload_tiles_v1";
 const COLUMN_ORDER_KEY = "enquote_workload_column_order_v1";
