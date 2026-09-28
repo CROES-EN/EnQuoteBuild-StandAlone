@@ -91,18 +91,18 @@ function generateDraftReferenceNumber() {
   return `AI-${ts}${rand}`;
 }
 
-export default function AutoDrafterCaseTile({
-  row,
-  index = 0,
-  caseNumberCol,
-  siteIdCol,
-  statusCol,
-  commentCol,
-  createdCol,
-  savedDraftRecord = null,
-  onDraftSaved,
-  onViewDraft
-}) {
+export default ({
+                  row,
+                  index = 0,
+                  caseNumberCol,
+                  siteIdCol,
+                  statusCol,
+                  commentCol,
+                  createdCol,
+                  savedDraftRecord = null,
+                  onDraftSaved,
+                  onViewDraft
+                }) => {
   const comment = commentCol ? row[commentCol] || "" : "";
 
   const quoteCategory = extractField(comment, "Quote Category");

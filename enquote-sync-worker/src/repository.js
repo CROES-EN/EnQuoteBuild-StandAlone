@@ -42,6 +42,13 @@ export async function getSnapshot(db) {
     .all();
   return results.map((r) => ({ ...JSON.parse(r.payload), _synced_at: r.updated_at }));
 }
+export async function getSnapshotMeta(db) {
+  const row = await db
+      .prepare("SELECT updated_at FROM quotes ORDER BY updated_at DESC LIMIT 1")
+      .first();
+  return row ? row.updated_at : null;
+}
+
 
 export async function recordOutboundItem(db, { id, entityType, quoteId, action, payload }) {
   await db

@@ -1,0 +1,61 @@
+  200:     //   2. The case's (generic) Status is anything OTHER than "Closed" (case-insensitive,
+  201:     //      since this is a coarser, less strictly-defined field than O&M Status).
+  202:     //   3. The case comment contains "O&M_QUOTE" or "Estimated Onsite Labor Hours" -- a
+  203:     //      genuine quote-request payload marker, confirmed present in a real imported case's
+  204:     //      comment text (see parseQuoteRequestCase.js's own header comment for the full
+  205:     //      confirmed structure).
+  206:     // Each condition independently falls back to "pass" (does not filter on it) if its
+  207:     // underlying column could not be detected at all -- so a genuinely malformed/renamed
+  208:     // export column never silently hides every case with no way to tell why.
+  209:     const QUALIFYING_OM_STATUS = "Quote Requested";
+  210:     const QUALIFYING_COMMENT_MARKERS = ["O&M_QUOTE", "Estimated Onsite Labor Hours"];
+  211:     const qualifyingRows = rows.filter((row) => {
+  212:         const matchesOmStatus = omStatusCol
+  213:             ? String(row[omStatusCol] ?? "").trim() === QUALIFYING_OM_STATUS
+  214:             : true;
+  215:         const isNotClosed = statusCol
+  216:             ? String(row[statusCol] ?? "").trim().toLowerCase() !== "closed"
+  217:             : true;
+  218:         const hasQualifyingMarker = commentCol
+  219:             ? QUALIFYING_COMMENT_MARKERS.some((marker) => String(row[commentCol] ?? "").includes(marker))
+  220:             : true;
+  221:         return matchesOmStatus && isNotClosed && hasQualifyingMarker;
+  222:     });
+  223: 
+  224:     // FIX (confirmed real cause, via direct inspection of the imported data file): a
+  225:     // React "duplicate key" warning was traced to genuine, expected source data -- the
+  226:     // Salesforce export includes ONE ROW PER CASE COMMENT, not one row per case, so any
+  227:     // case with more than one comment (e.g. an internal note added after the original
+  228:     // quote-request comment) produces multiple rows sharing the same Case Number. This is
+  229:     // not a data-corruption bug; it is normal comment history. To show exactly ONE tile per
+  230:     // case (never a React key collision, never a confusing duplicate tile), rows sharing a
+  231:     // case number are collapsed to the single MOST RECENT one, using Case Comment Created
+  232:     // Date when available (falling back to array order if that column can't be detected or
+  233:     // parsed). If two comments for the same case have genuinely different underlying
+  234:     // Case Comment text (not just different author/timestamp metadata), the older one's
+  235:     // content is still discarded here in favor of the most recent -- consistent with
+  236:     // treating the latest comment as the authoritative version of a case's quote request.
+  237:     function dedupedQualifyingRows
+  238: 
+  239:     = caseNumberCol
+  240: )
+  241:     {
+  242:         const byCaseNumber = new Map();
+  243:         qualifyingRows.forEach((row, originalIndex) => {
+  244:             const key = row[caseNumberCol];
+  245:             if (key === undefined || key === null || key === "") {
+  246:                 // No case number at all -- can't dedupe meaningfully, always keep.
+  247:                 byCaseNumber.set(`__no-case-number-${originalIndex}__`, row);
+  248:                 return;
+  249:             }
+  250:             const existing = byCaseNumber.get(key);
+  251:             if (!existing) {
+  252:                 byCaseNumber.set(key, row);
+  253:                 return;
+  254:             }
+  255:             if (!createdCol) return; // no way to compare recency -- keep the first one seen
+  256:             const existingTime = new Date(existing[createdCol]).getTime();
+  257:             const candidateTime = new Date(row[createdCol]).getTime();
+  258:             if (!Number.isNaN(candidateTime) && (Number.isNaN(existingTime) || candidateTime > existingTime)) {
+  259:                 byCaseNumber.set(key, row);
+  260:             }

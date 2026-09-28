@@ -21,9 +21,9 @@ import PVPanelRMAsPage from "./pages/PVPanelRMAs";
 import InactiveRevenueDashboardPage from "./pages/InactiveRevenueDashboard";
 import InactiveCollectionsPage from "./pages/InactiveCollections";
 import WorkloadPage from "./pages/Workload";
-import AutoDrafterPage from "./pages/AutoDrafter";
+import {AutoDrafter as AutoDrafterPage} from "./pages/AutoDrafter";
 
-import {AuthProvider, useAuth} from "@/lib/AuthContext";
+import AuthProvider, {useAuth} from "@/lib/AuthContext";
 import UserNotRegisteredError from "@/components/UserNotRegisteredError";
 import {ThemeProvider} from "@/features/theme/ThemeContext";
 

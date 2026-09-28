@@ -1,4 +1,4 @@
-import React, {createContext, useCallback, useContext, useEffect, useState} from 'react';
+import React, {createContext, useCallback, useContext, useEffect, useMemo, useState} from 'react';
 import {recordError} from '@/features/developerConsole/errorLog';
 import {base44} from '@/api/base44Client';
 import {appParams} from '@/lib/app-params';
@@ -17,7 +17,7 @@ const demoUser = {
 
 // Users who always get admin role regardless of what the synced Base44 record says -
 // mirrors the same list used by AutoAssignRole for the Base44-authenticated path.
-const FORCED_ADMIN_EMAILS = [
+const FORCED_ADMIN_EMAILS = new Set([
   "smosley@enphaseenergy.com",
   "croeschberger@enphaseenergy.com",
   "shawkins@enphaseenergy.com",
@@ -25,17 +25,12 @@ const FORCED_ADMIN_EMAILS = [
   "REDACTED-USER1@example.invalid",
   "jwood@enphaseenergy.com",
   "mjb@enphaseenergy.com"
-];
+]);
 
 // Remembers which local account is signed in on this PC across the frequent full-page
-// reloads the local-first sync design already triggers on its own - every scheduled
-// Base44 webhook import (every 15-20 minutes) and every manual "Refresh" that pulls new
-// data calls window.reload(). Without this, checkAppState() below had no way to tell a
-// routine sync reload apart from a genuine app restart, so it forced the "sign in again"
-// screen every time regardless, even though the person had already signed in correctly
-// minutes earlier. The password itself is still verified by the main process the first
-// time; this only remembers WHO last passed that check, the same way a browser doesn't
-// log you out of a site on every page navigation.
+// reloads the local-first sync design already triggers on its own. Without this,
+// checkAppState() below had no way to tell a routine sync reload apart from a genuine
+// app restart, so it forced the "sign in again" screen every time regardless.
 const LOCAL_SESSION_EMAIL_KEY = "enquote_local_session_email";
 
 function getPersistedLocalSessionEmail() {
@@ -58,21 +53,30 @@ function setPersistedLocalSessionEmail(email) {
   }
 }
 
-/**
- * FIX (per explicit request - "make the incorrect password error look nicer, not so 'code
- * looking'"): Electron's IPC boundary automatically wraps any error thrown in the main
- * process with boilerplate like `Error invoking remote method 'auth:login': Error: <message>`
- * before it ever reaches this renderer code - this is Electron's own behavior, not something
- * repository.cjs/main.cjs add themselves (they just throw a clean, human-written message like
- * "Incorrect password."). Previously that raw, technical-looking wrapper text was shown
- * directly to the user. This helper strips it down to just the real, human-written message
- * underneath, so the sign-in screen shows a clean "Incorrect password." instead of the full
- * "Error invoking remote method 'auth:login': Error: Incorrect password." string. Verified
- * against the exact real error text this app produces before being applied here.
- */
+// Centralizes access to the Electron preload bridge. IntelliJ/the type checker has no
+// declared type for this global (it's injected at runtime by Electron's preload script,
+// never declared anywhere), so every direct globalThis.window?.enquoteLocal access was
+// flagged as "Unresolved variable enquoteLocal". This one helper isolates that single,
+// intentional "any" cast in one place instead of repeating it at every call site.
+function getEnquoteLocal() {
+  return /** @type {any} */ (globalThis.window)?.enquoteLocal;
+}
+
+// FIX: Electron's IPC boundary wraps any error thrown in the main process with
+// boilerplate like `Error invoking remote method 'auth:login': Error: <message>` before
+// it reaches this renderer code. This strips that wrapper so the UI shows the clean,
+// human-written message underneath (e.g. "Incorrect password.") instead of the raw
+// technical wrapper text.
+//
+// Pattern moved to a module-level constant (built once, not on every call) and
+// simplified to use the "s" (dotAll) flag instead of a [\s\S]* character class, which
+// removes the nested-quantifier shape that was flagged as having super-linear
+// backtracking risk.
+const IPC_ERROR_PATTERN = /^Error invoking remote method '[^']+':\s*(?:Error:\s*)?(.*)$/s;
+
 function cleanIpcErrorMessage(message) {
   if (!message) return message;
-  const match = String(message).match(/Error invoking remote method '[^']+':\s*(?:Error:\s*)?([\s\S]*)$/);
+  const match = IPC_ERROR_PATTERN.exec(String(message));
   return match ? match[1].trim() : message;
 }
 
@@ -81,10 +85,10 @@ function cleanIpcErrorMessage(message) {
 // plain browser tab via `npm run dev` or `vite preview` - local mode falls back to the
 // original frictionless demoUser behavior so that workflow keeps working.
 function getLocalAuthBridge() {
-  return globalThis.window?.enquoteLocal?.auth || null;
+  return getEnquoteLocal()?.auth || null;
 }
 
-export const AuthProvider = ({ children }) => {
+const AuthProvider = ({children}) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
@@ -107,19 +111,13 @@ export const AuthProvider = ({ children }) => {
   const [needsRemoteSyncSecret, setNeedsRemoteSyncSecret] = useState(false);
   const [remoteSyncPromptUrl, setRemoteSyncPromptUrl] = useState(null);
 
-  useEffect(() => {
-    checkAppState();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // Turns a resolved identity (a real synced Base44 "User" record when we have one, or just
-  // the email otherwise) into the shape the rest of the app expects from `user` (see
-  // demoUser above for the reference shape). Note the synced record's own "full_name" field
-  // is actually the short username (e.g. "jwood") - the friendlier human name, when set,
-  // lives in "display_name".
+  // the email otherwise) into the shape the rest of the app expects from `user`. Note the
+  // synced record's own "full_name" field is actually the short username (e.g. "jwood") -
+  // the friendlier human name, when set, lives in "display_name".
   const buildUserFromRecord = (record, fallbackEmail) => {
     const email = record?.email || fallbackEmail || "";
-    const isForcedAdmin = FORCED_ADMIN_EMAILS.includes(email);
+    const isForcedAdmin = FORCED_ADMIN_EMAILS.has(email);
     // Deliberately do NOT default a missing app_role to "submitter" - leaving it unset lets
     // the existing RoleGuard "Role Not Assigned" screen correctly ask the person to contact
     // an admin, the same as it already does for Base44-authenticated users with no role.
@@ -137,15 +135,12 @@ export const AuthProvider = ({ children }) => {
     };
   };
 
-  // Loads the live synced users list (if any) to find the full record for the signed-in
-  // email, then activates it as the current session user.
   // Checks whether this machine needs the one-time remote-sync secret prompt.
-  // NEVER throws and never blocks sign-in -- a missing bridge (dev/browser mode) or
-  // an unreachable GitHub check are both treated as "nothing to do right now",
-  // exactly like the app already behaves before this feature existed.
+  // NEVER throws and never blocks sign-in - a missing bridge (dev/browser mode) or
+  // an unreachable check are both treated as "nothing to do right now".
   const checkRemoteSyncStatus = useCallback(async (email) => {
     try {
-      const bridge = globalThis.window?.enquoteLocal?.remoteSync;
+      const bridge = getEnquoteLocal()?.remoteSync;
       if (!bridge) return;
       const result = await bridge.checkStatus(email);
       if (result?.ok && result.needsSecret) {
@@ -166,6 +161,8 @@ export const AuthProvider = ({ children }) => {
     setRemoteSyncPromptUrl(null);
   }, []);
 
+  // Loads the live synced users list (if any) to find the full record for the signed-in
+  // email, then activates it as the current session user.
   const activateUser = useCallback(async (email) => {
     let record = null;
     try {
@@ -180,16 +177,12 @@ export const AuthProvider = ({ children }) => {
     setNeedsLocalLogin(false);
     setPendingPasswordChange(null);
     setPersistedLocalSessionEmail(email);
+
     // Announces this user as currently signed in, for the Developer Console's "Who's
-    // Online" tab. Still fire-and-forget and non-blocking (sign-in never waits on or
-    // fails because of this - confirmed via a standalone test covering success,
-    // rejection, a missing bridge entirely, and a malformed return value). The ONE
-    // change here: a failure is now captured via recordError() (the same mechanism
-    // already powering the Developer Console's App Errors tab) instead of vanishing
-    // completely silently - closing a real diagnostic blind spot that made it
-    // impossible to tell "presence failed" from "presence never ran" for a teammate
-    // whose sign-in status wasn't appearing correctly.
-    globalThis.window?.enquoteLocal?.presence?.announce?.({
+    // Online" tab. Fire-and-forget and non-blocking by design (sign-in never waits on or
+    // fails because of this). A failure is captured via recordError() instead of vanishing
+    // silently.
+    getEnquoteLocal()?.presence?.announce?.({
       email,
       name: record?.full_name || record?.name || email
     })?.catch?.((presenceError) => {
@@ -198,54 +191,78 @@ export const AuthProvider = ({ children }) => {
         message: presenceError?.message || String(presenceError)
       });
     });
-    checkRemoteSyncStatus(email);
+
+    // Intentionally not awaited: checkRemoteSyncStatus never throws (it has its own
+    // internal try/catch above), so there is nothing meaningful to await here. The `void`
+    // operator marks this as a deliberate fire-and-forget call rather than a missed await.
+    void checkRemoteSyncStatus(email);
   }, [checkRemoteSyncStatus]);
 
-  const checkAppState = async () => {
-    if (isLocalDemo) {
-      const authBridge = getLocalAuthBridge();
-      if (!authBridge) {
-        setUser(demoUser);
-        setIsAuthenticated(true);
-        setAppPublicSettings({ id: "local-demo", public_settings: {} });
-        setIsLoadingPublicSettings(false);
-        setIsLoadingAuth(false);
-        return;
+  // Maps a failed remote app-state check onto the right authError shape. Split out of
+  // checkRemoteAppState purely to keep that function's Cognitive Complexity low.
+  const handleAppStateError = (appError) => {
+    console.error('App state check failed:', appError);
+    const errData = /** @type {any} */ (appError).data;
+
+    if (appError.status === 403 && errData?.extra_data?.reason) {
+      const reason = errData.extra_data.reason;
+      if (reason === 'auth_required') {
+        setAuthError({type: 'auth_required', message: 'Authentication required'});
+      } else if (reason === 'user_not_registered') {
+        setAuthError({type: 'user_not_registered', message: 'User not registered for this app'});
+      } else {
+        setAuthError({type: reason, message: appError.message});
       }
-
-      setAppPublicSettings({ id: "local-demo", public_settings: {} });
-      setIsLoadingPublicSettings(false);
-
-      // Restore a previously-verified session instead of forcing a fresh sign-in on every
-      // reload - see the LOCAL_SESSION_EMAIL_KEY comment above for why this matters.
-      const persistedEmail = getPersistedLocalSessionEmail();
-      if (persistedEmail) {
-        await activateUser(persistedEmail);
-        setIsLoadingAuth(false);
-        return;
-      }
-
-      setNeedsLocalLogin(true);
-      setIsLoadingAuth(false);
-      return;
+    } else {
+      setAuthError({type: 'unknown', message: appError.message || 'Failed to load app'});
     }
+  };
 
+  const checkUserAuth = async () => {
+    try {
+      setIsLoadingAuth(true);
+      // Race the auth call against a 10s timeout so the app never hangs forever
+      const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Auth timeout')), 10000)
+      );
+      const currentUser = await Promise.race([base44.auth.me(), timeoutPromise]);
+      setUser(currentUser);
+      setIsAuthenticated(true);
+      setIsLoadingAuth(false);
+    } catch (error) {
+      console.error('User auth check failed:', error);
+      setIsLoadingAuth(false);
+      setIsAuthenticated(false);
+
+      if (error.status === 401 || error.status === 403) {
+        setAuthError({
+          type: 'auth_required',
+          message: 'Authentication required'
+        });
+      }
+      // On timeout or other errors, fall through - user will be prompted to log in
+    }
+  };
+
+  // Handles the "real" (non-local-demo) app-state check: loads public settings, then
+  // checks user auth if a token is present. Split out of checkAppState purely to keep
+  // Cognitive Complexity down (this piece + checkLocalAppState replace one much larger
+  // function that previously scored 26 against a limit of 15).
+  const checkRemoteAppState = async () => {
     try {
       setIsLoadingPublicSettings(true);
       setAuthError(null);
-      
-      // First, check app public settings (with token if available)
-      // This will tell us if auth is required, user not registered, etc.
+
       try {
         const settingsTimeout = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Settings timeout')), 10000)
+            setTimeout(() => reject(new Error('Settings timeout')), 10000)
         );
         const fetchSettings = fetch(`${appParams.serverUrl}/api/apps/public/prod/public-settings/by-id/${appParams.appId}`, {
           headers: {
             'X-App-Id': appParams.appId,
-            ...(appParams.token ? { 'Authorization': `Bearer ${appParams.token}` } : {})
+            ...(appParams.token ? {'Authorization': `Bearer ${appParams.token}`} : {})
           }
-        }).then(async res => {
+        }).then(async (res) => {
           if (!res.ok) {
             const data = await res.json().catch(() => ({}));
             const err = new Error(data?.message || 'Failed to load app settings');
@@ -255,10 +272,10 @@ export const AuthProvider = ({ children }) => {
           }
           return res.json();
         });
+
         const publicSettings = await Promise.race([fetchSettings, settingsTimeout]);
         setAppPublicSettings(publicSettings);
-        
-        // If we got the app public settings successfully, check if user is authenticated
+
         if (appParams.token) {
           await checkUserAuth();
         } else {
@@ -267,33 +284,7 @@ export const AuthProvider = ({ children }) => {
         }
         setIsLoadingPublicSettings(false);
       } catch (appError) {
-        console.error('App state check failed:', appError);
-        
-        // Handle app-level errors
-        if (appError.status === 403 && appError.data?.extra_data?.reason) {
-          const reason = appError.data.extra_data.reason;
-          if (reason === 'auth_required') {
-            setAuthError({
-              type: 'auth_required',
-              message: 'Authentication required'
-            });
-          } else if (reason === 'user_not_registered') {
-            setAuthError({
-              type: 'user_not_registered',
-              message: 'User not registered for this app'
-            });
-          } else {
-            setAuthError({
-              type: reason,
-              message: appError.message
-            });
-          }
-        } else {
-          setAuthError({
-            type: 'unknown',
-            message: appError.message || 'Failed to load app'
-          });
-        }
+        handleAppStateError(appError);
         setIsLoadingPublicSettings(false);
         setIsLoadingAuth(false);
       }
@@ -308,40 +299,64 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const checkUserAuth = async () => {
-    try {
-      setIsLoadingAuth(true);
-      // Race the auth call against a 10s timeout so the app never hangs forever
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Auth timeout')), 10000)
-      );
-      const currentUser = await Promise.race([base44.auth.me(), timeoutPromise]);
-      setUser(currentUser);
+  // Handles the local-demo app-state check (dev/browser mode or the Electron local-auth
+  // bridge). Split out of checkAppState for the same Cognitive Complexity reason as
+  // checkRemoteAppState above.
+  const checkLocalAppState = async () => {
+    const authBridge = getLocalAuthBridge();
+    if (!authBridge) {
+      setUser(demoUser);
       setIsAuthenticated(true);
+      setAppPublicSettings({id: "local-demo", public_settings: {}});
+      setIsLoadingPublicSettings(false);
       setIsLoadingAuth(false);
-    } catch (error) {
-      console.error('User auth check failed:', error);
-      setIsLoadingAuth(false);
-      setIsAuthenticated(false);
-      
-      if (error.status === 401 || error.status === 403) {
-        setAuthError({
-          type: 'auth_required',
-          message: 'Authentication required'
-        });
-      }
-      // On timeout or other errors, fall through â€” user will be prompted to log in
+      return;
     }
+
+    setAppPublicSettings({id: "local-demo", public_settings: {}});
+    setIsLoadingPublicSettings(false);
+
+    // Restore a previously-verified session instead of forcing a fresh sign-in on every
+    // reload - see the LOCAL_SESSION_EMAIL_KEY comment above for why this matters.
+    const persistedEmail = getPersistedLocalSessionEmail();
+    if (persistedEmail) {
+      await activateUser(persistedEmail);
+      setIsLoadingAuth(false);
+      return;
+    }
+
+    setNeedsLocalLogin(true);
+    setIsLoadingAuth(false);
+    // (No trailing `return;` here - this was the function's last statement anyway, so the
+    // explicit return was redundant and flagged as an unnecessary/"redundant jump".)
   };
 
-  const logout = (shouldRedirect = true) => {
+  const checkAppState = useCallback(async () => {
+    if (!isLocalDemo) {
+      await checkRemoteAppState();
+    } else {
+      await checkLocalAppState();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    // checkAppState never throws on its own (every branch inside it catches its own
+    // errors), but this .catch is kept as a safety net so a truly unexpected failure is
+    // never a silently "ignored floating promise" per the linter.
+    checkAppState().catch((error) => {
+      console.error('checkAppState failed:', error);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const logout = useCallback((shouldRedirect = true) => {
     // Removes this user from the "Who's Online" presence list, captured BEFORE user
     // state is cleared below (user?.email would be null after setUser(null)).
-    // Fire-and-forget, same reasoning as activateUser's announce call above - a
-    // sign-out must never be blocked or fail due to presence cleanup.
+    // Fire-and-forget, same reasoning as activateUser's announce call above.
     const signedOutEmail = user?.email || null;
     if (signedOutEmail) {
-      globalThis.window?.enquoteLocal?.presence?.remove?.({ email: signedOutEmail })?.catch?.(() => {});
+      getEnquoteLocal()?.presence?.remove?.({email: signedOutEmail})?.catch?.(() => {});
     }
 
     if (isLocalDemo) {
@@ -365,22 +380,20 @@ export const AuthProvider = ({ children }) => {
       // Just remove the token without redirect
       base44.auth.logout();
     }
-  };
+  }, [user, isLocalAuthActive]);
 
-  const navigateToLogin = () => {
+  const navigateToLogin = useCallback(() => {
     // Use the SDK's redirectToLogin method
     base44.auth.redirectToLogin(window.location.href);
-  };
+  }, []);
 
   // Validates the typed email/password against this PC's local credential store. Everyone
-  // starts out on the shared temporary password ("Enquote1") - if that's still active, this
-  // signals the caller to show the "set your own password" step instead of signing in.
+  // starts out on the shared temporary password - if that's still active, this signals the
+  // caller to show the "set your own password" step instead of signing in.
   //
-  // FIX: wraps the authBridge.login() call so any error it throws (which arrives from the
-  // main process pre-wrapped by Electron's own IPC layer - see cleanIpcErrorMessage's comment
-  // above) is cleaned up before it ever reaches the UI, so the sign-in screen shows a plain
-  // "Incorrect password." instead of the raw "Error invoking remote method '...': Error: ..."
-  // technical wrapper text.
+  // FIX: wraps the authBridge.login() call so any error it throws (pre-wrapped by
+  // Electron's own IPC layer - see cleanIpcErrorMessage's comment above) is cleaned up
+  // before it ever reaches the UI.
   const login = useCallback(async (email, password) => {
     const authBridge = getLocalAuthBridge();
     if (!authBridge) {
@@ -398,12 +411,12 @@ export const AuthProvider = ({ children }) => {
     }
 
     if (result.mustChangePassword) {
-      setPendingPasswordChange({ email: result.email, password });
-      return { mustChangePassword: true };
+      setPendingPasswordChange({email: result.email, password});
+      return {mustChangePassword: true};
     }
 
     await activateUser(result.email);
-    return { mustChangePassword: false };
+    return {mustChangePassword: false};
   }, [activateUser]);
 
   // Called from the "set your new password" step that follows a temporary-password sign-in.
@@ -422,30 +435,57 @@ export const AuthProvider = ({ children }) => {
     await activateUser(pendingPasswordChange.email);
   }, [pendingPasswordChange, activateUser]);
 
+  // The object passed to Context.Provider must keep the same reference across renders
+  // unless something it depends on actually changed - otherwise every component that
+  // consumes useAuth() re-renders on every AuthProvider render, regardless of whether
+  // anything relevant changed. useMemo (plus useCallback above on the functions in this
+  // object) keeps that reference stable.
+  const contextValue = useMemo(() => ({
+    user,
+    isAuthenticated,
+    isLoadingAuth,
+    isLoadingPublicSettings,
+    authError,
+    appPublicSettings,
+    logout,
+    navigateToLogin,
+    checkAppState,
+    needsLocalLogin,
+    pendingPasswordChange,
+    isLocalAuthActive,
+    login,
+    completePasswordChange,
+    needsRemoteSyncSecret,
+    remoteSyncPromptUrl,
+    clearRemoteSyncPrompt
+  }), [
+    user,
+    isAuthenticated,
+    isLoadingAuth,
+    isLoadingPublicSettings,
+    authError,
+    appPublicSettings,
+    logout,
+    navigateToLogin,
+    checkAppState,
+    needsLocalLogin,
+    pendingPasswordChange,
+    isLocalAuthActive,
+    login,
+    completePasswordChange,
+    needsRemoteSyncSecret,
+    remoteSyncPromptUrl,
+    clearRemoteSyncPrompt
+  ]);
+
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      isAuthenticated, 
-      isLoadingAuth,
-      isLoadingPublicSettings,
-      authError,
-      appPublicSettings,
-      logout,
-      navigateToLogin,
-      checkAppState,
-      needsLocalLogin,
-      pendingPasswordChange,
-      isLocalAuthActive,
-      login,
-      completePasswordChange,
-      needsRemoteSyncSecret,
-      remoteSyncPromptUrl,
-      clearRemoteSyncPrompt
-    }}>
-      {children}
-    </AuthContext.Provider>
+      <AuthContext.Provider value={contextValue}>
+        {children}
+      </AuthContext.Provider>
   );
 };
+
+export default AuthProvider;
 
 export const useAuth = () => {
   const context = useContext(AuthContext);

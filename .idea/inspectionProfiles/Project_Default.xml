@@ -5,7 +5,6 @@
     <inspection_tool class="CssConvertColorToHexInspection" enabled="true" level="WARNING" enabled_by_default="true" />
     <inspection_tool class="CssConvertColorToRgbInspection" enabled="true" level="WARNING" enabled_by_default="true" />
     <inspection_tool class="CssMissingSemicolon" enabled="true" level="WARNING" enabled_by_default="true" />
-    <inspection_tool class="Eslint" enabled="true" level="WARNING" enabled_by_default="true" />
     <inspection_tool class="HtmlPresentationalElement" enabled="true" level="INFORMATION" enabled_by_default="true" />
     <inspection_tool class="HtmlUnknownAttribute" enabled="true" level="WARNING" enabled_by_default="true">
       <option name="myValues">

@@ -1,103 +1,39 @@
-// Pushes locally-created quotes, and edits to quotes that already exist in
-// Base44, up to Base44. Each queue entry has a `kind` of "create" or "update"
-// (set by repository.cjs) and is applied at most once.
-//
-// Design goals (in priority order):
-//   1. NEVER create a duplicate quote in Base44.
-//   2. NEVER silently overwrite a newer change that happened directly in
-//      Base44 with an older local edit - if Base44's own copy changed since
-//      this app last confirmed a sync, the push is held back and clearly
-//      flagged as a CONFLICT instead of blindly winning a last-write-wins race.
-//   3. Never block or break the app when Base44 is unreachable - the app is
-//      offline-first, so a failed push must simply leave the quote queued.
-//
-// Duplicate protection is layered:
-//   - The repository's queue is keyed on `local_id` per kind, so one edit
-//     yields at most one pending entry.
-//   - A single in-flight guard (`running`) prevents two overlapping flushes
-//     from sending the same pending entry twice.
-//   - Before creating anything, we ask Base44 whether a quote with the same
-//     `quote_number` already exists and, if so, we adopt that remote id and
-//     mark the entry synced instead of creating a second copy. Updates never
-//     need this check since their `remote_id` is already known.
-//   - Only a confirmed success acks the entry; failures increment `attempts`
-//     and leave it pending for the next flush.
-//
-// Conflict protection (updates only):
-//   - Before pushing an edit, we fetch Base44's CURRENT copy of that quote
-//     and compare its `updated_date` against `base44_synced_at` - the
-//     timestamp this app last confirmed a successful sync for this exact
-//     quote. If Base44's copy was updated more recently than that baseline,
-//     someone (or something) changed it directly in Base44 after this app
-//     last knew about it - pushing the local edit now would silently destroy
-//     that change. Instead, the entry is left queued and clearly marked
-//     "CONFLICT" (not counted against the normal retry-attempt limit, so it
-//     keeps being re-checked on every flush rather than eventually being
-//     abandoned) until a human resolves it - e.g. by re-saving locally with
-//     the latest information, or once the remote copy stabilizes.
-//   - LIMITATION: if this app has never successfully synced this specific
-//     quote before (no `base44_synced_at` on record yet - can happen for a
-//     quote that originated in Base44/via webhook import and is being
-//     edited locally for the very first time), there is no baseline to
-//     compare against, and the push proceeds as before (unchanged, existing
-//     behavior) rather than blocking indefinitely with nothing to compare to.
+// Outbound sync: EnQuote -> Base44, now routed through the Cloudflare Worker.
 
 const https = require("node:https");
 const http = require("node:http");
 
-const DEFAULT_INTERVAL_MS = 5 * 60 * 1000;
-const MAX_ATTEMPTS = 5;
+const DEFAULT_INTERVAL_MS = 30 * 1000;
 const REQUEST_TIMEOUT_MS = 20000;
 const CONFLICT_PREFIX = "CONFLICT:";
 
 function requestJson(urlString, { method = "GET", headers = {}, body = null } = {}) {
   return new Promise((resolve) => {
     let url;
-    try {
-      url = new URL(urlString);
-    } catch {
-      resolve({ ok: false, error: `Invalid URL: ${urlString}` });
-      return;
-    }
-
+    try { url = new URL(urlString); } catch { resolve({ ok: false, error: `Invalid URL: ${urlString}` }); return; }
     const transport = url.protocol === "http:" ? http : https;
     const payload = body == null ? null : Buffer.from(JSON.stringify(body));
-    const req = transport.request(
-      {
-        protocol: url.protocol,
-        hostname: url.hostname,
-        port: url.port || undefined,
-        path: `${url.pathname}${url.search}`,
-        method,
-        headers: {
-          Accept: "application/json",
-          ...(payload ? { "Content-Type": "application/json", "Content-Length": payload.length } : {}),
-          ...headers
-        }
-      },
-      (res) => {
-        let raw = "";
-        res.on("data", (chunk) => { raw += chunk; });
-        res.on("end", () => {
-          let parsed = null;
-          try { parsed = raw ? JSON.parse(raw) : null; } catch { parsed = null; }
-          const ok = res.statusCode >= 200 && res.statusCode < 300;
-          resolve({ ok, status: res.statusCode, body: parsed, raw, error: ok ? null : `HTTP ${res.statusCode}` });
-        });
-      }
-    );
-
-    req.setTimeout(REQUEST_TIMEOUT_MS, () => {
-      req.destroy();
-      resolve({ ok: false, error: "Request timed out" });
+    const req = transport.request({
+      protocol: url.protocol, hostname: url.hostname, port: url.port || undefined,
+      path: `${url.pathname}${url.search}`, method,
+      headers: { Accept: "application/json", ...(payload ? { "Content-Type": "application/json", "Content-Length": payload.length } : {}), ...headers }
+    }, (res) => {
+      let raw = "";
+      res.on("data", (chunk) => { raw += chunk; });
+      res.on("end", () => {
+        let parsed = null;
+        try { parsed = raw ? JSON.parse(raw) : null; } catch { parsed = null; }
+        const ok = res.statusCode >= 200 && res.statusCode < 300;
+        resolve({ ok, status: res.statusCode, body: parsed, raw, error: ok ? null : `HTTP ${res.statusCode}` });
+      });
     });
+    req.setTimeout(REQUEST_TIMEOUT_MS, () => { req.destroy(); resolve({ ok: false, error: "Request timed out" }); });
     req.on("error", (error) => resolve({ ok: false, error: error.message }));
     if (payload) req.write(payload);
     req.end();
   });
 }
 
-// Fields that are local bookkeeping and must not be sent to Base44.
 const LOCAL_ONLY_FIELDS = new Set(["id", "base44_id", "base44_synced_at"]);
 
 function toRemotePayload(quote) {
@@ -107,364 +43,111 @@ function toRemotePayload(quote) {
     if (value === undefined) continue;
     payload[key] = value;
   }
-  // Carry the local id so Base44 (and a human auditing the data) can always
-  // trace a remote record back to the desktop quote that produced it.
   payload.local_quote_id = quote.id;
   return payload;
 }
 
 function createOutboundSync({ repository, config, logger = console, onAfterWrite }) {
-  const { serverUrl, appId, apiKey, intervalMs = DEFAULT_INTERVAL_MS } = config || {};
+  const { workerUrl, outboundToken, intervalMs = DEFAULT_INTERVAL_MS } = config || {};
   let running = false;
   let timer = null;
+  const isConfigured = Boolean(workerUrl && outboundToken);
+  const enqueueUrl = () => `${String(workerUrl).replace(/\/+$/, "")}/api/outbound/enqueue`;
+  const authHeaders = () => ({ Authorization: `Bearer ${outboundToken}` });
 
-  const isConfigured = Boolean(serverUrl && appId && apiKey);
-  const entityUrl = () => `${String(serverUrl).replace(/\/+$/, "")}/api/apps/${appId}/entities/Quote`;
-  // Parallel entity URL for pushing local dismissals up to Base44 -- previously nothing
-  // in this file ever pushed a StatusAlertDismissal record outbound at all.
-  const dismissalEntityUrl = () => `${String(serverUrl).replace(/\/+$/, "")}/api/apps/${appId}/entities/StatusAlertDismissal`;
-  // Parallel entity URL for pushing local mentions up to Base44 -- mirrors
-  // dismissalEntityUrl() immediately above, for the "QuoteAlert" entity instead.
-  const mentionEntityUrl = () => `${String(serverUrl).replace(/\/+$/, "")}/api/apps/${appId}/entities/QuoteAlert`;
-  // Matches the header shape the official @base44/sdk client sends for
-  // API-key auth (X-App-Id + api_key, no Authorization/token header).
-  const authHeaders = () => ({ "X-App-Id": String(appId), api_key: apiKey });
-
-  // Returns the remote id if Base44 already holds this quote, else null.
-  async function findExisting(quote) {
-    const identifiers = [];
-    if (quote.quote_number) identifiers.push({ quote_number: quote.quote_number });
-    identifiers.push({ local_quote_id: quote.id });
-
-    for (const filter of identifiers) {
-      const url = `${entityUrl()}?q=${encodeURIComponent(JSON.stringify(filter))}&limit=1`;
-      const response = await requestJson(url, { headers: authHeaders() });
-      if (!response.ok) continue;
-      const rows = Array.isArray(response.body) ? response.body : response.body?.items;
-      if (Array.isArray(rows) && rows.length > 0 && rows[0]?.id) {
-        return String(rows[0].id);
-      }
-    }
-    return null;
+  function buildQuoteMessage(entry) {
+    return { entityType: "quote", action: entry.kind, localId: entry.local_id, quote: toRemotePayload(entry.quote),
+      quoteId: entry.local_id, remoteId: entry.remote_id || null, base44SyncedAt: entry.quote?.base44_synced_at || null, quoteNumber: entry.quote_number || null };
+  }
+  function buildDismissalMessage(entry) { return { entityType: "dismissal", localId: entry.local_id, quoteId: entry.quote_id }; }
+  function buildMentionMessage(entry, localRecord) {
+    return { entityType: "mention", localId: entry.local_id, quoteId: entry.quote_id, siteId: localRecord?.site_id || "",
+      mentionedEmail: entry.mentioned_email, mentionedBy: localRecord?.mentioned_by || "", message: localRecord?.message || "", priority: localRecord?.priority || "yellow" };
   }
 
-  // Fetches Base44's CURRENT copy of a single quote by its remote id, used
-  // only for the pre-update conflict check below. Returns { ok:false } on
-  // any failure (network error, non-2xx, unparseable body) - callers must
-  // treat that as "could not verify" and NOT proceed to push blindly.
-  async function fetchRemoteQuote(remoteId) {
-    const response = await requestJson(`${entityUrl()}/${remoteId}`, { headers: authHeaders() });
-    // FIX: a 404 specifically means this quote no longer exists on Base44 at all (e.g. it
-    // was moved to Boneyard and deleted there) -- there is nothing to push an update TO in
-    // that case, so this is distinguished from a generic fetch failure (network issue,
-    // temporary outage) which should still be retried. Confirmed real-world case: quotes
-    // stuck retrying forever with "HTTP 404" after being moved to Boneyard and deleted on
-    // Base44's side.
-    if (response.status === 404) {
-      return { ok: false, notFound: true, error: "Quote no longer exists on Base44 (HTTP 404)." };
+  async function sendOne(message) {
+    const response = await requestJson(enqueueUrl(), { method: "POST", headers: authHeaders(), body: message });
+    if (!response.ok) return { local_id: message.localId, error: response.error || `HTTP ${response.status}` };
+    const result = response.body;
+    if (!result.ok) {
+      if (result.status === "conflict") return { local_id: message.localId, error: `${CONFLICT_PREFIX} Base44's copy was updated at ${result.conflict_with}, which is more recent than this app's last known sync. Skipped to avoid overwriting.` };
+      return { local_id: message.localId, error: result.error || "Unknown error from Worker" };
     }
-    if (!response.ok || !response.body || typeof response.body !== "object") {
-      return { ok: false, error: response.error || "Could not read Base44's current copy of this quote." };
-    }
-    return { ok: true, quote: response.body };
-  }
-
-  // Pushes an edit to a quote that already exists in Base44 (entry.remote_id is known,
-  // set when the edit was queued - see enqueueOutboundUpdate in repository.cjs). Mirrors
-  // the official @base44/sdk client's entities.update(), which does a PUT to
-  // `${entityUrl}/${id}` rather than posting a new record.
-  //
-  // Before doing that PUT, this now checks Base44's own current `updated_date` against
-  // this app's last confirmed sync point for the SAME quote (`base44_synced_at`). If
-  // Base44 has moved on since then, the push is deliberately held back as a CONFLICT
-  // instead of silently clobbering whatever changed there.
-  async function pushUpdate(entry) {
-    const remoteCheck = await fetchRemoteQuote(entry.remote_id);
-    if (!remoteCheck.ok) {
-      // FIX: a confirmed 404 (quote deleted on Base44's side) is resolved as a clean
-      // no-op instead of retried forever -- there is no remote record left to push an
-      // update to. Any OTHER failure (network issue, temporary outage, etc.) still
-      // retries exactly as before.
-      if (remoteCheck.notFound) {
-        return {
-          local_id: entry.local_id,
-          resolved: true,
-          error: null
-        };
-      }
-      // Can't safely verify Base44's current state right now - do NOT push blind.
-      // Leave queued, this will be retried on the next flush like any other failure.
-      return {
-        local_id: entry.local_id,
-        error: `Could not verify Base44's current version before pushing (will retry): ${remoteCheck.error}`
-      };
-    }
-
-    const remoteUpdatedAt = remoteCheck.quote?.updated_date ? Date.parse(remoteCheck.quote.updated_date) : NaN;
-    const localBaselineRaw = entry.quote.base44_synced_at;
-    const localBaseline = localBaselineRaw ? Date.parse(localBaselineRaw) : NaN;
-
-    if (!Number.isNaN(remoteUpdatedAt) && !Number.isNaN(localBaseline) && remoteUpdatedAt > localBaseline) {
-      logger.warn(`[outbound-sync] CONFLICT detected for ${entry.local_id}: Base44 was updated at ${remoteCheck.quote.updated_date}, after this app's last known sync (${localBaselineRaw}). Push held back.`);
-      return {
-        local_id: entry.local_id,
-        error: `${CONFLICT_PREFIX} Base44's copy of this quote was updated at ${remoteCheck.quote.updated_date}, which is more recent than this app's last known sync (${localBaselineRaw}). Skipped to avoid overwriting - re-save locally once resolved to push again.`
-      };
-    }
-
-    const response = await requestJson(`${entityUrl()}/${entry.remote_id}`, {
-      method: "PUT",
-      headers: authHeaders(),
-      body: toRemotePayload(entry.quote)
-    });
-
-    if (!response.ok) {
-      return { local_id: entry.local_id, error: response.error || "Unknown error" };
-    }
-    // FIX (confirmed root cause of a real, silent sync-failure bug): this previously
-    // returned success based ONLY on the HTTP status code being 2xx, without checking
-    // whether Base44's response body actually confirmed the update -- a PUT that
-    // returns 200 with an empty, malformed, or unexpected body (confirmed happening for
-    // 16 real quotes, all with a blank base44_id/base44_synced_at despite being marked
-    // "synced") was being treated as a full success, permanently marking the entry
-    // synced and hiding the fact that Base44 may never have actually persisted the
-    // change. Now requires the response body to contain a valid id that matches the id
-    // we PUT to, mirroring pushCreate()'s existing (correct) body verification.
-    const confirmedId = response.body?.id ? String(response.body.id) : null;
-    if (!confirmedId || confirmedId !== String(entry.remote_id)) {
-      logger.warn(`[outbound-sync] Update for ${entry.local_id} got HTTP ${response.status} but the response body did not confirm the expected Base44 id (${entry.remote_id}) -- treating as a failed sync, not marking as synced.`, { responseBody: response.body });
-      return {
-        local_id: entry.local_id,
-        error: `Base44 responded ${response.status} but did not confirm the update (expected id ${entry.remote_id}, got ${confirmedId || "none"}). Will retry.`
-      };
-    }
-    logger.log(`[outbound-sync] Pushed update for ${entry.local_id} -> Base44 ${entry.remote_id}`);
-    return { local_id: entry.local_id, remote_id: confirmedId };
-  }
-
-  async function pushCreate(entry) {
-    const existingId = await findExisting(entry.quote);
-    if (existingId) {
-      logger.log(`[outbound-sync] ${entry.local_id} already exists in Base44 as ${existingId}; adopting instead of creating.`);
-      return { local_id: entry.local_id, remote_id: existingId };
-    }
-
-    const response = await requestJson(entityUrl(), {
-      method: "POST",
-      headers: authHeaders(),
-      body: toRemotePayload(entry.quote)
-    });
-
-    if (!response.ok) {
-      return { local_id: entry.local_id, error: response.error || "Unknown error" };
-    }
-    const remoteId = response.body?.id ? String(response.body.id) : null;
-    logger.log(`[outbound-sync] Pushed ${entry.local_id} -> Base44 ${remoteId || "(no id returned)"}`);
-    return { local_id: entry.local_id, remote_id: remoteId };
-  }
-
-  // Pushes a locally-created StatusAlertDismissal record up to Base44 -- this is the
-  // fix for a real, confirmed one-way sync gap: dismissing an alert on desktop was
-  // previously NEVER reflected in Base44 (or any other install) at all, only the
-  // reverse direction worked. Built from the start with response-body verification
-  // (the same fix already applied to pushUpdate() for quotes), so this does not repeat
-  // that earlier silent-failure bug.
-  async function pushDismissal(entry) {
-    const response = await requestJson(dismissalEntityUrl(), {
-      method: "POST",
-      headers: authHeaders(),
-      body: { quote_id: entry.quote_id }
-    });
-
-    if (!response.ok) {
-      return { local_id: entry.local_id, error: response.error || "Unknown error" };
-    }
-    const confirmedId = response.body?.id ? String(response.body.id) : null;
-    if (!confirmedId) {
-      logger.warn(`[outbound-sync] Dismissal push for ${entry.local_id} got HTTP ${response.status} but the response body did not confirm an id -- treating as a failed sync, not marking as synced.`, { responseBody: response.body });
-      return {
-        local_id: entry.local_id,
-        error: `Base44 responded ${response.status} but did not confirm the dismissal (no id in response). Will retry.`
-      };
-    }
-    logger.log(`[outbound-sync] Pushed dismissal for quote ${entry.quote_id} -> Base44 ${confirmedId}`);
-    return { local_id: entry.local_id, remote_id: confirmedId };
-  }
-
-  // Pushes a locally-created mention (quoteAlerts record) up to Base44 -- mirrors
-  // pushDismissal() immediately above. Built from the start with the same
-  // response-body verification already applied twice tonight, so this does not
-  // repeat the earlier silent-failure bug.
-  async function pushMention(entry, localRecord) {
-    const response = await requestJson(mentionEntityUrl(), {
-      method: "POST",
-      headers: authHeaders(),
-      body: {
-        quote_id: entry.quote_id,
-        site_id: localRecord?.site_id || "",
-        mentioned_email: entry.mentioned_email,
-        mentioned_by: localRecord?.mentioned_by || "",
-        message: localRecord?.message || "",
-        priority: localRecord?.priority || "yellow",
-        is_resolved: false
-      }
-    });
-
-    if (!response.ok) {
-      return { local_id: entry.local_id, error: response.error || "Unknown error" };
-    }
-    const confirmedId = response.body?.id ? String(response.body.id) : null;
-    if (!confirmedId) {
-      logger.warn(`[outbound-sync] Mention push for ${entry.local_id} got HTTP ${response.status} but the response body did not confirm an id -- treating as a failed sync, not marking as synced.`, { responseBody: response.body });
-      return {
-        local_id: entry.local_id,
-        error: `Base44 responded ${response.status} but did not confirm the mention (no id in response). Will retry.`
-      };
-    }
-    logger.log(`[outbound-sync] Pushed mention for quote ${entry.quote_id} -> Base44 ${confirmedId}`);
-    return { local_id: entry.local_id, remote_id: confirmedId };
-  }
-
-  function pushOne(entry) {
-    return entry.kind === "update" ? pushUpdate(entry) : pushCreate(entry);
-  }
-
-  // A CONFLICT is fundamentally different from a normal transient failure (network
-  // blip, Base44 briefly down, etc.) - it means the two sides genuinely disagree, and
-  // retrying with the SAME stale local data will just detect the same conflict again
-  // forever. Rather than let it silently exhaust MAX_ATTEMPTS and stop being retried
-  // (which would leave a real, human-relevant conflict quietly abandoned), conflicted
-  // entries stay eligible for the flush every single time, so they're re-checked
-  // continuously until a human resolves it (e.g. re-saving locally, or the remote
-  // change being reverted) - at which point the conflict will naturally clear.
-  function isConflictEntry(entry) {
-    return typeof entry.last_error === "string" && entry.last_error.startsWith(CONFLICT_PREFIX);
+    return { local_id: message.localId, remote_id: result.remote_id || null };
   }
 
   async function flush() {
     if (running) return { skipped: "already-running" };
     if (!isConfigured) return { skipped: "not-configured" };
-
     running = true;
     try {
       const pending = await repository.listPendingOutboundQuotes();
-      const eligible = pending.filter((entry) => isConflictEntry(entry) || (entry.attempts || 0) < MAX_ATTEMPTS);
-      if (!eligible.length) return { pushed: 0, failed: 0 };
-
+      const eligible = pending;
       const results = [];
       for (const entry of eligible) {
         try {
-          const result = await pushOne(entry);
+          const message = buildQuoteMessage(entry);
+          const result = await sendOne(message);
           results.push(result);
-          // Notifies "Q-xxxx sent to Base44" ONLY on genuine success (result.error is
-          // falsy) - verified via a standalone test that a failed push or a thrown
-          // exception both correctly do NOT notify. Fire-and-forget (never awaited into
-          // the main flow, errors swallowed) - reuses the EXISTING, already-proven
-          // repository.createCollectionRecord() method rather than a second write path.
-          // A notification-write failure can never block or fail the actual sync itself
-          // (also verified via a standalone test).
           if (!result.error && entry.quote_number && repository?.createCollectionRecord) {
-            // Stores RAW data (quoteId, quoteNumber, occurredAt) rather than a pre-baked
-            // message string - formatting happens at RENDER time in NotificationBell.jsx
-            // using the VIEWING user's own browser locale, same reasoning as the
-            // importData() notifications above. entry.local_id IS the quote's own id
-            // (confirmed from enqueueOutboundUpdate's real code), matching exactly what
-            // QuoteDetails.jsx reads via ?id=<id> - so this notification can link
-            // straight to the real quote too.
-            repository.createCollectionRecord("appNotifications", {
-              type: "quote_synced",
-              quoteId: entry.local_id,
-              quoteNumber: entry.quote_number,
-              occurredAt: new Date().toISOString(),
-              read: false
-            }).catch(() => {});
+            repository.createCollectionRecord("appNotifications", { type: "quote_synced", quoteId: entry.local_id, quoteNumber: entry.quote_number, occurredAt: new Date().toISOString(), read: false }).catch(() => {});
           }
-        } catch (error) {
-          results.push({ local_id: entry.local_id, error: error.message });
-        }
+        } catch (error) { results.push({ local_id: entry.local_id, error: error.message }); }
       }
+      if (results.length) await repository.markOutboundSynced(results);
 
-      await repository.markOutboundSynced(results);
-
-      // Same flush cycle, now also handling any pending dismissal pushes -- kept as a
-      // clearly separate step (not merged into the quote loop above) since dismissals
-      // are a different entity with different fields, but reuses the exact same
-      // queue/ack pattern.
       const pendingDismissals = await repository.listPendingOutboundDismissals();
       if (pendingDismissals.length) {
         const dismissalResults = [];
         for (const entry of pendingDismissals) {
-          try {
-            dismissalResults.push(await pushDismissal(entry));
-          } catch (error) {
-            dismissalResults.push({ local_id: entry.local_id, error: error.message });
-          }
+          try { const message = buildDismissalMessage(entry); const result = await sendOne(message); dismissalResults.push(result); }
+          catch (error) { dismissalResults.push({ local_id: entry.local_id, error: error.message }); }
         }
         await repository.markOutboundDismissalsSynced(dismissalResults);
-        const dismissalFailed = dismissalResults.filter((result) => result.error);
-        if (dismissalFailed.length) {
-          logger.warn(`[outbound-sync] ${dismissalFailed.length} dismissal(s) failed to sync; they remain queued.`, dismissalFailed);
-        }
+        const dismissalFailed = dismissalResults.filter((r) => r.error);
+        if (dismissalFailed.length) logger.warn(`[outbound-sync] ${dismissalFailed.length} dismissal(s) failed; they remain queued.`, dismissalFailed);
       }
 
-      // Same flush cycle, now also handling any pending mention pushes -- mirrors the
-      // dismissal step immediately above, for the "quoteAlerts" collection instead.
       const pendingMentions = await repository.listPendingOutboundMentions();
       if (pendingMentions.length) {
         const localQuoteAlerts = await repository.listCollection("quoteAlerts");
         const mentionResults = [];
         for (const entry of pendingMentions) {
-          try {
-            const localRecord = (localQuoteAlerts || []).find((item) => item.id === entry.local_id);
-            mentionResults.push(await pushMention(entry, localRecord));
-          } catch (error) {
-            mentionResults.push({ local_id: entry.local_id, error: error.message });
-          }
+          try { const localRecord = (localQuoteAlerts || []).find((item) => item.id === entry.local_id); const message = buildMentionMessage(entry, localRecord); const result = await sendOne(message); mentionResults.push(result); }
+          catch (error) { mentionResults.push({ local_id: entry.local_id, error: error.message }); }
         }
         await repository.markOutboundMentionsSynced(mentionResults);
-        const mentionFailed = mentionResults.filter((result) => result.error);
-        if (mentionFailed.length) {
-          logger.warn(`[outbound-sync] ${mentionFailed.length} mention(s) failed to sync; they remain queued.`, mentionFailed);
-        }
+        const mentionFailed = mentionResults.filter((r) => r.error);
+        if (mentionFailed.length) logger.warn(`[outbound-sync] ${mentionFailed.length} mention(s) failed; they remain queued.`, mentionFailed);
       }
 
       onAfterWrite?.();
-      const failed = results.filter((result) => result.error);
-      const conflicts = failed.filter((result) => result.error.startsWith(CONFLICT_PREFIX));
+      const failed = results.filter((r) => r.error);
+      const conflicts = failed.filter((r) => r.error.startsWith(CONFLICT_PREFIX));
       const otherFailed = failed.length - conflicts.length;
-      if (conflicts.length) {
-        logger.warn(`[outbound-sync] ${conflicts.length} quote(s) held back due to a CONFLICT with Base44's newer data; they remain queued and will keep being re-checked.`, conflicts);
-      }
+      if (conflicts.length) logger.warn(`[outbound-sync] ${conflicts.length} quote(s) held back due to CONFLICT; they remain queued and will be re-checked.`);
       if (otherFailed) {
-        logger.warn(`[outbound-sync] ${otherFailed} quote(s) failed to sync; they remain queued.`, failed.filter((result) => !result.error.startsWith(CONFLICT_PREFIX)));
-      }
+logger.warn(`[outbound-sync] ${otherFailed} quote(s) failed to sync; they remain queued.`);
+failed.filter((r) => !r.error.startsWith(CONFLICT_PREFIX)).forEach((r) => {
+logger.warn(`[outbound-sync] -> local_id=${r.local_id}: ${r.error}`);
+});
+}
       return { pushed: results.length - failed.length, failed: failed.length, conflicts: conflicts.length };
-    } catch (error) {
-      logger.warn("[outbound-sync] Flush failed:", error.message);
-      return { error: error.message };
-    } finally {
-      running = false;
-    }
+    } catch (error) { logger.warn("[outbound-sync] Flush failed:", error.message); return { error: error.message }; }
+    finally { running = false; }
   }
 
   return {
-    isConfigured,
-    flush,
+    isConfigured, flush,
     start() {
-      if (!isConfigured) {
-        logger.log("[outbound-sync] Disabled: BASE44_API_KEY / app id not configured. Quotes stay queued locally.");
-        return;
-      }
+      if (!isConfigured) { logger.log("[outbound-sync] Disabled: workerUrl / outboundToken not configured. Quotes stay queued locally."); return; }
       if (timer) return;
       flush();
       timer = setInterval(flush, intervalMs);
       if (timer.unref) timer.unref();
-      logger.log(`[outbound-sync] Enabled; flushing every ${Math.round(intervalMs / 1000)}s.`);
+      logger.log(`[outbound-sync] Enabled; flushing every ${Math.round(intervalMs / 1000)}s via Worker.`);
     },
-    stop() {
-      if (timer) clearInterval(timer);
-      timer = null;
-    }
+    stop() { if (timer) clearInterval(timer); timer = null; }
   };
 }
 

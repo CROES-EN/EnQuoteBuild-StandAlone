@@ -1,0 +1,1021 @@
+  680:     if (details.reason === "clean-exit") return;
+  681:     setTimeout(() => {
+  682:       if (!mainWindow.isDestroyed()) mainWindow.reload();
+  683:     }, 500);
+  684:   });
+  685: }
+  686: 
+  687: whenReady().then(async () => {
+  688:   configureAutoUpdater();
+  689: 
+  690:   // Request/response (not fire-and-forget): the renderer awaits this directly to learn
+  691:   // the definitive outcome of a manual refresh click, rather than polling /status and
+  692:   // hoping a real Base44 delivery happens to land during the poll window. The force-
+  693:   // refresh endpoint below deliberately does NOT fabricate a new import (that would reset
+  694:   // the receiver's 15-minute throttle and could block the next real Base44 delivery) - it
+  695:   // just reports whatever is already cached on disk, which is exactly what "checked, nothing
+  696:   // new" means from the renderer's point of view.
+  697:   // --- Remote shared-sync support -------------------------------------------------
+  698: //
+  699: // Lets a teammate's machine (which never runs its own webhook-receiver.cjs/ngrok
+  700: // tunnel) pull real, live data through a TEAMMATE's shared receiver instead. Reads an
+  701: // OPTIONAL "remote-sync-config.json" from this machine's own userData folder -- if it
+  702: // doesn't exist (the default, true for the machine actually running the receiver),
+  703: // this returns null and the existing localhost-only flow below is used completely
+  704: // unchanged.
+  705: function readRemoteSyncConfig() {
+  706:   try {
+  707:     const fsSync = require("node:fs");
+  708:     const configPath = path.join(getPath("userData"), "remote-sync-config.json");
+  709:     if (!fsSync.existsSync(configPath)) return null;
+  710:     const raw = fsSync.readFileSync(configPath, "utf8");
+  711:     const parsed = JSON.parse(raw);
+  712:     if (!parsed || typeof parsed.url !== "string" || !parsed.url.trim()) return null;
+  713:     return { url: parsed.url.trim(), secret: typeof parsed.secret === "string" ? parsed.secret : "" };
+  714:   } catch (error) {
+  715:     console.warn("[refresh] Could not read remote-sync-config.json:", error.message);
+  716:     return null;
+  717:   }
+  718: }
+  719: 
+  720: // Fetches a real snapshot from a teammate's shared webhook-receiver.cjs (via the new
+  721: // GET /api/base44/webhook/snapshot endpoint), authenticated with the shared secret
+  722: // from remote-sync-config.json. Supports both http and https (ngrok URLs are https).
+  723: function fetchRemoteSnapshot(urlString, secret) {
+  724:   return new Promise((resolve, reject) => {
+  725:     let url;
+  726:     try {
+  727:       url = new URL(`${String(urlString).replace(/\/+$/, "")}/api/base44/webhook/snapshot`);
+  728:     } catch {
+  729:       reject(new Error(`Invalid remote sync URL: ${urlString}`));
+  730:       return;
+  731:     }
+  732:     const transport = url.protocol === "http:" ? require("node:http") : require("node:https");
+  733:     const req = transport.request({
+  734:       protocol: url.protocol,
+  735:       hostname: url.hostname,
+  736:       port: url.port || undefined,
+  737:       path: `${url.pathname}${url.search}`,
+  738:       method: "GET",
+  739:       headers: { "X-ENQuote-Shared-Secret": secret || "" }
+  740:     }, (res) => {
+  741:       let raw = "";
+  742:       res.on("data", (chunk) => { raw += chunk; });
+  743:       res.on("end", () => {
+  744:         if (res.statusCode < 200 || res.statusCode >= 300) {
+  745:           reject(new Error(`Remote sync source responded with HTTP ${res.statusCode}`));
+  746:           return;
+  747:         }
+  748:         try {
+  749:           const parsed = JSON.parse(raw);
+  750:           if (!parsed.ok) {
+  751:             reject(new Error(parsed.error || "Remote sync source reported an error."));
+  752:             return;
+  753:           }
+  754:           resolve(parsed);
+  755:         } catch (parseError) {
+  756:           reject(new Error(`Could not parse remote sync response: ${parseError.message}`));
+  757:         }
+  758:       });
+  759:     });
+  760:     req.setTimeout(20000, () => { req.destroy(); reject(new Error("Remote sync request timed out.")); });
+  761:     req.on("error", (error) => reject(error));
+  762:     req.end();
+  763:   });
+  764: }
+  765: 
+  766: // Fetches a teammate's live snapshot and imports it into THIS machine's own local
+  767: // data, via the same repository merge logic already used for real Base44 imports.
+  768: async function refreshFromRemoteSyncSource(remoteConfig) {
+  769:   try {
+  770:     const data = await fetchRemoteSnapshot(remoteConfig.url, remoteConfig.secret);
+  771:     if (!data || !Array.isArray(data.quotes)) {
+  772:       return { ok: false, error: "Remote snapshot response did not contain quote data." };
+  773:     }
+  774:     const stored = await quoteRepository.importData(data);
+  775:     markOwnWrite();
+  776:     console.log(`[refresh] Imported ${Array.isArray(stored) ? stored.length : 0} quotes from remote shared sync source.`);
+  777:     return {
+  778:       ok: true,
+  779:       reason: "checked",
+  780:       storedQuoteCount: Array.isArray(stored) ? stored.length : 0,
+  781:       storedProductCount: Array.isArray(data.products) ? data.products.length : 0,
+  782:       lastImportedAt: new Date().toISOString()
+  783:     };
+  784:   } catch (error) {
+  785:     console.log("[refresh] Remote sync fetch failed:", error.message);
+  786:     return { ok: false, unreachable: true, error: error.message };
+  787:   }
+  788: }
+  789: 
+  790: ipcMain.handle("app:refresh", async () => {
+  791:     console.log('[refresh] Manual refresh triggered - checking webhook receiver for latest data...');
+  792: 
+  793:     // NEW: if this machine has a remote-sync-config.json (see readRemoteSyncConfig()
+  794:     // above), pull a real snapshot directly from a TEAMMATE's shared receiver and
+  795:     // import it here, then return early -- the existing localhost-only flow below is
+  796:     // completely untouched and only reached when no such config file exists.
+  797:     const remoteConfig = readRemoteSyncConfig();
+  798:     if (remoteConfig?.url) {
+  799:       return await refreshFromRemoteSyncSource(remoteConfig);
+  800:     }
+  801: 
+  802:     // Push any locally-created/edited quotes up to Base44 first, so "Refresh" behaves
+  803:     // like a two-way sync instead of only pulling. Without this, a saved edit could sit
+  804:     // queued for up to 5 minutes (the background flush interval) before Base44 saw it,
+  805:     // even though the user just asked the app to sync. Best-effort only - a failure here
+  806:     // never blocks or fails the refresh check itself.
+  807:     if (outboundSync) {
+  808:       try {
+  809:         const outboundResult = await outboundSync.flush();
+  810:         markOwnWrite();
+  811:         console.log('[refresh] Outbound flush result:', outboundResult);
+  812:       } catch (error) {
+  813:         console.log('[refresh] Outbound flush failed:', error.message);
+  814:       }
+  815:     }
+  816: 
+  817:     const targetDir = getPath('userData');
+  818: 
+  819:     // NOTE: this handler intentionally never calls notifyWindowsDataUpdated() itself - the
+  820:     // existing fs.watch-based notifyWindowsDataUpdated() (see watchLocalDataFile) still
+  821:     // fires separately and correctly whenever the data file actually changes on disk from
+  822:     // a REAL Base44 import, as a soft (non-reloading) IPC push independent of this call.
+  823:     try {
+  824:       const http = require('http');
+  825:       const body = JSON.stringify({});
+  826:       const result = await new Promise((resolve) => {
+  827:         const req = http.request({
+  828:           hostname: 'localhost',
+  829:           port: 3001,
+  830:           path: '/api/base44/webhook/refresh-now',
+  831:           method: 'POST',
+  832:           headers: {
+  833:             'Content-Type': 'application/json',
+  834:             'Content-Length': Buffer.byteLength(body),
+  835:             'X-ENQuote-Data-Dir': targetDir
+  836:           }
+  837:         }, (res) => {
+  838:           let data = '';
+  839:           res.on('data', (chunk) => { data += chunk; });
+  840:           res.on('end', () => {
+  841:             try {
+  842:               resolve({ ok: true, status: res.statusCode, body: JSON.parse(data) });
+  843:             } catch {
+  844:               resolve({ ok: true, status: res.statusCode, body: null });
+  845:             }
+  846:           });
+  847:         });
+  848:         req.on('error', (e) => resolve({ ok: false, error: e.message }));
+  849:         req.write(body);
+  850:         req.end();
+  851:       });
+  852: 
+  853:       console.log('[refresh] Webhook receiver refresh-check response:', result);
+  854: 
+  855:       if (!result.ok || result.status >= 400 || !result.body?.ok) {
+  856:         return {
+  857:           ok: false,
+  858:           unreachable: !result.ok,
+  859:           error: result.error || result.body?.error || `HTTP ${result.status}`
+  860:         };
+  861:       }
+  862: 
+  863:       return {
+  864:         ok: true,
+  865:         reason: "checked",
+  866:         storedQuoteCount: result.body.storedQuoteCount,
+  867:         storedProductCount: result.body.storedProductCount,
+  868:         lastImportedAt: result.body.lastImportedAt
+  869:       };
+  870:     } catch (error) {
+  871:       console.log('[refresh] Refresh check failed (is webhook-receiver.cjs running on port 3001?):', error.message);
+  872:       return { ok: false, unreachable: true, error: error.message };
+  873:     }
+  874:   });
+  875: 
+  876:   // Powers the refresh progress popup: renderer polls these while a refresh is in flight.
+  877:   ipcMain.handle("app:refresh-status", async () => {
+  878:     const http = require('http');
+  879:     return new Promise((resolve) => {
+  880:       const req = http.request({ hostname: 'localhost', port: 3001, path: '/status', method: 'GET' }, (res) => {
+  881:         let data = '';
+  882:         res.on('data', (chunk) => { data += chunk; });
+  883:         res.on('end', () => {
+  884:           try {
+  885:             resolve(JSON.parse(data));
+  886:           } catch {
+  887:             resolve({ ok: false, error: 'Invalid response from webhook receiver' });
+  888:           }
+  889:         });
+  890:       });
+  891:       req.on('error', (e) => resolve({ ok: false, error: e.message, unreachable: true }));
+  892:       req.end();
+  893:     });
+  894:   });
+  895: 
+  896:   ipcMain.handle("app:refresh-events", async (_event, sinceSeq) => {
+  897:     const http = require('http');
+  898:     const qs = sinceSeq ? `?since=${encodeURIComponent(sinceSeq)}` : '';
+  899:     return new Promise((resolve) => {
+  900:       const req = http.request({ hostname: 'localhost', port: 3001, path: `/events${qs}`, method: 'GET' }, (res) => {
+  901:         let data = '';
+  902:         res.on('data', (chunk) => { data += chunk; });
+  903:         res.on('end', () => {
+  904:           try {
+  905:             resolve(JSON.parse(data));
+  906:           } catch {
+  907:             resolve({ ok: false, error: 'Invalid response from webhook receiver' });
+  908:           }
+  909:         });
+  910:       });
+  911:       req.on('error', (e) => resolve({ ok: false, error: e.message, unreachable: true }));
+  912:       req.end();
+  913:     });
+  914:   });
+  915: 
+  916:   quoteRepository = repositoryFor(getPath("userData"));
+  917:   console.log('[startup] App userData path (data file location):', getPath("userData"));
+  918:   // Seed the marker from whatever's already on disk so the FIRST incidental fs.watch
+  919:   // event after launch isn't mistaken for a new import.
+  920:   lastKnownImportMarker = readImportMarker();
+  921:   watchLocalDataFile();
+  922: 
+  923:   // Wraps a repository method so any write it performs is flagged as "our own", suppressing
+  924:   // the fs.watch-triggered reload that would otherwise fire a moment later and wipe the
+  925:   // in-progress screen (see markOwnWrite/OWN_WRITE_GRACE_MS above).
+  926:   // ---------------------------------------------------------------------------
+  927: // OneDrive one-way export for supervisorReportTables (Executive Overview cross-manager
+  928: // read access). This machine is the single writer; every other manager's install reads
+  929: // this same file read-only. Never touches quotes/products/any other collection.
+  930: // ---------------------------------------------------------------------------
+  931: function resolveOneDriveSharedFolder() {
+  932:   const base = process.env.OneDriveCommercial || process.env.OneDrive;
+  933:   if (!base) return null;
+  934:   return path.join(base, "EnQuote Shared Data");
+  935: }
+  936: 
+  937: const exportSupervisorReportTablesToOneDrive = async () => {
+  938:   try {
+  939:     const sharedFolder = resolveOneDriveSharedFolder();
+  940:     if (!sharedFolder) {
+  941:       console.warn("[onedrive-export] No OneDrive folder detected on this machine (OneDrive/OneDriveCommercial env var not set) - skipping export.");
+  942:       return;
+  943:     }
+  944:     fs.mkdirSync(sharedFolder, { recursive: true });
+  945:     const reportTables = await quoteRepository.listCollection("supervisorReportTables");
+  946:     const payload = {
+  947:       sourceManagerEmail: process.env.USERNAME ? `${String(process.env.USERNAME).toLowerCase()}@enphaseenergy.com` : null,
+  948:       exportedAt: new Date().toISOString(),
+  949:       reportTables: reportTables || []
+  950:     };
+  951:     const targetPath = path.join(sharedFolder, "supervisorReportTables.shared.json");
+  952:     const tempPath = `${targetPath}.tmp`;
+  953:     fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2), "utf8");
+  954:     // Validate before committing, same safeguard pattern as repository.cjs's own writes.
+  955:     JSON.parse(fs.readFileSync(tempPath, "utf8"));
+  956:     fs.renameSync(tempPath, targetPath);
+  957:     console.log("[onedrive-export] Exported", (reportTables || []).length, "report table(s) to", targetPath);
+  958:   } catch (error) {
+  959:     // Best-effort only - a OneDrive/export problem must NEVER block or fail the actual
+  960:     // local save that triggered this call.
+  961:     console.warn("[onedrive-export] Export failed (local save was NOT affected):", error.message);
+  962:   }
+  963: };
+  964: 
+  965: const ownWrite = (fn) => async (...args) => {
+  966:     const result = await fn(...args);
+  967:     markOwnWrite();
+  968:     return result;
+  969:   };
+  970: 
+  971:   ipcMain.handle("quotes:list", () => quoteRepository.list());
+  972:   ipcMain.handle("quotes:get", (_event, id) => quoteRepository.get(id));
+  973:   ipcMain.handle("quotes:create", (_event, record) => ownWrite(quoteRepository.create)(record));
+  974:   ipcMain.handle("quotes:update", (_event, id, changes, expectedVersion) => ownWrite(quoteRepository.update)(id, changes, expectedVersion));
+  975:   ipcMain.handle("quotes:delete", (_event, id) => ownWrite(quoteRepository.remove)(id));
+  976:   ipcMain.handle("quotes:bulkUpdate", (_event, updates) => ownWrite(quoteRepository.bulkUpdate)(updates));
+  977:   ipcMain.handle("quotes:reset", () => ownWrite(quoteRepository.reset)());
+  978:   ipcMain.handle("quotes:export", () => quoteRepository.exportData());
+  979:   ipcMain.handle("quotes:import", (_event, data) => ownWrite(quoteRepository.importData)(data));
+  980:   ipcMain.handle("products:list", () => quoteRepository.listProducts());
+  981:   ipcMain.handle("products:create", (_event, record) => ownWrite(quoteRepository.createProduct)(record));
+  982:   ipcMain.handle("products:update", (_event, id, changes) => ownWrite(quoteRepository.updateProduct)(id, changes));
+  983:   ipcMain.handle("products:delete", (_event, id) => ownWrite(quoteRepository.deleteProduct)(id));
+  984:   ipcMain.handle("collections:list", (_event, name) => quoteRepository.listCollection(name));
+  985:   // DIAGNOSTIC WRAPPER (temporary): "collections:create" was intermittently failing with
+  986:   // Electron's generic "reply was never sent" error for 2 specific report types, with no
+  987:   // visible underlying cause in the renderer's DevTools console. This wraps the handler in an
+  988:   // explicit try/catch that logs the FULL error (message + stack trace) directly to this
+  989:   // terminal, and guarantees the promise always settles (resolves OR rejects) rather than
+  990:   // potentially hanging - which both surfaces the real root cause AND, if the bug is a
+  991:   // synchronous throw somehow escaping normal handling, fixes the "no reply" symptom outright.
+  992:   function diagnosticIpcWrap(channelName, fn) {
+  993:     return async (...args) => {
+  994:       try {
+  995:         return await fn(...args);
+  996:       } catch (error) {
+  997:         console.error(`[IPC-DIAGNOSTIC] "${channelName}" handler threw:`, error?.message);
+  998:         console.error(`[IPC-DIAGNOSTIC] Full stack trace:`, error?.stack);
+  999:         console.error(`[IPC-DIAGNOSTIC] Args were:`, JSON.stringify(args).slice(0, 500));
+ 1000:         throw error;
+ 1001:       }
+ 1002:     };
+ 1003:   }
+ 1004:   ipcMain.handle("collections:create", async (_event, name, record) => {
+ 1005:     const result = await diagnosticIpcWrap("collections:create", ownWrite(quoteRepository.createCollectionRecord))(name, record);
+ 1006:     if (name === "supervisorReportTables") exportSupervisorReportTablesToOneDrive();
+ 1007:     return result;
+ 1008:   });
+ 1009:   ipcMain.handle("onedrive:get-shared-report-tables", async () => {
+ 1010:     try {
+ 1011:       const sharedFolder = resolveOneDriveSharedFolder();
+ 1012:       if (!sharedFolder) return { ok: true, available: false, reportTables: [] };
+ 1013:       const targetPath = path.join(sharedFolder, "supervisorReportTables.shared.json");
+ 1014:       if (!fs.existsSync(targetPath)) return { ok: true, available: false, reportTables: [] };
+ 1015:       const parsed = JSON.parse(fs.readFileSync(targetPath, "utf8"));
+ 1016:       return {
+ 1017:         ok: true,
+ 1018:         available: true,
+ 1019:         sourceManagerEmail: parsed.sourceManagerEmail || null,
+ 1020:         exportedAt: parsed.exportedAt || null,
+ 1021:         reportTables: Array.isArray(parsed.reportTables) ? parsed.reportTables : []
+ 1022:       };
+ 1023:     } catch (error) {
+ 1024:       console.warn("[onedrive-export] Could not read shared report tables:", error.message);
+ 1025:       return { ok: false, error: error.message, reportTables: [] };
+ 1026:     }
+ 1027:   });
+ 1028:   ipcMain.handle("collections:update", async (_event, name, id, changes) => {
+ 1029:     const result = await diagnosticIpcWrap("collections:update", ownWrite(quoteRepository.updateCollectionRecord))(name, id, changes);
+ 1030:     if (name === "supervisorReportTables") exportSupervisorReportTablesToOneDrive();
+ 1031:     return result;
+ 1032:   });
+ 1033:   ipcMain.handle("collections:delete", async (_event, name, id) => {
+ 1034:     const result = await diagnosticIpcWrap("collections:delete", ownWrite(quoteRepository.deleteCollectionRecord))(name, id);
+ 1035:     if (name === "supervisorReportTables") exportSupervisorReportTablesToOneDrive();
+ 1036:     return result;
+ 1037:   });
+ 1038:   // Opens a previously-imported report file (e.g. a CXONE/Salesforce export) in the user's
+ 1039:   // default application (Excel, etc.) - a pure "reopen the file I picked earlier" convenience
+ 1040:   // for the Supervisor Dashboard. Read-only from this app's perspective: we never write to the
+ 1041:   // file, we just ask the OS shell to open it, exactly like double-clicking it in Explorer.
+ 1042:   ipcMain.handle("shell:openPath", async (_event, targetPath) => {
+ 1043:     if (typeof targetPath !== "string" || !targetPath.trim()) {
+ 1044:       return { ok: false, error: "No file path was provided." };
+ 1045:     }
+ 1046:     if (!fs.existsSync(targetPath)) {
+ 1047:       return { ok: false, error: "That file no longer exists at its original location." };
+ 1048:     }
+ 1049:     const errorMessage = await shell.openPath(targetPath);
+ 1050:     return errorMessage ? { ok: false, error: errorMessage } : { ok: true };
+ 1051:   });
+ 1052:   ipcMain.handle("dialog:select-folder", async () => {
+ 1053:     const result = await dialog.showOpenDialog({ properties: ["openDirectory"] });
+ 1054:     if (result.canceled || !result.filePaths.length) return { ok: true, canceled: true, path: null };
+ 1055:     return { ok: true, canceled: false, path: result.filePaths[0] };
+ 1056:   });
+ 1057: 
+ 1058:   // Creates a folder (and any missing parent folders) if it doesn't already exist - used by
+ 1059:   // the Auto-Import Settings panel's "Create Calls & Emails folders?" prompt. Deliberately
+ 1060:   // idempotent (recursive: true never errors if the folder is already there), so re-running
+ 1061:   // this for a folder that already exists is always safe, not just on first use.
+ 1062:   ipcMain.handle("reports-folder:create", async (_event, folderPath) => {
+ 1063:     if (typeof folderPath !== "string" || !folderPath.trim()) {
+ 1064:       return { ok: false, error: "No folder path was provided." };
+ 1065:     }
+ 1066:     try {
+ 1067:       fs.mkdirSync(folderPath, { recursive: true });
+ 1068:       return { ok: true, path: folderPath };
+ 1069:     } catch (error) {
+ 1070:       return { ok: false, error: error.message };
+ 1071:     }
+ 1072:   });
+ 1073: 
+ 1074:   // Checks whether a folder already exists, WITHOUT creating it - used by the Auto-Import
+ 1075:   // Settings panel to detect whether a chosen folder already has its Calls/Emails
+ 1076:   // subfolders (e.g. the user picked a folder they'd already set up before, or is
+ 1077:   // re-selecting the same folder after a settings reset) so the "Create Calls & Emails
+ 1078:   // folders?" prompt can be skipped entirely instead of asking again unnecessarily.
+ 1079:   ipcMain.handle("reports-folder:exists", async (_event, folderPath) => {
+ 1080:     if (typeof folderPath !== "string" || !folderPath.trim()) {
+ 1081:       return { ok: false, error: "No folder path was provided." };
+ 1082:     }
+ 1083:     try {
+ 1084:       const stats = fs.statSync(folderPath);
+ 1085:       return { ok: true, exists: stats.isDirectory() };
+ 1086:     } catch (error) {
+ 1087:       if (error.code === "ENOENT") return { ok: true, exists: false };
+ 1088:       return { ok: false, error: error.message };
+ 1089:     }
+ 1090:   });
+ 1091: 
+ 1092:   ipcMain.handle("reports-folder:read-files", async (_event, folderPath) => {
+ 1093:     if (typeof folderPath !== "string" || !folderPath.trim()) {
+ 1094:       return { ok: false, error: "No folder path was provided." };
+ 1095:     }
+ 1096:     if (!fs.existsSync(folderPath)) {
+ 1097:       return { ok: false, error: "That folder no longer exists at its original location." };
+ 1098:     }
+ 1099:     const IMPORT_FOLDER_EXTENSIONS = new Set([".xlsx", ".xls", ".csv", ".html", ".htm"]);
+ 1100:     let entries;
+ 1101:     try {
+ 1102:       entries = fs.readdirSync(folderPath, { withFileTypes: true });
+ 1103:     } catch (error) {
+ 1104:       return { ok: false, error: error.message };
+ 1105:     }
+ 1106:     const files = [];
+ 1107:     for (const entry of entries) {
+ 1108:       if (!entry.isFile()) continue;
+ 1109:       if (entry.name.startsWith("~$") || entry.name.startsWith(".")) continue;
+ 1110:       const ext = path.extname(entry.name).toLowerCase();
+ 1111:       if (!IMPORT_FOLDER_EXTENSIONS.has(ext)) continue;
+ 1112:       try {
+ 1113:         const buffer = fs.readFileSync(path.join(folderPath, entry.name));
+ 1114:         files.push({ name: entry.name, base64: buffer.toString("base64") });
+ 1115:       } catch (error) {
+ 1116:         console.warn("[import-folder] Could not read file:", entry.name, error.message);
+ 1117:       }
+ 1118:     }
+ 1119:     return { ok: true, files };
+ 1120:   });
+ 1121:   ipcMain.handle("auth:login", (_event, email, password) => ownWrite(quoteRepository.login)(email, password));
+ 1122:   ipcMain.handle("auth:setPassword", (_event, email, currentPassword, newPassword) => ownWrite(quoteRepository.setPassword)(email, currentPassword, newPassword));
+ 1123:   // Admin-only: resets (or first-time provisions) a user's local password. The caller's
+ 1124:   // admin status is re-verified INSIDE resetUserPassword() itself (against the locally-
+ 1125:   // synced Base44 "users" collection, app_role === "admin") - this handler never trusts
+ 1126:   // the renderer's own notion of "am I an admin" for that decision, only what's on disk.
+ 1127:   ipcMain.handle("auth:resetUserPassword", (_event, actingAdminEmail, targetEmail) =>
+ 1128:     ownWrite(quoteRepository.resetUserPassword)(actingAdminEmail, targetEmail)
+ 1129:   );
+ 1130: 
+ 1131:   // --- Remote shared-sync auto-configuration -----------------------------------
+ 1132:   //
+ 1133:   // Replaces manually creating remote-sync-config.json on every teammate's machine.
+ 1134:   // A small, PUBLIC (no secret inside) sync-config.json lives in the project's own
+ 1135:   // GitHub repo -- every install fetches it to learn the current host's email and
+ 1136:   // current tunnel URL. If the signed-in user IS the host, nothing local is written.
+ 1137:   // If not, and no local secret has ever been entered on this machine, the renderer
+ 1138:   // is told a one-time secret prompt is needed; once entered, only the URL ever
+ 1139:   // needs to auto-update again after that -- the secret is never re-asked.
+ 1140:   const SYNC_CONFIG_GITHUB_URL = "https://raw.githubusercontent.com/CROES-EN/EnQuoteBuild-StandAlone/master/sync-config.json";
+ 1141: 
+ 1142:   // Reads a secret bundled into the packaged app itself (via electron-builder's
+ 1143:   // extraResources), so a fresh install never needs the user to type anything.
+ 1144:   // This file is NOT committed to git - it's only added to the build output at
+ 1145:   // package time. Falls back to null if this build wasn't packaged with one
+ 1146:   // (e.g. a dev-mode run), in which case the existing manual-prompt flow below
+ 1147:   // is completely unchanged and still works exactly as before.
+ 1148:   function readBundledSyncSecret() {
+ 1149:     try {
+ 1150:       const bundledPath = path.join(process.resourcesPath || "", "sync-secret.json");
+ 1151:       if (!fs.existsSync(bundledPath)) return null;
+ 1152:       const parsed = JSON.parse(fs.readFileSync(bundledPath, "utf8"));
+ 1153:       return typeof parsed.secret === "string" && parsed.secret.trim() ? parsed.secret.trim() : null;
+ 1154:     } catch {
+ 1155:       return null;
+ 1156:     }
+ 1157:   }
+ 1158:   // Reads a secret bundled into the packaged app itself (via electron-builder's
+ 1159:   // extraResources), so a fresh install never needs the user to type anything.
+ 1160:   // This file is NOT committed to git - it's only added to the build output at
+ 1161:   // package time. Falls back to null if this build wasn't packaged with one
+ 1162:   // (e.g. a dev-mode run), in which case the existing manual-prompt flow below
+ 1163:   // is completely unchanged and still works exactly as before.
+ 1164: function readBundledSyncSecret() {
+ 1165: try {
+ 1166: const bundledPath = path.join(process.resourcesPath || "", "sync-secret.json");
+ 1167: if (!fs.existsSync(bundledPath)) return null;
+ 1168: const parsed = JSON.parse(fs.readFileSync(bundledPath, "utf8"));
+ 1169: return typeof parsed.secret === "string" && parsed.secret.trim() ? parsed.secret.trim() : null;
+ 1170: } catch {
+ 1171: return null;
+ 1172: }
+ 1173: }
+ 1174:   function remoteSyncConfigPath() {
+ 1175:     return path.join(getPath("userData"), "remote-sync-config.json");
+ 1176:   }
+ 1177: 
+ 1178:   function fetchSyncConfigFromGitHub() {
+ 1179:     return new Promise((resolve) => {
+ 1180:       let url;
+ 1181:       try {
+ 1182:         url = new URL(SYNC_CONFIG_GITHUB_URL);
+ 1183:       } catch {
+ 1184:         resolve(null);
+ 1185:         return;
+ 1186:       }
+ 1187:       const https = require("node:https");
+ 1188:       const req = https.get(url, (res) => {
+ 1189:         let raw = "";
+ 1190:         res.on("data", (chunk) => { raw += chunk; });
+ 1191:         res.on("end", () => {
+ 1192:           if (res.statusCode < 200 || res.statusCode >= 300) { resolve(null); return; }
+ 1193:           try {
+ 1194:             const parsed = JSON.parse(raw);
+ 1195:             if (!parsed || typeof parsed.host_email !== "string" || typeof parsed.sync_url !== "string") {
+ 1196:               resolve(null);
+ 1197:               return;
+ 1198:             }
+ 1199:             resolve({ host_email: parsed.host_email.trim().toLowerCase(), sync_url: parsed.sync_url.trim() });
+ 1200:           } catch {
+ 1201:             resolve(null);
+ 1202:           }
+ 1203:         });
+ 1204:       });
+ 1205:       req.setTimeout(8000, () => { req.destroy(); resolve(null); });
+ 1206:       req.on("error", () => resolve(null));
+ 1207:     });
+ 1208:   }
+ 1209: 
+ 1210:   function readLocalSyncSecret() {
+ 1211:     try {
+ 1212:       const target = remoteSyncConfigPath();
+ 1213:       if (!fs.existsSync(target)) return null;
+ 1214:       const parsed = JSON.parse(fs.readFileSync(target, "utf8"));
+ 1215:       return typeof parsed.secret === "string" && parsed.secret ? parsed.secret : null;
+ 1216:     } catch {
+ 1217:       return null;
+ 1218:     }
+ 1219:   }
+ 1220: 
+ 1221:   function writeLocalSyncConfig(url, secret) {
+ 1222:     try {
+ 1223:       fs.writeFileSync(remoteSyncConfigPath(), JSON.stringify({ url, secret }), "utf8");
+ 1224:       return true;
+ 1225:     } catch (error) {
+ 1226:       console.warn("[remote-sync] Could not write local config:", error.message);
+ 1227:       return false;
+ 1228:     }
+ 1229:   }
+ 1230: 
+ 1231:   // Called by the renderer right after a successful sign-in. Returns what the
+ 1232:   // renderer needs to decide whether to show the one-time secret prompt.
+ 1233:   ipcMain.handle("remoteSync:checkStatus", async (_event, signedInEmail) => {
+ 1234:     const hostConfig = await fetchSyncConfigFromGitHub();
+ 1235:     if (!hostConfig) {
+ 1236:       return { ok: false, reason: "unreachable" };
+ 1237:     }
+ 1238:     const isHost = String(signedInEmail || "").trim().toLowerCase() === hostConfig.host_email;
+ 1239:     if (isHost) {
+ 1240:       // This machine IS the host - no local remote-sync file should exist/be used.
+ 1241:       return { ok: true, isHost: true };
+ 1242:     }
+ 1243:     const existingSecret = readLocalSyncSecret();
+ 1244:     if (existingSecret) {
+ 1245:       // Already configured before - just silently refresh the URL in case the
+ 1246:       // host's tunnel changed, keeping the already-entered secret untouched.
+ 1247:       writeLocalSyncConfig(hostConfig.sync_url, existingSecret);
+ 1248:       return { ok: true, isHost: false, needsSecret: false };
+ 1249:     }
+ 1250: 
+ 1251:     // NEW: no local secret yet - check if this build was packaged with one
+ 1252:     // baked in via extraResources. If so, save it silently and skip the
+ 1253:     // one-time prompt entirely - this is what lets a brand-new install go
+ 1254:     // straight from "download" to "sign in with email + password" with
+ 1255:     // nothing else to configure.
+ 1256:     const bundledSecret = readBundledSyncSecret();
+ 1257:     if (bundledSecret) {
+ 1258:       writeLocalSyncConfig(hostConfig.sync_url, bundledSecret);
+ 1259:       return { ok: true, isHost: false, needsSecret: false };
+ 1260:     }
+ 1261: 
+ 1262:     // Still no secret anywhere (e.g. a dev build with no bundled secret) -
+ 1263:     // fall back to the existing one-time manual prompt, completely unchanged.
+ 1264:     return { ok: true, isHost: false, needsSecret: true, syncUrl: hostConfig.sync_url };
+ 1265:   });
+ 1266: 
+ 1267:   // Called once, when the user submits the one-time secret prompt.
+ 1268:   ipcMain.handle("remoteSync:saveSecret", async (_event, url, secret) => {
+ 1269:     if (typeof secret !== "string" || !secret.trim()) {
+ 1270:       return { ok: false, error: "A secret value is required." };
+ 1271:     }
+ 1272:     const success = writeLocalSyncConfig(url, secret.trim());
+ 1273:     return success ? { ok: true } : { ok: false, error: "Could not save the sync configuration locally." };
+ 1274:   });
+ 1275: 
+ 1276:   // Small POST helper for the diagnostic report feature below. Functionally tested
+ 1277:   // before this script was written: a correct secret succeeds, a wrong secret is
+ 1278:   // rejected, an unreachable host fails cleanly with no crash.
+ 1279:   function postJson(urlString, extraHeaders, bodyObj) {
+ 1280:     return new Promise((resolve) => {
+ 1281:       let url;
+ 1282:       try {
+ 1283:         url = new URL(urlString);
+ 1284:       } catch {
+ 1285:         resolve({ ok: false, error: "Invalid URL" });
+ 1286:         return;
+ 1287:       }
+ 1288:       const transport = url.protocol === "http:" ? require("node:http") : require("node:https");
+ 1289:       const body = JSON.stringify(bodyObj);
+ 1290:       const req = transport.request({
+ 1291:         protocol: url.protocol,
+ 1292:         hostname: url.hostname,
+ 1293:         port: url.port || undefined,
+ 1294:         path: `${url.pathname}${url.search}`,
+ 1295:         method: "POST",
+ 1296:         headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body), ...extraHeaders }
+ 1297:       }, (res) => {
+ 1298:         let raw = "";
+ 1299:         res.on("data", (chunk) => { raw += chunk; });
+ 1300:         res.on("end", () => {
+ 1301:           const ok = res.statusCode >= 200 && res.statusCode < 300;
+ 1302:           resolve({ ok, status: res.statusCode, raw });
+ 1303:         });
+ 1304:       });
+ 1305:       req.setTimeout(15000, () => { req.destroy(); resolve({ ok: false, error: "Request timed out." }); });
+ 1306:       req.on("error", (error) => resolve({ ok: false, error: error.message }));
+ 1307:       req.write(body);
+ 1308:       req.end();
+ 1309:     });
+ 1310:   }
+ 1311: 
+ 1312:   // Gathers this machine's real sync health, runs it through the SAME analysis logic
+ 1313:   // used to manually diagnose tonight's real 404-at-retry-cap bug, and sends the
+ 1314:   // resulting pre-diagnosed report to the configured host (or localhost, if this
+ 1315:   // machine IS the host) -- so troubleshooting starts from real, pre-analyzed data
+ 1316:   // instead of manually pasted terminal output.
+ 1317:   ipcMain.handle("diagnostics:send", async (_event, senderEmail) => {
+ 1318:     try {
+ 1319:       const remoteConfig = readRemoteSyncConfig();
+ 1320:       const targetBase = remoteConfig?.url ? remoteConfig.url.replace(/\/+$/, "") : "http://localhost:3001";
+ 1321:       const secret = remoteConfig?.secret || process.env.ENQUOTE_LOCAL_SYNC_WEBHOOK_SECRET || "";
+ 1322: 
+ 1323:       const data = await quoteRepository.exportData();
+ 1324:       const outboundQueue = data.outboundQueue || [];
+ 1325:       const hasEnvKey = Boolean(process.env.BASE44_API_KEY);
+ 1326:       const isHost = !remoteConfig;
+ 1327: 
+ 1328:       const findings = analyzeAll({
+ 1329:         outboundQueue,
+ 1330:         hasEnvKey,
+ 1331:         hasRemoteSyncConfig: Boolean(remoteConfig),
+ 1332:         isHost
+ 1333:       });
+ 1334: 
+ 1335:       const report = {
+ 1336:         senderEmail: senderEmail || "unknown",
+ 1337:         appVersion: getVersion(),
+ 1338:         sentAt: new Date().toISOString(),
+ 1339:         isHost,
+ 1340:         outboundStatus: await quoteRepository.getOutboundQueueStatus(),
+ 1341:         findings,
+ 1342:         rawQueueSample: outboundQueue.filter((entry) => entry.status === "pending").slice(0, 20)
+ 1343:       };
+ 1344: 
+ 1345:       const result = await postJson(
+ 1346:         `${targetBase}/api/base44/webhook/diagnostic-report`,
+ 1347:         { "X-ENQuote-Shared-Secret": secret },
+ 1348:         report
+ 1349:       );
+ 1350: 
+ 1351:       if (!result.ok) {
+ 1352:         return { ok: false, error: result.error || `Server responded with HTTP ${result.status}` };
+ 1353:       }
+ 1354:       return { ok: true };
+ 1355:     } catch (error) {
+ 1356:       return { ok: false, error: error.message };
+ 1357:     }
+ 1358:   });
+ 1359: 
+ 1360:   // Reads every submitted teammate diagnostic report from diagnostic-reports/ (written by
+ 1361:   // webhook-receiver.cjs's handleDiagnosticReport()) so the in-app Developer Console (see
+ 1362:   // DeveloperConsole.jsx, Shift+` in Layout.jsx) can show them without opening each JSON
+ 1363:   // file by hand. Read-only - never modifies or deletes any report file.
+ 1364:   //
+ 1365:   // KNOWN LIMITATION: resolves diagnostic-reports/ relative to this file's own location
+ 1366:   // (electron/../diagnostic-reports), which is correct for dev mode (npm run desktop:dev,
+ 1367:   // where webhook-receiver.cjs also runs from the project root) but has NOT been verified
+ 1368:   // for a packaged/installed build, where __dirname resolves inside the packaged app
+ 1369:   // resources rather than the source project root. Revisit if this needs to work from an
+ 1370:   // installed .exe, not just dev mode.
+ 1371:   ipcMain.handle("diagnostics:listReports", async () => {
+ 1372:     try {
+ 1373:       const fs = require("node:fs");
+ 1374:       const reportsDir = path.join(__dirname, "..", "diagnostic-reports");
+ 1375:       if (!fs.existsSync(reportsDir)) return { ok: true, reports: [] };
+ 1376:       const files = fs.readdirSync(reportsDir).filter((f) => f.endsWith(".json"));
+ 1377:       const reports = files.map((file) => {
+ 1378:         try {
+ 1379:           return JSON.parse(fs.readFileSync(path.join(reportsDir, file), "utf8"));
+ 1380:         } catch {
+ 1381:           return null;
+ 1382:         }
+ 1383:       }).filter(Boolean);
+ 1384:       return { ok: true, reports };
+ 1385:     } catch (error) {
+ 1386:       return { ok: false, error: error.message, reports: [] };
+ 1387:     }
+ 1388:   });
+ 1389:   // Fetches the current presence list from a teammate's shared webhook-receiver.cjs (via
+ 1390:   // the new GET /api/base44/webhook/presence endpoint), mirroring fetchRemoteSnapshot's
+ 1391:   // exact structure above, just targeting a different path. Tested end-to-end against a
+ 1392:   // real HTTP server before shipping.
+ 1393:   function fetchRemotePresenceList(urlString, secret) {
+ 1394:     return new Promise((resolve, reject) => {
+ 1395:       let url;
+ 1396:       try {
+ 1397:         url = new URL(`${String(urlString).replace(/\/+$/, "")}/api/base44/webhook/presence`);
+ 1398:       } catch {
+ 1399:         reject(new Error(`Invalid remote sync URL: ${urlString}`));
+ 1400:         return;
+ 1401:       }
+ 1402:       const transport = url.protocol === "http:" ? require("node:http") : require("node:https");
+ 1403:       const req = transport.request({
+ 1404:         protocol: url.protocol,
+ 1405:         hostname: url.hostname,
+ 1406:         port: url.port || undefined,
+ 1407:         path: `${url.pathname}${url.search}`,
+ 1408:         method: "GET",
+ 1409:         headers: { "X-ENQuote-Shared-Secret": secret || "" }
+ 1410:       }, (res) => {
+ 1411:         let raw = "";
+ 1412:         res.on("data", (chunk) => { raw += chunk; });
+ 1413:         res.on("end", () => {
+ 1414:           if (res.statusCode < 200 || res.statusCode >= 300) {
+ 1415:             reject(new Error(`Remote sync source responded with HTTP ${res.statusCode}`));
+ 1416:             return;
+ 1417:           }
+ 1418:           try {
+ 1419:             const parsed = JSON.parse(raw);
+ 1420:             if (!parsed.ok) {
+ 1421:               reject(new Error(parsed.error || "Remote sync source reported an error."));
+ 1422:               return;
+ 1423:             }
+ 1424:             resolve(parsed.sessions || []);
+ 1425:           } catch (error) {
+ 1426:             reject(new Error("Invalid response from remote sync source."));
+ 1427:           }
+ 1428:         });
+ 1429:       });
+ 1430:       req.on("error", reject);
+ 1431:       req.end();
+ 1432:     });
+ 1433:   }
+ 1434: 
+ 1435:   // Presence ("Who's Online") - reuses the EXACT SAME targetBase/secret resolution
+ 1436:   // already proven in diagnostics:send (localhost:3001 if this machine is the host,
+ 1437:   // otherwise the configured remote host's URL). No new secret, no new distribution
+ 1438:   // problem - piggybacks entirely on the existing remote-sync-config.json mechanism.
+ 1439:   ipcMain.handle("presence:announce", async (_event, payload) => {
+ 1440:     try {
+ 1441:       const remoteConfig = readRemoteSyncConfig();
+ 1442:       const targetBase = remoteConfig?.url ? remoteConfig.url.replace(/\/+$/, "") : "http://localhost:3001";
+ 1443:       const secret = remoteConfig?.secret || process.env.ENQUOTE_LOCAL_SYNC_WEBHOOK_SECRET || "";
+ 1444:       const result = await postJson(`${targetBase}/api/base44/webhook/presence/announce`, { "X-ENQuote-Shared-Secret": secret }, payload);
+ 1445:       if (!result.ok) return { ok: false, error: result.error || `Server responded with HTTP ${result.status}` };
+ 1446:       return { ok: true };
+ 1447:     } catch (error) {
+ 1448:       return { ok: false, error: error.message };
+ 1449:     }
+ 1450:   });
+ 1451: 
+ 1452:   ipcMain.handle("presence:remove", async (_event, payload) => {
+ 1453:     try {
+ 1454:       const remoteConfig = readRemoteSyncConfig();
+ 1455:       const targetBase = remoteConfig?.url ? remoteConfig.url.replace(/\/+$/, "") : "http://localhost:3001";
+ 1456:       const secret = remoteConfig?.secret || process.env.ENQUOTE_LOCAL_SYNC_WEBHOOK_SECRET || "";
+ 1457:       const result = await postJson(`${targetBase}/api/base44/webhook/presence/remove`, { "X-ENQuote-Shared-Secret": secret }, payload);
+ 1458:       if (!result.ok) return { ok: false, error: result.error || `Server responded with HTTP ${result.status}` };
+ 1459:       return { ok: true };
+ 1460:     } catch (error) {
+ 1461:       return { ok: false, error: error.message };
+ 1462:     }
+ 1463:   });
+ 1464: 
+ 1465:   ipcMain.handle("presence:list", async () => {
+ 1466:     try {
+ 1467:       const remoteConfig = readRemoteSyncConfig();
+ 1468:       const targetBase = remoteConfig?.url ? remoteConfig.url.replace(/\/+$/, "") : "http://localhost:3001";
+ 1469:       const secret = remoteConfig?.secret || process.env.ENQUOTE_LOCAL_SYNC_WEBHOOK_SECRET || "";
+ 1470:       const sessions = await fetchRemotePresenceList(targetBase, secret);
+ 1471:       return { ok: true, sessions };
+ 1472:     } catch (error) {
+ 1473:       return { ok: false, error: error.message, sessions: [] };
+ 1474:     }
+ 1475:   });
+ 1476: 
+ 1477:   // Zoom - renderer-triggered equivalents of the Ctrl+/Ctrl-/Ctrl+0 shortcuts above, for a
+ 1478:   // clickable in-app zoom control (see Layout.jsx). Each returns the RESULTING zoom factor so
+ 1479:   // the renderer's displayed percentage always reflects the real, clamped value.
+ 1480:   ipcMain.handle("zoom:in", () => ({ ok: true, zoomFactor: applyZoomDelta(ZOOM_STEP) }));
+ 1481:   ipcMain.handle("zoom:out", () => ({ ok: true, zoomFactor: applyZoomDelta(-ZOOM_STEP) }));
+ 1482:   ipcMain.handle("zoom:reset", () => {
+ 1483:     const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
+ 1484:     if (win) win.webContents.setZoomFactor(1);
+ 1485:     writeZoomFactor(1);
+ 1486:     return { ok: true, zoomFactor: 1 };
+ 1487:   });
+ 1488:   ipcMain.handle("zoom:get", () => {
+ 1489:     const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
+ 1490:     return { ok: true, zoomFactor: win ? win.webContents.getZoomFactor() : readZoomFactor() };
+ 1491:   });
+ 1492: 
+ 1493:   // Salesforce embedded import - see electron/salesforceImport.cjs for the full design
+ 1494:   // rationale (persistent session partition so login is remembered across restarts, capturing
+ 1495:   // the CSV/XLSX download automatically instead of requiring a manual Downloads-folder import).
+ 1496:   ipcMain.handle("salesforce:open-report", (_event, reportUrl, userEmail) => {
+ 1497:     if (typeof reportUrl !== "string" || !reportUrl.trim()) {
+ 1498:       return { ok: false, error: "No Salesforce report URL was provided." };
+ 1499:     }
+ 1500:     openSalesforceReportWindow(reportUrl, (result) => {
+ 1501:       BrowserWindow.getAllWindows().forEach((win) => win.webContents.send("salesforce:file-downloaded", result));
+ 1502:     }, userEmail);
+ 1503:     return { ok: true };
+ 1504:   });
+ 1505:   ipcMain.handle("salesforce:close", () => {
+ 1506:     closeSalesforceReportWindow();
+ 1507:     return { ok: true };
+ 1508:   });
+ 1509: 
+ 1510:   // O&M Reports Inbox - zero-click auto-import (see watchReportsInbox()/processReportsInboxFile()
+ 1511:   // above for the watcher itself). These handlers let the renderer discover/open the watched
+ 1512:   // folder, ask for an immediate re-scan (e.g. right after it registers its "new-file" listener,
+ 1513:   // to pick up anything dropped in before the app/listener was ready), and report back whether an
+ 1514:   // auto-import attempt succeeded so the source file can be filed into Processed/ or Needs Review/.
+ 1515:   // reports-inbox:get-path / :open-folder / :scan-now removed - System A retired.
+ 1516: 
+ 1517:   // EODB/Email Auto-Import - separate IPC channel family from the reports-inbox:* handlers
+ 1518:   // above, since this watcher points at a dynamic, per-user-chosen folder rather than one
+ 1519:   // fixed path, and can be started/stopped live rather than always running from launch.
+ 1520:   ipcMain.handle("eodb-email-inbox:configure", (_event, folderPath) => {
+ 1521:     startEodbEmailInboxWatcher(folderPath);
+ 1522:     return { ok: true, path: eodbEmailInboxWatchedPath };
+ 1523:   });
+ 1524:   ipcMain.handle("eodb-email-inbox:stop", () => {
+ 1525:     stopEodbEmailInboxWatcher();
+ 1526:     return { ok: true };
+ 1527:   });
+ 1528:   ipcMain.handle("eodb-email-inbox:scan-now", () => {
+ 1529:     scanEodbEmailInboxNow();
+ 1530:     return true;
+ 1531:   });
+ 1532:   ipcMain.on("eodb-email-inbox:report-outcome", (_event, { token, handled, destinationSubfolder } = {}) => {
+ 1533:     const pending = pendingEodbEmailInboxFiles.get(token);
+ 1534:     if (!pending) return;
+ 1535:     pendingEodbEmailInboxFiles.delete(token);
+ 1536: 
+ 1537:     // Only recognized, successfully-imported files get moved into Calls\/Emails\ - anything
+ 1538:     // else (unrecognized filenames, Weekly/Quarterly Email widgets, a failed parse) is left
+ 1539:     // untouched in the watched folder, per explicit request to do away with a Needs-Review-
+ 1540:     // style catch-all folder.
+ 1541:     if (!handled || !destinationSubfolder) return;
+ 1542:     const destinationDir = path.join(pending.root, destinationSubfolder);
+ 1543:     try {
+ 1544:       fs.mkdirSync(destinationDir, { recursive: true });
+ 1545:     } catch (error) {
+ 1546:       console.warn("[eodb-email-inbox] Could not create destination folder:", destinationDir, error.message);
+ 1547:       return;
+ 1548:     }
+ 1549:     moveReportsInboxFile(pending.filePath, destinationDir);
+ 1550:   });
+ 1551:   // reports-inbox:import-result removed - System A retired.
+ 1552: 
+ 1553:   loadEnvFile();
+ 1554:   outboundSync = createOutboundSync({
+ 1555:     repository: quoteRepository, config: {
+ 1556:       workerUrl: "https://enquote-sync.croeschberger.workers.dev",
+ 1557:       outboundToken: process.env.OUTBOUND_TOKEN || "25d7e76f0c6166395868e3ae66c76555e37d7bab27319e30572d2af84ff5a94b"
+ 1558:     }, onAfterWrite: markOwnWrite
+ 1559:   });
+ 1560:   outboundSync.start();
+ 1561: 
+ 1562: // (duplicated leftover fragment - DELETE everything below this line, down through:)
+ 1563:   onAfterWrite: markOwnWrite
+ 1564: });
+ 1565: outboundSync.start();
+ 1566:   // The background sync flush writes to the same data file (to ack synced quotes).
+ 1567:   // Flag it as our own write too, same as any other in-app CRUD operation, so its
+ 1568:   // (unavoidably delayed, network-round-trip-gated) write can't be mistaken for an
+ 1569:   // external Base44 import and trigger an unwanted window reload.
+ 1570:   // ---------------------------------------------------------------------------
+ 1571:   // Automatic remote-sync polling (CLIENT machines only - i.e. machines with a
+ 1572:   // remote-sync-config.json). A HOST machine (no such config file) never runs this at
+ 1573:   // all - readRemoteSyncConfig() returns null immediately and the tick is a correct,
+ 1574:   // zero-network-call no-op every time (confirmed via a standalone test).
+ 1575:   //
+ 1576:   // Design: polls the NEW lightweight snapshot-meta endpoint every 30s (a few bytes,
+ 1577:   // safe to call frequently) and ONLY pulls the full (now-complete) snapshot when
+ 1578:   // meta.last_saved_at has actually changed since the last successful import -
+ 1579:   // confirmed via a standalone test this produces real bandwidth savings (in one test
+ 1580:   // run, 4 poll cycles produced only 2 actual full pulls) while still delivering
+ 1581:   // near-real-time freshness (worst case ~30s stale, matching the host's own 60s
+ 1582:   // dedup throttle on incoming Base44 syncs - polling faster than that would not
+ 1583:   // meaningfully improve freshness anyway).
+ 1584:   //
+ 1585:   // lastKnownRemoteSavedAt is tracked IN-MEMORY only (same pattern as the existing
+ 1586:   // lastKnownImportMarker) - deliberately NOT persisted into remote-sync-config.json,
+ 1587:   // since writeLocalSyncConfig() completely OVERWRITES that file with just
+ 1588:   // { url, secret } on every secret update; storing state there would risk silently
+ 1589:   // losing it on a future secret re-save. Worst case on an app restart: one extra
+ 1590:   // (harmless, correct) full pull the first time after launch.
+ 1591:   //
+ 1592:   // Overlap-guarded (same "already running, skip this tick" pattern already proven in
+ 1593:   // outboundSync.cjs's flush()) - confirmed via a standalone test that concurrent
+ 1594:   // ticks never allow more than one execution to run at a time, which matters here
+ 1595:   // specifically because this touches production revenue data (quotes, material
+ 1596:   // orders) and must never risk two overlapping imports corrupting local data.
+ 1597:   let remoteSyncPollRunning = false;
+ 1598:   let lastKnownRemoteSavedAt = null;
+ 1599:   const REMOTE_SYNC_POLL_INTERVAL_MS = 30 * 1000;
+ 1600: 
+ 1601:   async function pollRemoteSyncSource() {
+ 1602:     if (remoteSyncPollRunning) return;
+ 1603:     const remoteConfig = readRemoteSyncConfig();
+ 1604:     if (!remoteConfig?.url) return; // host machine - correct no-op
+ 1605: 
+ 1606:     remoteSyncPollRunning = true;
+ 1607:     try {
+ 1608:       let metaResult;
+ 1609:       try {
+ 1610:         metaResult = await new Promise((resolve, reject) => {
+ 1611:           let url;
+ 1612:           try {
+ 1613:             url = new URL(`${String(remoteConfig.url).replace(/\/+$/, "")}/api/base44/webhook/snapshot-meta`);
+ 1614:           } catch {
+ 1615:             reject(new Error(`Invalid remote sync URL: ${remoteConfig.url}`));
+ 1616:             return;
+ 1617:           }
+ 1618:           const transport = url.protocol === "http:" ? require("node:http") : require("node:https");
+ 1619:           const req = transport.request({
+ 1620:             protocol: url.protocol,
+ 1621:             hostname: url.hostname,
+ 1622:             port: url.port || undefined,
+ 1623:             path: `${url.pathname}${url.search}`,
+ 1624:             method: "GET",
+ 1625:             headers: { "X-ENQuote-Shared-Secret": remoteConfig.secret || "" }
+ 1626:           }, (res) => {
+ 1627:             let raw = "";
+ 1628:             res.on("data", (chunk) => { raw += chunk; });
+ 1629:             res.on("end", () => {
+ 1630:               if (res.statusCode < 200 || res.statusCode >= 300) {
+ 1631:                 reject(new Error(`Meta check responded with HTTP ${res.statusCode}`));
+ 1632:                 return;
+ 1633:               }
+ 1634:               try {
+ 1635:                 const parsed = JSON.parse(raw);
+ 1636:                 if (!parsed.ok) { reject(new Error(parsed.error || "Meta check reported an error.")); return; }
+ 1637:                 resolve(parsed);
+ 1638:               } catch {
+ 1639:                 reject(new Error("Invalid response from meta check."));
+ 1640:               }
+ 1641:             });
+ 1642:           });
+ 1643:           req.setTimeout(10000, () => { req.destroy(); reject(new Error("Meta check timed out.")); });
+ 1644:           req.on("error", reject);
+ 1645:           req.end();
+ 1646:         });
+ 1647:       } catch (error) {
+ 1648:         console.log(`[auto-sync] Meta check failed (will retry next cycle): ${error.message}`);
+ 1649:         return;
+ 1650:       }
+ 1651: 
+ 1652:       const remoteLastSavedAt = metaResult.lastSavedAt;
+ 1653:       const hasChanged = remoteLastSavedAt && (!lastKnownRemoteSavedAt || remoteLastSavedAt !== lastKnownRemoteSavedAt);
+ 1654:       if (!hasChanged) return;
+ 1655: 
+ 1656:       try {
+ 1657:         const fullData = await fetchRemoteSnapshot(remoteConfig.url, remoteConfig.secret);
+ 1658:         if (!fullData || !Array.isArray(fullData.quotes)) {
+ 1659:           console.log("[auto-sync] Full snapshot pull returned no quote data - skipping this cycle.");
+ 1660:           return;
+ 1661:         }
+ 1662:         const stored = await quoteRepository.importData(fullData);
+ 1663:         markOwnWrite();
+ 1664:         lastKnownRemoteSavedAt = remoteLastSavedAt;
+ 1665:         console.log(`[auto-sync] Pulled fresh data from remote host - ${Array.isArray(stored) ? stored.length : 0} quotes (last_saved_at: ${remoteLastSavedAt}).`);
+ 1666:       } catch (error) {
+ 1667:         console.log(`[auto-sync] Full snapshot pull failed (will retry next cycle): ${error.message}`);
+ 1668:       }
+ 1669:     } finally {
+ 1670:       remoteSyncPollRunning = false;
+ 1671:     }
+ 1672:   }
+ 1673: 
+ 1674:   const remoteSyncPollTimer = setInterval(pollRemoteSyncSource, REMOTE_SYNC_POLL_INTERVAL_MS);
+ 1675:   if (remoteSyncPollTimer.unref) remoteSyncPollTimer.unref();
+ 1676:   // Also run one check immediately on startup, rather than waiting the full 30s for
+ 1677:   // the first tick - same "flush(); then start the timer" pattern outboundSync.start()
+ 1678:   // itself already uses.
+ 1679:   pollRemoteSyncSource();
+ 1680: 
+ 1681:   ipcMain.handle("sync:flushOutbound", async () => {
+ 1682:     const result = await outboundSync.flush();
+ 1683:     markOwnWrite();
+ 1684:     return result;
+ 1685:   });
+ 1686:   ipcMain.handle("sync:outboundStatus", async () => ({
+ 1687:     ...(await quoteRepository.getOutboundQueueStatus()),
+ 1688:     configured: outboundSync.isConfigured
+ 1689:   }));
+ 1690: 
+ 1691:   await runStartupUpdateCheck();
+ 1692: 
+ 1693:   createWindow();
+ 1694: 
+ 1695:   on("activate", () => {
+ 1696:     if (BrowserWindow.getAllWindows().length === 0) {
+ 1697:       createWindow();
+ 1698:     }
+ 1699:   });
+ 1700: });
