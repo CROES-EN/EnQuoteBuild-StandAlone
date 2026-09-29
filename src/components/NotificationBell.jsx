@@ -3,7 +3,7 @@ import {Link} from "react-router-dom";
 import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
 import {ArrowUpRight, Bell, X} from "lucide-react";
 import {createPageUrl} from "@/utils";
-import {clearNotification, listNotifications, markAllRead} from "@/features/notifications/appNotifications";
+import {clearAllNotifications, clearNotification, listNotifications, markAllRead} from "@/features/notifications/appNotifications";
 
 // Formats a notification's timestamp using the VIEWING user's own browser locale -
 // matches Layout.jsx's existing formatLastUpdated pattern exactly (date part follows
@@ -97,6 +97,16 @@ export default function NotificationBell() {
     clearNotification(id).catch(() => {});
   }
 
+  // Same optimistic-then-background-delete pattern as handleClear above, applied to
+  // every notification at once - empties the visible list immediately so there's no
+  // perceived delay, then fires the actual bulk delete in the background. Errors are
+  // swallowed for the same reason handleClear's are: a failed clear must never
+  // re-populate a list the user already dismissed from their own view.
+  function handleClearAll() {
+    setNotifications([]);
+    clearAllNotifications().catch(() => {});
+  }
+
   return (
     <div className="fixed top-4 right-4 z-50">
       <Popover open={open} onOpenChange={handleOpenChange}>
@@ -119,6 +129,19 @@ export default function NotificationBell() {
             <p className="text-sm text-muted-foreground italic p-4 text-center">No notifications yet.</p>
           ) : (
             <div className="space-y-1.5">
+              <div className="flex items-center justify-between px-1 pb-1">
+                <span className="text-xs font-medium text-muted-foreground">
+                  {notifications.length} notification{notifications.length !== 1 ? "s" : ""}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleClearAll}
+                  className="inline-flex items-center gap-0.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+                >
+                  <X className="w-3 h-3" />
+                  Clear All
+                </button>
+              </div>
               {notifications.map((n) => (
                 <div key={n.id} className="rounded-lg border border-border bg-card p-2.5 text-sm">
                   <p className="text-foreground break-words">{formatNotificationMessage(n)}</p>

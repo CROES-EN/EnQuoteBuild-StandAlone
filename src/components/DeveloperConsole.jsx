@@ -1,8 +1,10 @@
 import {useCallback, useEffect, useState} from "react";
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import {Button} from "@/components/ui/button";
-import {AlertOctagon, AlertTriangle, Info, KeyRound, RefreshCw, Trash2, Users} from "lucide-react";
+import {AlertOctagon, AlertTriangle, Database, Info, KeyRound, RefreshCw, Trash2, Users} from "lucide-react";
 import {clearErrors, listErrors} from "@/features/developerConsole/errorLog";
+import {useQueryClient} from "@tanstack/react-query";
+import {toast} from "sonner";
 import {AdminResetPasswordButton} from "@/features/developerConsole/AdminPasswordReset.jsx";
 
 const REPORT_SEVERITY_ORDER = { critical: 0, known_issue: 1, needs_investigation: 2, warning: 3, info: 4 };
@@ -74,6 +76,7 @@ export default function DeveloperConsole({
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("errors");
+  const queryClient = useQueryClient();
 
     const loadAll = useCallback(async () => {
     setLoading(true);
@@ -104,6 +107,31 @@ export default function DeveloperConsole({
 
   async function handleClearErrors() {
     await clearErrors();
+    loadAll();
+  }
+
+  // Clears React Query's ENTIRE in-memory cache and immediately refetches every
+  // currently-active query, so any page showing stale cached data is guaranteed to
+  // reflect exactly what's on disk right now. This is a safe, non-destructive action -
+  // it never deletes any real data, it only forces a fresh re-read of it. Useful
+  // specifically for "make sure data is showing properly" situations, per explicit
+  // request.
+  async function handleClearCache() {
+    // Forces a fresh pull from Cloudflare's entity-snapshot endpoint FIRST (per
+    // Cloudflare's own guidance) - only re-reading the local data file would just
+    // show whatever was already there, not a genuinely fresh snapshot. Gracefully
+    // skipped if this bridge method isn't available for any reason.
+    try {
+      const syncBridge = globalThis.window?.enquoteLocal?.sync;
+      if (syncBridge?.forceEntitySnapshot) {
+        await syncBridge.forceEntitySnapshot();
+      }
+    } catch (error) {
+      console.error("Failed to force a fresh entity-snapshot pull:", error);
+    }
+    queryClient.clear();
+    await queryClient.refetchQueries();
+    toast.success("Cache cleared - pulled a fresh snapshot and refreshed all data.");
     loadAll();
   }
 
@@ -158,6 +186,9 @@ export default function DeveloperConsole({
           <div className="ml-auto flex items-center gap-1">
             <Button variant="ghost" size="icon" onClick={loadAll} disabled={loading} title="Refresh">
               <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={handleClearCache} title="Clear cache & refresh all data">
+              <Database className="w-4 h-4" />
             </Button>
             {activeTab === "errors" && (
               <Button variant="ghost" size="icon" onClick={handleClearErrors} title="Clear app error log">

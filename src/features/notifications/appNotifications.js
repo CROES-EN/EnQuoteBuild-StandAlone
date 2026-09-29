@@ -80,3 +80,21 @@ export async function clearNotification(id) {
   const all = readBrowserStorage();
   writeBrowserStorage(all.filter((n) => n.id !== id));
 }
+
+/**
+ * Deletes EVERY notification - used by the bell's "Clear All" button. Mirrors the exact
+ * same bridge-vs-browser-storage fallback pattern as clearNotification()/markAllRead()
+ * above. Deletes are fired in parallel (not one-by-one sequentially) since there is no
+ * ordering dependency between deleting separate notification records - matches the same
+ * "fire concurrently, tolerate individual failures" philosophy already used by
+ * createLocalRecords() in dataClient.js for bulk operations.
+ */
+export async function clearAllNotifications() {
+  const bridge = localBridge();
+  if (bridge) {
+    const all = (await bridge.list(COLLECTION)) || [];
+    await Promise.all(all.map((item) => bridge.delete(COLLECTION, item.id).catch(() => {})));
+    return;
+  }
+  writeBrowserStorage([]);
+}

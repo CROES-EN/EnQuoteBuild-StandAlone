@@ -4,16 +4,13 @@ import { json } from "./util.js";
 /**
  * Handles POST /api/outbound/enqueue.
  *
- * CHANGES:
  * - Uses `??` (nullish coalescing) instead of `||` so that `record: null`
  *   from delete payloads is respected, not treated as falsy.
  * - Extracts `updatedDate` from body (camelCase or snake_case) or record.
  * - Passes `action: "delete"` through to upsertBase44EntityState for tombstoning.
- * - Logs every request to `enqueue_request_log` with caller-identifying headers
- *   (User-Agent, CF-Connecting-IP, CF-Ray, CF-IPCountry).
+ * - Logs every request to `enqueue_request_log` with caller-identifying headers.
  */
 async function handleEnqueue(request, env) {
-  // Capture caller-identifying headers BEFORE processing the body
   const userAgent = request.headers.get("User-Agent") || null;
   const cfIp = request.headers.get("CF-Connecting-IP") || null;
   const cfRay = request.headers.get("CF-Ray") || null;
@@ -28,7 +25,6 @@ async function handleEnqueue(request, env) {
   try {
     body = JSON.parse(rawBodyText);
   } catch {
-    // Log even invalid requests
     try {
       await env.DB.prepare(
         "INSERT INTO enqueue_request_log (received_at, path, method, user_agent, cf_ip, cf_ray, cf_country, auth_prefix, entity_type, action, local_id, body_size) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
@@ -45,7 +41,6 @@ async function handleEnqueue(request, env) {
   const record = body.record ?? body.quote ?? (action === "delete" ? null : body);
   const updatedDate = body.updatedDate || body.updated_date || (record && (record.updated_date || record.updated_at)) || null;
 
-  // Log the request with all identifying info
   try {
     await env.DB.prepare(
       "INSERT INTO enqueue_request_log (received_at, path, method, user_agent, cf_ip, cf_ray, cf_country, auth_prefix, entity_type, action, local_id, body_size) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"

@@ -1,8 +1,4 @@
 -- Migration: Create enqueue_request_log table
--- Logs every request to /api/outbound/enqueue with caller-identifying
--- headers (User-Agent, CF-Connecting-IP, CF-Ray, CF-IPCountry).
--- Auto-cleaned by the reconciliation cron (entries older than 7 days).
-
 CREATE TABLE IF NOT EXISTS enqueue_request_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   received_at TEXT NOT NULL,

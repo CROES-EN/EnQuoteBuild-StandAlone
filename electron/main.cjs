@@ -2012,6 +2012,18 @@ let then = whenReady().then(async () => {
     if (entitySnapshotPollTimer.unref) entitySnapshotPollTimer.unref();
     pollEntitySnapshot();
 
+    // Lets the Developer Console's "Clear Cache" button force an immediate,
+    // out-of-cycle pull of the full entity-snapshot from Cloudflare (per Cloudflare's
+    // own guidance: "discard local cache and pull a fresh full snapshot from
+    // /api/base44/webhook/entity-snapshot") instead of only re-reading whatever's
+    // already been merged into the local data file. Awaits the SAME
+    // pollEntitySnapshot() already used by the normal 90s background timer and by
+    // "Refresh App" - no separate, parallel implementation to keep in sync.
+    ipcMain.handle("sync:forceEntitySnapshot", async () => {
+        await pollEntitySnapshot();
+        return { ok: true };
+    });
+
     ipcMain.handle("sync:flushOutbound", async () => {
         const result = await outboundSync.flush();
         markOwnWrite();

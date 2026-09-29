@@ -24,6 +24,7 @@ import {
 } from "@/features/quoteRequestIntake/autoDrafterSalesforceSettings";
 import AutoDrafterCaseTile from "@/components/autoDrafter/AutoDrafterCaseTile";
 import AutoDrafterDraftDetails from "@/components/autoDrafter/AutoDrafterDraftDetails";
+import {getQuotes} from "@/api/dataClient";
 
 const REPORT_TYPE = "quoteRequestCases";
 const REPORT_LABEL = "Quote Request Cases";
@@ -40,6 +41,7 @@ export const AutoDrafter = () => {
     const [search, setSearch] = useState("");
     const [generatedDraftsByCase, setGeneratedDraftsByCase] = useState({});
     const [selectedCaseNumber, setSelectedCaseNumber] = useState(null);
+    const [existingQuoteCaseNumbers, setExistingQuoteCaseNumbers] = useState(new Set());
 
     const loadTable = useCallback(async ({showSpinner} = {}) => {
         if (showSpinner) setReloading(true); else setLoading(true);
@@ -68,6 +70,29 @@ export const AutoDrafter = () => {
         }
     }, []);
 
+    // Fetches every REAL quote ONE TIME (same "load once at the parent, index it" pattern
+    // as loadGeneratedDrafts above, for the exact same OOM-crash-prevention reason) and
+    // builds a Set of every case_number that already has a real quote - per explicit
+    // request: once a case has been turned into an actual quote (in ANY status - draft,
+    // approved, rejected, etc. all count, since the case has already been handled either
+    // way), it should stop appearing in Auto-Drafter's "awaiting a quote draft" grid
+    // entirely. Matched trimmed/lowercased on both sides so formatting differences
+    // between the Salesforce export's Case Number column and a real quote's own
+    // case_number field never cause a false "no match".
+    const loadExistingQuoteCaseNumbers = useCallback(async () => {
+        try {
+            const quotes = await getQuotes();
+            const caseNumbers = new Set(
+                (quotes || [])
+                    .map((quote) => String(quote.case_number ?? "").trim().toLowerCase())
+                    .filter(Boolean)
+            );
+            setExistingQuoteCaseNumbers(caseNumbers);
+        } catch (error) {
+            console.error("Failed to load existing quote case numbers:", error);
+        }
+    }, []);
+
     // Same "reload on mount AND on tab re-visibility" pattern already proven in
     // ReportDataTablesPanel.jsx/NiceRawDataPanel.jsx - this page can stay mounted across
     // sidebar navigation depending on router behavior, so a mount-only effect could go stale.
@@ -92,6 +117,7 @@ export const AutoDrafter = () => {
     useEffect(() => {
         loadTable();
         loadGeneratedDrafts();
+        loadExistingQuoteCaseNumbers();
         lastRefreshRef.current = Date.now();
 
         function refreshIfDue() {
@@ -100,6 +126,7 @@ export const AutoDrafter = () => {
             lastRefreshRef.current = now;
             loadTable({showSpinner: true});
             loadGeneratedDrafts();
+            loadExistingQuoteCaseNumbers();
         }
 
         function handleVisibility() {
@@ -116,7 +143,7 @@ export const AutoDrafter = () => {
             document.removeEventListener("visibilitychange", handleVisibility);
             window.removeEventListener("focus", handleFocus);
         };
-    }, [loadTable, loadGeneratedDrafts]);
+    }, [loadTable, loadGeneratedDrafts, loadExistingQuoteCaseNumbers]);
 
     function handleImported() {
         loadTable({showSpinner: true});
@@ -260,12 +287,21 @@ export const AutoDrafter = () => {
           })()
         : qualifyingRows;
 
+    // Hides any case that already has a real quote (per explicit request) - matched
+    // against the Set built once above by loadExistingQuoteCaseNumbers.
+    const unclaimedQualifyingRows = caseNumberCol
+        ? dedupedQualifyingRows.filter((row) => {
+            const caseNumberValue = String(row[caseNumberCol] ?? "").trim().toLowerCase();
+            return caseNumberValue ? !existingQuoteCaseNumbers.has(caseNumberValue) : true;
+        })
+        : dedupedQualifyingRows;
+
     const term = search.trim().toLowerCase();
     const filteredRows = term
-        ? dedupedQualifyingRows.filter((row) =>
+        ? unclaimedQualifyingRows.filter((row) =>
             columns.some((col) => String(row[col] ?? "").toLowerCase().includes(term))
         )
-        : dedupedQualifyingRows;
+        : unclaimedQualifyingRows;
 
     if (selectedCaseNumber) {
         const selectedRecord = generatedDraftsByCase[selectedCaseNumber] || null;
@@ -361,7 +397,7 @@ export const AutoDrafter = () => {
                 ) : (
                     <>
                         <p className="text-xs text-muted-foreground mb-4">
-                            {dedupedQualifyingRows.length} case{dedupedQualifyingRows.length === 1 ? "" : "s"} awaiting
+                            {unclaimedQualifyingRows.length} case{unclaimedQualifyingRows.length === 1 ? "" : "s"} awaiting
                             a quote
                             draft -
                             imported {table.importedAt ? new Date(table.importedAt).toLocaleString() : "unknown time"}

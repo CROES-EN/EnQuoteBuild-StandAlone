@@ -3,26 +3,21 @@ main = "src/index.js"
 compatibility_date = "2026-09-25"
 usage_model = "standard"
 
-# D1 database binding
 [[d1_databases]]
 binding = "DB"
 database_name = "enquote-sync"
 database_id = "05a146fb-bba9-43a3-a2fe-40473037d19f"
 
-# Queue binding
 [[queues.producers]]
 binding = "OUTBOUND_QUEUE"
 queue = "enquote-outbound"
 
-# Cron trigger — reconciliation every 15 minutes
 [triggers]
 crons = ["*/15 * * * *"]
 
-# Plain text vars
 [vars]
 BASE44_API_URL = "https://enquote.base44.app"
 
-# Observability
 [observability]
 enabled = true
 head_sampling_rate = 1

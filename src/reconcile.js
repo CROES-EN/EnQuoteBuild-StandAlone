@@ -17,14 +17,12 @@ async function handleReconcile(env) {
 
   for (const entityType of RECONCILE_ENTITY_TYPES) {
     try {
-      // Get all active (non-tombstoned) records of this type from D1
       const { results: dbRows } = await env.DB.prepare(
         "SELECT local_id FROM base44_entity_state WHERE entity_type = ? AND deleted_at IS NULL"
       ).bind(entityType).all();
 
       if (!dbRows || dbRows.length === 0) continue;
 
-      // Fetch all records of this entity type from Base44
       const url = entityUrl(env, entityType) + "?limit=1000";
       const response = await requestJson(url, { headers: authHeaders(env) });
 
@@ -37,11 +35,9 @@ async function handleReconcile(env) {
       const remoteRows = Array.isArray(response.body) ? response.body : (response.body?.items || []);
       const remoteIds = new Set(remoteRows.map((r) => String(r.id || r.local_id || r._id || "")).filter(Boolean));
 
-      // Find local records that no longer exist in Base44
       for (const row of dbRows) {
         results.checked++;
         if (!remoteIds.has(row.local_id)) {
-          // Record was deleted in Base44 — tombstone it
           await env.DB.prepare(
             "UPDATE base44_entity_state SET deleted_at = ?, action = 'delete', synced_at = ? " +
             "WHERE entity_type = ? AND local_id = ? AND deleted_at IS NULL"

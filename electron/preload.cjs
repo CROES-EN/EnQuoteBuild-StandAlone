@@ -78,7 +78,8 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
   },
   sync: {
     flushOutbound: () => invoke("sync:flushOutbound"),
-    outboundStatus: () => invoke("sync:outboundStatus")
+    outboundStatus: () => invoke("sync:outboundStatus"),
+    forceEntitySnapshot: () => invoke("sync:forceEntitySnapshot")
   },
   shell: {
     // Opens a local file path (e.g. a previously-imported CXONE/Salesforce spreadsheet) in
