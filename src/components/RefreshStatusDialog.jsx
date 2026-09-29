@@ -70,7 +70,7 @@ export default function RefreshStatusDialog({ open, onOpenChange, phase, lastAtt
           </DialogTitle>
           <DialogDescription>
             {unreachable
-              ? "Could not reach the local webhook receiver on port 3001. Make sure webhook-receiver.cjs is running."
+              ? "Local sync service unreachable - see Details below."
               : !isFinished
                 ? "Checking the local webhook receiver for the latest imported data..."
                 : (REFRESH_REASON_LABELS[lastAttempt?.reason] || "Refresh check complete.")}

@@ -49,6 +49,7 @@ import {
     FileText,
     Hash,
     MessageSquarePlus,
+    Package,
     Pencil,
     Receipt,
     Send,
@@ -68,6 +69,8 @@ import QuoteVersionHistory from "@/components/quotes/QuoteVersionHistory";
 import FollowUpHistory from "@/components/quotes/FollowUpHistory";
 import QuoteActivityLog from "@/components/quotes/QuoteActivityLog";
 import QuoteVersionComparison from "@/components/quotes/QuoteVersionComparison";
+import CareEligibilityBanner from "@/components/quotes/CareEligibilityBanner";
+import BulkMaterialOrderReviewSheet from "@/components/materials/BulkMaterialOrderReviewSheet";
 
 // Only these users can grant/revoke pre-approval
 const PRE_APPROVAL_USERS = ["smosley@enphaseenergy.com", "REDACTED-USER1@example.invalid"];
@@ -137,6 +140,7 @@ function QuoteDetailsContent() {
  const [boneyardReason, setBoneyardReason] = useState("");
  const [decisionCategory, setDecisionCategory] = useState("no_customer_response");
  const [showPaidDialog, setShowPaidDialog] = useState(false);
+ const [showBulkMaterialOrderSheet, setShowBulkMaterialOrderSheet] = useState(false);
  const [paidDate, setPaidDate] = useState(format(new Date(), "yyyy-MM-dd"));
  const [stripeTransactionId, setStripeTransactionId] = useState("");
  const [stripeInvoiceId, setStripeInvoiceId] = useState("");
@@ -769,7 +773,46 @@ function QuoteDetailsContent() {
  ]
  }
  });
- toast.success("Quote marked as Scheduled");
+  toast.success("Quote marked as Scheduled");
+ };
+
+ const handleMarkMaterialsRequired = async () => {
+ const currentUser = await safeMe();
+ await updateMutation.mutateAsync({
+ id: quoteId,
+ data: {
+ status: "invoice_paid_materials_required",
+ status_history: [
+ ...(quote.status_history || []),
+ {
+ status: "invoice_paid_materials_required",
+ changed_by: currentUser.email,
+ changed_at: new Date().toISOString(),
+ reason: "Marked as needing materials ordered before scheduling"
+ }
+ ]
+ }
+ });
+ toast.success("Quote marked as needing materials ordered");
+ };
+
+ const handleMaterialsOrderSubmitted = async () => {
+ const currentUser = await safeMe();
+ await updateMutation.mutateAsync({
+ id: quoteId,
+ data: {
+ status: "materials_pending_shipment",
+ status_history: [
+ ...(quote.status_history || []),
+ {
+ status: "materials_pending_shipment",
+ changed_by: currentUser.email,
+ changed_at: new Date().toISOString(),
+ reason: "Bulk material order submitted"
+ }
+ ]
+ }
+ });
  };
 
  const handleCopyPartList = () => {
@@ -1199,6 +1242,8 @@ function QuoteDetailsContent() {
  <SelectItem value="ho_rejected">HO Rejected</SelectItem>
  <SelectItem value="invoiced">Quote Pending Payment</SelectItem>
  <SelectItem value="invoice_paid">Invoice Paid</SelectItem>
+ <SelectItem value="invoice_paid_materials_required">Invoice Paid - Materials Required</SelectItem>
+ <SelectItem value="materials_pending_shipment">Materials Pending Shipment</SelectItem>
  <SelectItem value="scheduled">Scheduled</SelectItem>
  <SelectItem value="on_hold">On Hold (Boneyard)</SelectItem>
  </SelectContent>
@@ -1298,6 +1343,17 @@ function QuoteDetailsContent() {
  )}
  {quote.status === "invoice_paid" && canEditQuote && (
  <Button
+ variant="outline"
+ onClick={handleMarkMaterialsRequired}
+ disabled={updateMutation.isPending}
+ className="border-cyan-200 text-cyan-700 hover:bg-cyan-50"
+ >
+ <Package className="w-4 h-4 mr-2" />
+ Materials Required
+ </Button>
+)}
+{["invoice_paid", "materials_pending_shipment"].includes(quote.status) && canEditQuote && (
+ <Button
  onClick={handleMarkScheduled}
  disabled={updateMutation.isPending}
  className="bg-teal-600 hover:bg-teal-700"
@@ -1305,7 +1361,16 @@ function QuoteDetailsContent() {
  <CalendarCheck className="w-4 h-4 mr-2" />
  Mark as Scheduled
  </Button>
- )}
+)}
+{quote.status === "invoice_paid_materials_required" && canEditQuote && (
+ <Button
+ onClick={() => setShowBulkMaterialOrderSheet(true)}
+ className="bg-cyan-600 hover:bg-cyan-700"
+ >
+ <Package className="w-4 h-4 mr-2" />
+ Order Materials
+ </Button>
+)}
  {canEditQuote && (
  <Button
  variant="outline"
@@ -1441,6 +1506,9 @@ function QuoteDetailsContent() {
  </div>
  </div>
 
+
+ {/* Enphase Care Eligibility Banner */}
+ {quote.site_id && <CareEligibilityBanner siteId={quote.site_id} />}
 
  {/* On Hold / Boneyard Banner */}
  {quote.status === "on_hold" && (
@@ -2221,6 +2289,13 @@ function QuoteDetailsContent() {
  </DialogFooter>
  </DialogContent>
  </Dialog>
+
+ <BulkMaterialOrderReviewSheet
+ open={showBulkMaterialOrderSheet}
+ onOpenChange={setShowBulkMaterialOrderSheet}
+ quote={quote}
+ onSubmitted={handleMaterialsOrderSubmitted}
+ />
  </div>
  );
 }

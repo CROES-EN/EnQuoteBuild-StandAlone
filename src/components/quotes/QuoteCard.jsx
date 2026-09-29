@@ -1,6 +1,6 @@
-﻿import {Card} from "@/components/ui/card";
+import {Card} from "@/components/ui/card";
 import {format} from "date-fns";
-import {Calendar, FileText, User} from "lucide-react";
+import {Calendar, FileText, ShieldCheck, User} from "lucide-react";
 import {Link} from "react-router-dom";
 import {createPageUrl} from "@/utils";
 import {calculateQuoteTotals} from "@/utils/quoteCalculations";
@@ -9,10 +9,15 @@ import StatusBadge from "./StatusBadge";
 import {MentionBadge, SLAAlertBadge} from "./AlertBadge";
 import {motion} from "framer-motion";
 import {Checkbox} from "@/components/ui/checkbox";
+import {useCareEligibilityIndex} from "@/features/supervisorDashboard/careEligibilityCache";
+import {getEligibilityFromIndex} from "@/features/supervisorDashboard/careEligibility";
 
 export default function QuoteCard({ quote, index = 0, selectable = false, isSelected = false, onToggleSelect, alert = null, hasMention = false, mentionPriority, mentionMessage, mentionedBy, onClearAlert }) {
   const { total: calculatedTotal } = calculateQuoteTotals(quote);
   const effectiveLevel = getEffectiveLevel(alert, hasMention, mentionPriority);
+  const careIndex = useCareEligibilityIndex();
+  const careEligibility = careIndex ? getEligibilityFromIndex(quote.site_id, careIndex) : null;
+  const hasActiveCare = careEligibility?.status === "ACTIVE_CARE";
   const stripeClass = effectiveLevel === "red"
     ? "border-l-4 border-l-red-500"
     : effectiveLevel === "orange"
@@ -64,11 +69,21 @@ export default function QuoteCard({ quote, index = 0, selectable = false, isSele
           </div>
           
           <div className="space-y-2 text-sm">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Calendar className="w-4 h-4 text-muted-foreground" />
-              {quote.created_date && !Number.isNaN(new Date(quote.created_date).getTime())
-                ? format(new Date(quote.created_date), "MMM d, yyyy")
-                : "Unknown"}
+            {/* CARE_SHIELD_ABOVE_TOTAL: positioned directly above the divider line and the
+                dollar total below it, right-aligned so it sits visually right above the $
+                figure - per explicit request, moved here from next to the Site ID title. */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Calendar className="w-4 h-4 text-muted-foreground" />
+                {quote.created_date && !Number.isNaN(new Date(quote.created_date).getTime())
+                  ? format(new Date(quote.created_date), "MMM d, yyyy")
+                  : "Unknown"}
+              </div>
+              {hasActiveCare && (
+                <span title="Active Enphase Care">
+                  <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
+                </span>
+              )}
             </div>
           </div>
           

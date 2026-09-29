@@ -1,6 +1,7 @@
-﻿import {useState} from "react";
+import {useState} from "react";
 import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 import {base44} from "@/api/base44Client";
+import {createLocalRecord, deleteLocalRecord, listLocalCollection, updateLocalRecord} from "@/api/dataClient";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {Textarea} from "@/components/ui/textarea";
@@ -13,7 +14,31 @@ import {Dialog, DialogContent, DialogHeader, DialogTitle,} from "@/components/ui
 import {Clock, Loader2, MapPin, Navigation, Pencil, Phone, Plus, Route, Trash2, Trophy, Users} from "lucide-react";
 import RoleGuard from "@/components/auth/RoleGuard";
 
-const emptyFST = { name: "", employee_id: "", city: "", state: "", zip: "", phone: "", is_active: true, notes: "" };
+// FST roster records now live in the local "fsts" collection (see
+// listLocalCollection/createLocalRecord/updateLocalRecord/deleteLocalRecord below) -
+// registered in electron/repository.cjs's collectionNames + zod schema by
+// Patch-AddFSTCollection.ps1. Previously this called base44.entities.FST directly,
+// which silently threw in local/offline mode (the noop base44 client has no
+// "entities" property at all) - meaning the roster could never actually save or
+// load data. shipping_address/home_address/supervisor/region/home_state are new
+// fields added per explicit request to store each FST's real shipping and home
+// addresses; city/state/zip are kept for the existing AI route-ranking feature.
+const emptyFST = {
+  name: "",
+  employee_id: "",
+  supervisor: "",
+  email: "",
+  phone: "",
+  shipping_address: "",
+  home_address: "",
+  region: "",
+  home_state: "",
+  city: "",
+  state: "",
+  zip: "",
+  is_active: true,
+  notes: ""
+};
 
 function ResourcePlannerPage() {
   const queryClient = useQueryClient();
@@ -31,23 +56,26 @@ function ResourcePlannerPage() {
 
   const { data: fsts = [], isLoading: fstsLoading } = useQuery({
     queryKey: ["fsts"],
-    queryFn: () => base44.entities.FST.list("name", 200)
+    queryFn: async () => {
+      const list = await listLocalCollection("fsts");
+      return [...(list || [])].sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+    }
   });
 
   const activeFSTs = fsts.filter(f => f.is_active !== false);
 
   const createFST = useMutation({
-    mutationFn: (data) => base44.entities.FST.create(data),
+    mutationFn: (data) => createLocalRecord("fsts", data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["fsts"] }); closeForm(); }
   });
 
   const updateFST = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.FST.update(id, data),
+    mutationFn: ({ id, data }) => updateLocalRecord("fsts", id, data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["fsts"] }); closeForm(); }
   });
 
   const deleteFST = useMutation({
-    mutationFn: (id) => base44.entities.FST.delete(id),
+    mutationFn: (id) => deleteLocalRecord("fsts", id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["fsts"] })
   });
 
@@ -72,6 +100,13 @@ function ResourcePlannerPage() {
     }
   };
 
+  // KNOWN LIMITATION (not fixed by this patch): base44.functions.invoke() is ALSO a
+  // noop in local/offline mode (resolves to undefined), so this still won't return
+  // real rankings locally - it will fail gracefully into the existing rankError
+  // message below, same as before this patch. Real distance-based ranking requires
+  // either a live Base44 backend or a separate geocoding/mapping API integration.
+  // This patch only fixes ROSTER STORAGE - addresses are now at least captured and
+  // available for whenever ranking is properly wired up.
   const handleRank = async () => {
     if (!svAddress.trim()) return;
     if (activeFSTs.length === 0) {
@@ -86,7 +121,10 @@ function ResourcePlannerPage() {
         sv_address: svAddress,
         fsts: activeFSTs.map(f => ({
           name: f.name,
-          address: `${f.city || ""}, ${f.state || ""} ${f.zip || ""}`.trim(),
+          // Prefers the fuller shipping/home address text when available - a real
+          // street address is far more precise input for distance estimation than
+          // city/state/zip alone, which is all this used to have.
+          address: (f.shipping_address || f.home_address || `${f.city || ""}, ${f.state || ""} ${f.zip || ""}`).trim(),
           city: f.city || "",
           state: f.state || "",
           zip: f.zip || ""
@@ -133,7 +171,7 @@ function ResourcePlannerPage() {
           </TabsTrigger>
         </TabsList>
 
-        {/* â”€â”€â”€ ROUTE PLANNER TAB â”€â”€â”€ */}
+        {/* --- ROUTE PLANNER TAB --- */}
         <TabsContent value="route" className="space-y-4 mt-4">
           <Card>
             <CardHeader className="pb-3">
@@ -165,7 +203,7 @@ function ResourcePlannerPage() {
               </div>
               {activeFSTs.length === 0 && !fstsLoading && (
                 <p className="text-sm text-amber-600 flex items-center gap-1">
-                  âš ï¸ No active FSTs in roster. Add FSTs in the <strong>FST Roster</strong> tab first.
+                  No active FSTs in roster. Add FSTs in the <strong>FST Roster</strong> tab first.
                 </p>
               )}
               {activeFSTs.length > 0 && (
@@ -218,7 +256,7 @@ function ResourcePlannerPage() {
                           return fst ? (
                             <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
                                 <MapPin className="w-3 h-3" />
-                                {fst.city}{fst.state ? `, ${fst.state}` : ""} {fst.zip || ""}
+                                {fst.shipping_address || `${fst.city}${fst.state ? `, ${fst.state}` : ""} ${fst.zip || ""}`}
                               </p>
                           ) : null;
                         })()}
@@ -249,10 +287,10 @@ function ResourcePlannerPage() {
           )}
         </TabsContent>
 
-        {/* â”€â”€â”€ FST ROSTER TAB â”€â”€â”€ */}
+        {/* --- FST ROSTER TAB --- */}
         <TabsContent value="roster" className="space-y-4 mt-4">
           <div className="flex justify-between items-center">
-            <p className="text-sm text-muted-foreground">{fsts.length} FST{fsts.length !== 1 ? "s" : ""} total · {activeFSTs.length} active</p>
+            <p className="text-sm text-muted-foreground">{fsts.length} FST{fsts.length !== 1 ? "s" : ""} total ・ {activeFSTs.length} active</p>
             <Button
               onClick={() => { setEditingFST(null); setFstForm(emptyFST); setShowFSTForm(true); }}
               className="bg-sky-600 hover:bg-sky-700 gap-2"
@@ -278,15 +316,33 @@ function ResourcePlannerPage() {
                   <CardContent className="pt-4 pb-4 px-5">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
                           <span className="font-semibold text-foreground">{fst.name}</span>
                           {fst.employee_id && <span className="text-xs text-muted-foreground">#{fst.employee_id}</span>}
+                          {fst.region && <Badge variant="outline" className="text-xs">{fst.region}</Badge>}
                           {!fst.is_active && <Badge className="bg-muted text-muted-foreground border-0 text-xs">Inactive</Badge>}
                         </div>
-                        <p className="text-sm text-muted-foreground flex items-center gap-1">
-                          <MapPin className="w-3 h-3 shrink-0" />
-                          {fst.city}{fst.state ? `, ${fst.state}` : ""} {fst.zip || ""}
-                        </p>
+                        {fst.supervisor && (
+                          <p className="text-xs text-muted-foreground mb-1">Supervisor: {fst.supervisor}</p>
+                        )}
+                        {fst.shipping_address && (
+                          <p className="text-sm text-muted-foreground flex items-start gap-1 mt-0.5">
+                            <MapPin className="w-3 h-3 shrink-0 mt-0.5" />
+                            <span><span className="font-medium text-foreground">Ship To:</span> {fst.shipping_address}</span>
+                          </p>
+                        )}
+                        {fst.home_address && (
+                          <p className="text-sm text-muted-foreground flex items-start gap-1 mt-0.5">
+                            <MapPin className="w-3 h-3 shrink-0 mt-0.5" />
+                            <span><span className="font-medium text-foreground">Home:</span> {fst.home_address}</span>
+                          </p>
+                        )}
+                        {!fst.shipping_address && !fst.home_address && (fst.city || fst.state || fst.zip) && (
+                          <p className="text-sm text-muted-foreground flex items-center gap-1">
+                            <MapPin className="w-3 h-3 shrink-0" />
+                            {fst.city}{fst.state ? `, ${fst.state}` : ""} {fst.zip || ""}
+                          </p>
+                        )}
                         {fst.phone && (
                           <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
                             <Phone className="w-3 h-3 shrink-0" />
@@ -319,7 +375,7 @@ function ResourcePlannerPage() {
 
       {/* Add/Edit FST Dialog */}
       <Dialog open={showFSTForm} onOpenChange={(open) => { if (!open) closeForm(); }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingFST ? "Edit FST" : "Add New FST"}</DialogTitle>
           </DialogHeader>
@@ -337,7 +393,7 @@ function ResourcePlannerPage() {
               <div className="space-y-1.5">
                 <Label>Employee ID</Label>
                 <Input
-                  placeholder="EMP-001"
+                  placeholder="FS_1234567"
                   value={fstForm.employee_id}
                   onChange={(e) => setFstForm({ ...fstForm, employee_id: e.target.value })}
                 />
@@ -348,6 +404,40 @@ function ResourcePlannerPage() {
                   placeholder="(555) 123-4567"
                   value={fstForm.phone}
                   onChange={(e) => setFstForm({ ...fstForm, phone: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Supervisor</Label>
+                <Input
+                  placeholder="e.g. Arturo/Brian"
+                  value={fstForm.supervisor}
+                  onChange={(e) => setFstForm({ ...fstForm, supervisor: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Region</Label>
+                <Input
+                  placeholder="e.g. NorCal West, socal"
+                  value={fstForm.region}
+                  onChange={(e) => setFstForm({ ...fstForm, region: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5 col-span-2">
+                <Label>Shipping Address</Label>
+                <Textarea
+                  placeholder="Full shipping/U-Haul address for material orders"
+                  value={fstForm.shipping_address}
+                  onChange={(e) => setFstForm({ ...fstForm, shipping_address: e.target.value })}
+                  rows={2}
+                />
+              </div>
+              <div className="space-y-1.5 col-span-2">
+                <Label>Home Address</Label>
+                <Textarea
+                  placeholder="Full home address"
+                  value={fstForm.home_address}
+                  onChange={(e) => setFstForm({ ...fstForm, home_address: e.target.value })}
+                  rows={2}
                 />
               </div>
               <div className="space-y-1.5">

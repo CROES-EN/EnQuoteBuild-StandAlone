@@ -909,7 +909,7 @@ function generateScopeOfWork(request) {
   }
 
   if (primaryItem && parts.join(" ").length < 160) {
-    const itemName = String(primaryItem).replace(/^\s*[-*ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢]\s*/, "").trim();
+    const itemName = String(primaryItem).replace(/^\s*[-*•]\s*/, "").trim();
     const itemSummary = itemName || "identified component";
     return `Replace one failed/non-producing ${itemSummary} identified during diagnostics and verify proper system operation following installation. Work includes removal of the failed module, installation of a compatible replacement module, operational testing, and confirmation of production functionality.`;
   }

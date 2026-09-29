@@ -2,7 +2,7 @@ import {useState} from "react";
 import {Card} from "@/components/ui/card";
 import {Badge} from "@/components/ui/badge";
 import {Button} from "@/components/ui/button";
-import {Calendar, ClipboardList, FileText, Loader2, MapPin, Package, Sparkles, User} from "lucide-react";
+import {Calendar, ClipboardList, FileText, Loader2, MapPin, Package, ShieldCheck, Sparkles, User} from "lucide-react";
 import {format} from "date-fns";
 import {motion} from "framer-motion";
 import {toast} from "sonner";
@@ -11,6 +11,8 @@ import {calculateQuoteTotals} from "@/utils/quoteCalculations";
 import {parseQuoteRequestCase} from "@/features/autoDrafter/parseQuoteRequestCase";
 import {generateQuoteDraft} from "@/features/quoteDraftAgent/draftEngine";
 import {saveGeneratedDraft} from "@/features/autoDrafter/autoDrafterDraftsStore";
+import {useCareEligibilityIndex} from "@/features/supervisorDashboard/careEligibilityCache";
+import {getEligibilityFromIndex} from "@/features/supervisorDashboard/careEligibility";
 
 /**
  * AutoDrafterCaseTile - a quote-page-style tile for a single raw Salesforce case row,
@@ -117,6 +119,12 @@ export default ({
 
   const hasParsedFields = Boolean(siteAddress || scopeDescription);
 
+  const careIndex = useCareEligibilityIndex();
+  const rawCaseCareEligibility = careIndex ? getEligibilityFromIndex(siteId, careIndex) : null;
+  const hasActiveCareRaw = rawCaseCareEligibility?.status === "ACTIVE_CARE";
+  const savedDraftCareEligibility = careIndex && savedDraftRecord ? getEligibilityFromIndex(savedDraftRecord.siteId, careIndex) : null;
+  const hasActiveCareSavedDraft = savedDraftCareEligibility?.status === "ACTIVE_CARE";
+
   const [isGenerating, setIsGenerating] = useState(false);
 
   async function handleGenerateDraft() {
@@ -183,9 +191,19 @@ export default ({
             </div>
 
             <div className="space-y-2 text-sm flex-1">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Calendar className="w-4 h-4 text-muted-foreground" />
-                {generatedDate || "Unknown"}
+              {/* CARE_SHIELD_ABOVE_TOTAL: positioned directly above the divider line and the
+                  dollar total below it, right-aligned so it sits visually right above the $
+                  figure - per explicit request, moved here from next to the Site ID title. */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Calendar className="w-4 h-4 text-muted-foreground" />
+                  {generatedDate || "Unknown"}
+                </div>
+                {hasActiveCareSavedDraft && (
+                  <span title="Active Enphase Care">
+                    <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
+                  </span>
+                )}
               </div>
             </div>
 
@@ -223,8 +241,13 @@ export default ({
               <FileText className="w-5 h-5 text-violet-600" />
             </div>
             <div>
-              <h3 className="font-semibold text-foreground group-hover:text-violet-600 transition-colors">
+              <h3 className="font-semibold text-foreground group-hover:text-violet-600 transition-colors flex items-center gap-1.5">
                 {customerName || (siteId ? `Site ${siteId}` : "Unknown Customer")}
+                {hasActiveCareRaw && (
+                  <span title="Active Enphase Care">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  </span>
+                )}
               </h3>
               <p className="text-sm text-muted-foreground">
                 Case #{caseNumber || "No reference"}

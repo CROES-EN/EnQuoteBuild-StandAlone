@@ -242,7 +242,7 @@ export default function SiteRejectionProgressPanel({ siteId, allReviews = [], on
                           <div className="flex flex-wrap gap-1">
                             {event.items.map((item, ii) => (
                               <span key={ii} className="text-xs bg-card border border-border rounded px-1.5 py-0.5 text-muted-foreground">
-                                {item.name} Ã— {item.quantity}
+                                {item.name} × {item.quantity}
                               </span>
                             ))}
                           </div>

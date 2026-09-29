@@ -116,6 +116,51 @@ async function pushMention(env, item) {
   return { status: "pushed", remote_id: confirmedId };
 }
 
+// All 20 entity types Base44 now sends, other than "quote" (which has its own
+// dedicated pushCreate/pushUpdate above, including conflict-checking against
+// the remote copy via fetchRemoteQuote - that logic is quote-specific and is
+// intentionally NOT duplicated here). "dismissal" and "mention" also keep
+// their own existing handlers below and are excluded from this generic list.
+//
+// Confirmed directly with Base44 (see chat log) - these are the exact Base44
+// entity names as they exist in the app today.
+const GENERIC_ENTITY_NAMES = new Set([
+  "Product",
+  "MaterialOrder",
+  "QuoteAlert",
+  "PriceReview",
+  "QuoteReview",
+  "QuoteActivity",
+  "QuoteDeletionRequest",
+  "FollowUpConfig",
+  "FollowUpLog",
+  "EmailDistribution",
+  "PDFTemplate",
+  "FST",
+  "PVManufacturer",
+  "PVPanelRMA",
+  "SiteFlag",
+  "SVCancelTracker",
+  "SupportInteraction",
+  "Invitation",
+]);
+
+// Generic create/update push for any of the entity names above. Base44's
+// outbound envelope for these is: { entityType, action, localId, record }.
+// Unlike quotes, these do NOT run a remote-conflict check before updating -
+// Base44 confirmed these entities don't need that (no concurrent-edit
+// scenario like quotes have), and QuoteActivity/FollowUpLog in particular are
+// append-only logs that are only ever created, never updated.
+async function pushGenericEntity(env, entityName, item) {
+  const isUpdate = item.action === "update" && item.remoteId;
+  const url = isUpdate ? `${entityUrl(env, entityName)}/${item.remoteId}` : entityUrl(env, entityName);
+  const method = isUpdate ? "PUT" : "POST";
+  const response = await requestJson(url, { method, headers: authHeaders(env), body: item.record });
+  if (!response.ok) throw new RetryableError(`${entityName} ${item.action} failed: ${response.status}`);
+  const confirmedId = response.body?.id ? String(response.body.id) : (item.remoteId || null);
+  if (!confirmedId) throw new RetryableError(`${entityName} ${item.action} returned no id`);
+  return { status: "pushed", remote_id: confirmedId };
+}
 export async function performPush(message, env) {
   const { entityType, action, ...rest } = message;
   if (entityType === "quote") {
@@ -123,6 +168,7 @@ export async function performPush(message, env) {
   }
   if (entityType === "dismissal") return await pushDismissal(env, rest);
   if (entityType === "mention") return await pushMention(env, rest);
+  if (GENERIC_ENTITY_NAMES.has(entityType)) return await pushGenericEntity(env, entityType, { ...rest, action });
   throw new Error(`unknown entity type: ${entityType}`);
 }
 

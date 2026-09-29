@@ -52,7 +52,7 @@ export default function CommonRejectionReasons({ quotes }) {
               <Badge className="bg-red-100 text-red-700 text-xs capitalize">{keyword}</Badge>
               <span className="text-sm text-muted-foreground">{count} quote{count > 1 ? "s" : ""}</span>
             </span>
-            <span className="text-xs text-muted-foreground">{expanded === keyword ? "â–²" : "â–¼"}</span>
+            <span className="text-xs text-muted-foreground">{expanded === keyword ? "▲" : "▼"}</span>
           </button>
           {expanded === keyword && (
             <div className="divide-y divide-slate-100">

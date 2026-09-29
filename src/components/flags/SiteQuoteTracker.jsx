@@ -130,9 +130,9 @@ function SiteRow({ site }) {
             </div>
             <div className="flex flex-wrap gap-3 mt-1 text-xs text-muted-foreground">
               <span>📋 {site.totalQuotes} quote{site.totalQuotes !== 1 ? "s" : ""}</span>
-              {site.totalRejections > 0 && <span className="text-red-600 font-medium">âœ• {site.totalRejections} rejection{site.totalRejections !== 1 ? "s" : ""}</span>}
-              {site.hoRejections > 0 && <span className="text-red-700 font-medium">âœ• {site.hoRejections} HO rejection{site.hoRejections !== 1 ? "s" : ""}</span>}
-              {site.reworkCount > 0 && <span className="text-orange-600 font-medium">â†º {site.reworkCount} rework{site.reworkCount !== 1 ? "s" : ""}</span>}
+              {site.totalRejections > 0 && <span className="text-red-600 font-medium">✕ {site.totalRejections} rejection{site.totalRejections !== 1 ? "s" : ""}</span>}
+              {site.hoRejections > 0 && <span className="text-red-700 font-medium">✕ {site.hoRejections} HO rejection{site.hoRejections !== 1 ? "s" : ""}</span>}
+              {site.reworkCount > 0 && <span className="text-orange-600 font-medium">↺ {site.reworkCount} rework{site.reworkCount !== 1 ? "s" : ""}</span>}
             </div>
           </div>
         </div>
@@ -173,7 +173,7 @@ function SiteRow({ site }) {
                     <div className="space-y-0.5">
                       {rejInHistory.map((h, i) => (
                         <p key={i} className="text-red-600">
-                          âœ• Rejected by {h.changed_by || "unknown"} on {h.changed_at ? format(new Date(h.changed_at), "MMM d, yyyy") : "—"}
+                          ✕ Rejected by {h.changed_by || "unknown"} on {h.changed_at ? format(new Date(h.changed_at), "MMM d, yyyy") : "—"}
                           {h.reason && ` — "${h.reason}"`}
                         </p>
                       ))}
@@ -183,7 +183,7 @@ function SiteRow({ site }) {
                     <p className="text-red-500 italic">Reason: {q.rejection_reason}</p>
                   )}
                   {resubmits.length > 1 && (
-                    <p className="text-orange-600">â†º Resubmitted {resubmits.length - 1} time{resubmits.length > 2 ? "s" : ""}</p>
+                    <p className="text-orange-600">↺ Resubmitted {resubmits.length - 1} time{resubmits.length > 2 ? "s" : ""}</p>
                   )}
                   <p className="text-muted-foreground">
                     Last updated: {q.updated_date ? format(new Date(q.updated_date), "MMM d, yyyy") : "—"}

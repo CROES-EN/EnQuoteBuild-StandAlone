@@ -20,8 +20,8 @@
 
 import {getQuotes} from "@/api/dataClient";
 
-export const TERMINAL_STATUSES = ["invoice_paid", "scheduled", "rejected", "ho_rejected"];
-export const DEFAULT_COMPLETED_STATUSES = ["invoice_paid", "scheduled"];
+export const TERMINAL_STATUSES = ["invoice_paid", "invoice_paid_materials_required", "materials_pending_shipment", "scheduled", "rejected", "ho_rejected"];
+export const DEFAULT_COMPLETED_STATUSES = ["invoice_paid", "invoice_paid_materials_required", "materials_pending_shipment", "scheduled"];
 
 /**
  * Matches the `is_current_version`/`exclude_from_reporting`/`on_hold` filtering already

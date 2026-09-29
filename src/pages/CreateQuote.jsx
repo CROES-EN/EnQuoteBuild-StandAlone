@@ -239,7 +239,7 @@ function CreateQuoteContent() {
  )}
  </div>
  <div className="text-right ml-4">
- <p className="text-muted-foreground">{item.quantity} Ã— ${item.unit_price.toFixed(2)}</p>
+ <p className="text-muted-foreground">{item.quantity} × ${item.unit_price.toFixed(2)}</p>
  <p className="font-semibold text-foreground">${item.total.toFixed(2)}</p>
  </div>
  </div>

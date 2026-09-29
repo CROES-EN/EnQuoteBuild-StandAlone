@@ -131,9 +131,9 @@ export default function LogFollowUpDialog({ quote, open, onOpenChange, onLogged 
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="yellow">Yellow Ã¢â‚¬â€ Normal</SelectItem>
-                  <SelectItem value="orange">Orange Ã¢â‚¬â€ High</SelectItem>
-                  <SelectItem value="red">Red Ã¢â‚¬â€ Urgent</SelectItem>
+                  <SelectItem value="yellow">Yellow — Normal</SelectItem>
+                  <SelectItem value="orange">Orange — High</SelectItem>
+                  <SelectItem value="red">Red — Urgent</SelectItem>
                 </SelectContent>
               </Select>
             </div>

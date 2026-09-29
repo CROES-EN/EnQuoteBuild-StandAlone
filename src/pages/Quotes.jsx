@@ -40,8 +40,11 @@ const statusFilters = [
   { value: "ho_approved_invoice_required", label: "HO Approved, Invoice Required" },
   { value: "invoiced", label: "Quote Pending Payment" },
   { value: "invoice_paid", label: "Invoice Paid" },
+  { value: "invoice_paid_materials_required", label: "Invoice Paid - Materials Required" },
+  { value: "materials_pending_shipment", label: "Materials Pending Shipment" },
   { value: "scheduled", label: "Scheduled" },
   { value: "ho_rejected", label: "HO Rejected" },
+  { value: "pending_materials", label: "Pending Materials" },
   { value: "on_hold", label: "Boneyard (On Hold)" }
 ];
 

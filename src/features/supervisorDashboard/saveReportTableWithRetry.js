@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Wraps saveReportTable() with automatic retry, specifically for a real, confirmed,
  * intermittent Electron IPC failure ("Error invoking remote method 'collections:create':
  * reply was never sent") that has been observed reproducibly for certain report imports,
@@ -18,11 +18,20 @@ const RETRYABLE_ERROR_PATTERN = /reply was never sent/i;
 const MAX_ATTEMPTS = 4;
 const BASE_DELAY_MS = 500;
 
+// Maps a report type to the column name that uniquely identifies each row, so
+// saveReportTable()'s change-detection can tell "this row changed" apart from "this
+// row was removed and a different one added" - without an entry here, a report type
+// still gets the skip-if-unchanged behavior, just with less precise changed-row counts
+// in the console log. Add more entries here as needed for other report types.
+const REPORT_KEY_FIELDS = {
+  care_subscriptions: "Subscription Id",
+};
+
 export async function saveReportTableWithRetry(reportType, payload) {
   let lastError;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      return await saveReportTable(reportType, payload);
+      return await saveReportTable(reportType, payload, { keyField: REPORT_KEY_FIELDS[reportType] || null });
     } catch (error) {
       lastError = error;
       const isRetryable = RETRYABLE_ERROR_PATTERN.test(error?.message || "");

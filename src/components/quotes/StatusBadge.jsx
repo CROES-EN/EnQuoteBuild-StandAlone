@@ -61,6 +61,18 @@ const statusConfig = {
     dot: "bg-green-500",
     label: "Invoice Paid"
   },
+  invoice_paid_materials_required: {
+    bg: "bg-cyan-50",
+    text: "text-cyan-700",
+    dot: "bg-cyan-500",
+    label: "Invoice Paid - Materials Required"
+  },
+  materials_pending_shipment: {
+    bg: "bg-sky-50",
+    text: "text-sky-700",
+    dot: "bg-sky-500",
+    label: "Materials Pending Shipment"
+  },
   scheduled: {
     bg: "bg-teal-50",
     text: "text-teal-700",
@@ -95,8 +107,24 @@ const statusConfig = {
   }
 };
 
+// FIX: previously fell back to statusConfig.draft for ANY unrecognized status -
+// actively misleading (a real, different status would render looking exactly like
+// a fresh untouched draft). Now generates a neutral, honest label from the raw
+// status text instead of pretending it's something it isn't.
+function humanizeUnknownStatus(status) {
+  return String(status || "unknown")
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
 export default function StatusBadge({ status, size = "default" }) {
-  const config = statusConfig[status] || statusConfig.draft;
+  const config = statusConfig[status] || {
+    bg: "bg-slate-100",
+    text: "text-slate-700",
+    dot: "bg-slate-400",
+    label: humanizeUnknownStatus(status)
+  };
   
   return (
     <span className={cn(

@@ -118,6 +118,70 @@ async function getLocalReportTable(reportType) {
   return all.find((item) => item.id === reportType) ?? null;
 }
 
+// --- Incremental import / change detection ---------------------------------------
+//
+// Cheap, non-cryptographic content hash (this is content-addressing to detect "did
+// this data change", not a security boundary, so a fast hash is fine - no need for
+// node:crypto in this renderer-side module). Object.keys().sort() makes the hash
+// independent of key ordering, so the same row imported twice always hashes the same
+// way even if the source file's column order shifted slightly.
+function hashRow(row) {
+  const sortedKeys = Object.keys(row || {}).sort();
+  const normalized = sortedKeys.map((k) => `${k}=${JSON.stringify(row[k])}`).join("|");
+  let hash = 0;
+  for (let i = 0; i < normalized.length; i++) {
+    hash = (hash * 31 + normalized.charCodeAt(i)) | 0;
+  }
+  return hash;
+}
+
+// Order-independent whole-table hash - sorting the individual row hashes means a
+// re-export with the same rows in a different order still correctly compares as
+// "unchanged", rather than a false "changed" purely from row reordering.
+function hashTable(rows) {
+  const hashes = (Array.isArray(rows) ? rows : []).map(hashRow).sort((a, b) => a - b);
+  return hashes.join(",");
+}
+
+// Informational only (does not affect whether the save happens) - reports how many
+// rows are new/changed/unchanged/removed compared to what's currently stored, so a
+// real import (one that DOES change something) still tells you what changed. When
+// `keyField` is omitted, "changed" rows cannot be distinguished from a
+// remove-and-re-add pair (both show up as new + removed) - pass the report's real
+// unique-id column name (e.g. "Case Number", "Id") for accurate changed-row counts.
+function diffRows(existingRows, incomingRows, keyField = null) {
+  const existing = Array.isArray(existingRows) ? existingRows : [];
+  const incoming = Array.isArray(incomingRows) ? incomingRows : [];
+
+  const keyOf = (row) => (keyField && row?.[keyField] !== undefined && row?.[keyField] !== null)
+    ? `k:${row[keyField]}`
+    : `h:${hashRow(row)}`;
+
+  const existingByKey = new Map(existing.map((row) => [keyOf(row), row]));
+  const incomingByKey = new Map(incoming.map((row) => [keyOf(row), row]));
+
+  let newCount = 0;
+  let changedCount = 0;
+  let unchangedCount = 0;
+
+  for (const [key, row] of incomingByKey) {
+    const prior = existingByKey.get(key);
+    if (!prior) {
+      newCount += 1;
+    } else if (keyField && hashRow(prior) !== hashRow(row)) {
+      changedCount += 1;
+    } else {
+      unchangedCount += 1;
+    }
+  }
+
+  const removedCount = keyField
+    ? [...existingByKey.keys()].filter((key) => !incomingByKey.has(key)).length
+    : Math.max(0, existing.length - incoming.length);
+
+  return { newCount, changedCount, unchangedCount, removedCount };
+}
+
 /**
  * Replaces all rows for a given report type with a fresh import. Uses `reportType` as the
  * record's `id` (one record per report type, same one-record-per-key pattern opsMetricsStore.js
@@ -132,11 +196,27 @@ async function getLocalReportTable(reportType) {
  * @param {string} payload.sourceFileName
  * @param {string} payload.importedAt - ISO timestamp
  */
-export async function saveReportTable(reportType, { columns, rows, sourceFileName, importedAt, importMethod }) {
+export async function saveReportTable(reportType, { columns, rows, sourceFileName, importedAt, importMethod }, options = {}) {
+  const { keyField = null, force = false } = options;
   const record = { id: reportType, reportType, columns, rows, sourceFileName, importedAt, importMethod: importMethod || "manual" };
   const bridge = localBridge();
   const existing = await listLocalOnly();
   const match = existing.find((item) => item.id === reportType);
+
+  // Skip the entire save when this import is byte-for-byte identical to what's
+  // already stored - covers the common "routine/duplicate re-import of the same
+  // export" case, which previously still triggered a full rewrite of the shared
+  // data file every time regardless of whether anything actually changed.
+  if (match && !force) {
+    const existingHash = hashTable(match.rows);
+    const incomingHash = hashTable(rows);
+    if (existingHash === incomingHash) {
+      console.log(`[importedTableStore] "${reportType}": no changes detected in ${Array.isArray(rows) ? rows.length : 0} row(s) - skipping save.`);
+      return match;
+    }
+    const diff = diffRows(match.rows, rows, keyField);
+    console.log(`[importedTableStore] "${reportType}": ${diff.newCount} new, ${diff.changedCount} changed, ${diff.unchangedCount} unchanged, ${diff.removedCount} removed - saving.`);
+  }
 
   if (bridge) {
     if (match) return retryBridgeCall(`collections:update (${reportType})`, () => bridge.update(COLLECTION, reportType, record));

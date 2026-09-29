@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Enphase Care eligibility logic - determines whether a homeowner at a given Enlighten Site ID
  * currently has ACTIVE Enphase Care coverage, based on the imported Care Subscriptions report
  * (Report Data tab, reportType "care_subscriptions"). This is the single source of truth used
@@ -153,6 +153,70 @@ export function groupRealRecordsBySiteId(realRecords) {
 /** Real customer records that have no Site ID at all - needs manual follow-up, never silently dropped. */
 export function findMissingSiteIdRecords(realRecords) {
   return realRecords.filter((row) => !normalize(row[SITE_ID_COLUMN]));
+}
+
+/**
+ * Builds a fast lookup index (Site ID -> that site's real-record history, newest first) from
+ * the full imported Care Subscriptions rows - call this ONCE (e.g. via useMemo keyed on the
+ * rows themselves), not per-row, since it internally re-classifies/re-groups every row. This
+ * is the exact same real-records grouping getEligibilityForSiteId itself uses - kept as a
+ * separate export so a caller checking eligibility for MANY rows in a loop (e.g. every row of
+ * a Workload report) can build the index once and do a cheap Map lookup per row via
+ * getEligibilityFromIndex below, instead of paying the full classify+group cost on every
+ * single row.
+ */
+export function buildCareEligibilityIndex(allCareSubscriptionRows) {
+  const { realRecords } = classifyCareSubscriptionRows(allCareSubscriptionRows || []);
+  return groupRealRecordsBySiteId(realRecords);
+}
+
+/**
+ * Same three-state result (ACTIVE_CARE / NO_ACTIVE_CARE / NOT_FOUND) as
+ * getEligibilityForSiteId, but reads from an already-built index (see
+ * buildCareEligibilityIndex above) instead of re-classifying/re-grouping the full rows list
+ * every call - use this for repeated per-row lookups against the same underlying data.
+ */
+export function getEligibilityFromIndex(siteId, index) {
+  const targetSiteId = normalize(siteId);
+  if (!targetSiteId) {
+    return { status: "NOT_FOUND", reason: "no_site_id_provided", current: null, history: [] };
+  }
+
+  const history = index.get(targetSiteId) || [];
+  if (history.length === 0) {
+    return { status: "NOT_FOUND", reason: "no_subscription_record", current: null, history: [] };
+  }
+
+  const current = history[0];
+  const currentStatus = normalize(current[STATUS_COLUMN]).toUpperCase();
+  const renewalCount = history.length - 1;
+
+  if (currentStatus === ACTIVE_STATUS) {
+    return {
+      status: "ACTIVE_CARE",
+      reason: null,
+      current: {
+        planName: current[PLAN_COLUMN],
+        renewalDate: current[RENEWAL_COLUMN],
+        createdDate: current[CREATED_COLUMN],
+        subscriptionStatus: currentStatus
+      },
+      renewalCount,
+      history
+    };
+  }
+
+  return {
+    status: "NO_ACTIVE_CARE",
+    reason: currentStatus === "EXPIRED" ? "expired" : (currentStatus === "CANCELLED" ? "cancelled" : "inactive"),
+    current: {
+      planName: current[PLAN_COLUMN],
+      subscriptionStatus: currentStatus,
+      createdDate: current[CREATED_COLUMN]
+    },
+    renewalCount,
+    history
+  };
 }
 
 /**

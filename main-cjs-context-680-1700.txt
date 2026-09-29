@@ -874,7 +874,7 @@
  1553:   loadEnvFile();
  1554:   outboundSync = createOutboundSync({
  1555:     repository: quoteRepository, config: {
- 1556:       workerUrl: "https://enquote-sync.croeschberger.workers.dev",
+ 1556:       workerUrl: "https://enphase-enquote.com",
  1557:       outboundToken: process.env.OUTBOUND_TOKEN || "25d7e76f0c6166395868e3ae66c76555e37d7bab27319e30572d2af84ff5a94b"
  1558:     }, onAfterWrite: markOwnWrite
  1559:   });

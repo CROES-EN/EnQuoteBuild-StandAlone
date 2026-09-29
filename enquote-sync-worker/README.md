@@ -50,7 +50,7 @@ Always-on EnQuote ↔ Base44 sync layer on Cloudflare Workers.
    createOutboundSync({
      repository,
      config: {
-       workerUrl: "https://enquote-sync.croeschberger.workers.dev",
+       workerUrl: "https://enphase-enquote.com",
        outboundToken: process.env.OUTBOUND_TOKEN || ""
      },
      onAfterWrite: markOwnWrite

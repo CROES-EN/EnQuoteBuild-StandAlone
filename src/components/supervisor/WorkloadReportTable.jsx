@@ -13,12 +13,15 @@ import {
     Pencil,
     Search,
     Settings2,
+    ShieldCheck,
     User,
     Users
 } from "lucide-react";
 import {cn} from "@/lib/utils";
 import StatusBadge from "@/components/quotes/StatusBadge";
 import {buildQuoteMatchIndex, findMatchingQuotes} from "@/features/supervisorDashboard/quoteMatchLookup";
+import {getReportTable} from "@/features/supervisorDashboard/importedTableStore";
+import {buildCareEligibilityIndex, getEligibilityFromIndex} from "@/features/supervisorDashboard/careEligibility";
 import {
     calcOpenDays,
     getOMStatusBadgeClasses,
@@ -77,6 +80,25 @@ function ColorPill({ classes }) {
         <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", classes.dot)} />
       )}
       {classes.label}
+    </span>
+  );
+}
+
+/** Small emerald pill shown next to a workload row's Enlighten Site ID when that site
+ *  currently has ACTIVE Enphase Care coverage (per careEligibility.js's single source of
+ *  truth - same exclusion/renewal-history rules the Care Data Hygiene report uses, so this
+ *  badge can never disagree with that report). Renders nothing at all for NO_ACTIVE_CARE or
+ *  NOT_FOUND, matching the existing quote-match badge's own "only show when there's something
+ *  real to show" convention. */
+function CareBadge({ eligibility }) {
+  if (!eligibility || eligibility.status !== "ACTIVE_CARE") return null;
+  return (
+    <span
+      title={`Active Enphase Care${eligibility.renewalCount > 0 ? ` (renewed ${eligibility.renewalCount}x)` : ""}`}
+      className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700"
+    >
+      <ShieldCheck className="h-3 w-3" />
+      Care
     </span>
   );
 }
@@ -414,6 +436,37 @@ export default function WorkloadReportTable({ table, onReload, isReloading }) {
     };
   }, []);
   const quoteMatchIndex = useMemo(() => buildQuoteMatchIndex(quotes), [quotes]);
+
+  // Care Subscriptions rows, loaded once for the Enphase Care eligibility badge (per explicit
+  // request) - same load-on-mount/refresh-on-focus pattern as the quotes list above, since a
+  // report re-import could happen while this page stays open. Reuses the exact same stored
+  // data the Care Subscriptions tab and Care Data Hygiene report already read.
+  const [careRows, setCareRows] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    async function loadCareRows() {
+      try {
+        const result = await getReportTable("care_subscriptions");
+        if (!cancelled) setCareRows(Array.isArray(result?.rows) ? result.rows : []);
+      } catch {
+        if (!cancelled) setCareRows([]);
+      }
+    }
+    loadCareRows();
+    function handleVisibility() {
+      if (document.visibilityState === "visible") loadCareRows();
+    }
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("focus", handleVisibility);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("focus", handleVisibility);
+    };
+  }, []);
+  // Built ONCE per careRows change, not per row - see buildCareEligibilityIndex's own comment
+  // in careEligibility.js for why this matters at Care Subscriptions' real row count.
+  const careEligibilityIndex = useMemo(() => buildCareEligibilityIndex(careRows), [careRows]);
 
   // --- Click-and-drag column reordering directly on the table headers, with a sliding
   // (FLIP) animation - per explicit request.
@@ -1123,6 +1176,7 @@ export default function WorkloadReportTable({ table, onReload, isReloading }) {
             {filteredSorted.map(({ row, openDays }, i) => {
               const tile = getTileForRow(row, tiles);
               const quoteMatches = findMatchingQuotes(quoteMatchIndex, row);
+              const careEligibility = getEligibilityFromIndex(row["Enlighten Site ID"], careEligibilityIndex);
               return (
                 <tr
                   key={row["Case ID"] || row["Case Number"] || i}
@@ -1158,6 +1212,11 @@ export default function WorkloadReportTable({ table, onReload, isReloading }) {
                           <ColorPill classes={getOMStatusBadgeClasses(row[col], tile)} />
                         ) : col === "Project Picklist" ? (
                           <ColorPill classes={getProjectPicklistBadgeClasses(row[col])} />
+                        ) : col === "Enlighten Site ID" ? (
+                          <div className="flex items-center gap-1.5">
+                            <span>{row[col] || "--"}</span>
+                            <CareBadge eligibility={careEligibility} />
+                          </div>
                         ) : showQuoteBadge ? (
                           <div className="flex items-center gap-1.5">
                             <span>{row[col] || "--"}</span>

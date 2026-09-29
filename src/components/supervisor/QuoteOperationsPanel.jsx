@@ -179,7 +179,7 @@ export default function QuoteOperationsPanel({
           <StatTile
             label="Unreconciled Quote Requests (approximate)"
             value={intakeGap}
-            helperText="Salesforce Received âˆ’ EnQuote Drafted. Not a true Case Number â†” Quote ID match."
+            helperText="Salesforce Received − EnQuote Drafted. Not a true Case Number ↔ Quote ID match."
           />
         </div>
 

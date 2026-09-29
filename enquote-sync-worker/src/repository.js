@@ -68,3 +68,25 @@ export async function markOutboundStatus(db, itemId, status, extra = {}) {
   values.push(itemId);
   await db.prepare(`UPDATE outbound_items SET ${sets.join(", ")} WHERE id = ?`).bind(...values).run();
 }
+
+// Stage 1 fix (confirmed with Base44): stores a Base44-originated entity
+// change for the desktop app to read later, WITHOUT ever writing back to
+// Base44's own API. This is what stopped the self-triggering loop where a
+// Product edit in Base44 -> pushed back to Base44's API -> Base44 saw it as
+// a new change -> re-triggered the same workflow, endlessly.
+//
+// Upserts by (entity_type, local_id) - a repeated create/update for the same
+// record simply overwrites the stored copy instead of accumulating rows.
+export async function upsertBase44EntityState(db, { entityType, localId, action, record }) {
+  await db
+    .prepare(
+      `INSERT INTO base44_entity_state (entity_type, local_id, action, record_json, origin, synced_at)
+       VALUES (?, ?, ?, ?, 'base44', ?)
+       ON CONFLICT(entity_type, local_id) DO UPDATE SET
+         action = excluded.action,
+         record_json = excluded.record_json,
+         synced_at = excluded.synced_at`
+    )
+    .bind(entityType, localId, action, JSON.stringify(record ?? {}), new Date().toISOString())
+    .run();
+}

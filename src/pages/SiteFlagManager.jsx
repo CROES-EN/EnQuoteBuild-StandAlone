@@ -715,7 +715,7 @@ function SupportInteractionsLog() {
                       repeatCount >= 2 ? "bg-warning/10 text-yellow-700" :
                       "bg-muted text-muted-foreground"
                     )}>
-                        {repeatCount}Ã—
+                        {repeatCount}×
                       </span>
                     </div>
                   </div>);

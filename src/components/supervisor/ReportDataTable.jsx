@@ -1,4 +1,4 @@
-﻿import {useMemo, useState} from "react";
+import {useEffect, useMemo, useState} from "react";
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
 import {Checkbox} from "@/components/ui/checkbox";
@@ -18,6 +18,7 @@ import {
 
 const NONE_VALUE = "__none__";
 const SUMMARY_SLOT_COUNT = 4;
+const PAGE_SIZE = 100;
 
 // Column-name keywords used to guess a reasonable default summary field when no explicit
 // defaultSummaryFields was provided for a report type and the user hasn't customized it yet -
@@ -164,6 +165,12 @@ export default function ReportDataTable({ reportType, table, defaultSummaryField
   const [showFieldConfig, setShowFieldConfig] = useState(false);
   const [detailsRow, setDetailsRow] = useState(null);
   const [, forceRerender] = useState(0);
+  // Only PAGE_SIZE rows are ever mounted into the DOM at once (see paginatedRows below) -
+  // search/sort still run over the FULL dataset, only rendering is limited. Without this,
+  // a 10,000+ row report (e.g. Care Subscriptions) rendered every matching row into the DOM
+  // simultaneously, which is what made the browser's native scrollbar thumb look tiny and
+  // made the whole panel feel sluggish.
+  const [page, setPage] = useState(0);
 
   // `defaultHiddenColumns` (optional) - columns hidden until the user explicitly shows them,
   // e.g. Care Subscriptions' many rarely-needed columns. Report types that don't pass this
@@ -209,6 +216,20 @@ export default function ReportDataTable({ reportType, table, defaultSummaryField
     }
     return rows;
   }, [table, visibleColumns, search, sortColumn, sortDirection]);
+
+  // Whenever the underlying filtered/sorted result set changes (new search term, new sort,
+  // a fresh import, etc.), snap back to page 1 - staying on e.g. page 40 after a search
+  // narrows the results down to 3 rows would silently show "no rows" instead of the matches.
+  useEffect(() => {
+    setPage(0);
+  }, [filteredRows]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+
+  const paginatedRows = useMemo(
+    () => filteredRows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
+    [filteredRows, page]
+  );
 
   function handleToggleColumn(column, visible) {
     setColumnVisibility(reportType, column, visible);
@@ -331,9 +352,9 @@ export default function ReportDataTable({ reportType, table, defaultSummaryField
       )}
 
       <div className="max-h-[32rem] space-y-2 overflow-auto rounded-lg border border-border bg-card p-2">
-        {filteredRows.map((row, i) => (
+        {paginatedRows.map((row, i) => (
           <button
-            key={i}
+            key={page * PAGE_SIZE + i}
             type="button"
             onClick={() => setDetailsRow(row)}
             className="flex w-full items-center justify-between gap-3 rounded-lg border border-border bg-secondary px-3 py-2.5 text-left transition-colors hover:border-indigo-200 hover:bg-indigo-50"
@@ -350,7 +371,7 @@ export default function ReportDataTable({ reportType, table, defaultSummaryField
                     </span>
                   ))
                 ) : (
-                  <span className="truncate text-sm text-muted-foreground">Row {i + 1}</span>
+                  <span className="truncate text-sm text-muted-foreground">Row {page * PAGE_SIZE + i + 1}</span>
                 )}
               </div>
             </div>
@@ -365,6 +386,34 @@ export default function ReportDataTable({ reportType, table, defaultSummaryField
           </div>
         )}
       </div>
+
+      {filteredRows.length > 0 && (
+        <div className="flex items-center justify-between gap-2 px-1 text-xs text-muted-foreground">
+          <span>
+            Showing {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, filteredRows.length)} of{" "}
+            {filteredRows.length} row{filteredRows.length === 1 ? "" : "s"}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+            >
+              Previous
+            </Button>
+            <span>Page {page + 1} of {totalPages}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={page >= totalPages - 1}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
 
       <RowDetailsDialog
         open={Boolean(detailsRow)}

@@ -25,24 +25,24 @@ const productSeed = [
 ];
 const quoteSchema = z.object({
   id: z.string().min(1),
-  quote_number: z.string().optional(),
-  status: z.string().optional(),
-  total: z.number().optional(),
-  is_current_version: z.boolean().optional(),
+  quote_number: z.string().nullable().optional(),
+  status: z.string().nullable().optional(),
+  total: z.number().nullable().optional(),
+  is_current_version: z.boolean().nullable().optional(),
   parent_quote_id: z.string().nullable().optional(),
-  version_number: z.number().optional(),
+  version_number: z.number().nullable().optional(),
   // Local-only optimistic-concurrency counter (NOT the business-facing "version_number"
   // above, which represents resubmitted quote revisions). Bumped on every write that goes
   // through create()/update()/the webhook-import merge, so update() can detect and reject
   // a save based on stale data (e.g. the quote changed via a Base44 import while the Edit
   // Quote form was still open) instead of silently overwriting it. See update() below.
-  _rev: z.number().int().positive().optional()
+  _rev: z.number().int().positive().nullable().optional()
 }).passthrough();
 const updateSchema = z.object({ id: z.string().min(1), changes: z.record(z.unknown()) });
 // "supervisorDailyMetrics" backs the Supervisor Dashboard (Calls/AHT, Emails Worked,
 // Quotes Drafted, Staffing). That dashboard is intentionally independent of Base44, so
 // this collection has no Base44 entity counterpart - it is only ever read/written locally.
-const collectionNames = ["reviews", "activities", "followUps", "users", "siteFlags", "deletionRequests", "materialOrders", "rmas", "svCancels", "supportInteractions", "pdfTemplates", "priceReviews", "followUpConfigs", "pvManufacturers", "supervisorDailyMetrics", "supervisorReportTables", "autoImportSettings", "statusAlertDismissals", "quoteAlerts", "appErrorLog", "appNotifications", "autoDrafterGeneratedDrafts"];
+const collectionNames = ["reviews", "activities", "followUps", "users", "siteFlags", "deletionRequests", "materialOrders", "rmas", "svCancels", "supportInteractions", "pdfTemplates", "priceReviews", "followUpConfigs", "pvManufacturers", "supervisorDailyMetrics", "supervisorReportTables", "autoImportSettings", "statusAlertDismissals", "quoteAlerts", "appErrorLog", "appNotifications", "autoDrafterGeneratedDrafts", "fsts"];
 const collectionDefaults = {
   reviews: [],
   activities: [],
@@ -434,7 +434,7 @@ function repositoryFor(userDataPath) {
       parsed.outboundQueue = Array.isArray(parsed.outboundQueue) ? parsed.outboundQueue : [];
       parsed.outboundDismissalQueue = Array.isArray(parsed.outboundDismissalQueue) ? parsed.outboundDismissalQueue : [];
       parsed.outboundMentionQueue = Array.isArray(parsed.outboundMentionQueue) ? parsed.outboundMentionQueue : [];
-                  collectionNames.forEach(name => { parsed[name] = parsed[name] || structuredClone(collectionDefaults[name]); });
+      collectionNames.forEach(name => { parsed[name] = parsed[name] || structuredClone(collectionDefaults[name]); });
 
       // BUGFIX: this sweep must run AT MOST ONCE, EVER - not on every read() (which
       // happens on nearly every IPC action). Without this completion flag, any account
@@ -524,7 +524,7 @@ function repositoryFor(userDataPath) {
     try {
       JSON.parse(await fs.readFile(tempPath, "utf8"));
     } catch (verifyError) {
-      await fs.rm(tempPath, { force: true }).catch(() => {});
+      await fs.rm(tempPath, { force: true }).catch(() => { });
       throw new Error(`Refused to save - the data failed to verify as valid JSON before writing: ${verifyError.message}`);
     }
     logTiming(`[write-timing] Verify-read took ${Date.now() - __t2}ms`);
@@ -533,7 +533,7 @@ function repositoryFor(userDataPath) {
     // (e.g. OneDrive or antivirus briefly holding a read handle on the live file while
     // scanning/syncing it) is exactly the failure mode confirmed in a real log tonight, and
     // is very often gone within a few hundred milliseconds rather than being permanent.
-    const maxAttempts = 4;
+    const maxAttempts = 6;
     const __t3 = Date.now();
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
@@ -548,13 +548,21 @@ function repositoryFor(userDataPath) {
           logTiming(`[write-timing] ENOENT fallback direct-write, took ${Date.now() - __t0}ms total`);
           return;
         }
-        console.warn(`[write-timing] Rename attempt ${attempt} FAILED (${error.code}): ${error.message}`);
+        logTiming(`[write-timing] Rename attempt ${attempt} FAILED (${error.code}): ${error.message}`);
         if (attempt === maxAttempts) {
-          await fs.rm(tempPath, { force: true }).catch(() => {});
-          console.error(`[write-timing] ALL ${maxAttempts} rename attempts failed, took ${Date.now() - __t3}ms total before giving up.`);
-          throw error;
+          console.warn(`[write-timing] All ${maxAttempts} rename attempts were blocked (${error.code}) - falling back to a direct overwrite instead of failing the save.`);
+          try {
+            await fs.writeFile(dataPath, serialized, "utf8");
+            await fs.rm(tempPath, { force: true }).catch(() => { });
+            logTiming(`[write-timing] Direct-write fallback succeeded, took ${Date.now() - __t0}ms total`);
+            return;
+          } catch (fallbackError) {
+            await fs.rm(tempPath, { force: true }).catch(() => { });
+            console.error(`[write-timing] Direct-write fallback ALSO failed: ${fallbackError.message}`);
+            throw fallbackError;
+          }
         }
-        await new Promise((resolve) => setTimeout(resolve, attempt * 150));
+        await new Promise((resolve) => setTimeout(resolve, Math.min(attempt * 400, 1500)));
       }
     }
   }
@@ -854,6 +862,10 @@ function repositoryFor(userDataPath) {
         // above, per the exact silent-wipe bug already documented in this file for the
         // 3 collections fixed previously.
         autoDrafterGeneratedDrafts: z.array(z.record(z.unknown())).optional(),
+        // fsts: FST roster (name/employee id/shipping+home address/etc.) - added in the
+        // SAME change as collectionNames above, per this file's own documented history of a
+        // silent-data-wipe bug when a collection is added to collectionNames but not here.
+        fsts: z.array(z.record(z.unknown())).optional(),
         userCredentials: z.record(z.unknown()).optional(),
         outboundQueue: z.array(z.record(z.unknown())).optional(),
         meta: z.object({
@@ -938,7 +950,7 @@ function repositoryFor(userDataPath) {
         total: queue.length
       };
     },
-    async listProducts() { return (await read()).products || productSeed; },    async createProduct(record) {
+    async listProducts() { return (await read()).products || productSeed; }, async createProduct(record) {
       const now = new Date().toISOString();
       const product = z.record(z.unknown()).parse({
         created_date: now,
@@ -1176,7 +1188,7 @@ function repositoryFor(userDataPath) {
       const data = await read();
       data.userCredentials = data.userCredentials || {};
 
-            // SECURITY FIX: accounts are no longer auto-provisioned with a shared temporary
+      // SECURITY FIX: accounts are no longer auto-provisioned with a shared temporary
       // password on first login. An admin must explicitly set the account's first
       // temporary password via resetUserPassword() below - first-time setup and
       // password reset are now the same operation.
@@ -1208,7 +1220,7 @@ function repositoryFor(userDataPath) {
         throw new Error("Current password is incorrect.");
       }
 
-            data.userCredentials[key] = {
+      data.userCredentials[key] = {
         ...hashPassword(newPassword),
         mustChangePassword: false,
         updatedAt: new Date().toISOString()

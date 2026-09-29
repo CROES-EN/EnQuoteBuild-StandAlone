@@ -50,10 +50,15 @@ function toRemotePayload(quote) {
 function createOutboundSync({ repository, config, logger = console, onAfterWrite }) {
   const { workerUrl, outboundToken, intervalMs = DEFAULT_INTERVAL_MS } = config || {};
   let running = false;
+  const recentlyNotifiedQuoteIds = new Map();
   let timer = null;
   const isConfigured = Boolean(workerUrl && outboundToken);
-  const enqueueUrl = () => `${String(workerUrl).replace(/\/+$/, "")}/api/outbound/enqueue`;
-  const authHeaders = () => ({ Authorization: `Bearer ${outboundToken}` });
+  const enqueueUrl = () => `${String(workerUrl).replace(/\/+$/, "")}/api/inbound/base44`;
+  const authHeaders = () => ({
+    Authorization: `Bearer ${outboundToken}`,
+    "CF-Access-Client-Id": process.env.CF_ACCESS_CLIENT_ID || "",
+    "CF-Access-Client-Secret": process.env.CF_ACCESS_CLIENT_SECRET || "",
+  });
 
   function buildQuoteMessage(entry) {
     return { entityType: "quote", action: entry.kind, localId: entry.local_id, quote: toRemotePayload(entry.quote),
@@ -90,8 +95,13 @@ function createOutboundSync({ repository, config, logger = console, onAfterWrite
           const result = await sendOne(message);
           results.push(result);
           if (!result.error && entry.quote_number && repository?.createCollectionRecord) {
-            repository.createCollectionRecord("appNotifications", { type: "quote_synced", quoteId: entry.local_id, quoteNumber: entry.quote_number, occurredAt: new Date().toISOString(), read: false }).catch(() => {});
-          }
+const now = Date.now();
+const recentTimestamps = (recentlyNotifiedQuoteIds.get(entry.local_id) || []).filter((t) => now - t < 60000);
+if (recentTimestamps.length === 0) {
+recentlyNotifiedQuoteIds.set(entry.local_id, [...recentTimestamps, now]);
+repository.createCollectionRecord("appNotifications", { type: "quote_synced", quoteId: entry.local_id, quoteNumber: entry.quote_number, occurredAt: new Date().toISOString(), read: false }).catch(() => {});
+}
+}
         } catch (error) { results.push({ local_id: entry.local_id, error: error.message }); }
       }
       if (results.length) await repository.markOutboundSynced(results);
