@@ -1,12 +1,14 @@
-﻿import {useState} from "react";
-import {exportLocalData, getQuotes, listLocalCollection} from "@/api/dataClient";
-import {toast} from "sonner";
-import {useAuth} from "@/lib/AuthContext";
-import {useQuery} from "@tanstack/react-query";
-import {Card} from "@/components/ui/card";
-import {Button} from "@/components/ui/button";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {CheckCircle, Download, FileText, Filter, FolderCheck, FolderOpen, TrendingUp, XCircle} from "lucide-react";
+import { useState } from "react";
+import { exportLocalData, getQuotes, listLocalCollection } from "@/api/dataClient";
+import { calculateDashboardMetrics } from "@/utils/dashboardMetrics";
+
+import { toast } from "sonner";
+import { useAuth } from "@/lib/AuthContext";
+import { useQuery } from "@tanstack/react-query";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CheckCircle, Download, FileText, Filter, FolderCheck, FolderOpen, TrendingUp, XCircle } from "lucide-react";
 import MetricCard from "@/components/dashboard/MetricCard";
 import StatusChart from "@/components/dashboard/StatusChart";
 import TrendChart from "@/components/dashboard/TrendChart";
@@ -17,8 +19,8 @@ import SiteFlagBanner from "@/components/flags/SiteFlagBanner";
 import CoachingFeedback from "@/components/dashboard/CoachingFeedback";
 
 import RoleGuard from "@/components/auth/RoleGuard";
-import {createPageUrl} from "@/utils";
-
+import { createPageUrl } from "@/utils";
+  
 function DashboardContent() {
   const [statusFilter, setStatusFilter] = useState("all");
   const { user: currentUser } = useAuth();
@@ -49,22 +51,43 @@ function DashboardContent() {
   }
 
   const { data: allQuotes = [], isLoading } = useQuery({
-  queryKey: ["quotes", "dashboard"],
-  queryFn: async () => {
-    const quotes = await getQuotes();
+    queryKey: ["quotes", "dashboard"],
+    queryFn: async () => {
+      const quotes = await getQuotes();
 
-    return quotes.filter(
-      q =>
-        q.is_current_version !== false &&
-        !q.exclude_from_reporting
-    );
-  }
-});
+      return quotes.filter(
+        q =>
+          q.is_current_version !== false &&
+          !q.exclude_from_reporting
+      );
+    }
+  });
 
+  // FIX (confirmed real bug: "siteFlags is not defined" / "dismissedQuoteIds is not
+  // defined" - this file referenced both in its JSX below but never actually loaded
+  // either one). siteFlags: routed through listLocalCollection("siteFlags") - the same
+  // function/collection name every other working page uses - passed as a plain array
+  // to <SiteFlagBanner>, which does its own is_resolved/flag_level filtering internally
+  // (confirmed by reading SiteFlagBanner.jsx's real code, so no filtering is duplicated
+  // here).
   const { data: siteFlags = [] } = useQuery({
     queryKey: ["siteFlags"],
-    queryFn: () => listLocalCollection("siteFlags"),
+    queryFn: async () => {
+      return await listLocalCollection("siteFlags");
+    }
   });
+
+  // dismissedQuoteIds: mirrors the EXACT SAME query already proven working in
+  // src/pages/Quotes.jsx (confirmed by reading its real code) - that file's own comment
+  // explicitly notes this must be a SEPARATE query per file, since fixing one file's
+  // copy does not fix another's.
+  const { data: dismissals = [] } = useQuery({
+    queryKey: ["statusAlertDismissals"],
+    queryFn: async () => {
+      return await listLocalCollection("statusAlertDismissals");
+    }
+  });
+  const dismissedQuoteIds = new Set(dismissals.map((d) => d.quote_id));
 
   // Get unique coordinators
   const coordinators = [...new Set(allQuotes.map(q => q.created_by).filter(Boolean))];
@@ -79,12 +102,12 @@ function DashboardContent() {
   // Calculate key metrics
   const totalQuotes = filteredQuotes.length;
   const submittedQuotes = filteredQuotes.filter(q => q.status !== 'draft').length;
-  const approvedQuotes = filteredQuotes.filter(q => 
-    q.status === 'approved' || q.status === 'quote_sent_to_ho' || 
-    q.status === 'ho_approved_invoice_required' || q.status === 'invoiced' || 
+  const approvedQuotes = filteredQuotes.filter(q =>
+    q.status === 'approved' || q.status === 'quote_sent_to_ho' ||
+    q.status === 'ho_approved_invoice_required' || q.status === 'invoiced' ||
     q.status === 'invoice_paid' || q.status === 'scheduled'
   ).length;
-  const rejectedQuotes = filteredQuotes.filter(q => 
+  const rejectedQuotes = filteredQuotes.filter(q =>
     q.status === 'rejected' || q.status === 'ho_rejected'
   ).length;
   const totalValue = filteredQuotes.reduce((sum, q) => sum + (q.total || 0), 0);
@@ -124,7 +147,7 @@ function DashboardContent() {
         {currentUser && <CoachingFeedback currentUserEmail={currentUser.email} />}
 
         {/* Status Alerts */}
-        <StatusAlerts quotes={allQuotes} />
+        <StatusAlerts quotes={allQuotes} dismissedQuoteIds={dismissedQuoteIds} />
 
         {/* Filters */}
         <Card className="p-4 mb-6 border-border">

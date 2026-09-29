@@ -23,7 +23,6 @@ const STATUS_THRESHOLDS = {
   invoiced: 14,
   invoice_paid: 2,
   pending_materials: 10,
-  on_hold: 30
 };
 
 const STATUS_LABELS = {
@@ -107,8 +106,12 @@ export default function StatusAlerts({ quotes }) {
     if (quote.status === "scheduled") return;
     if (quote.status === "on_hold") return;
     if (quote.exclude_from_reporting) return;
-    // HO Rejected quotes with a reason logged are considered handled — don't flag them
-    if (quote.status === "ho_rejected" && quote.ho_rejection_reason && quote.ho_rejection_reason.trim()) return;
+    // Matches Base44's actual live dashboard behavior exactly (confirmed via Base44's
+    // own investigation of its real dashboard code): there is NO reason-based
+    // suppression - every ho_rejected quote is alertable after 5 days regardless of
+    // whether ho_rejection_reason is populated. This is a deliberate parity choice,
+    // not an oversight - do not re-add a reason check without re-confirming against
+    // Base44's actual current dashboard logic first.
 
     // Draft quotes are only flagged if they've been previously submitted — i.e.
     // they went through the approval/review cycle (submitted → rejected/approved/

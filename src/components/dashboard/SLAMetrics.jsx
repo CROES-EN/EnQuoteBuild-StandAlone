@@ -35,14 +35,49 @@ export default function SLAMetrics({ quotes }) {
     ? ((fullyApproved / submittedOrBeyond) * 100).toFixed(1)
     : 0;
 
-  // Calculate average time in each status
+  // Calculate average time in each status using Base44's history reduction logic.
+  // Base44 retains the final history entry plus the first occurrence of each
+  // lifecycle status, then calculates durations between adjacent pairs in
+  // the REDUCED history. This produces different results than raw history.
+  const RETAINED_STATUSES = [
+    "submitted",
+    "approved",
+    "quote_sent_to_ho",
+    "ho_approved_invoice_required",
+    "invoiced",
+    "invoice_paid",
+  ];
+
+  function reduceHistory(statusHistory) {
+    if (!statusHistory || statusHistory.length === 0) return [];
+
+    const reduced = [];
+    const seen = new Set();
+
+    // Keep the final entry
+    reduced.push(statusHistory[statusHistory.length - 1]);
+
+    // Keep the first occurrence of each retained status
+    for (const entry of statusHistory) {
+      if (RETAINED_STATUSES.includes(entry.status) && !seen.has(entry.status)) {
+        reduced.push(entry);
+        seen.add(entry.status);
+      }
+    }
+
+    // Sort chronologically
+    reduced.sort((a, b) => new Date(a.changed_at) - new Date(b.changed_at));
+    return reduced;
+  }
+
   const statusDurations = quotes.reduce((acc, quote) => {
-    if (quote.status_history && quote.status_history.length > 1) {
-      for (let i = 0; i < quote.status_history.length - 1; i++) {
-        const current = quote.status_history[i];
-        const next = quote.status_history[i + 1];
+    const reduced = reduceHistory(quote.status_history);
+    if (reduced.length > 1) {
+      for (let i = 0; i < reduced.length - 1; i++) {
+        const current = reduced[i];
+        const next = reduced[i + 1];
         const duration = differenceInHours(parseISO(next.changed_at), parseISO(current.changed_at));
-        
+
         if (!acc[current.status]) {
           acc[current.status] = { total: 0, count: 0 };
         }
@@ -53,7 +88,7 @@ export default function SLAMetrics({ quotes }) {
     return acc;
   }, {});
 
-  const avgTimeInSubmitted = statusDurations['submitted'] 
+  const avgTimeInSubmitted = statusDurations['submitted']
     ? (statusDurations['submitted'].total / statusDurations['submitted'].count).toFixed(1)
     : 'N/A';
 

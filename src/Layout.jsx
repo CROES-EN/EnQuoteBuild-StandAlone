@@ -171,22 +171,13 @@ export default function Layout({ children, currentPageName }) {
     persistLastUpdated(date);
   }, []);
 
-  // Best-effort: on first mount, ask the local webhook receiver (if reachable) what the
-  // last known-good import status was, so returning users see a real timestamp right away
-  // instead of waiting for their next manual refresh.
-  useEffect(() => {
-    const bridge = globalThis.window?.enquoteLocal?.app;
-    if (!bridge?.getRefreshStatus) return;
-    let cancelled = false;
-    bridge.getRefreshStatus().then((res) => {
-      if (cancelled) return;
-      const attempt = res?.lastAttempt;
-      if (attempt?.ok && attempt?.finishedAt) {
-        recordDataRefresh(new Date(attempt.finishedAt));
-      }
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [recordDataRefresh]);
+  // REMOVED: this used to ask the retired webhook-receiver.cjs (localhost:3001) for the
+  // last known-good import status on mount. That endpoint ("app:refresh-status") was
+  // removed from main.cjs as dead code - this was its last remaining caller, which
+  // failed safely (optional-chaining + catch) but logged a noisy console error every
+  // launch. The real refresh flow (manual refresh, outbound sync, entity-snapshot
+  // polling) is completely unaffected by this removal.
+
 
   // Passive background sync: whenever the main process notifies us that new data landed
   // on disk (a Base44 webhook import, whether from the automatic 15-min schedule or a

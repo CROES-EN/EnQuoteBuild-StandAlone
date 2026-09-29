@@ -37,14 +37,24 @@ async function requestJson(url, { method = "GET", headers = {}, body = null } = 
 async function findExisting(env, quote) {
   const url = entityUrl(env, "Quote");
   const identifiers = [];
-  if (quote.quote_number) identifiers.push({ quote_number: quote.quote_number });
-  identifiers.push({ local_quote_id: quote.id });
+  if (quote.quote_number) identifiers.push({ field: "quote_number", value: quote.quote_number });
+  identifiers.push({ field: "local_quote_id", value: quote.id });
   for (const filter of identifiers) {
-    const q = `${url}?q=${encodeURIComponent(JSON.stringify(filter))}&limit=1`;
+    const q = url + "?q=" + encodeURIComponent(JSON.stringify({ [filter.field]: filter.value })) + "&limit=1";
     const response = await requestJson(q, { headers: authHeaders(env) });
     if (!response.ok) continue;
     const rows = Array.isArray(response.body) ? response.body : response.body?.items;
-    if (Array.isArray(rows) && rows.length > 0 && rows[0]?.id) return String(rows[0].id);
+    if (!Array.isArray(rows) || rows.length === 0 || !rows[0]?.id) continue;
+
+    // VERIFY: the returned record must actually match the search criteria
+    const matched = rows[0];
+    if (filter.field === "quote_number") {
+      if (matched.quote_number !== filter.value) continue;
+    } else if (filter.field === "local_quote_id") {
+      if (matched.local_quote_id !== filter.value) continue;
+    }
+
+    return String(matched.id);
   }
   return null;
 }
@@ -58,7 +68,30 @@ async function fetchRemoteQuote(env, remoteId) {
 
 async function pushCreate(env, item) {
   const existingId = await findExisting(env, item.quote);
-  if (existingId) return { status: "adopted", remote_id: existingId };
+  if (existingId) {
+    // HARDENING FIX (confirmed real bug tonight - two separate quotes each silently
+    // "adopted" a COMPLETELY UNRELATED real Base44 quote's ID): findExisting()'s search
+    // response alone is not trustworthy enough to adopt on - whether Base44's search API
+    // returns wrong results, or the search response's fields don't reflect the real
+    // record, a single search hit must never be treated as confirmed. CONFIRM: the
+    // candidate must be independently re-fetched BY ID and BOTH quote_number and
+    // local_quote_id must match the local quote before it is ever adopted. If the fetch
+    // fails, or either field mismatches, this is NOT a real match - fall through and
+    // create a genuinely new record instead, exactly the safe behavior both false
+    // adoptions tonight should have had.
+    const confirmCheck = await fetchRemoteQuote(env, existingId);
+    if (confirmCheck.ok && confirmCheck.quote) {
+      const confirmedQuoteNumber = confirmCheck.quote.quote_number;
+      const confirmedLocalId = confirmCheck.quote.local_quote_id;
+      const quoteNumberOk = !item.quote.quote_number || confirmedQuoteNumber === item.quote.quote_number;
+      const localIdOk = confirmedLocalId === item.quote.id;
+      if (quoteNumberOk && localIdOk) {
+        return { status: "adopted", remote_id: existingId };
+      }
+      // Candidate failed independent confirmation - do NOT adopt. Fall through to create.
+    }
+    // Fetch failed, or confirmation mismatched - fall through to create a new record.
+  }
   const url = entityUrl(env, "Quote");
   const response = await requestJson(url, { method: "POST", headers: authHeaders(env), body: toRemotePayload(item.quote) });
   if (!response.ok) throw new RetryableError(`create failed: ${response.status}`);

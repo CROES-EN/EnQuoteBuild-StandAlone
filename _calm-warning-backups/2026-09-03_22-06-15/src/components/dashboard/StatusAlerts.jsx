@@ -99,7 +99,6 @@ export default function StatusAlerts({ quotes }) {
     if (quote.status === "on_hold") return;
     if (quote.exclude_from_reporting) return;
     // HO Rejected quotes with a reason logged are considered handled â€” don't flag them
-    if (quote.status === "ho_rejected" && quote.ho_rejection_reason && quote.ho_rejection_reason.trim()) return;
 
     // Draft quotes are only flagged if they've been previously submitted â€” i.e.
     // they went through the approval/review cycle (submitted â†’ rejected/approved/

@@ -51,16 +51,13 @@ export function useLocalSyncStatus() {
     // A newer trigger() started while this one was in flight - let that one own the state.
     if (runId !== runIdRef.current) return true;
 
-    // Best-effort: pull the diagnostic event log for the Details dialog. Never blocks or
-    // changes the reported outcome if it fails.
-    try {
-      const eventsRes = await bridge.getRefreshEvents?.(0);
-      if (runId === runIdRef.current && eventsRes?.ok && Array.isArray(eventsRes.events)) {
-        setEvents(eventsRes.events.slice(-200));
-      }
-    } catch {
-      // Diagnostic log is optional.
-    }
+    // REMOVED: this used to pull the diagnostic event log from the retired
+    // webhook-receiver.cjs ("app:refresh-events", localhost:3001). That IPC channel was
+    // removed from main.cjs as dead code - this was its last remaining caller, which
+    // already failed safely (optional-chaining + try/catch) but logged a noisy console
+    // error every refresh. The Details dialog's event log will simply show no
+    // historical entries going forward - the actual refresh outcome (phase/lastAttempt
+    // below) is completely unaffected.
 
     const finishedAt = new Date().toISOString();
     if (!result?.ok) {

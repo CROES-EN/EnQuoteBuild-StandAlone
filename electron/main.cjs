@@ -885,7 +885,7 @@ let then = whenReady().then(async () => {
                 storedProductCount: Array.isArray(currentData?.products) ? currentData.products.length : 0,
                 lastImportedAt: currentData?.meta?.last_imported_at || null,
                 outboundPending: queueStatus.pending,
-                outboundSynced: queueStatus.synced
+                outboundSync: queueStatus.synced
             };
         } catch (error) {
             console.log('[refresh] Refresh check failed:', error.message);
@@ -893,54 +893,10 @@ let then = whenReady().then(async () => {
         }
     });
 
-    // Powers the refresh progress popup: renderer polls these while a refresh is in flight.
-    ipcMain.handle("app:refresh-status", async () => {
-        const http = require('http');
-        return new Promise((resolve) => {
-            const req = http.request({ hostname: 'localhost', port: 3001, path: '/status', method: 'GET' }, (res) => {
-                let data = '';
-                res.on('data', (chunk) => {
-                    data += chunk;
-                });
-                res.on('end', () => {
-                    try {
-                        resolve(JSON.parse(data));
-                    } catch {
-                        resolve({ ok: false, error: 'Invalid response from webhook receiver' });
-                    }
-                });
-            });
-            req.on('error', (e) => resolve({ ok: false, error: e.message, unreachable: true }));
-            req.end();
-        });
-    });
-
-    ipcMain.handle("app:refresh-events", async (_event, sinceSeq) => {
-        const http = require('http');
-        const qs = sinceSeq ? `?since=${encodeURIComponent(sinceSeq)}` : '';
-        return new Promise((resolve) => {
-            const req = http.request({
-                hostname: 'localhost',
-                port: 3001,
-                path: `/events${qs}`,
-                method: 'GET'
-            }, (res) => {
-                let data = '';
-                res.on('data', (chunk) => {
-                    data += chunk;
-                });
-                res.on('end', () => {
-                    try {
-                        resolve(JSON.parse(data));
-                    } catch {
-                        resolve({ ok: false, error: 'Invalid response from webhook receiver' });
-                    }
-                });
-            });
-            req.on('error', (e) => resolve({ ok: false, error: e.message, unreachable: true }));
-            req.end();
-        });
-    });
+    // REMOVED: "app:refresh-status" / "app:refresh-events" - both only ever talked to the
+    // retired webhook-receiver.cjs on localhost:3001. Confirmed nothing spawns that process
+    // anymore (desktop-dev.cjs only starts Vite + Electron) - these always silently resolved
+    // { ok: false, unreachable: true } since nothing listens on port 3001. Dead code, removed.
 
     quoteRepository = repositoryFor(getPath("userData"));
     console.log('[startup] App userData path (data file location):', getPath("userData"));
@@ -1474,7 +1430,7 @@ let then = whenReady().then(async () => {
                 path: `${url.pathname}${url.search}`,
                 method: "GET",
                 headers: {
-                    "Authorization": `Bearer ${remoteConfig.secret || ""}`,
+                    "Authorization": `Bearer ${secret || ""}`, // FIX: was "remoteConfig.secret" - remoteConfig is not in scope here, only the "secret" parameter is. This threw ReferenceError on every call, breaking "Who's Online" entirely.
                     "CF-Access-Client-Id": process.env.CF_ACCESS_CLIENT_ID || "",
                     "CF-Access-Client-Secret": process.env.CF_ACCESS_CLIENT_SECRET || ""
                 }
@@ -1888,8 +1844,12 @@ let then = whenReady().then(async () => {
                 const match = (existing || []).find((rec) => rec?.base44_id === entity.localId);
                 try {
                     if (match) {
-                        const incomingUpdatedAt = payload.updated_date ? new Date(payload.updated_date).getTime() : 0;
-                        const existingUpdatedAt = match.updated_date ? new Date(match.updated_date).getTime() : 0;
+                        // CONSISTENCY FIX: uses the same getLatestStatusChangeTime() helper already
+                        // fixed for Quotes above, instead of the old payload.updated_date-only check -
+                        // so every synced entity type (MaterialOrder, SiteFlag, etc.) benefits from the
+                        // same status_history fallback if its own updated_date is ever missing too.
+                        const incomingUpdatedAt = getLatestStatusChangeTime(payload);
+                        const existingUpdatedAt = getLatestStatusChangeTime(match);
                         if (incomingUpdatedAt > existingUpdatedAt) {
                             await quoteRepository.updateCollectionRecord(collectionName, match.id, payload);
                             updatedCount += 1;
