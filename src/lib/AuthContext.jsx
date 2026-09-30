@@ -99,10 +99,33 @@ const AuthProvider = ({children}) => {
   // Local (email/password) login state - only meaningful when isLocalDemo && the Electron
   // auth bridge exists.
   const [needsLocalLogin, setNeedsLocalLogin] = useState(false);
+  // Cloudflare Access's verified identity (set once, on mount, from the main process -
+  // never editable by the renderer) and whether this verified email has NO EnQuote
+  // account yet (first-time self-service setup) vs. an existing one (normal login).
+  const [verifiedEmail, setVerifiedEmail] = useState(null);
+  const [needsAccountCreation, setNeedsAccountCreation] = useState(false);
   // { email, password } once sign-in succeeds with the temporary password, held only in
   // memory (never persisted) until the new password is saved.
   const [pendingPasswordChange, setPendingPasswordChange] = useState(null);
   const isLocalAuthActive = isLocalDemo && !!getLocalAuthBridge();
+
+  // On mount, read the Cloudflare-verified identity (main-process memory, set by the
+  // startup gate BEFORE this window was ever shown - never trust anything else as proof
+  // of identity here) and check whether an EnQuote account already exists for it.
+  useEffect(() => {
+    const authBridge = getLocalAuthBridge();
+    if (!authBridge?.getVerifiedIdentity) return;
+    let cancelled = false;
+    (async () => {
+      const identity = await authBridge.getVerifiedIdentity().catch(() => null);
+      if (cancelled || !identity?.email) return;
+      setVerifiedEmail(identity.email);
+      const exists = await authBridge.hasAccount?.(identity.email).catch(() => true);
+      if (cancelled) return;
+      setNeedsAccountCreation(exists === false);
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Remote shared-sync auto-configuration: replaces manually creating
   // remote-sync-config.json on every teammate's machine. See main.cjs's
@@ -421,6 +444,23 @@ const AuthProvider = ({children}) => {
 
   // Called from the "set your new password" step that follows a temporary-password sign-in.
   // Same IPC-error cleanup as login() above, for consistency (e.g. a wrong current password).
+  // First-time self-service account setup (per explicit request: skip the admin-generated
+  // temp password entirely for a Cloudflare-verified, already-recognized EnQuote user).
+  // Mirrors completePasswordChange's exact structure/error-cleanup below.
+  const createAccount = useCallback(async (newPassword) => {
+    const authBridge = getLocalAuthBridge();
+    if (!authBridge?.provisionNewAccount || !verifiedEmail) {
+      throw new Error("Verify your identity again before creating a password.");
+    }
+    try {
+      await authBridge.provisionNewAccount(verifiedEmail, newPassword);
+    } catch (error) {
+      throw new Error(cleanIpcErrorMessage(error?.message) || "Could not create your account.");
+    }
+    setNeedsAccountCreation(false);
+    await activateUser(verifiedEmail);
+  }, [verifiedEmail, activateUser]);
+
   const completePasswordChange = useCallback(async (newPassword) => {
     const authBridge = getLocalAuthBridge();
     if (!authBridge || !pendingPasswordChange) {
@@ -455,6 +495,9 @@ const AuthProvider = ({children}) => {
     isLocalAuthActive,
     login,
     completePasswordChange,
+    verifiedEmail,
+    needsAccountCreation,
+    createAccount,
     needsRemoteSyncSecret,
     remoteSyncPromptUrl,
     clearRemoteSyncPrompt
@@ -473,6 +516,9 @@ const AuthProvider = ({children}) => {
     isLocalAuthActive,
     login,
     completePasswordChange,
+    verifiedEmail,
+    needsAccountCreation,
+    createAccount,
     needsRemoteSyncSecret,
     remoteSyncPromptUrl,
     clearRemoteSyncPrompt

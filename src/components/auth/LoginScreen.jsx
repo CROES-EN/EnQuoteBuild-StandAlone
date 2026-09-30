@@ -219,6 +219,78 @@ function CredentialsStep({ onError }) {
  );
 }
 
+// First-time-only setup screen: shown ONLY when a Cloudflare-verified email has NO
+// existing EnQuote account yet (needsAccountCreation). Once this succeeds, the account
+// exists permanently - any LATER "forgot password" situation goes through the existing,
+// unchanged admin-driven resetUserPassword flow (NewPasswordStep below), never this one
+// again for that email.
+function CreateAccountStep({ onError }) {
+  const { verifiedEmail, createAccount } = useAuth();
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    onError("");
+    if (newPassword.length < 4) {
+      onError("Choose a password with at least 4 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      onError("Passwords don't match.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await createAccount(newPassword);
+    } catch (error) {
+      onError(error?.message || "Could not create your account.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <Card className="max-w-md w-full p-8">
+      <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-100 flex items-center justify-center">
+        <ShieldCheck className="w-8 h-8 text-emerald-600" />
+      </div>
+      <h2 className="text-2xl font-bold text-foreground mb-2 text-center">Welcome to EnQuote</h2>
+      <p className="text-muted-foreground mb-6 text-center text-sm">
+        Signed in as <strong>{verifiedEmail}</strong>. Choose a password to finish setting up your account.
+      </p>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="create-password">Password</Label>
+          <Input
+            id="create-password"
+            type="password"
+            value={newPassword}
+            onChange={(event) => setNewPassword(event.target.value)}
+            autoFocus
+            required
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="create-confirm-password">Confirm password</Label>
+          <Input
+            id="create-confirm-password"
+            type="password"
+            value={confirmPassword}
+            onChange={(event) => setConfirmPassword(event.target.value)}
+            required
+          />
+        </div>
+        <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700" disabled={isSubmitting}>
+          {isSubmitting ? "Creating account..." : "Create Account"}
+        </Button>
+      </form>
+    </Card>
+  );
+}
+
 function NewPasswordStep({ onError }) {
  const { pendingPasswordChange, completePasswordChange } = useAuth();
  const [newPassword, setNewPassword] = useState("");
@@ -310,7 +382,7 @@ function ErrorBanner({ message }) {
 }
 
 export default function LoginScreen() {
- const { pendingPasswordChange } = useAuth();
+ const { pendingPasswordChange, needsAccountCreation } = useAuth();
  const [error, setError] = useState("");
 
  return (
@@ -318,7 +390,9 @@ export default function LoginScreen() {
  <AppVersionBadge />
  <div className="w-full flex flex-col items-center">
  <ErrorBanner message={error} />
- {pendingPasswordChange ? (
+ {needsAccountCreation ? (
+ <CreateAccountStep onError={setError} />
+ ) : pendingPasswordChange ? (
  <NewPasswordStep onError={setError} />
  ) : (
  <CredentialsStep onError={setError} />

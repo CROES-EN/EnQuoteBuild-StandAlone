@@ -1206,6 +1206,57 @@ function repositoryFor(userDataPath) {
     // Replaces a temporary/existing password with a new one the account holder chose. The
     // current password must still verify correctly first (defense in depth - the renderer
     // only calls this right after a successful login, but this must not just trust it).
+    // Checks whether ANY credential (temp or real) already exists for this email - used
+    // by the renderer, right after Cloudflare verification, to decide whether to show the
+    // normal password login vs. the new "create your password" first-time setup screen.
+    async hasAccount(email) {
+      const data = await read();
+      const key = normalizeEmail(email);
+      return Boolean(key && data.userCredentials && data.userCredentials[key]);
+    },
+    // Self-service first-time account setup: lets a user who has ALREADY been verified by
+    // Cloudflare Access choose their own password directly, with NO admin-generated temp
+    // password step. Reuses the EXACT SAME known-user gate as resetUserPassword()
+    // (KNOWN_ENQUOTE_USERS + the locally-synced Base44 users collection) - only emails
+    // already recognized for EnQuote access can self-provision this way; this is not an
+    // open "anyone who passes Cloudflare gets an account" door.
+    async provisionNewAccount(email, newPassword) {
+      const data = await read();
+      const key = normalizeEmail(email);
+      if (!key) throw new Error("A valid email is required.");
+      if (!newPassword || String(newPassword).length < 4) {
+        throw new Error("Choose a password with at least 4 characters.");
+      }
+
+      const isKnownAccount =
+        KNOWN_ENQUOTE_USERS.some(candidate => normalizeEmail(candidate.email) === key) ||
+        (data.users || []).some(candidate => normalizeEmail(candidate.email) === key);
+      if (!isKnownAccount) {
+        throw new Error("This email isn't registered for EnQuote access.");
+      }
+
+      data.userCredentials = data.userCredentials || {};
+      if (data.userCredentials[key]) {
+        throw new Error("An account already exists for this email - please sign in instead.");
+      }
+
+      data.userCredentials[key] = {
+        ...hashPassword(newPassword),
+        mustChangePassword: false,
+        updatedAt: new Date().toISOString()
+      };
+
+      data.passwordResetAudit = Array.isArray(data.passwordResetAudit) ? data.passwordResetAudit : [];
+      data.passwordResetAudit.push({
+        id: makeId("pwreset"),
+        targetEmail: key,
+        resetBy: "self-service-cloudflare-verified",
+        at: new Date().toISOString()
+      });
+
+      await write(data);
+      return { email: key };
+    },
     async setPassword(email, currentPassword, newPassword) {
       const key = normalizeEmail(email);
       if (!key) throw new Error("Choose your account first.");

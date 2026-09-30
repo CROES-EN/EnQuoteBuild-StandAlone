@@ -56,6 +56,9 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
   },
     auth: {
     login: (email, password) => invoke("auth:login", email, password),
+    hasAccount: (email) => invoke("auth:hasAccount", email),
+    provisionNewAccount: (email, newPassword) => invoke("auth:provisionNewAccount", email, newPassword),
+    getVerifiedIdentity: () => invoke("auth:getVerifiedIdentity"),
     setPassword: (email, currentPassword, newPassword) => invoke("auth:setPassword", email, currentPassword, newPassword),
     // Admin-only: the actual admin-status check happens on the main-process side
     // (repository.cjs's resetUserPassword re-verifies app_role === "admin" against the

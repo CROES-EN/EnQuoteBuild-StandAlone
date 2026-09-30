@@ -3,6 +3,7 @@ import { handleSnapshot } from "./snapshot.js";
 import { handleSnapshotMeta } from "./snapshot-meta.js";
 import { handleInboundBase44 } from "./inbound.js";
 import { handleEntitySnapshot } from "./entity-snapshot.js";
+import { handleAuthSession } from "./auth-session.js";
 import { handleEnqueue } from "./outbound.js";
 import { handleStatus } from "./status.js";
 import { pushToBase44 } from "./pusher.js";
@@ -20,6 +21,7 @@ export default {
     if (url.pathname === "/api/inbound/base44" && request.method === "POST") return handleInboundBase44(request, env);
     if (url.pathname === "/api/base44/webhook/entity-snapshot" && request.method === "GET") return handleEntitySnapshot(request, env);
     if (url.pathname === "/api/outbound/status" && request.method === "GET") return handleStatus(request, env);
+    if (url.pathname === "/auth/session" && request.method === "GET") return handleAuthSession(request);
     return json({ error: "not_found" }, 404);
   },
   async queue(batch, env) {

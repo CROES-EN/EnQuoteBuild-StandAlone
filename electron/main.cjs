@@ -17,6 +17,7 @@ const { repositoryFor } = require("./repository.cjs");
 const { createOutboundSync } = require("./outboundSync.cjs");
 const { openSalesforceReportWindow, closeSalesforceReportWindow } = require("./salesforceImport.cjs");
 const { analyzeAll } = require("./diagnosticReportAnalyzer.cjs");
+const { verifyCloudflareSession, openCloudflareAuthWindow, setVerifiedIdentity, getVerifiedIdentity, clearCloudflareSession, reauthenticate: reauthenticateCloudflare } = require("./cloudflareAuth.cjs");
 
 // Loads key=value pairs from an optional .env next to the app so the outbound
 // Base44 credentials never have to be baked into the bundle.
@@ -614,7 +615,16 @@ async function runStartupUpdateCheck() {
 
 let mainWindow;
 
+// FIX (confirmed real bug tonight): the Cloudflare auth gate's hidden verification
+// window is, before createWindow() first runs, the ONLY window in existence - so
+// destroying it fires window-all-closed, which used to unconditionally quit() on
+// Windows/Linux, tearing down the app mid-startup. This flag lets window-all-closed
+// tell the difference between "our hidden verification window closed" (false alarm,
+// before this flag is set) and "the user actually closed the real app" (after).
+let mainWindowHasBeenCreated = false;
+
 function createWindow() {
+    mainWindowHasBeenCreated = true;
     mainWindow = new BrowserWindow({
         width: 1500,
         height: 960,
@@ -1137,6 +1147,9 @@ let then = whenReady().then(async () => {
         return { ok: true, files };
     });
     ipcMain.handle("auth:login", (_event, email, password) => ownWrite(quoteRepository.login)(email, password));
+    ipcMain.handle("auth:hasAccount", (_event, email) => quoteRepository.hasAccount(email));
+    ipcMain.handle("auth:provisionNewAccount", (_event, email, newPassword) => ownWrite(quoteRepository.provisionNewAccount)(email, newPassword));
+    ipcMain.handle("auth:getVerifiedIdentity", () => getVerifiedIdentity());
     ipcMain.handle("auth:setPassword", (_event, email, currentPassword, newPassword) => ownWrite(quoteRepository.setPassword)(email, currentPassword, newPassword));
     // Admin-only: resets (or first-time provisions) a user's local password. The caller's
     // admin status is re-verified INSIDE resetUserPassword() itself (against the locally-
@@ -1989,6 +2002,18 @@ let then = whenReady().then(async () => {
         markOwnWrite();
         return result;
     });
+        // Cloudflare Access identity handlers (v1.1.4, spec Part 7) - the renderer never
+    // reaches into cloudflareAuth.cjs directly, only through these narrow IPC channels.
+    ipcMain.handle("cloudflareAuth:getVerifiedIdentity", () => getVerifiedIdentity());
+    ipcMain.handle("cloudflareAuth:reauthenticate", async () => {
+        const result = await reauthenticateCloudflare();
+        if (result.authenticated) setVerifiedIdentity({ email: result.email });
+        return result;
+    });
+    ipcMain.handle("cloudflareAuth:signOutEverywhere", async () => {
+        await clearCloudflareSession();
+        return { ok: true };
+    });
     ipcMain.handle("sync:outboundStatus", async () => ({
         ...(await quoteRepository.getOutboundQueueStatus()),
         configured: outboundSync.isConfigured
@@ -1996,16 +2021,83 @@ let then = whenReady().then(async () => {
 
     await runStartupUpdateCheck();
 
-    createWindow();
+    // --- Cloudflare Access cold-start authentication gate (v1.1.4, spec Part 5) ---
+    //
+    // Revalidates the Cloudflare session LIVE on every cold start (never trusts a
+    // cached/local value - spec Part 20's explicit requirement). The main EnQuote window
+    // is only ever created AFTER a verified identity is confirmed, so the existing
+    // password-only EnQuote login screen can never appear without a live Cloudflare
+    // check having already succeeded.
+    async function runCloudflareAuthGate() {
+        const initialCheck = await verifyCloudflareSession();
+        if (initialCheck.authenticated) {
+            setVerifiedIdentity({ email: initialCheck.email });
+            createWindow();
+            return;
+        }
+
+        // Not yet verified (or session expired) - open the embedded auth window and wait
+        // for it to resolve. openCloudflareAuthWindow() ALWAYS resolves (never hangs) -
+        // either with a real verified identity, or a reason the flow didn't complete
+        // (window closed by the user, network error, access denied, etc).
+        const authResult = await openCloudflareAuthWindow();
+        if (authResult.authenticated) {
+            setVerifiedIdentity({ email: authResult.email });
+            createWindow();
+            return;
+        }
+
+        // Authentication did not complete - per spec Part 5 requirement #6, do NOT leave
+        // the process running invisibly. Quit cleanly rather than silently doing nothing.
+        console.log(`[cloudflare-auth] Startup gate did not complete (reason: ${authResult.reason || "unknown"}) - exiting.`);
+        quit();
+    }
+
+    // KILL SWITCH (temporary - see Patch-AddCloudflareAuthKillSwitch.ps1): the Cloudflare
+    // Access session-verification step is CONFIRMED BROKEN as of this commit (a real,
+    // valid Access session's own cookies are not being honored on repeat verification,
+    // root cause still under investigation with Cloudflare). Gating this feature entirely
+    // behind an opt-in environment variable means this code can safely exist in master
+    // and ship in a real build WITHOUT locking every user out of the app - the default
+    // (variable unset) behaves EXACTLY like v1.1.3, calling createWindow() directly.
+    // REMOVE this kill switch entirely (not just flip it on) once the real fix is
+    // confirmed working end-to-end.
+    const CLOUDFLARE_AUTH_ENABLED = process.env.ENQUOTE_ENABLE_CLOUDFLARE_AUTH === "true";
+
+    if (CLOUDFLARE_AUTH_ENABLED) {
+        await runCloudflareAuthGate();
+    } else {
+        console.log("[cloudflare-auth] Feature disabled (ENQUOTE_ENABLE_CLOUDFLARE_AUTH not set) - skipping gate, behaving as v1.1.3.");
+        createWindow();
+    }
 
     on("activate", () => {
         if (BrowserWindow.getAllWindows().length === 0) {
-            createWindow();
+            if (!CLOUDFLARE_AUTH_ENABLED) {
+                createWindow();
+                return;
+            }
+            // Same gate applies on a second "activate" trigger (e.g. dock icon on macOS,
+            // or Windows launched again with no window open) - per spec Part 5 requirement
+            // #7, installer/Start-menu/second launches all follow the identical rule.
+            if (getVerifiedIdentity()) {
+                createWindow();
+            } else {
+                runCloudflareAuthGate().catch((error) => {
+                    console.error("[cloudflare-auth] Re-gate on activate failed:", error.message);
+                });
+            }
         }
     });
 });
 
 on("window-all-closed", () => {
+    // See mainWindowHasBeenCreated's definition above createWindow() - before the real
+    // main window has ever been created, a "window-all-closed" event can only mean the
+    // Cloudflare auth gate's hidden verification window just closed, NOT that the user
+    // closed the real app. Ignore it in that case; the auth gate itself is responsible
+    // for quitting cleanly if authentication genuinely fails (see runCloudflareAuthGate).
+    if (!mainWindowHasBeenCreated) return;
     if (process.platform !== "darwin") {
         quit();
     }
