@@ -186,13 +186,52 @@ const AuthProvider = ({children}) => {
 
   // Loads the live synced users list (if any) to find the full record for the signed-in
   // email, then activates it as the current session user.
-  const activateUser = useCallback(async (email) => {
+  // FIX (confirmed real bug - Denice's infinite "Setting up your account..." spinner):
+  // RoleGuard.jsx's auto-retry mechanism needs a way to re-fetch this user's Base44 role
+  // record WITHOUT going through the full sign-in flow (activateUser() also resets
+  // isAuthenticated/needsLocalLogin/etc., which would be wrong to do mid-session just to
+  // check for an updated role). This does the SAME core lookup - re-fetch getUsers(),
+  // rebuild the user record - but ONLY updates `user`, nothing else about the session.
+  const refreshLocalUser = useCallback(async () => {
+    if (!user?.email) return;
     let record = null;
     try {
-      const users = await getUsers();
+      const users = await Promise.race([
+        getUsers(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("getUsers timed out")), 5000))
+      ]);
+      record = (users || []).find((candidate) => candidate.email?.toLowerCase() === user.email.toLowerCase()) || null;
+    } catch (error) {
+      console.warn('[Local Auth] refreshLocalUser could not load synced users list (or timed out):', error?.message || error);
+      return;
+    }
+    if (record) {
+      setUser(buildUserFromRecord(record, user.email));
+    }
+  }, [user]);
+
+  const activateUser = useCallback(async (email) => {
+    let record = null;
+    // FIX (confirmed real bug via live tester feedback - Denice's account hung forever on
+    // "Setting up your account..."): the ORIGINAL try/catch below only protects against a
+    // REJECTED getUsers() promise - not one that simply never resolves at all. If it hangs
+    // (a slow first Base44 sync, a locked local data file, etc.), setUser()/
+    // setIsAuthenticated() further below never run, leaving the user permanently stuck with
+    // no way to recover short of force-quitting. A hard timeout guarantees activateUser()
+    // ALWAYS completes within ACTIVATE_USER_TIMEOUT_MS, falling back to record=null (the
+    // exact same fallback already used for a genuine error) if getUsers() is too slow - the
+    // user still gets signed in and using the app; their display name/role simply
+    // populates a moment later via the normal background refetch (RoleGuard's own
+    // already-fixed mechanism), rather than blocking sign-in entirely.
+    const ACTIVATE_USER_TIMEOUT_MS = 5000;
+    try {
+      const users = await Promise.race([
+        getUsers(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("getUsers timed out")), ACTIVATE_USER_TIMEOUT_MS))
+      ]);
       record = (users || []).find((candidate) => candidate.email?.toLowerCase() === email.toLowerCase()) || null;
     } catch (error) {
-      console.warn('[Local Auth] Could not load synced users list:', error?.message || error);
+      console.warn('[Local Auth] Could not load synced users list (or timed out):', error?.message || error);
     }
 
     setUser(buildUserFromRecord(record, email));
@@ -498,6 +537,7 @@ const AuthProvider = ({children}) => {
     verifiedEmail,
     needsAccountCreation,
     createAccount,
+    refreshLocalUser,
     needsRemoteSyncSecret,
     remoteSyncPromptUrl,
     clearRemoteSyncPrompt
@@ -519,6 +559,7 @@ const AuthProvider = ({children}) => {
     verifiedEmail,
     needsAccountCreation,
     createAccount,
+    refreshLocalUser,
     needsRemoteSyncSecret,
     remoteSyncPromptUrl,
     clearRemoteSyncPrompt

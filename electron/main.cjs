@@ -2053,33 +2053,16 @@ let then = whenReady().then(async () => {
         quit();
     }
 
-    // KILL SWITCH (temporary - see Patch-AddCloudflareAuthKillSwitch.ps1): the Cloudflare
-    // Access session-verification step is CONFIRMED BROKEN as of this commit (a real,
-    // valid Access session's own cookies are not being honored on repeat verification,
-    // root cause still under investigation with Cloudflare). Gating this feature entirely
-    // behind an opt-in environment variable means this code can safely exist in master
-    // and ship in a real build WITHOUT locking every user out of the app - the default
-    // (variable unset) behaves EXACTLY like v1.1.3, calling createWindow() directly.
-    // REMOVE this kill switch entirely (not just flip it on) once the real fix is
-    // confirmed working end-to-end.
-    const CLOUDFLARE_AUTH_ENABLED = process.env.ENQUOTE_ENABLE_CLOUDFLARE_AUTH === "true";
-
-    if (CLOUDFLARE_AUTH_ENABLED) {
-        await runCloudflareAuthGate();
-    } else {
-        console.log("[cloudflare-auth] Feature disabled (ENQUOTE_ENABLE_CLOUDFLARE_AUTH not set) - skipping gate, behaving as v1.1.3.");
-        createWindow();
-    }
+    // Cloudflare Access two-stage sign-in - now the REAL, ACTIVE default for every user
+    // (confirmed working end-to-end: hidden-window verification, JWT validation via the
+    // Worker, binding cookie disabled on the Access Application, real close-and-reopen
+    // test passed with no re-prompt within the session's ~7-day validity window).
+    await runCloudflareAuthGate();
 
     on("activate", () => {
         if (BrowserWindow.getAllWindows().length === 0) {
-            if (!CLOUDFLARE_AUTH_ENABLED) {
-                createWindow();
-                return;
-            }
-            // Same gate applies on a second "activate" trigger (e.g. dock icon on macOS,
-            // or Windows launched again with no window open) - per spec Part 5 requirement
-            // #7, installer/Start-menu/second launches all follow the identical rule.
+            // Per spec Part 5 requirement #7 - installer/Start-menu/second launches all
+            // follow the identical rule as the initial launch.
             if (getVerifiedIdentity()) {
                 createWindow();
             } else {

@@ -41,7 +41,7 @@ function AppVersionBadge() {
 }
 
 function useCurrentUserQuery() {
- const { isAuthenticated, user: authUser, navigateToLogin } = useAuth();
+ const { isAuthenticated, user: authUser, navigateToLogin, refreshLocalUser } = useAuth();
  const hasLoadedOnceRef = useRef(false);
 
  const { data: queriedUser, isLoading: queryLoading, isFetching, isError, refetch: refetchUser } = useQuery({
@@ -75,7 +75,13 @@ function useCurrentUserQuery() {
  const isBackgroundRefetch = hasLoadedOnceRef.current && (isLocalDemo ? false : isFetching);
 
  const needsLogin = !isLocalDemo && !isFirstLoad && (isError || !user);
-  return { user, isLoading: isFirstLoad, isBackgroundRefetch, needsLogin, navigateToLogin, refetchUser };
+  // FIX (confirmed real bug): refetchUser (React Query's refetch) is a SILENT NO-OP in
+  // local mode, since this query is `enabled: !isLocalDemo` - calling it never actually
+  // re-fetches anything, which is why the auto-retry below used to hang forever instead
+  // of ever reaching "Role Not Assigned". In local mode, use the REAL local refresh
+  // (refreshLocalUser) instead; in remote/Base44 mode, keep using the original refetchUser.
+  const realRefetch = isLocalDemo ? refreshLocalUser : refetchUser;
+  return { user, isLoading: isFirstLoad, isBackgroundRefetch, needsLogin, navigateToLogin, refetchUser: realRefetch };
 }
 
 function LoadingScreen() {
