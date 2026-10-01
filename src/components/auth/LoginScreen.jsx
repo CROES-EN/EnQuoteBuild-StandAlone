@@ -7,7 +7,7 @@ import {Card} from "@/components/ui/card";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {Label} from "@/components/ui/label";
-import {ChevronDown, KeyRound, Lock, LogIn, ShieldCheck} from "lucide-react";
+import {ChevronDown, Eye, EyeOff, KeyRound, Lock, LogIn, ShieldCheck} from "lucide-react";
 import appPackage from "../../../package.json";
 
 const appVersion = appPackage?.version || "0.0.0";

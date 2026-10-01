@@ -5,38 +5,14 @@ import { json } from "./util.js";
 const TEAM_DOMAIN = "https://boise-enphase-om.cloudflareaccess.com";
 const POLICY_AUD = "c656512e6473639baedf21ec09682fd2e634ab018020ad16c933f8ee367880e4";
 
-// Defense-in-depth allow-list, mirroring the Access policy's own email list -
-// keep this in sync with the real Access policy (Zero Trust dashboard).
-const ALLOWED_EMAILS = new Set([
-  "jwood@enphaseenergy.com",
-  "mjb@enphaseenergy.com",
-  "aschilling@enphaseenergy.com",
-  "nchoudhary@enphaseenergy.com",
-  "dtorchy@enphaseenergy.com",
-  "cmckenna@enphaseenergy.com",
-  "hmackey@enphaseenergy.com",
-  "bkittelmann@enphaseenergy.com",
-  "smosley@enphaseenergy.com",
-  "croeschberger@enphaseenergy.com",
-  "mkuriakose@enphaseenergy.com",
-  "shawkins@enphaseenergy.com",
-  "clmorrow@enphaseenergy.com",
-  "jlasley@enphaseenergy.com",
-  "dudavis@enphaseenergy.com",
-  "abermudez@enphaseenergy.com",
-  "sfrederick@enphaseenergy.com",
-  "cwilson@enphaseenergy.com",
-  "vseganos@enphaseenergy.com",
-  "khaumann@enphaseenergy.com",
-  "dankenman@enphaseenergy.com",
-  "ajennings@enphaseenergy.com",
-  "mmccullough@enphaseenergy.com",
-  "jbarron@enphaseenergy.com",
-  "jcarpenetti@enphaseenergy.com",
-  "semani@enphaseenergy.com",
-  "isison@enphaseenergy.com",
-  "asharma@enphaseenergy.com",
-]);
+// Defense-in-depth allow-list - moved to a Cloudflare Worker secret
+// (ALLOWED_EMAILS_LIST) so it never sits in plaintext in git. Same values,
+// same check, same behavior as before - only the storage location changed.
+// To update the list: npx wrangler secret put ALLOWED_EMAILS_LIST
+function getAllowedEmails(env) {
+  const raw = env.ALLOWED_EMAILS_LIST || "";
+  return new Set(raw.split(",").map((e) => e.trim().toLowerCase()).filter(Boolean));
+}
 
 // JWKS endpoint - Access publishes its public signing keys here. createRemoteJWKSet
 // caches keys internally and handles rotation automatically - no manual key management
@@ -73,7 +49,7 @@ async function validateAccessJwt(token) {
  * on any failure - callers just need to check `.ok` and use `.status`/`.reason`
  * directly in their own response.
  */
-async function verifyRequestIdentity(request) {
+async function verifyRequestIdentity(request, env) {
   const jwt =
     request.headers.get("cf-access-jwt-assertion") ||
     request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ||
@@ -99,7 +75,8 @@ async function verifyRequestIdentity(request) {
     return { ok: false, status: 401, reason: "no_email_claim" };
   }
 
-  if (!ALLOWED_EMAILS.has(email)) {
+  const allowedEmails = getAllowedEmails(env);
+  if (!allowedEmails.has(email)) {
     return { ok: false, status: 403, reason: "email_not_allowed" };
   }
 
@@ -110,7 +87,7 @@ async function verifyRequestIdentity(request) {
  * Stage 1 identity endpoint (v1.1.4 Cloudflare Access two-stage sign-in).
  * Answers "who is this user?" - see verifyRequestIdentity for the real logic.
  */
-export async function handleAuthSession(request) {
+export async function handleAuthSession(request, env) {
   const headers = { "Cache-Control": "no-store" };
   const result = await verifyRequestIdentity(request);
 

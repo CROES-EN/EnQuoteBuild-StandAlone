@@ -50,7 +50,9 @@ const collectionDefaults = {
   reviews: [],
   activities: [],
   followUps: [],
-  users: [{ id: "demo-user", email: "demo.manager@example.invalid", app_role: "admin", role: "admin", name: "Demo Manager" }]
+  // Official release: no demo/placeholder user on a fresh install - real users sync
+  // in from Base44 automatically.
+  users: []
 };
 collectionNames.forEach(name => { if (!collectionDefaults[name]) collectionDefaults[name] = []; });
 const makeId = prefix => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -710,18 +712,18 @@ function repositoryFor(userDataPath) {
 
     async reset() {
       // Resets demo quote/product/collection data back to the seed set, but must never
-      // touch userCredentials or outboundQueue - those are local-only state (signed-in
-      // passwords and quotes still waiting to reach Base44) that a demo-data reset has
-      // no business erasing.
+      // touch userCredentials, outboundQueue, OR users - those are local-only/real-team
+      // state that a reset demo data action has no business erasing.
       const current = await read();
       const data = {
         version: DATA_VERSION,
         quotes: structuredClone(seedQuotes),
         products: structuredClone(productSeed),
         userCredentials: current.userCredentials || {},
-        outboundQueue: current.outboundQueue || []
+        outboundQueue: current.outboundQueue || [],
+        users: current.users || []
       };
-      collectionNames.forEach(name => { data[name] = structuredClone(collectionDefaults[name]); });
+      collectionNames.forEach(name => { if (name !== 'users') data[name] = structuredClone(collectionDefaults[name]); });
       await write(data);
       return data.quotes;
     },
