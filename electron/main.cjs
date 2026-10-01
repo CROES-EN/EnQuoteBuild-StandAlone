@@ -117,7 +117,7 @@ let lastKnownImportMarker = null;
 
 function readImportMarker() {
     try {
-        const dataPath = path.join(getPath("userData"), "enquote-demo-data-v1.json");
+        const dataPath = path.join(getPath("userData"), "enquote-data-v1.json");
         let raw = fs.readFileSync(dataPath, "utf8");
         // See the matching comment in electron/repository.cjs's read() - strip a leading UTF-8 BOM
         // defensively so an externally-resaved file (e.g. via a tool that writes BOM'd UTF-8) can
@@ -189,7 +189,7 @@ function watchLocalDataFile() {
     try {
         dataDirectoryWatcher = fs.watch(userDataPath, { persistent: false }, (eventType, filename) => {
             console.log('[watch] fs.watch event:', eventType, filename);
-            if (filename !== "enquote-demo-data-v1.json") return;
+            if (filename !== "enquote-data-v1.json") return;
             notifyWindowsDataUpdated();
         });
     } catch (error) {

@@ -229,6 +229,10 @@ function CreateAccountStep({ onError }) {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Quality-of-life: lets the user confirm what they typed before submitting - each
+  // field toggles independently.
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -264,24 +268,48 @@ function CreateAccountStep({ onError }) {
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-1.5">
           <Label htmlFor="create-password">Password</Label>
-          <Input
-            id="create-password"
-            type="password"
-            value={newPassword}
-            onChange={(event) => setNewPassword(event.target.value)}
-            autoFocus
-            required
-          />
+          <div className="relative">
+            <Input
+              id="create-password"
+              type={showNewPassword ? "text" : "password"}
+              value={newPassword}
+              onChange={(event) => setNewPassword(event.target.value)}
+              autoFocus
+              required
+              className="pr-10"
+            />
+            <button
+              type="button"
+              tabIndex={-1}
+              onClick={() => setShowNewPassword((prev) => !prev)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/60 hover:text-foreground"
+              aria-label={showNewPassword ? "Hide password" : "Show password"}
+            >
+              {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="create-confirm-password">Confirm password</Label>
-          <Input
-            id="create-confirm-password"
-            type="password"
-            value={confirmPassword}
-            onChange={(event) => setConfirmPassword(event.target.value)}
-            required
-          />
+          <div className="relative">
+            <Input
+              id="create-confirm-password"
+              type={showConfirmPassword ? "text" : "password"}
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+              required
+              className="pr-10"
+            />
+            <button
+              type="button"
+              tabIndex={-1}
+              onClick={() => setShowConfirmPassword((prev) => !prev)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/60 hover:text-foreground"
+              aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+            >
+              {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
         </div>
         <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700" disabled={isSubmitting}>
           {isSubmitting ? "Creating account..." : "Create Account"}

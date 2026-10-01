@@ -91,7 +91,7 @@ const mirrorUpdateOrCreate = async (
 };
 
 // Base44 is the primary source of truth in this mode, but every write is ALSO mirrored,
-// best-effort, into the local Electron JSON file (enquote-demo-data-v1.json) so there's
+// best-effort, into the local Electron JSON file (enquote-data-v1.json) so there's
 // always an on-disk backup copy that survives even if Base44 is unreachable. This mirror
 // must never throw or block the UI - if it's unavailable (e.g. running in a plain browser
 // tab without the Electron bridge) or fails for any reason, we log and move on silently.

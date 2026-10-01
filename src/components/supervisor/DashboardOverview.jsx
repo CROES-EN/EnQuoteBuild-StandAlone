@@ -1,4 +1,4 @@
-﻿import {useMemo, useState} from "react";
+import {useMemo, useState} from "react";
 import {useQuery} from "@tanstack/react-query";
 import {
     AlertCircle,
@@ -653,7 +653,7 @@ function formatSecondsAsHoursMinutes(totalSeconds) {
 // "Auto-imported Sep 11, 3:51 AM") - used by StaffingStatCard below to show, right under the
 // tile's label, exactly when and how its underlying data was last refreshed. Added specifically
 // so it's possible to visually confirm at a glance whether the new EODB/Email auto-import
-// watcher actually ran, rather than needing to check enquote-demo-data-v1.json by hand.
+// watcher actually ran, rather than needing to check enquote-data-v1.json by hand.
 function formatImportTimestamp(importedAt, importMethod) {
   if (!importedAt) return null;
   const date = new Date(importedAt);

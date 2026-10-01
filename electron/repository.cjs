@@ -6,7 +6,7 @@ const { KNOWN_ENQUOTE_USERS } = require("./knownEnquoteUsers.cjs");
 
 const DATA_VERSION = 1;
 const DEFAULT_SYNC_TTL_MS = 5 * 60 * 1000;
-const fileName = "enquote-demo-data-v1.json";
+const fileName = "enquote-data-v1.json";
 // Gates the verbose [write-timing] diagnostic logging added this week while chasing the
 // concurrency race + the write() self-deadlock, behind an explicit opt-in env var. Now
 // that both of those bugs are fixed AND verified (clean restart, no recurrence), this
@@ -15,6 +15,9 @@ const fileName = "enquote-demo-data-v1.json";
 // similar bug ever needs to be chased again - console.warn/console.error calls for the
 // same [write-timing] tag are NOT gated by this and always log, since those represent
 // real failures, not routine timing info.
+// Official release: no demo/placeholder quotes on a fresh install - a genuinely new
+// user starts with zero quotes and syncs their own real data from Base44.
+const seedQuotes = [];
 function logTiming(...args) {
   if (process.env.ENQUOTE_DEBUG_WRITES) console.log(...args);
 }
@@ -230,16 +233,6 @@ function migrateSharedTempPasswords(data) {
 
   return migratedAccounts;
 }
-
-const seedQuotes = [
-  { id: "demo-q-1001", quote_number: "DEMO-1001", site_id: "DEMO-SITE-01", case_number: "DEMO-CASE-01", status: "draft_without_internal", total: 1240, materials_total: 620, labor_total: 480, travel_total: 140, sales_tax: 0, created_by: "demo.coordinator.one", created_date: "2026-08-20T14:00:00.000Z", updated_date: "2026-08-20T14:00:00.000Z", is_current_version: true, version_number: 1, scope_of_work: "Replace damaged disconnect enclosure", homeowner_summary: "Repair solar equipment enclosure" },
-  { id: "demo-q-1002", quote_number: "DEMO-1002", site_id: "DEMO-SITE-02", case_number: "DEMO-CASE-02", status: "submitted", total: 2160, materials_total: 910, labor_total: 980, travel_total: 270, sales_tax: 0, created_by: "demo.coordinator.two", created_date: "2026-08-18T14:00:00.000Z", updated_date: "2026-08-19T14:00:00.000Z", is_current_version: true, version_number: 1, scope_of_work: "Replace rooftop wiring and conduit", homeowner_summary: "Repair rooftop wiring" },
-  { id: "demo-q-1003", quote_number: "DEMO-1003", site_id: "DEMO-SITE-03", case_number: "DEMO-CASE-03", status: "approved", total: 3480, materials_total: 1320, labor_total: 1740, travel_total: 420, sales_tax: 0, created_by: "demo.coordinator.three", created_date: "2026-08-12T14:00:00.000Z", updated_date: "2026-08-14T14:00:00.000Z", is_current_version: true, version_number: 1, scope_of_work: "Replace failed inverter components", homeowner_summary: "Replace inverter components" },
-  { id: "demo-q-1004-v1", quote_number: "DEMO-1004", site_id: "DEMO-SITE-04", case_number: "DEMO-CASE-04", status: "rejected", total: 1920, materials_total: 700, labor_total: 980, travel_total: 240, sales_tax: 0, created_by: "demo.coordinator.one", created_date: "2026-08-05T14:00:00.000Z", updated_date: "2026-08-07T14:00:00.000Z", is_current_version: false, parent_quote_id: "demo-q-1004-v1", version_number: 1, scope_of_work: "Replace damaged combiner components", homeowner_summary: "Repair combiner" },
-  { id: "demo-q-1004-v2", quote_number: "DEMO-1004", site_id: "DEMO-SITE-04", case_number: "DEMO-CASE-04", status: "quote_sent_to_ho", total: 1780, materials_total: 640, labor_total: 920, travel_total: 220, sales_tax: 0, created_by: "demo.coordinator.one", created_date: "2026-08-09T14:00:00.000Z", updated_date: "2026-08-11T14:00:00.000Z", is_current_version: true, parent_quote_id: "demo-q-1004-v1", version_number: 2, scope_of_work: "Replace damaged combiner components", homeowner_summary: "Repair combiner" },
-  { id: "demo-q-1005", quote_number: "DEMO-1005", site_id: "DEMO-SITE-05", case_number: "DEMO-CASE-05", status: "invoice_paid", total: 2640, materials_total: 1060, labor_total: 1260, travel_total: 320, sales_tax: 0, created_by: "demo.coordinator.two", created_date: "2026-07-30T14:00:00.000Z", updated_date: "2026-08-03T14:00:00.000Z", is_current_version: true, version_number: 1, scope_of_work: "Replace service wiring", homeowner_summary: "Repair service wiring" },
-  { id: "demo-q-1006", quote_number: "DEMO-1006", site_id: "DEMO-SITE-06", case_number: "DEMO-CASE-06", status: "scheduled", total: 3120, materials_total: 1240, labor_total: 1500, travel_total: 380, sales_tax: 0, created_by: "demo.coordinator.three", created_date: "2026-07-25T14:00:00.000Z", updated_date: "2026-08-01T14:00:00.000Z", is_current_version: true, version_number: 1, scope_of_work: "Replace damaged panel wiring", homeowner_summary: "Repair panel wiring" }
-];
 
 const collectionEntityMappings = {
   reviews: ["QuoteReview"],
@@ -714,6 +707,7 @@ function repositoryFor(userDataPath) {
       await write(data);
       return data.quotes;
     },
+
     async reset() {
       // Resets demo quote/product/collection data back to the seed set, but must never
       // touch userCredentials or outboundQueue - those are local-only state (signed-in
