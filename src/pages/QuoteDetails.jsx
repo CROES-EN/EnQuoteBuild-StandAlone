@@ -1061,9 +1061,13 @@ function QuoteDetailsContent() {
  setNewOwner("");
  };
 
- // Effective owner: prefer owner_email (reassigned) over created_by (original creator)
+ const creatorEmail = quote?.created_by_email ||
+ quote?.status_history?.find((entry) => entry.entry_type !== "follow_up")?.changed_by ||
+ quote?.created_by;
+ // Effective owner: prefer owner_email (reassigned) over the original creator.
  const effectiveOwner = quote?.owner_email || quote?.created_by;
- const isOriginalCreator = quote?.created_by_id === user?.id;
+ const isOriginalCreator = quote?.created_by_id === user?.id ||
+ creatorEmail?.toLowerCase() === user?.email?.toLowerCase();
  const canEditQuote = isOriginalCreator || isApprover || isAdmin;
  const canViewVersionHistory = roles.includes("approver");
  const canRestoreVersion = roles.includes("approver");
@@ -1703,17 +1707,18 @@ function QuoteDetailsContent() {
  </div>
  </div>
  )}
- {(quote.owner_email || quote.created_by) && (
+ {(creatorEmail || quote.owner_email) && (
  <div className="flex items-center gap-3">
  <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
  <Users className="w-4 h-4 text-muted-foreground" />
  </div>
  <div className="min-w-0">
- <p className="text-sm text-muted-foreground">{quote.owner_email ? "Owner" : "Created By"}</p>
- <p className="font-medium text-foreground break-all">{effectiveOwner}</p>
- {quote.owner_email && quote.created_by && quote.owner_email !== quote.created_by && (
- <p className="text-xs text-muted-foreground">Originally by {quote.created_by}</p>
+ <p className="text-sm text-muted-foreground">Created By</p>
+ <p className="font-medium text-foreground break-all">{creatorEmail || quote.owner_email}</p>
+ {quote.owner_email && quote.owner_email !== (creatorEmail || quote.owner_email) && (
+ <p className="text-xs text-muted-foreground">Owner: {quote.owner_email}</p>
  )}
+ {quote.last_updated_by && <p className="text-xs text-muted-foreground">Last updated by {quote.last_updated_by}</p>}
  </div>
  </div>
  )}

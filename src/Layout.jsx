@@ -404,7 +404,7 @@ export default function Layout({ children, currentPageName }) {
     running: "Checking for new data...",
     success: REFRESH_REASON_LABELS[lastAttempt?.reason] || "Refresh complete",
     error: REFRESH_REASON_LABELS[lastAttempt?.reason] || "Refresh failed - see details",
-    unreachable: "Local sync service unreachable"
+    unreachable: "Shared data source unavailable"
   }[phase] || null;
 
   // Starts the refresh in the background - no blocking confirmation, no page reload.

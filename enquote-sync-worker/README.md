@@ -102,6 +102,12 @@ Cloudflare Access sign-in page; after sign-in it should return JSON with
 | POST | `/api/outbound/enqueue` | Bearer `OUTBOUND_TOKEN` | Queue a local edit for push |
 | GET | `/api/outbound/status` | Bearer `OUTBOUND_TOKEN` | Check status of a queued item |
 
+Presence endpoints use `OUTBOUND_TOKEN`: `POST /api/presence/heartbeat`,
+`GET /api/presence`, and `POST /api/presence/remove`. Presence is stored in D1 per
+desktop session. The app sends a heartbeat every 45 seconds; sessions expire after
+two minutes without one so a crash or network interruption cannot leave someone
+shown as online indefinitely.
+
 ## Secrets
 
 | Secret | Purpose |

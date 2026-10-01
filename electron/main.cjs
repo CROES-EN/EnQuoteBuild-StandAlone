@@ -15,6 +15,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { repositoryFor } = require("./repository.cjs");
 const { importEntitySnapshot } = require("./entitySnapshotSync.cjs");
+const { applyVerifiedQuoteCreator, applyVerifiedQuoteUpdate, requireVerifiedEmail } = require("./quoteAttribution.cjs");
+const { createPresenceSync } = require("./presenceSync.cjs");
 const { createOutboundSync } = require("./outboundSync.cjs");
 const { openSalesforceReportWindow, closeSalesforceReportWindow } = require("./salesforceImport.cjs");
 const { analyzeAll } = require("./diagnosticReportAnalyzer.cjs");
@@ -56,6 +58,15 @@ function loadEnvFile() {
 let quoteRepository;
 let outboundSync;
 let dataDirectoryWatcher;
+const presenceSync = createPresenceSync({
+    workerUrl: "https://enquote-sync.croeschberger.workers.dev",
+    getIdentity: getVerifiedIdentity,
+    getOutboundToken: () => process.env.OUTBOUND_TOKEN || "",
+    getAccessHeaders: () => ({
+        "CF-Access-Client-Id": process.env.CF_ACCESS_CLIENT_ID || "",
+        "CF-Access-Client-Secret": process.env.CF_ACCESS_CLIENT_SECRET || ""
+    })
+});
 
 // --- Zoom (Ctrl+/Ctrl-/Ctrl+0 + in-app buttons) ---
 // Persisted to its own small JSON file in userData - deliberately NOT the main quote data
@@ -834,12 +845,10 @@ let then = whenReady().then(async () => {
     }
 
     ipcMain.handle("app:refresh", async () => {
-        console.log('[refresh] Manual refresh triggered - checking webhook receiver for latest data...');
+        console.log('[refresh] Manual refresh triggered - checking Cloudflare for latest shared data...');
 
-        // NEW: if this machine has a remote-sync-config.json (see readRemoteSyncConfig()
-        // above), pull a real snapshot directly from a TEAMMATE's shared receiver and
-        // import it here, then return early -- the existing localhost-only flow below is
-        // completely untouched and only reached when no such config file exists.
+        // If this machine has an optional remote-sync-config.json, use that configured
+        // shared receiver; otherwise continue through the standard Cloudflare Worker path.
         const remoteConfig = readRemoteSyncConfig();
         if (remoteConfig?.url) {
             return await refreshFromRemoteSyncSource(remoteConfig);
@@ -860,12 +869,8 @@ let then = whenReady().then(async () => {
             }
         }
 
-        // Real sync path refresh - pulls from the actual Cloudflare Worker sync system
-        // (the SAME pollEntitySnapshot/outboundSync already running on their normal 90s
-        // timers), instead of pinging the legacy, no-longer-started webhook-receiver.cjs
-        // on localhost:3001 (confirmed NOT spawned by desktop-dev.cjs or anywhere in
-        // package.json - it was reporting "unreachable" for an unrelated, unused
-        // component, not a real problem with your actual sync).
+        // Pull from the Cloudflare Worker sync system (the same entity snapshot poll used
+        // by the normal 90-second timer), rather than the retired localhost receiver.
         try {
             if (outboundSync) {
                 try {
@@ -877,10 +882,9 @@ let then = whenReady().then(async () => {
             }
 
             if (typeof pollEntitySnapshot === "function") {
-                try {
-                    await pollEntitySnapshot();
-                } catch (pollError) {
-                    console.log('[refresh] Entity snapshot pull failed:', pollError.message);
+                const syncResult = await pollEntitySnapshot();
+                if (!syncResult?.ok) {
+                    throw new Error(syncResult?.error || "Cloudflare data refresh failed.");
                 }
             }
 
@@ -900,7 +904,7 @@ let then = whenReady().then(async () => {
             };
         } catch (error) {
             console.log('[refresh] Refresh check failed:', error.message);
-            return { ok: false, unreachable: true, error: error.message };
+            return { ok: false, error: error.message };
         }
     });
 
@@ -979,10 +983,34 @@ let then = whenReady().then(async () => {
 
     ipcMain.handle("quotes:list", () => quoteRepository.list());
     ipcMain.handle("quotes:get", (_event, id) => quoteRepository.get(id));
-    ipcMain.handle("quotes:create", (_event, record) => ownWrite(quoteRepository.create)(record));
-    ipcMain.handle("quotes:update", (_event, id, changes, expectedVersion) => ownWrite(quoteRepository.update)(id, changes, expectedVersion));
+    ipcMain.handle("quotes:create", (_event, record) => {
+        const attributedRecord = applyVerifiedQuoteCreator(record, getVerifiedIdentity());
+        return ownWrite(quoteRepository.create)(attributedRecord);
+    });
+    ipcMain.handle("quotes:update", async (_event, id, changes, expectedVersion) => {
+        const identity = getVerifiedIdentity();
+        requireVerifiedEmail(identity);
+        const current = await quoteRepository.get(id);
+        if (!current) throw new Error("Quote not found.");
+        const attributedChanges = applyVerifiedQuoteUpdate(current, changes, identity);
+        return ownWrite(quoteRepository.update)(id, attributedChanges, expectedVersion);
+    });
     ipcMain.handle("quotes:delete", (_event, id) => ownWrite(quoteRepository.remove)(id));
-    ipcMain.handle("quotes:bulkUpdate", (_event, updates) => ownWrite(quoteRepository.bulkUpdate)(updates));
+    ipcMain.handle("quotes:bulkUpdate", async (_event, updates) => {
+        const identity = getVerifiedIdentity();
+        requireVerifiedEmail(identity);
+        const quotes = await quoteRepository.list();
+        const quoteById = new Map(quotes.map((quote) => [quote.id, quote]));
+        const attributedUpdates = updates.map((update) => {
+            const current = quoteById.get(update.id);
+            if (!current) return update;
+            return {
+                ...update,
+                changes: applyVerifiedQuoteUpdate(current, update.changes, identity)
+            };
+        });
+        return ownWrite(quoteRepository.bulkUpdate)(attributedUpdates);
+    });
     ipcMain.handle("quotes:reset", () => ownWrite(quoteRepository.reset)());
     ipcMain.handle("quotes:export", () => quoteRepository.exportData());
     ipcMain.handle("quotes:import", (_event, data) => ownWrite(quoteRepository.importData)(data));
@@ -1423,108 +1451,14 @@ let then = whenReady().then(async () => {
             return { ok: false, error: error.message, reports: [] };
         }
     });
-    // Fetches the current presence list from a teammate's shared webhook-receiver.cjs (via
-    // the new GET /api/base44/webhook/presence endpoint), mirroring fetchRemoteSnapshot's
-    // exact structure above, just targeting a different path. Tested end-to-end against a
-    // real HTTP server before shipping.
-    function fetchRemotePresenceList(urlString, secret) {
-        return new Promise((resolve, reject) => {
-            let url;
-            try {
-                url = new URL(`${String(urlString).replace(/\/+$/, "")}/api/base44/webhook/presence`);
-            } catch {
-                reject(new Error(`Invalid remote sync URL: ${urlString}`));
-                return;
-            }
-            const transport = url.protocol === "http:" ? require("node:http") : require("node:https");
-            const req = transport.request({
-                protocol: url.protocol,
-                hostname: url.hostname,
-                port: url.port || undefined,
-                path: `${url.pathname}${url.search}`,
-                method: "GET",
-                headers: {
-                    "Authorization": `Bearer ${secret || ""}`, // FIX: was "remoteConfig.secret" - remoteConfig is not in scope here, only the "secret" parameter is. This threw ReferenceError on every call, breaking "Who's Online" entirely.
-                    "CF-Access-Client-Id": process.env.CF_ACCESS_CLIENT_ID || "",
-                    "CF-Access-Client-Secret": process.env.CF_ACCESS_CLIENT_SECRET || ""
-                }
-            }, (res) => {
-                let raw = "";
-                res.on("data", (chunk) => {
-                    raw += chunk;
-                });
-                res.on("end", () => {
-                    if (res.statusCode < 200 || res.statusCode >= 300) {
-                        reject(new Error(`Remote sync source responded with HTTP ${res.statusCode}`));
-                        return;
-                    }
-                    try {
-                        const parsed = JSON.parse(raw);
-                        if (!parsed.ok) {
-                            reject(new Error(parsed.error || "Remote sync source reported an error."));
-                            return;
-                        }
-                        resolve(parsed.sessions || []);
-                    } catch (error) {
-                        reject(new Error("Invalid response from remote sync source."));
-                    }
-                });
-            });
-            req.on("error", reject);
-            req.end();
-        });
-    }
-
-    // Presence ("Who's Online") - reuses the EXACT SAME targetBase/secret resolution
-    // already proven in diagnostics:send (localhost:3001 if this machine is the host,
-    // otherwise the configured remote host's URL). No new secret, no new distribution
-    // problem - piggybacks entirely on the existing remote-sync-config.json mechanism.
     ipcMain.handle("presence:announce", async (_event, payload) => {
-        try {
-            const remoteConfig = readRemoteSyncConfig();
-            const targetBase = remoteConfig?.url ? remoteConfig.url.replace(/\/+$/, "") : "http://localhost:3001";
-            const secret = remoteConfig?.secret || process.env.ENQUOTE_LOCAL_SYNC_WEBHOOK_SECRET || "";
-            const result = await postJson(`${targetBase}/api/base44/webhook/presence/announce`, {
-                "Authorization": `Bearer ${remoteConfig.secret || ""}`,
-                "CF-Access-Client-Id": process.env.CF_ACCESS_CLIENT_ID || "",
-                "CF-Access-Client-Secret": process.env.CF_ACCESS_CLIENT_SECRET || ""
-            }, payload);
-            if (!result.ok) return { ok: false, error: result.error || `Server responded with HTTP ${result.status}` };
-            return { ok: true };
-        } catch (error) {
-            return { ok: false, error: error.message };
-        }
+        const result = await presenceSync.heartbeat(payload?.name);
+        if (result.ok) presenceSync.start();
+        return result;
     });
 
-    ipcMain.handle("presence:remove", async (_event, payload) => {
-        try {
-            const remoteConfig = readRemoteSyncConfig();
-            const targetBase = remoteConfig?.url ? remoteConfig.url.replace(/\/+$/, "") : "http://localhost:3001";
-            const secret = remoteConfig?.secret || process.env.ENQUOTE_LOCAL_SYNC_WEBHOOK_SECRET || "";
-            const result = await postJson(`${targetBase}/api/base44/webhook/presence/remove`, {
-                "Authorization": `Bearer ${remoteConfig.secret || ""}`,
-                "CF-Access-Client-Id": process.env.CF_ACCESS_CLIENT_ID || "",
-                "CF-Access-Client-Secret": process.env.CF_ACCESS_CLIENT_SECRET || ""
-            }, payload);
-            if (!result.ok) return { ok: false, error: result.error || `Server responded with HTTP ${result.status}` };
-            return { ok: true };
-        } catch (error) {
-            return { ok: false, error: error.message };
-        }
-    });
-
-    ipcMain.handle("presence:list", async () => {
-        try {
-            const remoteConfig = readRemoteSyncConfig();
-            const targetBase = remoteConfig?.url ? remoteConfig.url.replace(/\/+$/, "") : "http://localhost:3001";
-            const secret = remoteConfig?.secret || process.env.ENQUOTE_LOCAL_SYNC_WEBHOOK_SECRET || "";
-            const sessions = await fetchRemotePresenceList(targetBase, secret);
-            return { ok: true, sessions };
-        } catch (error) {
-            return { ok: false, error: error.message, sessions: [] };
-        }
-    });
-
+    ipcMain.handle("presence:remove", () => presenceSync.remove());
+    ipcMain.handle("presence:list", () => presenceSync.list());
     // Zoom - renderer-triggered equivalents of the Ctrl+/Ctrl-/Ctrl+0 shortcuts above, for a
     // clickable in-app zoom control (see Layout.jsx). Each returns the RESULTING zoom factor so
     // the renderer's displayed percentage always reflects the real, clamped value.
@@ -1678,12 +1612,16 @@ let then = whenReady().then(async () => {
     let entitySnapshotPollRunning = false;
     async function pollEntitySnapshot() {
         const snapshotToken = process.env.SNAPSHOT_TOKEN || "";
-        if (!snapshotToken) return;
+        if (!snapshotToken) {
+            return { ok: false, error: "Cloudflare sync credentials are unavailable." };
+        }
         // FIX (confirmed root cause of repeated duplicate Quote creation): without this
         // guard, an overlapping/slow poll cycle could run concurrently with the next timer
         // tick - both independently reading "no existing match yet" and both creating a new
         // quote. Mirrors the exact same guard pattern pollRemoteSyncSource() already uses.
-        if (entitySnapshotPollRunning) return;
+        if (entitySnapshotPollRunning) {
+            return { ok: false, error: "A Cloudflare data refresh is already in progress. Try again shortly." };
+        }
         entitySnapshotPollRunning = true;
 
         try {
@@ -1718,7 +1656,10 @@ let then = whenReady().then(async () => {
                 req.end();
             });
 
-            if (!response?.ok || !Array.isArray(response.entities) || response.entities.length === 0) return;
+            if (!response?.ok || !Array.isArray(response.entities)) {
+                throw new Error("Cloudflare returned an invalid entity snapshot.");
+            }
+            if (response.entities.length === 0) return { ok: true, importedRecordCount: 0 };
 
             const importedRecordCount = await importEntitySnapshot(quoteRepository, response.entities);
             if (importedRecordCount > 0) {
@@ -1728,7 +1669,7 @@ let then = whenReady().then(async () => {
                     at: new Date().toISOString(),
                     changedQuoteNumbers: []
                 }));
-                return;
+                return { ok: true, importedRecordCount };
             }
 
             // Base44 sends PascalCase entity names, but the local repository's
@@ -1894,8 +1835,10 @@ let then = whenReady().then(async () => {
                 markOwnWrite();
                 console.log(`[entity-sync] Synced ${updatedCount} Base44 entity record(s).`);
             }
+            return { ok: true, importedRecordCount: updatedCount };
         } catch (error) {
             console.log(`[entity-sync] Poll failed (will retry next cycle): ${error.message}`);
+            return { ok: false, error: error.message };
         } finally {
             entitySnapshotPollRunning = false;
         }
@@ -2063,6 +2006,7 @@ let then = whenReady().then(async () => {
         const credentials = await fetchSyncCredentials();
         if (credentials.ok) {
             process.env.SNAPSHOT_TOKEN = credentials.snapshotToken;
+            process.env.OUTBOUND_TOKEN = credentials.outboundToken;
             if (credentials.cfAccessClientId && credentials.cfAccessClientSecret) {
                 process.env.CF_ACCESS_CLIENT_ID = credentials.cfAccessClientId;
                 process.env.CF_ACCESS_CLIENT_SECRET = credentials.cfAccessClientSecret;
@@ -2071,6 +2015,7 @@ let then = whenReady().then(async () => {
                 console.warn("[cloudflare-auth] No CF Access service token credentials in response - entity-snapshot sync will likely fail until the Worker has them configured.");
             }
             startOutboundSync(credentials.outboundToken);
+            presenceSync.start();
             console.log("[cloudflare-auth] Sync credentials obtained - outbound/entity sync enabled.");
             try {
                 const snapshot = await fetchRemoteSnapshot(
@@ -2147,4 +2092,8 @@ on("window-all-closed", () => {
     if (process.platform !== "darwin") {
         quit();
     }
+});
+
+on("before-quit", () => {
+    presenceSync.remove();
 });

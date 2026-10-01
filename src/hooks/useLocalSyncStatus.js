@@ -1,8 +1,7 @@
 import {useCallback, useRef, useState} from "react";
 
-// Human-readable labels for the webhook receiver's "reason" field, shared by the inline
-// slim progress bar (Layout) and the deeper diagnostic dialog (RefreshStatusDialog) so
-// both surfaces describe a given outcome identically.
+// Human-readable labels for refresh outcomes, shared by the inline status and details
+// dialog so both surfaces describe a given result identically.
 export const REFRESH_REASON_LABELS = {
   imported: "New data imported",
   checked: "Already up to date",
@@ -14,8 +13,8 @@ export const REFRESH_REASON_LABELS = {
 
 /**
  * Single source of truth for "is a manual refresh in flight / did it work". Triggers the
- * local webhook receiver's force-refresh + outbound flush (via the enquoteLocal.app
- * Electron bridge) and awaits its definitive result directly - the main process's
+ * Cloudflare shared-data refresh + outbound flush (via the enquoteLocal.app Electron
+ * bridge) and awaits its definitive result directly - the main process's
  * "app:refresh" handler is request/response (not fire-and-forget), so there's no need to
  * poll and guess whether a real Base44 delivery happened to land during the check.
  * Shared by the inline slim progress bar in Layout and the optional diagnostic
@@ -45,7 +44,7 @@ export function useLocalSyncStatus() {
     try {
       result = await bridge.refresh();
     } catch (error) {
-      result = { ok: false, unreachable: true, error: error?.message };
+      result = { ok: false, error: error?.message };
     }
 
     // A newer trigger() started while this one was in flight - let that one own the state.

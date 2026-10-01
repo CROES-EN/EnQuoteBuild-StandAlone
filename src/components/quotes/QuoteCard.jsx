@@ -92,10 +92,10 @@ export default function QuoteCard({ quote, index = 0, selectable = false, isSele
               <span className="text-xs text-muted-foreground">
                 {quote.items?.length || 0} item{quote.items?.length !== 1 ? "s" : ""}
               </span>
-              {(quote.owner_email || quote.created_by) && (
+              {(quote.created_by_email || quote.owner_email || quote.created_by || quote.status_history?.[0]?.changed_by) && (
                 <span className="text-xs text-muted-foreground flex items-center gap-1">
                   <User className="w-3 h-3" />
-                  {(quote.owner_email || quote.created_by).split("@")[0]}
+                  {(quote.created_by_email || quote.status_history?.[0]?.changed_by || quote.owner_email || quote.created_by).split("@")[0]}
                 </span>
               )}
             </div>

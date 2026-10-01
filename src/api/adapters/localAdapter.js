@@ -55,7 +55,7 @@ function getPersistedSessionEmail() {
 
 // Mirrors AuthContext.jsx's buildUserFromRecord(): prefers a real synced Base44
 // "User" record's display_name/full_name for the human-friendly name, falling
-// back to just the email if no record/name is available.
+// back to just the verified Cloudflare email if no record/name is available.
 function buildUserFromRecord(record, fallbackEmail) {
   const email = record?.email || fallbackEmail || "";
   const displayName = record?.display_name || record?.full_name || email;
@@ -70,7 +70,19 @@ function buildUserFromRecord(record, fallbackEmail) {
 }
 
 async function resolveCurrentUser() {
-  const sessionEmail = getPersistedSessionEmail();
+  const authBridge = globalThis.window?.enquoteLocal?.auth;
+  let sessionEmail;
+  if (typeof authBridge?.getVerifiedIdentity === "function") {
+    const identity = await authBridge.getVerifiedIdentity();
+    sessionEmail = identity?.email?.trim().toLowerCase() || null;
+    if (!sessionEmail) {
+      throw new Error("Verified Cloudflare identity is unavailable. Sign in again before continuing.");
+    }
+  } else {
+    // Browser/dev environments without the Electron auth bridge may still use the
+    // legacy local session key. Packaged desktop sessions always use Cloudflare above.
+    sessionEmail = getPersistedSessionEmail();
+  }
   if (!sessionEmail) {
     // Nobody has signed in yet via the real local login flow - unchanged prior
     // behavior for this specific case.

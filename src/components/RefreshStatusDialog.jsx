@@ -70,29 +70,35 @@ export default function RefreshStatusDialog({ open, onOpenChange, phase, lastAtt
           </DialogTitle>
           <DialogDescription>
             {unreachable
-              ? "Local sync service unreachable - see Details below."
-              : !isFinished
-                ? "Checking the local webhook receiver for the latest imported data..."
-                : (REFRESH_REASON_LABELS[lastAttempt?.reason] || "Refresh check complete.")}
+              ? "Could not reach the shared data source. Previously loaded data may still be available."
+              : phase === "error"
+                ? "The refresh check failed. See the error details below."
+                : !isFinished
+                  ? "Checking Cloudflare for the latest shared data..."
+                  : (REFRESH_REASON_LABELS[lastAttempt?.reason] || "Refresh check complete.")}
           </DialogDescription>
         </DialogHeader>
 
-        {!unreachable && (
-          <div className="rounded-lg border border-border bg-secondary p-3 text-sm space-y-1">
+        <div className="rounded-lg border border-border bg-secondary p-3 text-sm space-y-1">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Quotes on disk</span>
+              <span className="text-muted-foreground">Quotes on this device</span>
               <span className="font-medium text-foreground">{lastAttempt?.storedQuoteCount ?? "â€”"}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Products on disk</span>
+              <span className="text-muted-foreground">Products on this device</span>
               <span className="font-medium text-foreground">{lastAttempt?.storedProductCount ?? "â€”"}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Last import attempt</span>
+              <span className="text-muted-foreground">Last refresh check</span>
               <span className="font-medium text-foreground">
                 {lastAttempt?.finishedAt ? new Date(lastAttempt.finishedAt).toLocaleTimeString() : "â€”"}
               </span>
             </div>
+        </div>
+
+        {lastAttempt?.error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 break-words">
+            {lastAttempt.error}
           </div>
         )}
 

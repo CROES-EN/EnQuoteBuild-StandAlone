@@ -73,18 +73,36 @@ export default function DeveloperConsole({
   const [appErrors, setAppErrors] = useState([]);
   const [reports, setReports] = useState([]);
   const [sessions, setSessions] = useState([]);
+  const [presenceError, setPresenceError] = useState(null);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("errors");
   const queryClient = useQueryClient();
 
+    const loadPresence = useCallback(async () => {
+      const listPresence = globalThis.window?.enquoteLocal?.presence?.list;
+      if (!listPresence) {
+        setSessions([]);
+        setPresenceError("Presence is unavailable in this app version.");
+        return;
+      }
+      try {
+        const result = await listPresence();
+        if (!result?.ok) throw new Error(result?.error || "Could not load online users.");
+        setSessions(result.sessions || []);
+        setPresenceError(null);
+      } catch (error) {
+        setSessions([]);
+        setPresenceError(error?.message || "Could not load online users.");
+      }
+    }, []);
+
     const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [errors, reportsRes, presenceRes, usersRes] = await Promise.all([
+      const [errors, reportsRes, usersRes] = await Promise.all([
         listErrors(),
         globalThis.window?.enquoteLocal?.diagnostics?.listReports?.() ?? Promise.resolve({ ok: false, reports: [] }),
-        globalThis.window?.enquoteLocal?.presence?.list?.() ?? Promise.resolve({ ok: false, sessions: [] }),
         // ASSUMPTION (verify against your real preload.cjs): collections:list
         // exposed as window.enquoteLocal.collections.list(name), matching the
         // same namespaced convention as diagnostics/presence above. Defensive
@@ -94,16 +112,23 @@ export default function DeveloperConsole({
       ]);
       setAppErrors(errors);
       setReports(reportsRes?.ok ? (reportsRes.reports || []) : []);
-      setSessions(presenceRes?.ok ? (presenceRes.sessions || []) : []);
       setUsers(Array.isArray(usersRes) ? usersRes : []);
+      await loadPresence();
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadPresence]);
 
   useEffect(() => {
     if (open) loadAll();
   }, [open, loadAll]);
+
+  useEffect(() => {
+    if (!open || activeTab !== "presence") return undefined;
+    loadPresence();
+    const timer = setInterval(loadPresence, 30 * 1000);
+    return () => clearInterval(timer);
+  }, [open, activeTab, loadPresence]);
 
   async function handleClearErrors() {
     await clearErrors();
@@ -264,8 +289,12 @@ export default function DeveloperConsole({
           )}
 
                     {activeTab === "presence" && (
-            sessions.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic p-4 text-center">No one else is currently signed in.</p>
+            presenceError ? (
+              <p className="text-sm text-rose-600 p-4 text-center">
+                Could not load who’s online: {presenceError}
+              </p>
+            ) : sessions.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic p-4 text-center">No one is currently signed in.</p>
             ) : (
               sessions
                 .slice()
