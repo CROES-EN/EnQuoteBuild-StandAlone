@@ -33,9 +33,10 @@ export default function UpdateStatusBadge() {
 
   const labels = {
     checking: "Checking for updates...",
-    available: `Update v${state.version} found -- downloading...`,
+    available: `Update v${state.version} available`,
+    deferred: `Update v${state.version} postponed until next launch`,
     downloading: `Downloading update... ${state.percent ?? 0}%`,
-    ready: `Update v${state.version} ready -- restart EnQuote to install`,
+    ready: `Update v${state.version} downloaded -- restarting EnQuote`,
     "up-to-date": "EnQuote is up to date",
     error: "Update check failed -- will retry next launch"
   };

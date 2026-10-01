@@ -10,6 +10,8 @@ const isPackaged = app.isPackaged;
 const on = app.on.bind(app);
 const quit = app.quit.bind(app);
 const whenReady = app.whenReady.bind(app);
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) quit();
 const { autoUpdater } = require("electron-updater");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -17,6 +19,7 @@ const { repositoryFor } = require("./repository.cjs");
 const { importEntitySnapshot } = require("./entitySnapshotSync.cjs");
 const { applyVerifiedQuoteCreator, applyVerifiedQuoteUpdate, requireVerifiedEmail } = require("./quoteAttribution.cjs");
 const { createPresenceSync } = require("./presenceSync.cjs");
+const { createUpdatePrompt } = require("./updatePrompt.cjs");
 const { createOutboundSync } = require("./outboundSync.cjs");
 const { openSalesforceReportWindow, closeSalesforceReportWindow } = require("./salesforceImport.cjs");
 const { analyzeAll } = require("./diagnosticReportAnalyzer.cjs");
@@ -403,8 +406,7 @@ function moveReportsInboxFile(filePath, destinationDir) {
 
 // Relays electron-updater events to the renderer so update activity is visible in the
 // app itself, instead of only going to a console.log that's invisible when launching
-// the installed app normally (not from a terminal). Does not change update TIMING --
-// same feed URL, same autoDownload, same install-on-quit behavior as before.
+// the installed app normally (not from a terminal).
 function sendStatus(status, data = {}) {
     if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send("updater:status", { status, ...data });
@@ -428,20 +430,61 @@ function configureAutoUpdater() {
         });
     }
 
-    autoUpdater.autoDownload = true;
+    autoUpdater.autoDownload = false;
     autoUpdater.autoInstallOnAppQuit = true;
+    let updaterCheckInProgress = false;
+    let updateAvailableOrDownloading = false;
+    let startupUpdateCheckActive = false;
+    const updatePrompt = createUpdatePrompt({
+        showDialog: async (version) => {
+            const options = {
+                type: "info",
+                title: "Update required",
+                message: `EnQuote ${version} is available.`,
+                detail: "Download now to close EnQuote and reopen it with the updated version, or choose Later to install it the next time you open the app.",
+                buttons: ["Download now", "Later"],
+                defaultId: 0,
+                cancelId: 1,
+                noLink: true
+            };
+            const parent = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
+            const result = parent
+                ? await dialog.showMessageBox(parent, options)
+                : await dialog.showMessageBox(options);
+            return result.response;
+        },
+        downloadUpdate: () => autoUpdater.downloadUpdate(),
+        installUpdate: () => autoUpdater.quitAndInstall(true, true),
+        sendStatus,
+        logger: console
+    });
 
     autoUpdater.on("checking-for-update", () => {
+        updaterCheckInProgress = true;
         console.log("Checking for EnQuote updates...");
         sendStatus("checking");
     });
 
     autoUpdater.on("update-available", (info) => {
+        updaterCheckInProgress = false;
+        updateAvailableOrDownloading = true;
         console.log("Update available:", info.version);
         sendStatus("available", { version: info.version });
+        if (!startupUpdateCheckActive) {
+            updatePrompt.offer(info.version).then((result) => {
+                if (result === "deferred" || result === "failed") {
+                    updateAvailableOrDownloading = false;
+                }
+            }).catch((error) => {
+                updateAvailableOrDownloading = false;
+                console.error("[updater] Could not process the in-session update:", error.message);
+            });
+        }
     });
 
     autoUpdater.on("update-not-available", () => {
+        updaterCheckInProgress = false;
+        updateAvailableOrDownloading = false;
         console.log("EnQuote is up to date.");
         sendStatus("up-to-date");
     });
@@ -452,29 +495,48 @@ function configureAutoUpdater() {
     });
 
     autoUpdater.on("error", (error) => {
+        updaterCheckInProgress = false;
+        updateAvailableOrDownloading = false;
+        updatePrompt.onError();
         console.error("Auto-update error:", error);
         sendStatus("error", { message: String(error) });
     });
 
     autoUpdater.on("update-downloaded", () => {
-        // FIX: no longer force-quits immediately when the download finishes - this was
-        // interrupting whoever had the app open (a jarring, unexpected close, sometimes
-        // just seconds after opening it). autoInstallOnAppQuit (set above) already
-        // handles this correctly and silently: the update is applied the NEXT time the
-        // app is closed normally by the user, with zero extra prompts or mid-session
-        // interruption - this handler now just logs that it is ready and lets that
-        // existing, non-disruptive mechanism do its job.
-        console.log("Update downloaded - it will install automatically the next time EnQuote is closed.");
+        updateAvailableOrDownloading = false;
+        console.log("Update downloaded and ready to install.");
         sendStatus("ready");
+        if (!startupUpdateCheckActive && updatePrompt.onDownloaded()) {
+            console.log("Installing the requested update and relaunching EnQuote.");
+        }
     });
 
-    // NOTE: the initial update check is now explicitly triggered by
-    // runStartupUpdateCheck() (see below), BEFORE the main window is created -- not
-    // here -- so a confirmed update can be applied before the user starts working,
-    // instead of only downloading silently in the background and waiting for a later,
-    // disruptive quit. This function now only configures the feed + these persistent
-    // event listeners (used by the in-app status badge for the lifetime of the
-    // session); it no longer triggers a check itself.
+    return {
+        beginStartupCheck() {
+            startupUpdateCheckActive = true;
+        },
+        endStartupCheck() {
+            startupUpdateCheckActive = false;
+        },
+        checkForUpdates() {
+            if (updaterCheckInProgress || updateAvailableOrDownloading) return;
+            updaterCheckInProgress = true;
+            autoUpdater.checkForUpdates().catch((error) => {
+                updaterCheckInProgress = false;
+                console.error("[updater] Background update check failed:", error.message);
+            });
+        }
+    };
+}
+
+const UPDATE_CHECK_INTERVAL_MS = 15 * 60 * 1000;
+let updateCheckTimer = null;
+let updateCheckController = null;
+
+function startPeriodicUpdateChecks() {
+    if (!isPackaged || updateCheckTimer || !updateCheckController) return;
+    updateCheckTimer = setInterval(() => updateCheckController.checkForUpdates(), UPDATE_CHECK_INTERVAL_MS);
+    updateCheckTimer.unref?.();
 }
 
 // --- Startup update check (runs before the main window is ever shown) ------------
@@ -559,6 +621,7 @@ async function runStartupUpdateCheck() {
         let splash = null;
         let handleDownloadProgress = null;
         let timeoutId = null;
+        updateCheckController?.beginStartupCheck();
 
         const clearActiveTimeout = () => {
             if (timeoutId) {
@@ -570,6 +633,7 @@ async function runStartupUpdateCheck() {
         const finish = () => {
             if (settled) return;
             settled = true;
+            updateCheckController?.endStartupCheck();
             clearActiveTimeout();
             if (typeof handleDownloadProgress === "function") {
                 autoUpdater.removeListener("download-progress", handleDownloadProgress);
@@ -601,6 +665,10 @@ async function runStartupUpdateCheck() {
                 });
             };
             autoUpdater.on("download-progress", handleDownloadProgress);
+            autoUpdater.downloadUpdate().catch((error) => {
+                console.error("[updater] Startup download failed:", error.message);
+                finish();
+            });
         });
 
         autoUpdater.once("update-not-available", finish);
@@ -609,6 +677,7 @@ async function runStartupUpdateCheck() {
         autoUpdater.once("update-downloaded", () => {
             if (settled) return;
             settled = true;
+            updateCheckController?.endStartupCheck();
             clearActiveTimeout();
             // Quits the app and relaunches it automatically on the new version. Passes
             // (isSilent=true, isForceRunAfter=true) -- WITHOUT these, the underlying NSIS
@@ -626,6 +695,13 @@ async function runStartupUpdateCheck() {
 }
 
 let mainWindow;
+if (hasSingleInstanceLock) {
+    on("second-instance", () => {
+        if (!mainWindow || mainWindow.isDestroyed()) return;
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.focus();
+    });
+}
 
 // FIX (confirmed real bug tonight): the Cloudflare auth gate's hidden verification
 // window is, before createWindow() first runs, the ONLY window in existence - so
@@ -728,10 +804,14 @@ function createWindow() {
             if (!mainWindow.isDestroyed()) mainWindow.reload();
         }, 500);
     });
+
+    startPeriodicUpdateChecks();
 }
 
 let then = whenReady().then(async () => {
-    configureAutoUpdater();
+    if (!hasSingleInstanceLock) return;
+    console.log(`[updater] Starting EnQuote ${getVersion()} from ${process.execPath}`);
+    updateCheckController = configureAutoUpdater();
 
     // Request/response (not fire-and-forget): the renderer awaits this directly to learn
     // the definitive outcome of a manual refresh click, rather than polling /status and

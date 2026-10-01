@@ -82,16 +82,16 @@ export default function RefreshStatusDialog({ open, onOpenChange, phase, lastAtt
         <div className="rounded-lg border border-border bg-secondary p-3 text-sm space-y-1">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Quotes on this device</span>
-              <span className="font-medium text-foreground">{lastAttempt?.storedQuoteCount ?? "â€”"}</span>
+              <span className="font-medium text-foreground">{lastAttempt?.storedQuoteCount ?? "—"}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Products on this device</span>
-              <span className="font-medium text-foreground">{lastAttempt?.storedProductCount ?? "â€”"}</span>
+              <span className="font-medium text-foreground">{lastAttempt?.storedProductCount ?? "—"}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Last refresh check</span>
               <span className="font-medium text-foreground">
-                {lastAttempt?.finishedAt ? new Date(lastAttempt.finishedAt).toLocaleTimeString() : "â€”"}
+                {lastAttempt?.finishedAt ? new Date(lastAttempt.finishedAt).toLocaleTimeString() : "—"}
               </span>
             </div>
         </div>
