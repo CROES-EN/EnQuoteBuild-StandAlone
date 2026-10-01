@@ -49,7 +49,7 @@ async function validateAccessJwt(token) {
  * on any failure - callers just need to check `.ok` and use `.status`/`.reason`
  * directly in their own response.
  */
-async function verifyRequestIdentity(request, env) {
+async function verifyRequestIdentity(request, env, verifyJwt = validateAccessJwt) {
   const jwt =
     request.headers.get("cf-access-jwt-assertion") ||
     request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ||
@@ -61,7 +61,7 @@ async function verifyRequestIdentity(request, env) {
 
   let payload;
   try {
-    payload = await validateAccessJwt(jwt);
+    payload = await verifyJwt(jwt);
   } catch (error) {
     return { ok: false, status: 401, reason: "validation_failed", error: error.message };
   }
@@ -87,9 +87,9 @@ async function verifyRequestIdentity(request, env) {
  * Stage 1 identity endpoint (v1.1.4 Cloudflare Access two-stage sign-in).
  * Answers "who is this user?" - see verifyRequestIdentity for the real logic.
  */
-export async function handleAuthSession(request, env) {
+export async function handleAuthSession(request, env, verifyJwt = validateAccessJwt) {
   const headers = { "Cache-Control": "no-store" };
-  const result = await verifyRequestIdentity(request);
+  const result = await verifyRequestIdentity(request, env, verifyJwt);
 
   if (!result.ok) {
     return json({ authenticated: false, reason: result.reason }, result.status, headers);
@@ -110,9 +110,9 @@ export async function handleAuthSession(request, env) {
  * (confirmed live via wrangler secret list) - never from any file shipped to a client
  * machine.
  */
-export async function handleSyncCredentials(request, env) {
+export async function handleSyncCredentials(request, env, verifyJwt = validateAccessJwt) {
   const headers = { "Cache-Control": "no-store" };
-  const result = await verifyRequestIdentity(request);
+  const result = await verifyRequestIdentity(request, env, verifyJwt);
 
   if (!result.ok) {
     return json({ ok: false, reason: result.reason }, result.status, headers);

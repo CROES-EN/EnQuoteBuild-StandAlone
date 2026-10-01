@@ -154,7 +154,7 @@ function NameField({ candidates, selectedEmail, onSelect }) {
 }
 
 function CredentialsStep({ onError }) {
- const { login } = useAuth();
+ const { login, reauthenticateCloudflare } = useAuth();
  const candidates = useAccountCandidates();
  const [selectedEmail, setSelectedEmail] = useState("");
  const [password, setPassword] = useState("");
@@ -188,8 +188,28 @@ function CredentialsStep({ onError }) {
  {/* FIX (per explicit request): removed the em dash after "Enquote1" - now two plain,
      complete sentences instead of one run-on sentence joined by a dash. */}
  <p className="text-muted-foreground mb-6 text-center text-sm">
- New here? Sign in with the temporary password your admin gave you. You'll be asked to set your own password right after.
+ Sign in with your Cloudflare Access account. Legacy local accounts can still use the password form below.
  </p>
+ <Button
+ type="button"
+ variant="outline"
+ className="w-full mb-4"
+ disabled={isSubmitting}
+ onClick={async () => {
+ onError("");
+ setIsSubmitting(true);
+ try {
+ await reauthenticateCloudflare();
+ } catch (error) {
+ onError(error?.message || "Cloudflare sign-in failed.");
+ } finally {
+ setIsSubmitting(false);
+ }
+ }}
+ >
+ <ShieldCheck className="w-4 h-4 mr-2" />
+ Continue with Cloudflare Access
+ </Button>
  <form onSubmit={handleSubmit} className="space-y-4">
  <NameField candidates={candidates} selectedEmail={selectedEmail} onSelect={setSelectedEmail} />
  <div className="space-y-1.5">

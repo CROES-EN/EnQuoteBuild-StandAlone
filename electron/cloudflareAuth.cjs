@@ -419,8 +419,6 @@ async function fetchSyncCredentials() {
     await hiddenWindow.loadURL(`${WORKER_BASE_URL}/auth/sync-credentials`);
     const bodyText = await hiddenWindow.webContents.executeJavaScript("document.body.innerText");
 
-    console.log(`[cloudflare-auth] RAW SYNC-CREDENTIALS RESPONSE: ${bodyText}`);
-
     let body;
     try {
       body = JSON.parse(bodyText);

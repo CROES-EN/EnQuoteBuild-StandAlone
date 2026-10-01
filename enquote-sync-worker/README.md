@@ -26,10 +26,13 @@ Always-on EnQuote ↔ Base44 sync layer on Cloudflare Workers.
    ```
 3. Set secrets (same values as your other machine):
    ```sh
+   npx wrangler secret put ALLOWED_EMAILS_LIST
    npx wrangler secret put ENQUOTE_LOCAL_SYNC_WEBHOOK_SECRET
    npx wrangler secret put ENQUOTE_LOCAL_SYNC_ENCRYPTION_KEY
    npx wrangler secret put SNAPSHOT_TOKEN
    npx wrangler secret put OUTBOUND_TOKEN
+   npx wrangler secret put CF_ACCESS_CLIENT_ID
+   npx wrangler secret put CF_ACCESS_CLIENT_SECRET
    npx wrangler secret put BASE44_API_KEY
    npx wrangler secret put BASE44_APP_ID
    ```
@@ -57,6 +60,38 @@ Always-on EnQuote ↔ Base44 sync layer on Cloudflare Workers.
    });
    ```
 3. Add `OUTBOUND_TOKEN=<value>` to your `.env` file
+
+## Desktop Cloudflare Access sign-in
+
+The desktop app opens only after `/auth/session` validates the Cloudflare Access JWT
+and confirms the email against the Worker secret `ALLOWED_EMAILS_LIST`. The app then
+uses that verified email directly; users do not need a separate EnQuote password or
+per-computer shared-sync secret. The Cloudflare Access application must protect
+`enquote-sync.croeschberger.workers.dev`, and its
+application audience must match `POLICY_AUD` in `src/auth-session.js`. Keep the
+team-domain and Worker URL constants in `src/auth-session.js` and
+`../electron/cloudflareAuth.cjs` aligned with the Cloudflare Access configuration.
+
+Configure these Worker secrets with `npx wrangler secret put <NAME>`:
+
+| Secret | Required for | Purpose |
+|---|---|---|
+| `ALLOWED_EMAILS_LIST` | Sign-in | Comma-separated, allow-listed email addresses |
+| `OUTBOUND_TOKEN` | App sync | Enables dynamic outbound sync credentials |
+| `SNAPSHOT_TOKEN` | App sync | Enables dynamic snapshot sync credentials |
+| `CF_ACCESS_CLIENT_ID` | Entity snapshot sync | Optional Access service-token ID |
+| `CF_ACCESS_CLIENT_SECRET` | Entity snapshot sync | Optional Access service-token secret |
+
+The two token secrets are required for the Worker to return sync credentials, but a
+missing token does not invalidate an already verified identity; the app logs that sync
+is disabled. The service-token pair is optional and only needed for background
+entity-snapshot requests. None of these values should be placed in the installer or
+on each user's machine.
+
+After updating Worker code or secrets, deploy the Worker with `npx wrangler deploy`.
+An unauthenticated request to `/auth/session` should redirect to the configured
+Cloudflare Access sign-in page; after sign-in it should return JSON with
+`authenticated: true` for an allow-listed user.
 
 ## Endpoints
 

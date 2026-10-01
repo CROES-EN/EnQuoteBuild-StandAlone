@@ -29,7 +29,6 @@ import {
 } from "lucide-react";
 import {Link} from "react-router-dom";
 import UpdateStatusBadge from "@/components/UpdateStatusBadge";
-import RemoteSyncSecretDialog from "@/components/auth/RemoteSyncSecretDialog";
 import {createPageUrl} from "@/utils";
 import {cn} from "@/lib/utils";
 import {useCallback, useEffect, useRef, useState} from "react";
@@ -121,7 +120,7 @@ function formatLastUpdated(date) {
 
 export default function Layout({ children, currentPageName }) {
   const { isAdmin, roles, user } = useUserRole();
-  const { isAuthenticated, isLocalAuthActive, logout, needsRemoteSyncSecret, remoteSyncPromptUrl, clearRemoteSyncPrompt } = useAuth();
+  const { isAuthenticated, isLocalAuthActive, logout } = useAuth();
 
   const navItems = [
     { name: "Dashboard", icon: LayoutDashboard, page: "Dashboard", roles: ["submitter", "approver", "admin", "invoicer"] },
@@ -732,12 +731,6 @@ export default function Layout({ children, currentPageName }) {
       />
       <NotificationBell />
       <UpdateStatusBadge />
-
-      <RemoteSyncSecretDialog
-        open={needsRemoteSyncSecret}
-        syncUrl={remoteSyncPromptUrl}
-        onSaved={clearRemoteSyncPrompt}
-      />
     </div>
   );
 }

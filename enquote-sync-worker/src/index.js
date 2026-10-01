@@ -21,7 +21,7 @@ export default {
     if (url.pathname === "/api/inbound/base44" && request.method === "POST") return handleInboundBase44(request, env);
     if (url.pathname === "/api/base44/webhook/entity-snapshot" && request.method === "GET") return handleEntitySnapshot(request, env);
     if (url.pathname === "/api/outbound/status" && request.method === "GET") return handleStatus(request, env);
-    if (url.pathname === "/auth/session" && request.method === "GET") return handleAuthSession(request);
+    if (url.pathname === "/auth/session" && request.method === "GET") return handleAuthSession(request, env);
     if (url.pathname === "/auth/sync-credentials" && request.method === "GET") return handleSyncCredentials(request, env);
     return json({ error: "not_found" }, 404);
   },

@@ -96,43 +96,15 @@ const AuthProvider = ({children}) => {
   const [authError, setAuthError] = useState(null);
   const [appPublicSettings, setAppPublicSettings] = useState(null); // Contains only { id, public_settings }
 
-  // Local (email/password) login state - only meaningful when isLocalDemo && the Electron
-  // auth bridge exists.
+  // Local login state remains available for legacy accounts.
   const [needsLocalLogin, setNeedsLocalLogin] = useState(false);
-  // Cloudflare Access's verified identity (set once, on mount, from the main process -
-  // never editable by the renderer) and whether this verified email has NO EnQuote
-  // account yet (first-time self-service setup) vs. an existing one (normal login).
+  // Cloudflare Access identity is set by Electron after live verification.
   const [verifiedEmail, setVerifiedEmail] = useState(null);
   const [needsAccountCreation, setNeedsAccountCreation] = useState(false);
   // { email, password } once sign-in succeeds with the temporary password, held only in
   // memory (never persisted) until the new password is saved.
   const [pendingPasswordChange, setPendingPasswordChange] = useState(null);
   const isLocalAuthActive = isLocalDemo && !!getLocalAuthBridge();
-
-  // On mount, read the Cloudflare-verified identity (main-process memory, set by the
-  // startup gate BEFORE this window was ever shown - never trust anything else as proof
-  // of identity here) and check whether an EnQuote account already exists for it.
-  useEffect(() => {
-    const authBridge = getLocalAuthBridge();
-    if (!authBridge?.getVerifiedIdentity) return;
-    let cancelled = false;
-    (async () => {
-      const identity = await authBridge.getVerifiedIdentity().catch(() => null);
-      if (cancelled || !identity?.email) return;
-      setVerifiedEmail(identity.email);
-      const exists = await authBridge.hasAccount?.(identity.email).catch(() => true);
-      if (cancelled) return;
-      setNeedsAccountCreation(exists === false);
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
-  // Remote shared-sync auto-configuration: replaces manually creating
-  // remote-sync-config.json on every teammate's machine. See main.cjs's
-  // "remoteSync:checkStatus"/"remoteSync:saveSecret" handlers and
-  // RemoteSyncSecretDialog.jsx for the rest of this feature.
-  const [needsRemoteSyncSecret, setNeedsRemoteSyncSecret] = useState(false);
-  const [remoteSyncPromptUrl, setRemoteSyncPromptUrl] = useState(null);
 
   // Turns a resolved identity (a real synced Base44 "User" record when we have one, or just
   // the email otherwise) into the shape the rest of the app expects from `user`. Note the
@@ -157,32 +129,6 @@ const AuthProvider = ({children}) => {
       additional_roles: record?.additional_roles || []
     };
   };
-
-  // Checks whether this machine needs the one-time remote-sync secret prompt.
-  // NEVER throws and never blocks sign-in - a missing bridge (dev/browser mode) or
-  // an unreachable check are both treated as "nothing to do right now".
-  const checkRemoteSyncStatus = useCallback(async (email) => {
-    try {
-      const bridge = getEnquoteLocal()?.remoteSync;
-      if (!bridge) return;
-      const result = await bridge.checkStatus(email);
-      if (result?.ok && result.needsSecret) {
-        setRemoteSyncPromptUrl(result.syncUrl);
-        setNeedsRemoteSyncSecret(true);
-      } else {
-        setNeedsRemoteSyncSecret(false);
-        setRemoteSyncPromptUrl(null);
-      }
-    } catch (error) {
-      console.warn("[remote-sync] Status check failed (non-blocking):", error?.message || error);
-    }
-  }, []);
-
-  // Called by RemoteSyncSecretDialog.jsx once the secret has been saved successfully.
-  const clearRemoteSyncPrompt = useCallback(() => {
-    setNeedsRemoteSyncSecret(false);
-    setRemoteSyncPromptUrl(null);
-  }, []);
 
   // Loads the live synced users list (if any) to find the full record for the signed-in
   // email, then activates it as the current session user.
@@ -254,11 +200,7 @@ const AuthProvider = ({children}) => {
       });
     });
 
-    // Intentionally not awaited: checkRemoteSyncStatus never throws (it has its own
-    // internal try/catch above), so there is nothing meaningful to await here. The `void`
-    // operator marks this as a deliberate fire-and-forget call rather than a missed await.
-    void checkRemoteSyncStatus(email);
-  }, [checkRemoteSyncStatus]);
+  }, []);
 
   // Maps a failed remote app-state check onto the right authError shape. Split out of
   // checkRemoteAppState purely to keep that function's Cognitive Complexity low.
@@ -378,6 +320,20 @@ const AuthProvider = ({children}) => {
     setAppPublicSettings({id: "local-demo", public_settings: {}});
     setIsLoadingPublicSettings(false);
 
+    // Electron only creates the app window after Cloudflare Access has verified the
+    // identity in the main process. Use that identity directly rather than requiring
+    // users to create and maintain a second, machine-local password.
+    const identity = await Promise.resolve(authBridge.getVerifiedIdentity?.()).catch((error) => {
+      console.error("[Local Auth] Could not read Cloudflare-verified identity:", error?.message || error);
+      return null;
+    });
+    if (identity?.email) {
+      setVerifiedEmail(identity.email);
+      await activateUser(identity.email);
+      setIsLoadingAuth(false);
+      return;
+    }
+
     // Restore a previously-verified session instead of forcing a fresh sign-in on every
     // reload - see the LOCAL_SESSION_EMAIL_KEY comment above for why this matters.
     const persistedEmail = getPersistedLocalSessionEmail();
@@ -412,7 +368,7 @@ const AuthProvider = ({children}) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const logout = useCallback((shouldRedirect = true) => {
+  const logout = useCallback(async (shouldRedirect = true) => {
     // Removes this user from the "Who's Online" presence list, captured BEFORE user
     // state is cleared below (user?.email would be null after setUser(null)).
     // Fire-and-forget, same reasoning as activateUser's announce call above.
@@ -426,9 +382,14 @@ const AuthProvider = ({children}) => {
       setIsAuthenticated(false);
       setPendingPasswordChange(null);
       setPersistedLocalSessionEmail(null);
-      // Only re-show the login screen if it's actually wired up (Electron bridge present);
-      // otherwise there'd be nothing to sign back in with.
       setNeedsLocalLogin(isLocalAuthActive);
+      if (isLocalAuthActive) {
+        try {
+          await getLocalAuthBridge()?.signOutEverywhere?.();
+        } catch (error) {
+          console.error("[cloudflare-auth] Could not clear the previous sign-in:", error?.message || error);
+        }
+      }
       return;
     }
 
@@ -443,6 +404,21 @@ const AuthProvider = ({children}) => {
       base44.auth.logout();
     }
   }, [user, isLocalAuthActive]);
+
+  const reauthenticateCloudflare = useCallback(async () => {
+    const authBridge = getLocalAuthBridge();
+    if (!authBridge?.reauthenticate) {
+      throw new Error("Cloudflare sign-in is only available in the desktop app.");
+    }
+    const result = await authBridge.reauthenticate();
+    if (!result?.authenticated || !result.email) {
+      throw new Error("Cloudflare authentication was not completed.");
+    }
+    setVerifiedEmail(result.email);
+    setNeedsAccountCreation(false);
+    await activateUser(result.email);
+    return result;
+  }, [activateUser]);
 
   const navigateToLogin = useCallback(() => {
     // Use the SDK's redirectToLogin method
@@ -538,9 +514,7 @@ const AuthProvider = ({children}) => {
     needsAccountCreation,
     createAccount,
     refreshLocalUser,
-    needsRemoteSyncSecret,
-    remoteSyncPromptUrl,
-    clearRemoteSyncPrompt
+    reauthenticateCloudflare
   }), [
     user,
     isAuthenticated,
@@ -560,9 +534,7 @@ const AuthProvider = ({children}) => {
     needsAccountCreation,
     createAccount,
     refreshLocalUser,
-    needsRemoteSyncSecret,
-    remoteSyncPromptUrl,
-    clearRemoteSyncPrompt
+    reauthenticateCloudflare
   ]);
 
   return (
