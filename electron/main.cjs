@@ -14,6 +14,7 @@ const { autoUpdater } = require("electron-updater");
 const fs = require("node:fs");
 const path = require("node:path");
 const { repositoryFor } = require("./repository.cjs");
+const { importEntitySnapshot } = require("./entitySnapshotSync.cjs");
 const { createOutboundSync } = require("./outboundSync.cjs");
 const { openSalesforceReportWindow, closeSalesforceReportWindow } = require("./salesforceImport.cjs");
 const { analyzeAll } = require("./diagnosticReportAnalyzer.cjs");
@@ -1719,6 +1720,17 @@ let then = whenReady().then(async () => {
 
             if (!response?.ok || !Array.isArray(response.entities) || response.entities.length === 0) return;
 
+            const importedRecordCount = await importEntitySnapshot(quoteRepository, response.entities);
+            if (importedRecordCount > 0) {
+                markOwnWrite();
+                console.log(`[entity-sync] Bulk-imported ${importedRecordCount} Base44 entity record(s).`);
+                BrowserWindow.getAllWindows().forEach((window) => window.webContents.send("app:data-updated", {
+                    at: new Date().toISOString(),
+                    changedQuoteNumbers: []
+                }));
+                return;
+            }
+
             // Base44 sends PascalCase entity names, but the local repository's
             // generic collection system uses different (often abbreviated)
             // camelCase names - confirmed directly against repository.cjs's real
@@ -2060,6 +2072,18 @@ let then = whenReady().then(async () => {
             }
             startOutboundSync(credentials.outboundToken);
             console.log("[cloudflare-auth] Sync credentials obtained - outbound/entity sync enabled.");
+            try {
+                const snapshot = await fetchRemoteSnapshot(
+                    "https://enquote-sync.croeschberger.workers.dev",
+                    credentials.snapshotToken
+                );
+                await quoteRepository.importData(snapshot);
+                markOwnWrite();
+                console.log(`[cloudflare-auth] Imported ${snapshot.quotes.length} shared quote record(s).`);
+            } catch (error) {
+                console.error("[cloudflare-auth] Could not import the initial shared quote snapshot:", error.message);
+            }
+            await pollEntitySnapshot();
         } else {
             console.warn(`[cloudflare-auth] Could not obtain sync credentials (reason: ${credentials.reason}) - sync disabled this session.`);
         }

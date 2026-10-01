@@ -407,6 +407,10 @@ function normalizeIncomingSnapshot(input) {
   };
 }
 
+function isRecord(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
 function repositoryFor(userDataPath) {
   const dataPath = path.join(userDataPath, fileName);
 
@@ -441,26 +445,119 @@ function repositoryFor(userDataPath) {
     }
   }
 
+  async function backupIncompatibleData() {
+    const backupDirectory = path.join(userDataPath, "Backups");
+    await fs.mkdir(backupDirectory, { recursive: true });
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    let backupPath = path.join(backupDirectory, `${fileName}.incompatible-${timestamp}.json`);
+    let suffix = 1;
+    while (await fs.access(backupPath).then(() => true).catch(() => false)) {
+      backupPath = path.join(backupDirectory, `${fileName}.incompatible-${timestamp}-${suffix++}.json`);
+    }
+    await fs.copyFile(dataPath, backupPath);
+    return backupPath;
+  }
+
+  function recoverStoredData(parsed) {
+    if (!isRecord(parsed)) {
+      return {
+        version: DATA_VERSION,
+        quotes: seedQuotes,
+        products: productSeed,
+        meta: { sync_ttl_ms: DEFAULT_SYNC_TTL_MS },
+        userCredentials: {},
+        outboundQueue: [],
+        outboundDismissalQueue: [],
+        outboundMentionQueue: []
+      };
+    }
+
+    const snapshot = normalizeIncomingSnapshot(parsed);
+    const recovered = {
+      ...parsed,
+      version: DATA_VERSION,
+      quotes: Array.isArray(parsed.quotes) ? parsed.quotes : snapshot.quotes,
+      products: Array.isArray(parsed.products) ? parsed.products : snapshot.products,
+      meta: isRecord(parsed.meta) ? parsed.meta : {},
+      userCredentials: isRecord(parsed.userCredentials) ? parsed.userCredentials : {},
+      outboundQueue: Array.isArray(parsed.outboundQueue) ? parsed.outboundQueue : [],
+      outboundDismissalQueue: Array.isArray(parsed.outboundDismissalQueue) ? parsed.outboundDismissalQueue : [],
+      outboundMentionQueue: Array.isArray(parsed.outboundMentionQueue) ? parsed.outboundMentionQueue : []
+    };
+    collectionNames.forEach((name) => {
+      recovered[name] = Array.isArray(parsed[name])
+        ? parsed[name]
+        : Array.isArray(snapshot[name])
+          ? snapshot[name]
+          : structuredClone(collectionDefaults[name]);
+    });
+    return recovered;
+  }
+
+  async function recoverIncompatibleData(parsed, reason) {
+    const backupPath = await backupIncompatibleData();
+    const recovered = recoverStoredData(parsed);
+    console.warn(`[migration] Recovered incompatible local data (${reason}); original preserved at "${backupPath}".`);
+    await write(recovered);
+    return recovered;
+  }
+
+  async function createInitialData() {
+    const initial = {
+      version: DATA_VERSION,
+      quotes: seedQuotes,
+      products: productSeed,
+      meta: { sync_ttl_ms: DEFAULT_SYNC_TTL_MS },
+      userCredentials: {},
+      outboundQueue: [],
+      outboundDismissalQueue: [],
+      outboundMentionQueue: []
+    };
+    await write(initial);
+    return initial;
+  }
+
   async function read() {
+    let raw;
     try {
-      let raw = await fs.readFile(dataPath, "utf8");
-      // Strip a leading UTF-8 BOM if present - JSON.parse doesn't tolerate one, and a BOM can
-      // easily end up here from an external editor/tool resaving this file (e.g. Windows
-      // PowerShell 5.1's `Out-File -Encoding utf8` always writes one, unlike newer tools) even
-      // though this app itself never writes one (see write() below). Confirmed as the root
-      // cause of a real "Failed to persist incoming snapshot ... Unexpected token '\uFEFF'"
-      // outage in webhook-receiver.cjs, which reads this same file through this function.
-      if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
-      const parsed = JSON.parse(raw);
-      if (parsed.version !== DATA_VERSION || !Array.isArray(parsed.quotes)) throw new Error("Incompatible local data file");
-      parsed.products = parsed.products || structuredClone(productSeed);
-      parsed.meta = parsed.meta || {};
-      parsed.meta.sync_ttl_ms = parsed.meta.sync_ttl_ms || DEFAULT_SYNC_TTL_MS;
-      parsed.userCredentials = parsed.userCredentials || {};
-      parsed.outboundQueue = Array.isArray(parsed.outboundQueue) ? parsed.outboundQueue : [];
-      parsed.outboundDismissalQueue = Array.isArray(parsed.outboundDismissalQueue) ? parsed.outboundDismissalQueue : [];
-      parsed.outboundMentionQueue = Array.isArray(parsed.outboundMentionQueue) ? parsed.outboundMentionQueue : [];
-      collectionNames.forEach(name => { parsed[name] = parsed[name] || structuredClone(collectionDefaults[name]); });
+      raw = await fs.readFile(dataPath, "utf8");
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+      return createInitialData();
+    }
+
+    if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (error) {
+      if (!(error instanceof SyntaxError)) throw error;
+      parsed = null;
+      console.warn(`[migration] Local data file is not valid JSON (${error.message}); preserving it before cloud recovery.`);
+      await backupIncompatibleData();
+    }
+
+    if (!isRecord(parsed) || parsed.version !== DATA_VERSION || !Array.isArray(parsed.quotes)) {
+      const reason = !isRecord(parsed)
+        ? "unrecognized data structure"
+        : `version ${String(parsed.version)} or missing quotes array`;
+      if (parsed !== null) {
+        parsed = await recoverIncompatibleData(parsed, reason);
+      } else {
+        parsed = await createInitialData();
+      }
+    }
+
+    parsed.products = Array.isArray(parsed.products) ? parsed.products : structuredClone(productSeed);
+    parsed.meta = isRecord(parsed.meta) ? parsed.meta : {};
+    parsed.meta.sync_ttl_ms = parsed.meta.sync_ttl_ms || DEFAULT_SYNC_TTL_MS;
+    parsed.userCredentials = isRecord(parsed.userCredentials) ? parsed.userCredentials : {};
+    parsed.outboundQueue = Array.isArray(parsed.outboundQueue) ? parsed.outboundQueue : [];
+    parsed.outboundDismissalQueue = Array.isArray(parsed.outboundDismissalQueue) ? parsed.outboundDismissalQueue : [];
+    parsed.outboundMentionQueue = Array.isArray(parsed.outboundMentionQueue) ? parsed.outboundMentionQueue : [];
+    collectionNames.forEach(name => {
+      parsed[name] = Array.isArray(parsed[name]) ? parsed[name] : structuredClone(collectionDefaults[name]);
+    });
 
       // BUGFIX: this sweep must run AT MOST ONCE, EVER - not on every read() (which
       // happens on nearly every IPC action). Without this completion flag, any account
@@ -481,13 +578,7 @@ function repositoryFor(userDataPath) {
         await write(parsed);
       }
 
-      return parsed;
-    } catch (error) {
-      if (error.code !== "ENOENT") throw error;
-      const initial = { version: DATA_VERSION, quotes: seedQuotes, products: productSeed, meta: { sync_ttl_ms: DEFAULT_SYNC_TTL_MS }, userCredentials: {}, outboundQueue: [], outboundDismissalQueue: [], outboundMentionQueue: [] };
-      await write(initial);
-      return initial;
-    }
+    return parsed;
   }
 
   // Serializes every write() call through this single promise chain, so two near-

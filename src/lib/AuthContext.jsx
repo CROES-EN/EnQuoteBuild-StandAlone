@@ -113,10 +113,10 @@ const AuthProvider = ({children}) => {
   const buildUserFromRecord = (record, fallbackEmail) => {
     const email = record?.email || fallbackEmail || "";
     const isForcedAdmin = FORCED_ADMIN_EMAILS.has(email);
-    // Deliberately do NOT default a missing app_role to "submitter" - leaving it unset lets
-    // the existing RoleGuard "Role Not Assigned" screen correctly ask the person to contact
-    // an admin, the same as it already does for Base44-authenticated users with no role.
-    const resolvedRole = isForcedAdmin ? "admin" : (record?.app_role || null);
+    // Cloudflare Access is the identity allow-list for packaged users. Give an authenticated
+    // user without a synced role the least-privileged app role so a missing local User record
+    // does not block first-run access; explicit roles and forced admins still take precedence.
+    const resolvedRole = isForcedAdmin ? "admin" : (record?.app_role || "submitter");
     const displayName = record?.display_name || record?.full_name || email;
 
     return {
