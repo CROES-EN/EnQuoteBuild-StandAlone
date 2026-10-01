@@ -9,6 +9,11 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
     // NOT fire-and-forget, so the caller learns the real outcome instead of having to
     // guess by polling.
     refresh: () => invoke("app:refresh"),
+    onRefreshProgress: (callback) => {
+      const listener = (_event, progress) => callback(progress);
+      ipcRenderer.on("app:refresh-progress", listener);
+      return () => ipcRenderer.removeListener("app:refresh-progress", listener);
+    },
     getRefreshStatus: () => invoke("app:refresh-status"),
     getRefreshEvents: (sinceSeq) => invoke("app:refresh-events", sinceSeq),
     // Subscribes to soft "new data landed on disk" notifications (fired when a Base44

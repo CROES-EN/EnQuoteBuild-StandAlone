@@ -2,7 +2,7 @@ import {useEffect, useState} from "react";
 import {useAuth} from "@/lib/AuthContext";
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import {Button} from "@/components/ui/button";
-import {AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, CloudOff, Info, Loader2, XCircle} from "lucide-react";
+import {AlertTriangle, ArrowDown, ArrowUp, CheckCircle2, ChevronDown, ChevronUp, CloudOff, Info, Loader2, XCircle} from "lucide-react";
 import {cn} from "@/lib/utils";
 import {REFRESH_REASON_LABELS} from "@/hooks/useLocalSyncStatus";
 
@@ -14,15 +14,17 @@ const LEVEL_ICON = {
 };
 
 /**
- * Optional deep-dive view into a refresh check: current phase, stored counts, and a
- * collapsible diagnostic event log. Purely presentational - all polling/triggering lives
- * in the shared useLocalSyncStatus() hook (see Layout.jsx), so this can be opened at any
- * time (mid-refresh or after it settles) without starting a second, independent poll.
+ * Shows live pull/push progress and the settled result; refresh control remains in the
+ * shared useLocalSyncStatus() hook (see Layout.jsx).
  */
-export default function RefreshStatusDialog({ open, onOpenChange, phase, lastAttempt, events = [], outboundStatus = null, fetchOutboundStatus }) {
+export default function RefreshStatusDialog({ open, onOpenChange, phase, lastAttempt, progress, events = [], outboundStatus = null, fetchOutboundStatus }) {
   const [logOpen, setLogOpen] = useState(false);
   const unreachable = phase === "unreachable";
-  const isFinished = phase === "success" || phase === "error";
+  const isFinished = phase === "success" || phase === "error" || unreachable;
+  const inbound = progress?.inbound || lastAttempt;
+  const outbound = progress?.outbound || lastAttempt?.outbound;
+  const outboundActive = phase === "running" && progress?.stage === "outbound";
+  const inboundActive = phase === "running" && progress?.stage === "inbound";
 
   // Refreshes outbound sync health once whenever the dialog actually opens, so it's
   // current when someone looks at it without polling continuously in the background.
@@ -66,20 +68,80 @@ export default function RefreshStatusDialog({ open, onOpenChange, phase, lastAtt
             {phase === "success" && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
             {phase === "error" && <XCircle className="w-4 h-4 text-red-500" />}
             {unreachable && <XCircle className="w-4 h-4 text-red-500" />}
-            Refreshing Quote Data
+            Syncing Quote Data
           </DialogTitle>
           <DialogDescription>
             {unreachable
               ? "Could not reach the shared data source. Previously loaded data may still be available."
               : phase === "error"
                 ? "The refresh check failed. See the error details below."
-                : !isFinished
-                  ? "Checking Cloudflare for the latest shared data..."
-                  : (REFRESH_REASON_LABELS[lastAttempt?.reason] || "Refresh check complete.")}
+                  : phase === "running" && outboundActive
+                    ? "Sending saved quote changes to the team before checking for updates."
+                    : phase === "running" && inboundActive
+                      ? "Outgoing changes have been sent. Checking Cloudflare for quotes coming in."
+                      : !isFinished
+                        ? "Preparing to sync quotes in both directions..."
+                    : (REFRESH_REASON_LABELS[lastAttempt?.reason] || "Refresh check complete.")}
           </DialogDescription>
-        </DialogHeader>
+          </DialogHeader>
 
-        <div className="rounded-lg border border-border bg-secondary p-3 text-sm space-y-1">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <section className="rounded-lg border border-border bg-secondary p-3 text-sm space-y-2">
+              <h3 className="flex items-center gap-2 font-semibold text-foreground">
+                <ArrowDown className="h-4 w-4 text-blue-600" />
+                Quotes coming in
+              </h3>
+              <p className="text-muted-foreground">
+                {inboundActive
+                  ? "Checking Cloudflare for quote updates..."
+                  : outboundActive
+                    ? "Starts after outgoing quotes are sent."
+                    : phase === "error"
+                      ? "Incoming sync did not complete."
+                      : inbound?.quoteAddedCount != null && inbound?.quoteUpdatedCount != null
+                        ? `${inbound.quoteAddedCount} new, ${inbound.quoteUpdatedCount} updated`
+                        : inbound?.quoteSnapshotCount != null
+                          ? `Snapshot checked: ${inbound.quoteSnapshotCount} quote(s)`
+                          : "No incoming quote details yet."}
+              </p>
+              {inbound?.quoteSnapshotCount != null && (
+                <p className="text-xs text-muted-foreground">
+                  {inbound.quoteSnapshotCount} quote(s) checked in the shared snapshot
+                </p>
+              )}
+            </section>
+
+            <section className="rounded-lg border border-border bg-secondary p-3 text-sm space-y-2">
+              <h3 className="flex items-center gap-2 font-semibold text-foreground">
+                <ArrowUp className="h-4 w-4 text-orange-600" />
+                Quotes going out
+              </h3>
+              <p className="text-muted-foreground">
+                {outboundActive
+                  ? "Sending locally saved quote changes..."
+                  : outbound?.configured === false
+                    ? "Outbound sync is not configured on this device."
+                    : outbound?.error
+                      ? `Sync error: ${outbound.error}`
+                      : outbound?.skipped === "already-running"
+                        ? "Another outgoing sync is already in progress."
+                        : outbound?.pushed != null
+                          ? `${outbound.pushed} quote(s) sent`
+                          : "No outgoing quote details yet."}
+              </p>
+              {outbound?.failed > 0 && (
+                <p className="text-amber-700">{outbound.failed} quote(s) could not be sent and remain queued.</p>
+              )}
+              {outbound?.conflicts > 0 && (
+                <p className="text-amber-700">{outbound.conflicts} quote(s) need conflict review.</p>
+              )}
+              {outbound?.pending > 0 && (
+                <p className="text-muted-foreground">{outbound.pending} quote(s) still waiting to sync.</p>
+              )}
+            </section>
+          </div>
+
+          <div className="rounded-lg border border-border bg-secondary p-3 text-sm space-y-1">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Quotes on this device</span>
               <span className="font-medium text-foreground">{lastAttempt?.storedQuoteCount ?? "—"}</span>

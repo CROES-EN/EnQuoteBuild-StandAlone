@@ -1,7 +1,7 @@
 {
     "name": "base44-app",
     "private": true,
-    "version": "1.0.11",
+    "version": "1.0.12",
     "type": "module",
     "main": "electron/main.cjs",
     "scripts": {
@@ -89,6 +89,7 @@
         "tailwindcss-animate": "^1.0.7",
         "three": "^0.171.0",
         "vaul": "^1.1.2",
+        "ws": "^8.22.0",
         "xlsx": "^0.18.5",
         "zod": "^3.24.2"
     },

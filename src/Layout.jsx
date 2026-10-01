@@ -155,7 +155,7 @@ export default function Layout({ children, currentPageName }) {
   const [, forceTick] = useState(0);
 
   const queryClient = useQueryClient();
-  const { phase, lastAttempt, events, trigger, hasBridge, outboundStatus, fetchOutboundStatus } = useLocalSyncStatus();
+  const { phase, lastAttempt, events, progress, trigger, hasBridge, outboundStatus, fetchOutboundStatus } = useLocalSyncStatus();
 
   // Suppresses the passive "New data synced" toast when the background fs-watch
   // notification is just the natural side-effect of a manual refresh the user JUST
@@ -423,6 +423,7 @@ export default function Layout({ children, currentPageName }) {
       toast.success("Data refreshed.");
       return;
     }
+    setDetailsOpen(true);
     trigger();
   }
 
@@ -718,6 +719,7 @@ export default function Layout({ children, currentPageName }) {
         onOpenChange={setDetailsOpen}
         phase={phase}
         lastAttempt={lastAttempt}
+        progress={progress}
         events={events}
         outboundStatus={outboundStatus}
         fetchOutboundStatus={fetchOutboundStatus}

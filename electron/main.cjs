@@ -21,6 +21,7 @@ const { applyVerifiedQuoteCreator, applyVerifiedQuoteUpdate, requireVerifiedEmai
 const { createPresenceSync } = require("./presenceSync.cjs");
 const { createUpdatePrompt } = require("./updatePrompt.cjs");
 const { createOutboundSync } = require("./outboundSync.cjs");
+const { startRealtimeSync } = require("./realtimeSync.cjs");
 const { openSalesforceReportWindow, closeSalesforceReportWindow } = require("./salesforceImport.cjs");
 const { analyzeAll } = require("./diagnosticReportAnalyzer.cjs");
 const { verifyCloudflareSession, openCloudflareAuthWindow, setVerifiedIdentity, getVerifiedIdentity, clearCloudflareSession, reauthenticate: reauthenticateCloudflare, fetchSyncCredentials } = require("./cloudflareAuth.cjs");
@@ -60,6 +61,7 @@ function loadEnvFile() {
 
 let quoteRepository;
 let outboundSync;
+let realtimeSync;
 let dataDirectoryWatcher;
 const presenceSync = createPresenceSync({
     workerUrl: "https://enquote-sync.croeschberger.workers.dev",
@@ -916,6 +918,7 @@ let then = whenReady().then(async () => {
                 reason: "checked",
                 storedQuoteCount: Array.isArray(stored) ? stored.length : 0,
                 storedProductCount: Array.isArray(data.products) ? data.products.length : 0,
+                quoteSnapshotCount: data.quotes.length,
                 lastImportedAt: new Date().toISOString()
             };
         } catch (error) {
@@ -924,45 +927,72 @@ let then = whenReady().then(async () => {
         }
     }
 
-    ipcMain.handle("app:refresh", async () => {
+    async function refreshFromCloudflare() {
+        const workerUrl = "https://enquote-sync.croeschberger.workers.dev";
+        const snapshot = await fetchRemoteSnapshot(workerUrl, process.env.SNAPSHOT_TOKEN || "");
+        const stored = await quoteRepository.importData(snapshot);
+        markOwnWrite();
+        const entityResult = await pollEntitySnapshot();
+        if (!entityResult?.ok && !entityResult?.error?.includes("already in progress")) {
+            throw new Error(entityResult?.error || "Cloudflare entity refresh failed.");
+        }
+        return {
+            ok: true,
+            storedQuoteCount: Array.isArray(stored) ? stored.length : 0,
+            quoteSnapshotCount: snapshot.quotes.length,
+            importedRecordCount: entityResult?.importedRecordCount || 0
+        };
+    }
+
+    ipcMain.handle("app:refresh", async (event) => {
         console.log('[refresh] Manual refresh triggered - checking Cloudflare for latest shared data...');
+
+        const sendProgress = (progress) => {
+            if (!event.sender.isDestroyed()) event.sender.send("app:refresh-progress", progress);
+        };
+        let outboundResult = { skipped: "not-configured" };
+        let outboundError = null;
+
+        sendProgress({ stage: "outbound" });
+        if (outboundSync) {
+            try {
+                outboundResult = await outboundSync.flush();
+                markOwnWrite();
+                console.log('[refresh] Outbound flush result:', outboundResult);
+            } catch (error) {
+                outboundError = error.message;
+                outboundResult = { error: error.message };
+                console.log('[refresh] Outbound flush failed:', error.message);
+            }
+        }
+
+        const outboundProgress = {
+            ...outboundResult,
+            error: outboundError || outboundResult.error || null,
+            configured: Boolean(outboundSync?.isConfigured)
+        };
+        sendProgress({ stage: "inbound", outbound: outboundProgress });
 
         // If this machine has an optional remote-sync-config.json, use that configured
         // shared receiver; otherwise continue through the standard Cloudflare Worker path.
         const remoteConfig = readRemoteSyncConfig();
         if (remoteConfig?.url) {
-            return await refreshFromRemoteSyncSource(remoteConfig);
-        }
-
-        // Push any locally-created/edited quotes up to Base44 first, so "Refresh" behaves
-        // like a two-way sync instead of only pulling. Without this, a saved edit could sit
-        // queued for up to 5 minutes (the background flush interval) before Base44 saw it,
-        // even though the user just asked the app to sync. Best-effort only - a failure here
-        // never blocks or fails the refresh check itself.
-        if (outboundSync) {
-            try {
-                const outboundResult = await outboundSync.flush();
-                markOwnWrite();
-                console.log('[refresh] Outbound flush result:', outboundResult);
-            } catch (error) {
-                console.log('[refresh] Outbound flush failed:', error.message);
-            }
+            const result = await refreshFromRemoteSyncSource(remoteConfig);
+            const completed = { ...result, outbound: outboundProgress };
+            sendProgress({ stage: result.ok ? "complete" : "error", outbound: outboundProgress });
+            return completed;
         }
 
         // Pull from the Cloudflare Worker sync system (the same entity snapshot poll used
         // by the normal 90-second timer), rather than the retired localhost receiver.
         try {
-            if (outboundSync) {
-                try {
-                    await outboundSync.flush();
-                    markOwnWrite();
-                } catch (flushError) {
-                    console.log('[refresh] Outbound flush failed (will retry on next cycle):', flushError.message);
-                }
-            }
-
+            let syncResult = {
+                quoteSnapshotCount: 0,
+                quoteAddedCount: 0,
+                quoteUpdatedCount: 0
+            };
             if (typeof pollEntitySnapshot === "function") {
-                const syncResult = await pollEntitySnapshot();
+                syncResult = await pollEntitySnapshot();
                 if (!syncResult?.ok) {
                     throw new Error(syncResult?.error || "Cloudflare data refresh failed.");
                 }
@@ -973,18 +1003,37 @@ let then = whenReady().then(async () => {
 
             console.log('[refresh] Real sync refresh complete -', currentData?.quotes?.length || 0, 'quotes on disk,', queueStatus.pending, 'pending outbound.');
 
-            return {
+            const result = {
                 ok: true,
-                reason: "checked",
+                reason: (syncResult?.quoteAddedCount || 0) + (syncResult?.quoteUpdatedCount || 0) > 0
+                    ? "imported"
+                    : (outboundProgress.pushed || 0) > 0
+                        ? "synced"
+                        : "checked",
                 storedQuoteCount: Array.isArray(currentData?.quotes) ? currentData.quotes.length : 0,
                 storedProductCount: Array.isArray(currentData?.products) ? currentData.products.length : 0,
                 lastImportedAt: currentData?.meta?.last_imported_at || null,
                 outboundPending: queueStatus.pending,
-                outboundSync: queueStatus.synced
+                outboundSync: queueStatus.synced,
+                quoteSnapshotCount: syncResult?.quoteSnapshotCount ?? 0,
+                quoteAddedCount: syncResult?.quoteAddedCount ?? 0,
+                quoteUpdatedCount: syncResult?.quoteUpdatedCount ?? 0,
+                outbound: {
+                    ...outboundProgress,
+                    pending: queueStatus.pending,
+                    total: queueStatus.total
+                }
             };
+            sendProgress({ stage: "complete", outbound: result.outbound, inbound: {
+                quoteSnapshotCount: result.quoteSnapshotCount,
+                quoteAddedCount: result.quoteAddedCount,
+                quoteUpdatedCount: result.quoteUpdatedCount
+            } });
+            return result;
         } catch (error) {
             console.log('[refresh] Refresh check failed:', error.message);
-            return { ok: false, error: error.message };
+            sendProgress({ stage: "error", outbound: outboundProgress, error: error.message });
+            return { ok: false, error: error.message, outbound: outboundProgress };
         }
     });
 
@@ -1739,17 +1788,25 @@ let then = whenReady().then(async () => {
             if (!response?.ok || !Array.isArray(response.entities)) {
                 throw new Error("Cloudflare returned an invalid entity snapshot.");
             }
-            if (response.entities.length === 0) return { ok: true, importedRecordCount: 0 };
+            if (response.entities.length === 0) {
+                return {
+                    ok: true,
+                    importedRecordCount: 0,
+                    quoteSnapshotCount: 0,
+                    quoteAddedCount: 0,
+                    quoteUpdatedCount: 0
+                };
+            }
 
-            const importedRecordCount = await importEntitySnapshot(quoteRepository, response.entities);
-            if (importedRecordCount > 0) {
+            const importSummary = await importEntitySnapshot(quoteRepository, response.entities);
+            if (importSummary.importedRecordCount > 0) {
                 markOwnWrite();
-                console.log(`[entity-sync] Bulk-imported ${importedRecordCount} Base44 entity record(s).`);
+                console.log(`[entity-sync] Bulk-imported ${importSummary.importedRecordCount} Base44 entity record(s).`);
                 BrowserWindow.getAllWindows().forEach((window) => window.webContents.send("app:data-updated", {
                     at: new Date().toISOString(),
                     changedQuoteNumbers: []
                 }));
-                return { ok: true, importedRecordCount };
+                return { ok: true, ...importSummary };
             }
 
             // Base44 sends PascalCase entity names, but the local repository's
@@ -1915,7 +1972,13 @@ let then = whenReady().then(async () => {
                 markOwnWrite();
                 console.log(`[entity-sync] Synced ${updatedCount} Base44 entity record(s).`);
             }
-            return { ok: true, importedRecordCount: updatedCount };
+            return {
+                ok: true,
+                importedRecordCount: updatedCount,
+                quoteSnapshotCount: 0,
+                quoteAddedCount: 0,
+                quoteUpdatedCount: 0
+            };
         } catch (error) {
             console.log(`[entity-sync] Poll failed (will retry next cycle): ${error.message}`);
             return { ok: false, error: error.message };
@@ -2109,6 +2172,17 @@ let then = whenReady().then(async () => {
                 console.error("[cloudflare-auth] Could not import the initial shared quote snapshot:", error.message);
             }
             await pollEntitySnapshot();
+            realtimeSync?.stop();
+            realtimeSync = startRealtimeSync({
+                workerUrl: "https://enquote-sync.croeschberger.workers.dev",
+                sharedSecret: credentials.snapshotToken,
+                accessHeaders: {
+                    "CF-Access-Client-Id": credentials.cfAccessClientId || "",
+                    "CF-Access-Client-Secret": credentials.cfAccessClientSecret || ""
+                },
+                onQuotesUpdated: () => refreshFromCloudflare(),
+                onOutboundStatus: (data) => outboundSync?.handleRealtimeStatus(data)
+            });
         } else {
             console.warn(`[cloudflare-auth] Could not obtain sync credentials (reason: ${credentials.reason}) - sync disabled this session.`);
         }
@@ -2175,5 +2249,6 @@ on("window-all-closed", () => {
 });
 
 on("before-quit", () => {
+    realtimeSync?.stop();
     presenceSync.remove();
 });

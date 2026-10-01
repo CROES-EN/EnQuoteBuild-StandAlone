@@ -4,6 +4,7 @@ import {useCallback, useRef, useState} from "react";
 // dialog so both surfaces describe a given result identically.
 export const REFRESH_REASON_LABELS = {
   imported: "New data imported",
+  synced: "Outgoing quotes sent; no incoming changes",
   checked: "Already up to date",
   throttled: "Already up to date",
   invalid_signature: "Rejected: invalid webhook signature",
@@ -24,6 +25,8 @@ export function useLocalSyncStatus() {
   const [phase, setPhase] = useState("idle"); // idle | running | success | error | unreachable
   const [lastAttempt, setLastAttempt] = useState(null);
   const [events, setEvents] = useState([]);
+  const [progress, setProgress] = useState(null);
+  const [outboundStatus, setOutboundStatus] = useState(null);
   const runIdRef = useRef(0);
 
   const bridge = typeof window !== "undefined" ? window.enquoteLocal?.app : null;
@@ -38,13 +41,20 @@ export function useLocalSyncStatus() {
     const runId = ++runIdRef.current;
     setEvents([]);
     setLastAttempt(null);
+    setProgress({ stage: "outbound" });
     setPhase("running");
 
     let result;
+    let unsubscribeProgress;
     try {
+      unsubscribeProgress = bridge.onRefreshProgress?.((nextProgress) => {
+        if (runId === runIdRef.current) setProgress(nextProgress);
+      });
       result = await bridge.refresh();
     } catch (error) {
       result = { ok: false, error: error?.message };
+    } finally {
+      unsubscribeProgress?.();
     }
 
     // A newer trigger() started while this one was in flight - let that one own the state.
@@ -60,22 +70,54 @@ export function useLocalSyncStatus() {
 
     const finishedAt = new Date().toISOString();
     if (!result?.ok) {
+      if (result?.outbound) {
+        setOutboundStatus({
+          pending: result.outbound.pending ?? 0,
+          synced: 0,
+          total: result.outbound.total ?? 0,
+          configured: result.outbound.configured ?? false
+        });
+      }
       setLastAttempt({
         ok: false,
         reason: result?.reason || "error",
         error: result?.error,
-        finishedAt
+        finishedAt,
+        outbound: result?.outbound
       });
+      setProgress({ stage: "error", outbound: result?.outbound, error: result?.error });
       setPhase(result?.unreachable ? "unreachable" : "error");
       return true;
     }
 
+    const outbound = result.outbound || null;
+    if (outbound) {
+      setOutboundStatus({
+        pending: outbound.pending ?? result.outboundPending ?? 0,
+        synced: result.outboundSync ?? 0,
+        total: outbound.total ?? 0,
+        configured: outbound.configured ?? false
+      });
+    }
     setLastAttempt({
       ok: true,
       reason: result.reason || "checked",
       finishedAt,
       storedQuoteCount: result.storedQuoteCount,
-      storedProductCount: result.storedProductCount
+      storedProductCount: result.storedProductCount,
+      quoteSnapshotCount: result.quoteSnapshotCount,
+      quoteAddedCount: result.quoteAddedCount,
+      quoteUpdatedCount: result.quoteUpdatedCount,
+      outbound
+    });
+    setProgress({
+      stage: "complete",
+      inbound: {
+        quoteSnapshotCount: result.quoteSnapshotCount,
+        quoteAddedCount: result.quoteAddedCount,
+        quoteUpdatedCount: result.quoteUpdatedCount
+      },
+      outbound
     });
     setPhase("success");
     return true;
@@ -87,8 +129,6 @@ export function useLocalSyncStatus() {
 // waiting to push) directly in the UI instead of requiring a manual diagnostic.
 // Never throws - returns null on any failure so it can never break the existing
 // refresh flow above.
-const [outboundStatus, setOutboundStatus] = useState(null);
-
 const fetchOutboundStatus = useCallback(async () => {
   try {
     const syncBridge = typeof window !== "undefined" ? window.enquoteLocal?.sync : null;
@@ -115,5 +155,5 @@ const fetchOutboundStatus = useCallback(async () => {
   }
 }, []);
 
-return { phase, lastAttempt, events, trigger, hasBridge: !!bridge?.refresh, outboundStatus, fetchOutboundStatus };
+return { phase, lastAttempt, events, progress, trigger, hasBridge: !!bridge?.refresh, outboundStatus, fetchOutboundStatus };
 }

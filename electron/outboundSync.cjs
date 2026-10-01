@@ -51,9 +51,10 @@ function createOutboundSync({ repository, config, logger = console, onAfterWrite
   const { workerUrl, outboundToken, intervalMs = DEFAULT_INTERVAL_MS } = config || {};
   let running = false;
   const recentlyNotifiedQuoteIds = new Map();
+  const awaitingRemoteStatus = new Map();
   let timer = null;
   const isConfigured = Boolean(workerUrl && outboundToken);
-  const enqueueUrl = () => `${String(workerUrl).replace(/\/+$/, "")}/api/inbound/base44`;
+  const enqueueUrl = () => `${String(workerUrl).replace(/\/+$/, "")}/api/outbound/enqueue`;
   const authHeaders = () => ({
     Authorization: `Bearer ${outboundToken}`,
     "CF-Access-Client-Id": process.env.CF_ACCESS_CLIENT_ID || "",
@@ -75,10 +76,37 @@ function createOutboundSync({ repository, config, logger = console, onAfterWrite
     if (!response.ok) return { local_id: message.localId, error: response.error || `HTTP ${response.status}` };
     const result = response.body;
     if (!result.ok) {
+      if (result.queued && result.itemId) {
+        return { local_id: message.localId, queued: true, item_id: String(result.itemId) };
+      }
       if (result.status === "conflict") return { local_id: message.localId, error: `${CONFLICT_PREFIX} Base44's copy was updated at ${result.conflict_with}, which is more recent than this app's last known sync. Skipped to avoid overwriting.` };
       return { local_id: message.localId, error: result.error || "Unknown error from Worker" };
     }
+    if (result.status === "conflict") {
+      return { local_id: message.localId, error: `${CONFLICT_PREFIX} Base44's copy was updated at ${result.conflict_with || "an unknown time"}, which is more recent than this app's last known sync. Skipped to avoid overwriting.` };
+    }
     return { local_id: message.localId, remote_id: result.remote_id || null };
+  }
+
+  async function handleRealtimeStatus(data) {
+    if (data?.entityType !== "quote" || typeof data.quoteId !== "string" || !data.quoteId) return { updated: 0 };
+    const result = { local_id: data.quoteId };
+    if (data.status === "pushed" || data.status === "adopted") {
+      result.remote_id = data.remoteId || null;
+    } else if (data.status === "conflict") {
+      result.error = `${CONFLICT_PREFIX} Base44's copy was updated at ${data.conflictWith || "an unknown time"}, which is more recent than this app's last known sync. Skipped to avoid overwriting.`;
+    } else if (data.status === "error") {
+      result.error = data.errorMessage || "The Worker could not sync this quote.";
+    } else {
+      return { updated: 0 };
+    }
+
+    const update = await repository.markOutboundSynced([result]);
+    if (data.itemId && awaitingRemoteStatus.get(data.quoteId) === data.itemId) {
+      awaitingRemoteStatus.delete(data.quoteId);
+    }
+    if (update.updated) onAfterWrite?.();
+    return update;
   }
 
   async function flush() {
@@ -87,12 +115,16 @@ function createOutboundSync({ repository, config, logger = console, onAfterWrite
     running = true;
     try {
       const pending = await repository.listPendingOutboundQuotes();
-      const eligible = pending;
+      const eligible = pending.filter((entry) => !awaitingRemoteStatus.has(entry.local_id));
       const results = [];
       for (const entry of eligible) {
         try {
           const message = buildQuoteMessage(entry);
           const result = await sendOne(message);
+          if (result.queued) {
+            awaitingRemoteStatus.set(entry.local_id, result.item_id);
+            continue;
+          }
           results.push(result);
           if (!result.error && entry.quote_number && repository?.createCollectionRecord) {
 const now = Date.now();
@@ -148,7 +180,7 @@ logger.warn(`[outbound-sync] -> local_id=${r.local_id}: ${r.error}`);
   }
 
   return {
-    isConfigured, flush,
+    isConfigured, flush, handleRealtimeStatus,
     start() {
       if (!isConfigured) { logger.log("[outbound-sync] Disabled: workerUrl / outboundToken not configured. Quotes stay queued locally."); return; }
       if (timer) return;
