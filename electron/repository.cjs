@@ -410,6 +410,37 @@ function normalizeIncomingSnapshot(input) {
 function repositoryFor(userDataPath) {
   const dataPath = path.join(userDataPath, fileName);
 
+  const OLD_FILE_NAMES = ["enquote-demo-data-v1.json"];
+  for (const oldName of OLD_FILE_NAMES) {
+    const oldPath = path.join(userDataPath, oldName);
+    try {
+      const oldStat = require("node:fs").statSync(oldPath);
+      if (!oldStat.isFile()) continue;
+      console.warn(`[migration] Found legacy data file "${oldName}" - merging into current data file.`);
+      const oldRaw = require("node:fs").readFileSync(oldPath, "utf8").replace(/^\uFEFF/, "");
+      const oldData = JSON.parse(oldRaw);
+      let newData = { quotes: [], users: [] };
+      try {
+        const newRaw = require("node:fs").readFileSync(dataPath, "utf8").replace(/^\uFEFF/, "");
+        newData = JSON.parse(newRaw);
+      } catch { }
+      const byId = new Map();
+      (oldData.quotes || []).forEach((q) => byId.set(q.id, q));
+      (newData.quotes || []).forEach((q) => byId.set(q.id, q));
+      newData.quotes = Array.from(byId.values());
+      if (!newData.users || newData.users.length === 0) {
+        newData.users = oldData.users || [];
+      }
+      require("node:fs").writeFileSync(dataPath, JSON.stringify(newData, null, 2), "utf8");
+      require("node:fs").renameSync(oldPath, `C:\Users\croeschberger\AppData\Roaming\base44-app\enquote-demo-data-v1.json.RETIRED-DO-NOT-USE`);
+      console.warn(`[migration] Merged ${newData.quotes.length} quote(s) and ${newData.users.length} user(s); legacy file renamed aside.`);
+    } catch (migrationError) {
+      if (migrationError.code !== "ENOENT") {
+        console.error(`[migration] Failed to migrate legacy file "${oldName}":`, migrationError.message);
+      }
+    }
+  }
+
   async function read() {
     try {
       let raw = await fs.readFile(dataPath, "utf8");

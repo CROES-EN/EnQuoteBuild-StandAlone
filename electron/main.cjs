@@ -1808,9 +1808,13 @@ let then = whenReady().then(async () => {
                             } catch (notifError) {
                                 console.log(`[entity-sync] Failed to create notification for Quote ${entity.localId}: ${notifError.message}`);
                             }
-                        } else {
-                            await quoteRepository.create(payload);
-                        }
+                            } else {
+                                if (!payload.site_id || !payload.quote_number) {
+                                    console.log(`[entity-sync] Skipping create - payload is missing site_id/quote_number for Quote ${entity.localId}, will retry next cycle.`);
+                                } else {
+                                    await quoteRepository.create(payload);
+                                }
+                            }
                         updatedCount += 1;
                     } catch (recordError) {
                         console.log(`[entity-sync] Failed to store Quote record ${entity.localId}: ${recordError.message}`);
