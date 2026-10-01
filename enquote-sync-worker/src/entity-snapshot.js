@@ -1,5 +1,7 @@
 import { json } from "./util.js";
 
+const SNAPSHOT_PAGE_SIZE = 100;
+
 // Stage 2: lets the desktop app read every Base44-originated entity change
 // stored by /api/outbound/enqueue (see outbound.js's upsertBase44EntityState
 // and repository.js). This is how a Product/MaterialOrder/QuoteAlert/etc.
@@ -12,27 +14,54 @@ export async function handleEntitySnapshot(request, env) {
     return json({ error: "unauthorized" }, 401);
   }
 
-  const { results } = await env.DB
-    .prepare(
-      "SELECT entity_type, local_id, action, record_json, synced_at FROM base44_entity_state ORDER BY synced_at DESC"
-    )
-    .all();
+  const entityPages = [];
+  let offset = 0;
+  while (true) {
+    const { results } = await env.DB.prepare(`
+      SELECT COUNT(*) AS row_count,
+        json_group_array(json_object(
+          'entityType', entity_type,
+          'localId', local_id,
+          'action', action,
+          'record', json(CASE WHEN json_valid(record_json) THEN record_json ELSE '{}' END),
+          'syncedAt', synced_at
+        )) AS entities_json
+      FROM (
+        SELECT entity_type, local_id, action, record_json, synced_at
+        FROM base44_entity_state
+        ORDER BY synced_at DESC
+        LIMIT ? OFFSET ?
+      )
+    `).bind(SNAPSHOT_PAGE_SIZE, offset).all();
 
-  const entities = (results || []).map((row) => {
-    let record = {};
-    try {
-      record = JSON.parse(row.record_json);
-    } catch {
-      record = {};
+    const page = results?.[0];
+    const rowCount = Number(page?.row_count || 0);
+    if (rowCount === 0) break;
+    if (typeof page.entities_json !== "string") {
+      throw new Error("Could not encode an entity snapshot page.");
     }
-    return {
-      entityType: row.entity_type,
-      localId: row.local_id,
-      action: row.action,
-      record,
-      syncedAt: row.synced_at,
-    };
+    entityPages.push(page.entities_json);
+    offset += rowCount;
+  }
+
+  const encoder = new TextEncoder();
+  const body = new ReadableStream({
+    start(controller) {
+      controller.enqueue(encoder.encode('{"ok":true,"entities":['));
+      let hasEntities = false;
+      for (const page of entityPages) {
+        const entities = page.slice(1, -1);
+        if (!entities) continue;
+        if (hasEntities) controller.enqueue(encoder.encode(","));
+        controller.enqueue(encoder.encode(entities));
+        hasEntities = true;
+      }
+      controller.enqueue(encoder.encode(`],"generated_at":${JSON.stringify(new Date().toISOString())}}`));
+      controller.close();
+    }
   });
 
-  return json({ ok: true, entities, generated_at: new Date().toISOString() });
+  return new Response(body, {
+    headers: { "content-type": "application/json; charset=utf-8" }
+  });
 }
