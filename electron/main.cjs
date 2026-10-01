@@ -17,7 +17,7 @@ const { repositoryFor } = require("./repository.cjs");
 const { createOutboundSync } = require("./outboundSync.cjs");
 const { openSalesforceReportWindow, closeSalesforceReportWindow } = require("./salesforceImport.cjs");
 const { analyzeAll } = require("./diagnosticReportAnalyzer.cjs");
-const { verifyCloudflareSession, openCloudflareAuthWindow, setVerifiedIdentity, getVerifiedIdentity, clearCloudflareSession, reauthenticate: reauthenticateCloudflare } = require("./cloudflareAuth.cjs");
+const { verifyCloudflareSession, openCloudflareAuthWindow, setVerifiedIdentity, getVerifiedIdentity, clearCloudflareSession, reauthenticate: reauthenticateCloudflare, fetchSyncCredentials } = require("./cloudflareAuth.cjs");
 
 // Loads key=value pairs from an optional .env next to the app so the outbound
 // Base44 credentials never have to be baked into the bundle.
@@ -1601,13 +1601,11 @@ let then = whenReady().then(async () => {
     // reports-inbox:import-result removed - System A retired.
 
     loadEnvFile();
-    outboundSync = createOutboundSync({
-        repository: quoteRepository, config: {
-            workerUrl: "https://enquote-sync.croeschberger.workers.dev",
-            outboundToken: process.env.OUTBOUND_TOKEN || "25d7e76f0c6166395868e3ae66c76555e37d7bab27319e30572d2af84ff5a94b"
-        }, onAfterWrite: markOwnWrite
-    });
-    outboundSync.start();
+    // REMOVED (confirmed real security/ordering bug): outboundSync used to be created and
+    // started HERE - before the Cloudflare auth gate ever ran - using a hardcoded fallback
+    // token that was sitting in plaintext in this file. outboundSync is now created ONLY
+    // after a genuinely Cloudflare-verified user has fetched real, dynamic credentials -
+    // see startOutboundSync() and its call sites inside runCloudflareAuthGate() below.
 
     // The background sync flush writes to the same data file (to ack synced quotes).
     // Flag it as our own write too, same as any other in-app CRUD operation, so its
@@ -2028,10 +2026,46 @@ let then = whenReady().then(async () => {
     // is only ever created AFTER a verified identity is confirmed, so the existing
     // password-only EnQuote login screen can never appear without a live Cloudflare
     // check having already succeeded.
+    // Creates and starts outboundSync using a REAL, dynamically-fetched token - never a
+    // hardcoded fallback. Safe to call multiple times defensively (e.g. re-auth after
+    // session expiry) - a prior instance is simply replaced.
+    function startOutboundSync(outboundToken) {
+        outboundSync = createOutboundSync({
+            repository: quoteRepository, config: {
+                workerUrl: "https://enquote-sync.croeschberger.workers.dev",
+                outboundToken
+            }, onAfterWrite: markOwnWrite
+        });
+        outboundSync.start();
+    }
+
+    // Fetches dynamic sync credentials and starts outbound sync, right after Cloudflare
+    // verification succeeds. If this fails for any reason, the user is still signed in
+    // (their identity is already confirmed) - sync simply stays disabled for this
+    // session, logged clearly, rather than blocking sign-in or crashing.
+    async function applySyncCredentialsOrDisable() {
+        const credentials = await fetchSyncCredentials();
+        if (credentials.ok) {
+            process.env.SNAPSHOT_TOKEN = credentials.snapshotToken;
+            if (credentials.cfAccessClientId && credentials.cfAccessClientSecret) {
+                process.env.CF_ACCESS_CLIENT_ID = credentials.cfAccessClientId;
+                process.env.CF_ACCESS_CLIENT_SECRET = credentials.cfAccessClientSecret;
+                console.log("[cloudflare-auth] CF Access service token credentials applied - entity-snapshot sync enabled.");
+            } else {
+                console.warn("[cloudflare-auth] No CF Access service token credentials in response - entity-snapshot sync will likely fail until the Worker has them configured.");
+            }
+            startOutboundSync(credentials.outboundToken);
+            console.log("[cloudflare-auth] Sync credentials obtained - outbound/entity sync enabled.");
+        } else {
+            console.warn(`[cloudflare-auth] Could not obtain sync credentials (reason: ${credentials.reason}) - sync disabled this session.`);
+        }
+    }
+
     async function runCloudflareAuthGate() {
         const initialCheck = await verifyCloudflareSession();
         if (initialCheck.authenticated) {
             setVerifiedIdentity({ email: initialCheck.email });
+            await applySyncCredentialsOrDisable();
             createWindow();
             return;
         }
@@ -2043,6 +2077,7 @@ let then = whenReady().then(async () => {
         const authResult = await openCloudflareAuthWindow();
         if (authResult.authenticated) {
             setVerifiedIdentity({ email: authResult.email });
+            await applySyncCredentialsOrDisable();
             createWindow();
             return;
         }

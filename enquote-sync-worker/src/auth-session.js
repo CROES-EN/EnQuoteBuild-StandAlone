@@ -6,38 +6,36 @@ const TEAM_DOMAIN = "https://boise-enphase-om.cloudflareaccess.com";
 const POLICY_AUD = "c656512e6473639baedf21ec09682fd2e634ab018020ad16c933f8ee367880e4";
 
 // Defense-in-depth allow-list, mirroring the Access policy's own email list -
-// REVIEW AND UPDATE THIS LIST before deploying (see the patch script's console
-// output for instructions). Access's own policy already gates who can complete
-// login in the first place; this is a second, app-side check on top of that.
+// keep this in sync with the real Access policy (Zero Trust dashboard).
 const ALLOWED_EMAILS = new Set([
-"jwood@enphaseenergy.com",
-"mjb@enphaseenergy.com",
-"aschilling@enphaseenergy.com",
-"nchoudhary@enphaseenergy.com",
-"dtorchy@enphaseenergy.com",
-"cmckenna@enphaseenergy.com",
-"hmackey@enphaseenergy.com",
-"bkittelmann@enphaseenergy.com",
-"smosley@enphaseenergy.com",
-"croeschberger@enphaseenergy.com",
-"mkuriakose@enphaseenergy.com",
-"shawkins@enphaseenergy.com",
-"clmorrow@enphaseenergy.com",
-"jlasley@enphaseenergy.com",
-"dudavis@enphaseenergy.com",
-"abermudez@enphaseenergy.com",
-"sfrederick@enphaseenergy.com",
-"cwilson@enphaseenergy.com",
-"vseganos@enphaseenergy.com",
-"khaumann@enphaseenergy.com",
-"dankenman@enphaseenergy.com",
-"ajennings@enphaseenergy.com",
-"mmccullough@enphaseenergy.com",
-"jbarron@enphaseenergy.com",
-"jcarpenetti@enphaseenergy.com",
-"semani@enphaseenergy.com",
-"isison@enphaseenergy.com",
-"asharma@enphaseenergy.com",
+  "jwood@enphaseenergy.com",
+  "mjb@enphaseenergy.com",
+  "aschilling@enphaseenergy.com",
+  "nchoudhary@enphaseenergy.com",
+  "dtorchy@enphaseenergy.com",
+  "cmckenna@enphaseenergy.com",
+  "hmackey@enphaseenergy.com",
+  "bkittelmann@enphaseenergy.com",
+  "smosley@enphaseenergy.com",
+  "croeschberger@enphaseenergy.com",
+  "mkuriakose@enphaseenergy.com",
+  "shawkins@enphaseenergy.com",
+  "clmorrow@enphaseenergy.com",
+  "jlasley@enphaseenergy.com",
+  "dudavis@enphaseenergy.com",
+  "abermudez@enphaseenergy.com",
+  "sfrederick@enphaseenergy.com",
+  "cwilson@enphaseenergy.com",
+  "vseganos@enphaseenergy.com",
+  "khaumann@enphaseenergy.com",
+  "dankenman@enphaseenergy.com",
+  "ajennings@enphaseenergy.com",
+  "mmccullough@enphaseenergy.com",
+  "jbarron@enphaseenergy.com",
+  "jcarpenetti@enphaseenergy.com",
+  "semani@enphaseenergy.com",
+  "isison@enphaseenergy.com",
+  "asharma@enphaseenergy.com",
 ]);
 
 // JWKS endpoint - Access publishes its public signing keys here. createRemoteJWKSet
@@ -54,8 +52,7 @@ function getCookieValue(cookieHeader, name) {
 /**
  * Validates a Cloudflare Access JWT cryptographically against Access's own public
  * signing keys - confirms the token is genuinely signed by Access (not forged), has
- * not expired, and was issued for THIS specific app (audience check). This is real
- * cryptographic proof, not just "a cookie happened to be present."
+ * not expired, and was issued for THIS specific app (audience check).
  */
 async function validateAccessJwt(token) {
   if (!token) return null;
@@ -67,54 +64,102 @@ async function validateAccessJwt(token) {
 }
 
 /**
- * Stage 1 identity endpoint (v1.1.4 Cloudflare Access two-stage sign-in) - UPDATED
- * per Cloudflare's confirmed root-cause diagnosis: the original header-only check
- * (Cf-Access-Authenticated-User-Email) only works for requests that pass THROUGH
- * Access's edge with a full browser navigation context. Re-verification from
- * Electron's main process (a fresh BrowserWindow, or a direct API call) does not
- * reliably carry the CF_Binding cookie (SameSite=None) that Access's edge normally
- * requires alongside CF_Authorization - this is confirmed, documented Access
- * behavior for non-standard browser contexts, not a bug.
+ * SHARED verification logic - the ONE place that decides "is this request genuinely
+ * from a trusted, allow-listed, Cloudflare-verified user." Used by both
+ * handleAuthSession (Stage 1 identity check) and handleSyncCredentials (dynamic token
+ * issuance) below, so there is no risk of the two checks ever drifting apart.
  *
- * THE FIX: accepts the CF_Authorization JWT itself from any of three sources (checked
- * in order), and validates it directly and cryptographically - completely bypassing
- * the browser cookie-sending/binding-cookie mechanism:
- *   1. cf-access-jwt-assertion header (set by Access edge on browser-navigated requests)
- *   2. Authorization: Bearer <jwt> header (sent explicitly by the Electron main process,
- *      after reading the JWT directly out of the persistent session's cookie jar)
- *   3. CF_Authorization cookie (fallback, for genuine in-browser requests)
+ * Returns { ok: true, email, exp, iat } on success, or { ok: false, status, reason }
+ * on any failure - callers just need to check `.ok` and use `.status`/`.reason`
+ * directly in their own response.
  */
-export async function handleAuthSession(request) {
+async function verifyRequestIdentity(request) {
   const jwt =
     request.headers.get("cf-access-jwt-assertion") ||
     request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ||
     getCookieValue(request.headers.get("cookie"), "CF_Authorization");
 
-  const headers = { "Cache-Control": "no-store" };
-
   if (!jwt) {
-    return json({ authenticated: false, reason: "no_token" }, 401, headers);
+    return { ok: false, status: 401, reason: "no_token" };
   }
 
   let payload;
   try {
     payload = await validateAccessJwt(jwt);
   } catch (error) {
-    return json({ authenticated: false, reason: "validation_failed", error: error.message }, 401, headers);
+    return { ok: false, status: 401, reason: "validation_failed", error: error.message };
   }
 
   if (!payload) {
-    return json({ authenticated: false, reason: "invalid_token" }, 401, headers);
+    return { ok: false, status: 401, reason: "invalid_token" };
   }
 
   const email = typeof payload.email === "string" ? payload.email.trim().toLowerCase() : null;
   if (!email) {
-    return json({ authenticated: false, reason: "no_email_claim" }, 401, headers);
+    return { ok: false, status: 401, reason: "no_email_claim" };
   }
 
   if (!ALLOWED_EMAILS.has(email)) {
-    return json({ authenticated: false, reason: "email_not_allowed" }, 403, headers);
+    return { ok: false, status: 403, reason: "email_not_allowed" };
   }
 
-  return json({ authenticated: true, email, exp: payload.exp, iat: payload.iat }, 200, headers);
+  return { ok: true, email, exp: payload.exp, iat: payload.iat };
+}
+
+/**
+ * Stage 1 identity endpoint (v1.1.4 Cloudflare Access two-stage sign-in).
+ * Answers "who is this user?" - see verifyRequestIdentity for the real logic.
+ */
+export async function handleAuthSession(request) {
+  const headers = { "Cache-Control": "no-store" };
+  const result = await verifyRequestIdentity(request);
+
+  if (!result.ok) {
+    return json({ authenticated: false, reason: result.reason }, result.status, headers);
+  }
+
+  return json({ authenticated: true, email: result.email, exp: result.exp, iat: result.iat }, 200, headers);
+}
+
+/**
+ * NEW: dynamic sync-credential issuance. Per explicit design decision - these tokens
+ * must never be bundled into the installer or require manual per-machine setup. They
+ * are handed out ONLY after a request proves it is from a genuinely Cloudflare-
+ * verified, allow-listed user (the EXACT SAME check as /auth/session) - so a new
+ * machine or a new user gets full sync capability automatically and securely, purely
+ * as a consequence of being authenticated.
+ *
+ * Reads OUTBOUND_TOKEN and SNAPSHOT_TOKEN from the Worker's OWN environment secrets
+ * (confirmed live via wrangler secret list) - never from any file shipped to a client
+ * machine.
+ */
+export async function handleSyncCredentials(request, env) {
+  const headers = { "Cache-Control": "no-store" };
+  const result = await verifyRequestIdentity(request);
+
+  if (!result.ok) {
+    return json({ ok: false, reason: result.reason }, result.status, headers);
+  }
+
+  if (!env.OUTBOUND_TOKEN || !env.SNAPSHOT_TOKEN) {
+    return json({ ok: false, reason: "server_misconfigured" }, 500, headers);
+  }
+
+  // CF Access service token credentials - needed by pollEntitySnapshot()'s background
+  // entity-snapshot pulls to bypass the interactive Access challenge. Confirmed these
+  // previously only existed as plain .env entries on one machine - now distributed the
+  // SAME dynamic, Cloudflare-verified way as the other two tokens. Optional in the
+  // response (not a hard failure if absent) - entity-snapshot sync simply won't work
+  // without them, but outbound sync and everything else still functions.
+  const response = {
+    ok: true,
+    outboundToken: env.OUTBOUND_TOKEN,
+    snapshotToken: env.SNAPSHOT_TOKEN
+  };
+  if (env.CF_ACCESS_CLIENT_ID && env.CF_ACCESS_CLIENT_SECRET) {
+    response.cfAccessClientId = env.CF_ACCESS_CLIENT_ID;
+    response.cfAccessClientSecret = env.CF_ACCESS_CLIENT_SECRET;
+  }
+
+  return json(response, 200, headers);
 }

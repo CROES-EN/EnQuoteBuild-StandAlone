@@ -388,8 +388,72 @@ async function reauthenticate() {
   return openCloudflareAuthWindow();
 }
 
+/**
+ * Fetches dynamic sync credentials (outboundToken, snapshotToken) from the Worker's
+ * /auth/sync-credentials endpoint - using the SAME proven hidden-window navigation
+ * method as verifyCloudflareSession() (confirmed working through Access's edge, unlike
+ * a raw net.fetch request). Called once, right after Cloudflare verification succeeds,
+ * so these secrets are obtained dynamically per-session rather than ever being bundled
+ * into the installer or requiring manual per-machine setup.
+ *
+ * Returns { ok: true, outboundToken, snapshotToken } on success, or
+ * { ok: false, reason } on any failure - callers should treat failure as "sync stays
+ * disabled this session" rather than a fatal error, since the user is already
+ * correctly signed in at this point.
+ */
+async function fetchSyncCredentials() {
+  const partitionSession = session.fromPartition(AUTH_PARTITION);
+  let hiddenWindow = null;
+
+  try {
+    hiddenWindow = new BrowserWindow({
+      show: false,
+      webPreferences: {
+        session: partitionSession,
+        nodeIntegration: false,
+        contextIsolation: true,
+        sandbox: true
+      }
+    });
+
+    await hiddenWindow.loadURL(`${WORKER_BASE_URL}/auth/sync-credentials`);
+    const bodyText = await hiddenWindow.webContents.executeJavaScript("document.body.innerText");
+
+    console.log(`[cloudflare-auth] RAW SYNC-CREDENTIALS RESPONSE: ${bodyText}`);
+
+    let body;
+    try {
+      body = JSON.parse(bodyText);
+    } catch (parseError) {
+      console.log(`[cloudflare-auth] sync-credentials JSON.parse failed: ${parseError.message}`);
+      return { ok: false, reason: "malformed_response" };
+    }
+
+    console.log(`[cloudflare-auth] Parsed sync-credentials body: ${JSON.stringify({ ok: body?.ok, reason: body?.reason, hasOutboundToken: Boolean(body?.outboundToken), hasSnapshotToken: Boolean(body?.snapshotToken) })}`);
+
+    if (!body || body.ok !== true || !body.outboundToken || !body.snapshotToken) {
+      return { ok: false, reason: body?.reason || "missing_credentials" };
+    }
+
+    return {
+      ok: true,
+      outboundToken: body.outboundToken,
+      snapshotToken: body.snapshotToken,
+      cfAccessClientId: body.cfAccessClientId,
+      cfAccessClientSecret: body.cfAccessClientSecret
+    };
+  } catch (error) {
+    return { ok: false, reason: "network_error", error: error.message };
+  } finally {
+    if (hiddenWindow && !hiddenWindow.isDestroyed()) {
+      hiddenWindow.destroy();
+    }
+  }
+}
+
 module.exports = {
   verifyCloudflareSession,
+  fetchSyncCredentials,
   openCloudflareAuthWindow,
   getVerifiedIdentity,
   setVerifiedIdentity,
