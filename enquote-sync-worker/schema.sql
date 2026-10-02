@@ -40,3 +40,31 @@ CREATE TABLE IF NOT EXISTS presence_sessions (
 );
 CREATE INDEX IF NOT EXISTS idx_presence_last_seen ON presence_sessions(last_seen_at);
 CREATE INDEX IF NOT EXISTS idx_presence_email ON presence_sessions(email);
+
+-- Shared Supervisor Dashboard data (daily metrics + imported report tables).
+CREATE TABLE IF NOT EXISTS supervisor_records (
+  collection  TEXT NOT NULL,
+  id          TEXT NOT NULL,
+  updated_at  TEXT NOT NULL,
+  deleted     INTEGER NOT NULL DEFAULT 0,
+  chunk_count INTEGER NOT NULL DEFAULT 0,
+  updated_by  TEXT,
+  PRIMARY KEY (collection, id)
+);
+
+CREATE TABLE IF NOT EXISTS supervisor_record_chunks (
+  collection  TEXT NOT NULL,
+  id          TEXT NOT NULL,
+  version     TEXT NOT NULL,
+  chunk_index INTEGER NOT NULL,
+  data        TEXT NOT NULL,
+  PRIMARY KEY (collection, id, version, chunk_index)
+);
+
+-- Shared FST roster (Resource Planner). One row per FST; newest updated_at wins.
+CREATE TABLE IF NOT EXISTS fst_roster (
+  id          TEXT PRIMARY KEY,
+  record_json TEXT NOT NULL,
+  updated_at  TEXT NOT NULL,
+  updated_by  TEXT
+);

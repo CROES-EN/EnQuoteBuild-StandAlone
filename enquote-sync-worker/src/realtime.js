@@ -66,7 +66,7 @@ export async function handleRealtimeSocket(request, env) {
   return room.fetch(request);
 }
 
-export async function broadcastQuoteUpdate(env, data) {
+export async function broadcastMessage(env, message) {
   if (!env.QUOTE_SYNC_ROOM) {
     console.warn("[realtime] Durable Object binding is unavailable; periodic polling remains active.");
     return;
@@ -75,9 +75,13 @@ export async function broadcastQuoteUpdate(env, data) {
   const response = await room.fetch("https://quote-sync-room/broadcast", {
     method: "POST",
     headers: { "X-Internal-Sync-Key": env.SNAPSHOT_TOKEN || "" },
-    body: JSON.stringify({ type: "quotes_updated", ...data })
+    body: JSON.stringify(message)
   });
   if (!response.ok) {
     console.warn(`[realtime] Broadcast failed with HTTP ${response.status}.`);
   }
+}
+
+export async function broadcastQuoteUpdate(env, data) {
+  return broadcastMessage(env, { type: "quotes_updated", ...data });
 }

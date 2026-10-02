@@ -1,0 +1,41 @@
+﻿import { readFileSync } from "node:fs";
+import { DatabaseSync } from "node:sqlite";
+
+// Minimal D1 shim over a real in-memory SQLite database, so tests exercise the Worker's actual SQL.
+export function createSupervisorD1() {
+  const db = new DatabaseSync(":memory:");
+  db.exec(readFileSync(new URL("../migrations/0002_supervisor_records.sql", import.meta.url), "utf8"));
+  const wrap = (sql) => {
+    let params = [];
+    const statement = {
+      bind(...values) { params = values; return statement; },
+      async run() { return runSync(); },
+      async all() { return allSync(); },
+      runSync,
+      allSync,
+      isSelect: /^\s*select/i.test(sql)
+    };
+    function allSync() {
+      return { results: db.prepare(sql).all(...params) };
+    }
+    function runSync() {
+      const { changes } = db.prepare(sql).run(...params);
+      return { success: true, meta: { changes } };
+    }
+    return statement;
+  };
+  return {
+    prepare: wrap,
+    async batch(statements) {
+      db.exec("BEGIN");
+      try {
+        const results = statements.map((s) => (s.isSelect ? s.allSync() : s.runSync()));
+        db.exec("COMMIT");
+        return results;
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
+    }
+  };
+}

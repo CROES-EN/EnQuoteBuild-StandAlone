@@ -156,6 +156,9 @@ export const localAdapter = {
   },
   updateLocalRecord: (name, recordId, data) =>
     bridge().collections.update(name, recordId, data),
+  // Shared FST roster: seeds from the bundled roster and syncs with other installs.
+  syncFstRoster: () => bridge().fsts.sync(),
+  importFstRoster: (rows) => bridge().fsts.importRows(rows),
   deleteLocalRecord: (name, recordId) =>
     bridge().collections.delete(name, recordId),
 

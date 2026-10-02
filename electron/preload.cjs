@@ -52,13 +52,6 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
     update: (name, id, changes) => invoke("collections:update", name, id, changes),
     delete: (name, id) => invoke("collections:delete", name, id)
   },
-  // Read-only view of the primary manager's supervisorReportTables, synced via a shared
-  // OneDrive file (see main.cjs's exportSupervisorReportTablesToOneDrive()). This machine
-  // never writes through this channel -- it only reads whatever the primary manager's
-  // machine last exported.
-  onedrive: {
-    getSharedReportTables: () => invoke("onedrive:get-shared-report-tables")
-  },
     auth: {
     login: (email, password) => invoke("auth:login", email, password),
     hasAccount: (email) => invoke("auth:hasAccount", email),
@@ -85,6 +78,11 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
     announce: (payload) => invoke("presence:announce", payload),
     remove: (payload) => invoke("presence:remove", payload),
     list: () => invoke("presence:list")
+  },
+  // Shared FST roster (seeded locally, kept in sync with other installs via the Worker).
+  fsts: {
+    sync: () => invoke("fsts:sync"),
+    importRows: rows => invoke("fsts:import", rows)
   },
   sync: {
     flushOutbound: () => invoke("sync:flushOutbound"),

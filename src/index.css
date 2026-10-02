@@ -101,3 +101,6 @@
     @apply bg-background text-foreground;
   }
 }
+/* In-app Ctrl+F find (see components/FindBar.jsx) */
+::highlight(find-all) { background-color: #fde047; color: #000; }
+::highlight(find-current) { background-color: #fb923c; color: #000; }

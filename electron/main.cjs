@@ -19,6 +19,18 @@ const { repositoryFor } = require("./repository.cjs");
 const { importEntitySnapshot } = require("./entitySnapshotSync.cjs");
 const { applyVerifiedQuoteCreator, applyVerifiedQuoteUpdate, requireVerifiedEmail } = require("./quoteAttribution.cjs");
 const { createPresenceSync } = require("./presenceSync.cjs");
+const { createFstRosterSync } = require("./fstRosterSync.cjs");
+// The roster itself is NOT bundled (this repo and its installers are public, and the roster
+// holds employees' home addresses and phone numbers). It lives in the private Cloudflare Worker
+// and every install pulls it from there. An optional local fstRosterSeed.json is only honored
+// for private/dev builds.
+let fstRosterSeed = { seededAt: "2026-10-02T00:00:00.000Z", fsts: [] };
+try {
+    fstRosterSeed = require("./fstRosterSeed.json");
+} catch {
+    // No bundled seed - expected for released builds.
+}
+const { createSupervisorSync } = require("./supervisorSync.cjs");
 const { createUpdatePrompt } = require("./updatePrompt.cjs");
 const { createOutboundSync } = require("./outboundSync.cjs");
 const { startRealtimeSync } = require("./realtimeSync.cjs");
@@ -62,6 +74,7 @@ function loadEnvFile() {
 let quoteRepository;
 let outboundSync;
 let realtimeSync;
+let supervisorSync;
 let dataDirectoryWatcher;
 const presenceSync = createPresenceSync({
     workerUrl: "https://enquote-sync.croeschberger.workers.dev",
@@ -1054,48 +1067,32 @@ let then = whenReady().then(async () => {
     lastKnownImportMarker = readImportMarker();
     watchLocalDataFile();
 
+    // Keeps the Supervisor Dashboard's imported data (daily metrics + report tables) identical
+    // on every machine via the Cloudflare Worker. Started once sync credentials are available
+    // (see applySyncCredentialsOrDisable); the collections:* handlers below feed it local changes.
+    supervisorSync = createSupervisorSync({
+        workerUrl: "https://enquote-sync.croeschberger.workers.dev",
+        repository: quoteRepository,
+        pendingDeletesPath: path.join(getPath("userData"), "supervisor-sync-pending-deletes.json"),
+        getIdentity: getVerifiedIdentity,
+        getOutboundToken: () => process.env.OUTBOUND_TOKEN || "",
+        getAccessHeaders: () => ({
+            "CF-Access-Client-Id": process.env.CF_ACCESS_CLIENT_ID || "",
+            "CF-Access-Client-Secret": process.env.CF_ACCESS_CLIENT_SECRET || ""
+        }),
+        onRemoteApplied: () => {
+            markOwnWrite();
+            // Same soft-refresh event the Base44 import uses: the renderer re-queries in place.
+            BrowserWindow.getAllWindows().forEach((window) => window.webContents.send("app:data-updated", {
+                at: new Date().toISOString(),
+                changedQuoteNumbers: []
+            }));
+        }
+    });
+
     // Wraps a repository method so any write it performs is flagged as "our own", suppressing
     // the fs.watch-triggered reload that would otherwise fire a moment later and wipe the
     // in-progress screen (see markOwnWrite/OWN_WRITE_GRACE_MS above).
-    // ---------------------------------------------------------------------------
-    // OneDrive one-way export for supervisorReportTables (Executive Overview cross-manager
-    // read access). This machine is the single writer; every other manager's install reads
-    // this same file read-only. Never touches quotes/products/any other collection.
-    // ---------------------------------------------------------------------------
-    function resolveOneDriveSharedFolder() {
-        const base = process.env.OneDriveCommercial || process.env.OneDrive;
-        if (!base) return null;
-        return path.join(base, "EnQuote Shared Data");
-    }
-
-    const exportSupervisorReportTablesToOneDrive = async () => {
-        try {
-            const sharedFolder = resolveOneDriveSharedFolder();
-            if (!sharedFolder) {
-                console.warn("[onedrive-export] No OneDrive folder detected on this machine (OneDrive/OneDriveCommercial env var not set) - skipping export.");
-                return;
-            }
-            fs.mkdirSync(sharedFolder, { recursive: true });
-            const reportTables = await quoteRepository.listCollection("supervisorReportTables");
-            const payload = {
-                sourceManagerEmail: process.env.USERNAME ? `${String(process.env.USERNAME).toLowerCase()}@enphaseenergy.com` : null,
-                exportedAt: new Date().toISOString(),
-                reportTables: reportTables || []
-            };
-            const targetPath = path.join(sharedFolder, "supervisorReportTables.shared.json");
-            const tempPath = `${targetPath}.tmp`;
-            fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2), "utf8");
-            // Validate before committing, same safeguard pattern as repository.cjs's own writes.
-            JSON.parse(fs.readFileSync(tempPath, "utf8"));
-            fs.renameSync(tempPath, targetPath);
-            console.log("[onedrive-export] Exported", (reportTables || []).length, "report table(s) to", targetPath);
-        } catch (error) {
-            // Best-effort only - a OneDrive/export problem must NEVER block or fail the actual
-            // local save that triggered this call.
-            console.warn("[onedrive-export] Export failed (local save was NOT affected):", error.message);
-        }
-    };
-
     const ownWrite = (fn) => async (...args) => {
         const result = await fn(...args);
         markOwnWrite();
@@ -1175,27 +1172,8 @@ let then = whenReady().then(async () => {
 
     ipcMain.handle("collections:create", async (_event, name, record) => {
         const result = await diagnosticIpcWrap("collections:create", ownWrite(quoteRepository.createCollectionRecord))(name, record);
-        if (name === "supervisorReportTables") exportSupervisorReportTablesToOneDrive();
+        void supervisorSync.recordSaved(name, result);
         return result;
-    });
-    ipcMain.handle("onedrive:get-shared-report-tables", async () => {
-        try {
-            const sharedFolder = resolveOneDriveSharedFolder();
-            if (!sharedFolder) return { ok: true, available: false, reportTables: [] };
-            const targetPath = path.join(sharedFolder, "supervisorReportTables.shared.json");
-            if (!fs.existsSync(targetPath)) return { ok: true, available: false, reportTables: [] };
-            const parsed = JSON.parse(fs.readFileSync(targetPath, "utf8"));
-            return {
-                ok: true,
-                available: true,
-                sourceManagerEmail: parsed.sourceManagerEmail || null,
-                exportedAt: parsed.exportedAt || null,
-                reportTables: Array.isArray(parsed.reportTables) ? parsed.reportTables : []
-            };
-        } catch (error) {
-            console.warn("[onedrive-export] Could not read shared report tables:", error.message);
-            return { ok: false, error: error.message, reportTables: [] };
-        }
     });
     ipcMain.handle("collections:update", async (_event, name, id, changes) => {
         // Notifications are purely local and never need to sync to Base44 - skipping
@@ -1210,7 +1188,7 @@ let then = whenReady().then(async () => {
             }
             : ownWrite(quoteRepository.updateCollectionRecord);
         const result = await diagnosticIpcWrap("collections:update", writeFn)(name, id, changes);
-        if (name === "supervisorReportTables") exportSupervisorReportTablesToOneDrive();
+        void supervisorSync.recordSaved(name, result);
         return result;
     });
     ipcMain.handle("collections:delete", async (_event, name, id) => {
@@ -1221,8 +1199,15 @@ let then = whenReady().then(async () => {
                 return result;
             }
             : ownWrite(quoteRepository.deleteCollectionRecord);
-        const result = await diagnosticIpcWrap("collections:delete", writeFn)(name, id);
-        if (name === "supervisorReportTables") exportSupervisorReportTablesToOneDrive();
+        let result;
+        try {
+            result = await diagnosticIpcWrap("collections:delete", writeFn)(name, id);
+        } catch (error) {
+            // Clearing a record this machine never received yet still has to remove the shared copy.
+            if (String(error?.message || "").includes("record not found")) void supervisorSync.recordDeleted(name, id);
+            throw error;
+        }
+        void supervisorSync.recordDeleted(name, id);
         return result;
     });
 
@@ -1585,6 +1570,27 @@ let then = whenReady().then(async () => {
         } catch (error) {
             return { ok: false, error: error.message, reports: [] };
         }
+    });
+    // Shared FST roster: seeded from the bundled roster, then kept in sync with every other
+    // install through the Cloudflare Worker (see fstRosterSync.cjs). Both channels write the
+    // whole roster in a single repository write.
+    const fstRosterSync = createFstRosterSync({
+        repository: quoteRepository,
+        seedFile: fstRosterSeed,
+        workerUrl: "https://enquote-sync.croeschberger.workers.dev",
+        getIdentity: getVerifiedIdentity,
+        getOutboundToken: () => process.env.OUTBOUND_TOKEN || "",
+        getAccessHeaders: () => ({
+            "CF-Access-Client-Id": process.env.CF_ACCESS_CLIENT_ID || "",
+            "CF-Access-Client-Secret": process.env.CF_ACCESS_CLIENT_SECRET || ""
+        }),
+        onLocalChange: markOwnWrite
+    });
+    ipcMain.handle("fsts:sync", () => fstRosterSync.sync());
+    ipcMain.handle("fsts:import", async (_event, rows) => {
+        const summary = await fstRosterSync.importRows(rows);
+        void fstRosterSync.sync();
+        return summary;
     });
     ipcMain.handle("presence:announce", async (_event, payload) => {
         const result = await presenceSync.heartbeat(payload?.name);
@@ -2167,6 +2173,7 @@ let then = whenReady().then(async () => {
             }
             startOutboundSync(credentials.outboundToken);
             presenceSync.start();
+            supervisorSync?.start();
             console.log("[cloudflare-auth] Sync credentials obtained - outbound/entity sync enabled.");
             try {
                 const snapshot = await fetchRemoteSnapshot(
@@ -2189,7 +2196,8 @@ let then = whenReady().then(async () => {
                     "CF-Access-Client-Secret": credentials.cfAccessClientSecret || ""
                 },
                 onQuotesUpdated: () => refreshFromCloudflare(),
-                onOutboundStatus: (data) => outboundSync?.handleRealtimeStatus(data)
+                onOutboundStatus: (data) => outboundSync?.handleRealtimeStatus(data),
+                onSupervisorUpdated: () => supervisorSync?.reconcile()
             });
         } else {
             console.warn(`[cloudflare-auth] Could not obtain sync credentials (reason: ${credentials.reason}) - sync disabled this session.`);
@@ -2258,5 +2266,6 @@ on("window-all-closed", () => {
 
 on("before-quit", () => {
     realtimeSync?.stop();
+    supervisorSync?.stop();
     presenceSync.remove();
 });

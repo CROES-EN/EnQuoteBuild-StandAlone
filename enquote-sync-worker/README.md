@@ -142,6 +142,24 @@ desktop session. The app sends a heartbeat every 45 seconds; sessions expire aft
 two minutes without one so a crash or network interruption cannot leave someone
 shown as online indefinitely.
 
+### Shared Supervisor Dashboard data
+
+The Supervisor Dashboard's imported data (`supervisorDailyMetrics` and
+`supervisorReportTables`) is mirrored through the Worker so every manager sees the same
+records. Apply `migrations/0002_supervisor_records.sql` to D1 before deploying:
+
+```sh
+npx wrangler d1 execute enquote-sync --remote --file=migrations/0002_supervisor_records.sql
+```
+
+All endpoints use `OUTBOUND_TOKEN`; writes also require an allow-listed `email`.
+`GET /api/supervisor/index`, `GET /api/supervisor/record?collection=&id=`,
+`POST /api/supervisor/upsert`, `POST /api/supervisor/delete`. The newest `updatedAt`
+stamp wins per record, deletions leave a tombstone, large records are split across
+chunk rows (D1's 2 MB row limit), and each applied change broadcasts a
+`supervisor_updated` WebSocket message so open dashboards refresh immediately. Desktop
+apps also reconcile every 60 seconds as a fallback (`electron/supervisorSync.cjs`).
+
 ## Secrets
 
 | Secret | Purpose |

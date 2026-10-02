@@ -80,6 +80,7 @@ function openSalesforceReportWindow(reportUrl, onFileDownloaded) {
     width: 1280,
     height: 900,
     title: "Salesforce Report - EnQuote Import",
+    backgroundColor: "#ffffff",
     // No preload/contextBridge here deliberately - this window only ever shows Salesforce's
     // own real pages; EnQuote's renderer APIs have no reason to exist inside it, and omitting
     // a preload keeps this window's capabilities minimal on principle.
@@ -89,6 +90,32 @@ function openSalesforceReportWindow(reportUrl, onFileDownloaded) {
       nodeIntegration: false,
       sandbox: true
     }
+  });
+
+  // Salesforce/SSO login pages can render a blurred, non-interactive overlay when they detect
+  // an unrecognized embedded browser (the default UA contains "Electron/x" and the app name,
+  // which showed up on macOS). Present a plain Chrome UA instead.
+  const chromeUserAgent = salesforceWindow.webContents.userAgent
+    .replace(/\s*Electron\/\S+/i, "")
+    .replace(/\s*enquote\S*\/\S+/i, "");
+  salesforceWindow.webContents.setUserAgent(chromeUserAgent);
+
+  // SSO / 2FA flows often open a popup window. Without a handler, the popup is created as an
+  // unmanaged window that can sit behind the page and leave it unclickable; open popups as
+  // child windows that share this session instead.
+  salesforceWindow.webContents.setWindowOpenHandler(() => ({
+    action: "allow",
+    overrideBrowserWindowOptions: {
+      parent: salesforceWindow,
+      width: 640,
+      height: 760,
+      autoHideMenuBar: true,
+      webPreferences: { session: partitionSession, contextIsolation: true, nodeIntegration: false, sandbox: true }
+    }
+  }));
+
+  salesforceWindow.webContents.on("did-fail-load", (_event, code, description, url, isMainFrame) => {
+    if (isMainFrame && code !== -3) console.warn("[salesforce-import] Page failed to load:", code, description, url);
   });
 
   salesforceWindow.loadURL(reportUrl);

@@ -58,7 +58,7 @@ export default function BulkMaterialOrderReviewSheet({ open, onOpenChange, quote
     (async () => {
       try {
         const list = await listLocalCollection("fsts");
-        if (!cancelled) setFsts(Array.isArray(list) ? list : []);
+        if (!cancelled) setFsts(Array.isArray(list) ? list.filter((fst) => !fst.is_deleted) : []);
       } catch {
         if (!cancelled) setFsts([]);
       }

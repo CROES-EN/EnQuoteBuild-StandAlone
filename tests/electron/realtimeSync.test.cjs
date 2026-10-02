@@ -40,6 +40,7 @@ test("authenticates, keeps the connection alive, and handles both update types",
   let clearedPings = 0;
   let received;
   let outboundStatus;
+  let supervisorUpdate;
   const realtime = startRealtimeSync({
     workerUrl: "https://enquote-sync.example.workers.dev",
     sharedSecret: "test-snapshot-token",
@@ -49,6 +50,7 @@ test("authenticates, keeps the connection alive, and handles both update types",
     },
     onQuotesUpdated: (data) => { received = data; },
     onOutboundStatus: (data) => { outboundStatus = data; },
+    onSupervisorUpdated: (data) => { supervisorUpdate = data; },
     WebSocketImpl: FakeWebSocket,
     setIntervalFn: (callback) => {
       pingCallback = callback;
@@ -74,6 +76,8 @@ test("authenticates, keeps the connection alive, and handles both update types",
   assert.deepEqual(received, { type: "quotes_updated", quoteCount: 2 });
   socket.emit("message", Buffer.from(JSON.stringify({ type: "outbound_status", itemId: "worker-item", status: "pushed" })));
   assert.deepEqual(outboundStatus, { type: "outbound_status", itemId: "worker-item", status: "pushed" });
+  socket.emit("message", Buffer.from(JSON.stringify({ type: "supervisor_updated", collection: "supervisorReportTables", id: "workload" })));
+  assert.deepEqual(supervisorUpdate, { type: "supervisor_updated", collection: "supervisorReportTables", id: "workload" });
 
   realtime.stop();
   assert.equal(clearedPings, 1);

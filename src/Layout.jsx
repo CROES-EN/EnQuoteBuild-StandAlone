@@ -37,6 +37,7 @@ import {toast} from "sonner";
 import {Button} from "@/components/ui/button";
 import {useUserRole} from "@/components/auth/RoleGuard";
 import {useAuth} from "@/lib/AuthContext";
+import {canAccessPage} from "@/lib/rolePageAccess";
 import AutoAssignRole from "@/components/auth/AutoAssignRole";
 import RefreshStatusDialog from "@/components/RefreshStatusDialog";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
@@ -145,6 +146,11 @@ export default function Layout({ children, currentPageName }) {
     { name: "Supervisor Dashboard", icon: Headset, page: "SupervisorDashboard", roles: ["admin", "approver", "submitter", "invoicer"] },
     { name: "Inactive Revenue", icon: Wallet, page: "InactiveRevenueDashboard", roles: ["admin", "approver", "invoicer", "submitter"] }
   ];
+
+  const visibleNavItems = navItems.filter(item =>
+    (!item.roles || isAdmin || item.roles.some(itemRole => roles.includes(itemRole))) && canAccessPage(roles, item.page, isAdmin)
+  );
+  const currentPageBlocked = Boolean(currentPageName) && isAuthenticated && !canAccessPage(roles, currentPageName, isAdmin);
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -475,7 +481,7 @@ export default function Layout({ children, currentPageName }) {
 
           {/* Navigation */}
           <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto min-h-0">
-            {navItems.filter(item => !item.roles || isAdmin || item.roles.some(itemRole => roles.includes(itemRole))).map((item) => {
+            {visibleNavItems.map((item) => {
               const isActive = currentPageName === item.page;
               return (
                 <Link
@@ -680,7 +686,7 @@ export default function Layout({ children, currentPageName }) {
       {isAuthenticated && mobileMenuOpen && (
         <div className="lg:hidden fixed inset-0 z-40 bg-background pt-16">
           <nav className="p-4 space-y-1">
-            {navItems.filter(item => !item.roles || isAdmin || item.roles.some(itemRole => roles.includes(itemRole))).map((item) => {
+            {visibleNavItems.map((item) => {
               const isActive = currentPageName === item.page;
               return (
                 <Link
@@ -709,9 +715,18 @@ export default function Layout({ children, currentPageName }) {
       {/* Main Content */}
       <main className={cn("transition-[padding] duration-300 ease-in-out", isAuthenticated && (sidebarCollapsed ? "lg:pl-20" : "lg:pl-64"), isAuthenticated && "pt-16 lg:pt-0")}>
         <ErrorBoundary>
-          <AutoAssignRole>
-            {children}
-          </AutoAssignRole>
+          {currentPageBlocked ? (
+            <div className="flex min-h-[60vh] items-center justify-center p-6 text-center">
+              <div>
+                <h2 className="mb-2 text-2xl font-bold text-foreground">Access Not Granted</h2>
+                <p className="text-muted-foreground">An administrator has not given you access to this tab.</p>
+              </div>
+            </div>
+          ) : (
+            <AutoAssignRole>
+              {children}
+            </AutoAssignRole>
+          )}
         </ErrorBoundary>
       </main>
       <RefreshStatusDialog

@@ -150,6 +150,12 @@ export const createLocalRecords =
 export const updateLocalRecord =
   (...args) => call("updateLocalRecord", args);
 
+export const syncFstRoster =
+  (...args) => call("syncFstRoster", args);
+
+export const importFstRoster =
+  (...args) => call("importFstRoster", args);
+
 export const deleteLocalRecord =
   (...args) => call("deleteLocalRecord", args);
 

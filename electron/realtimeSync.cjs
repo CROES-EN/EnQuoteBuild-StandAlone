@@ -19,6 +19,7 @@ function startRealtimeSync({
   accessHeaders = {},
   onQuotesUpdated,
   onOutboundStatus,
+  onSupervisorUpdated,
   logger = console,
   WebSocketImpl = WebSocket,
   setIntervalFn = setInterval,
@@ -77,6 +78,17 @@ function startRealtimeSync({
           }
         } catch (error) {
           logger.error("[realtime-sync] Outbound status handling failed:", error.message);
+        }
+        return;
+      }
+      if (message?.type === "supervisor_updated") {
+        try {
+          const result = onSupervisorUpdated?.(message);
+          if (result && typeof result.catch === "function") {
+            result.catch((error) => logger.error("[realtime-sync] Supervisor refresh failed:", error.message));
+          }
+        } catch (error) {
+          logger.error("[realtime-sync] Supervisor refresh failed:", error.message);
         }
         return;
       }

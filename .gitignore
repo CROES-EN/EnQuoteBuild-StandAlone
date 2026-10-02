@@ -19,3 +19,14 @@ webhook-receiver-error.log
 *.bak-*
 
 sync-secret.json
+
+# Private data that must never reach the public repo or installer (e.g. FST roster seed)
+_private/
+
+# Scratch/debug output and old release folder
+/dbg.cjs
+/e.txt
+/err.txt
+/o.txt
+/out.txt
+/enquote-release-v102/

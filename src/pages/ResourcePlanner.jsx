@@ -1,28 +1,26 @@
-import {useState} from "react";
-import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
-import {base44} from "@/api/base44Client";
-import {createLocalRecord, deleteLocalRecord, listLocalCollection, updateLocalRecord} from "@/api/dataClient";
+import {useRef, useState} from "react";
+import {useMutation} from "@tanstack/react-query";
+import {createLocalRecord, importFstRoster, updateLocalRecord} from "@/api/dataClient";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {Textarea} from "@/components/ui/textarea";
-import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
+import {Card, CardContent} from "@/components/ui/card";
 import {Badge} from "@/components/ui/badge";
 import {Switch} from "@/components/ui/switch";
 import {Label} from "@/components/ui/label";
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
 import {Dialog, DialogContent, DialogHeader, DialogTitle,} from "@/components/ui/dialog";
-import {Clock, Loader2, MapPin, Navigation, Pencil, Phone, Plus, Route, Trash2, Trophy, Users} from "lucide-react";
+import {Loader2, Mail, MapPin, Navigation, Pencil, Phone, Plus, Route, Trash2, Upload, Users} from "lucide-react";
 import RoleGuard from "@/components/auth/RoleGuard";
+import FstRouteFinder from "@/components/resourcePlanner/FstRouteFinder";
+import {FIELD_TEAM_SHEET, parseFieldTeamWorkbook} from "@/lib/fstRoster";
+import {useFstRoster} from "@/lib/useFstRoster";
 
-// FST roster records now live in the local "fsts" collection (see
-// listLocalCollection/createLocalRecord/updateLocalRecord/deleteLocalRecord below) -
-// registered in electron/repository.cjs's collectionNames + zod schema by
-// Patch-AddFSTCollection.ps1. Previously this called base44.entities.FST directly,
-// which silently threw in local/offline mode (the noop base44 client has no
-// "entities" property at all) - meaning the roster could never actually save or
-// load data. shipping_address/home_address/supervisor/region/home_state are new
-// fields added per explicit request to store each FST's real shipping and home
-// addresses; city/state/zip are kept for the existing AI route-ranking feature.
+// FST roster records live in the local "fsts" collection (registered in
+// electron/repository.cjs). shipping_address is where product material orders ship
+// (the FST's U-Haul unit); home_address is where the FST drives from. home_geo/ship_geo
+// cache the geocoded coordinates of those addresses so routing only has to look each
+// one up once.
 const emptyFST = {
   name: "",
   employee_id: "",
@@ -33,6 +31,7 @@ const emptyFST = {
   home_address: "",
   region: "",
   home_state: "",
+  fsl_case_no: "",
   city: "",
   state: "",
   zip: "",
@@ -41,42 +40,32 @@ const emptyFST = {
 };
 
 function ResourcePlannerPage() {
-  const queryClient = useQueryClient();
-
   // FST Roster state
   const [showFSTForm, setShowFSTForm] = useState(false);
   const [editingFST, setEditingFST] = useState(null);
   const [fstForm, setFstForm] = useState(emptyFST);
 
-  // Routing state
-  const [svAddress, setSvAddress] = useState("");
-  const [rankings, setRankings] = useState(null);
-  const [isRanking, setIsRanking] = useState(false);
-  const [rankError, setRankError] = useState(null);
+  // Excel import state
+  const importInputRef = useRef(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importMessage, setImportMessage] = useState(null);
 
-  const { data: fsts = [], isLoading: fstsLoading } = useQuery({
-    queryKey: ["fsts"],
-    queryFn: async () => {
-      const list = await listLocalCollection("fsts");
-      return [...(list || [])].sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
-    }
-  });
-
-  const activeFSTs = fsts.filter(f => f.is_active !== false);
+  const { fsts, activeFSTs, isLoading: fstsLoading, afterRosterWrite } = useFstRoster();
 
   const createFST = useMutation({
     mutationFn: (data) => createLocalRecord("fsts", data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["fsts"] }); closeForm(); }
+    onSuccess: () => { afterRosterWrite(); closeForm(); }
   });
 
   const updateFST = useMutation({
     mutationFn: ({ id, data }) => updateLocalRecord("fsts", id, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["fsts"] }); closeForm(); }
+    onSuccess: () => { afterRosterWrite(); closeForm(); }
   });
 
+  // Soft delete so the removal syncs to every other user like any other edit.
   const deleteFST = useMutation({
-    mutationFn: (id) => deleteLocalRecord("fsts", id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["fsts"] })
+    mutationFn: (id) => updateLocalRecord("fsts", id, { is_deleted: true }),
+    onSuccess: afterRosterWrite
   });
 
   const closeForm = () => {
@@ -100,49 +89,29 @@ function ResourcePlannerPage() {
     }
   };
 
-  // KNOWN LIMITATION (not fixed by this patch): base44.functions.invoke() is ALSO a
-  // noop in local/offline mode (resolves to undefined), so this still won't return
-  // real rankings locally - it will fail gracefully into the existing rankError
-  // message below, same as before this patch. Real distance-based ranking requires
-  // either a live Base44 backend or a separate geocoding/mapping API integration.
-  // This patch only fixes ROSTER STORAGE - addresses are now at least captured and
-  // available for whenever ranking is properly wired up.
-  const handleRank = async () => {
-    if (!svAddress.trim()) return;
-    if (activeFSTs.length === 0) {
-      setRankError("No active FSTs in the roster. Please add FSTs first.");
-      return;
-    }
-    setIsRanking(true);
-    setRankings(null);
-    setRankError(null);
-    try {
-      const response = await base44.functions.invoke("rankFSTs", {
-        sv_address: svAddress,
-        fsts: activeFSTs.map(f => ({
-          name: f.name,
-          // Prefers the fuller shipping/home address text when available - a real
-          // street address is far more precise input for distance estimation than
-          // city/state/zip alone, which is all this used to have.
-          address: (f.shipping_address || f.home_address || `${f.city || ""}, ${f.state || ""} ${f.zip || ""}`).trim(),
-          city: f.city || "",
-          state: f.state || "",
-          zip: f.zip || ""
-        }))
-      });
-      setRankings(response.data?.rankings || []);
-    } catch (err) {
-      setRankError("Failed to rank FSTs. Please try again.");
-    } finally {
-      setIsRanking(false);
-    }
-  };
+  const handleImportFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
 
-  const rankColor = (index) => {
-    if (index === 0) return "bg-emerald-100 text-emerald-700 border-emerald-200";
-    if (index === 1) return "bg-sky-100 text-sky-700 border-sky-200";
-    if (index === 2) return "bg-violet-100 text-violet-700 border-violet-200";
-    return "bg-muted text-muted-foreground border-border";
+    setIsImporting(true);
+    setImportMessage(null);
+    try {
+      const parsed = parseFieldTeamWorkbook(await file.arrayBuffer());
+      if (parsed.length === 0) throw new Error(`No FSTs found on the "${FIELD_TEAM_SHEET}" tab.`);
+
+      const { created, updated, unchanged } = await importFstRoster(parsed);
+      afterRosterWrite();
+
+      setImportMessage({
+        type: "success",
+        text: `Imported from "${FIELD_TEAM_SHEET}": ${created} added, ${updated} updated, ${unchanged} unchanged. Changes sync to all users.`
+      });
+    } catch (err) {
+      setImportMessage({ type: "error", text: `Import failed: ${err?.message || "unknown error"}` });
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   return (
@@ -154,7 +123,7 @@ function ResourcePlannerPage() {
         </div>
         <div>
           <h1 className="text-2xl font-bold text-foreground">Resource Planner</h1>
-          <p className="text-sm text-muted-foreground">AI-powered FST routing for site visits</p>
+          <p className="text-sm text-muted-foreground">Drive-time FST routing for site visits</p>
         </div>
       </div>
 
@@ -173,131 +142,43 @@ function ResourcePlannerPage() {
 
         {/* --- ROUTE PLANNER TAB --- */}
         <TabsContent value="route" className="space-y-4 mt-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-sky-600" />
-                Enter Site Visit Address
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex gap-3">
-                <Input
-                  placeholder="e.g. 123 Main St, Denver, CO 80202"
-                  value={svAddress}
-                  onChange={(e) => setSvAddress(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleRank()}
-                  className="flex-1"
-                />
-                <Button
-                  onClick={handleRank}
-                  disabled={isRanking || !svAddress.trim()}
-                  className="bg-sky-600 hover:bg-sky-700 gap-2 shrink-0"
-                >
-                  {isRanking ? (
-                    <><Loader2 className="w-4 h-4 animate-spin" /> Analyzing...</>
-                  ) : (
-                    <><Navigation className="w-4 h-4" /> Find Best FST</>
-                  )}
-                </Button>
-              </div>
-              {activeFSTs.length === 0 && !fstsLoading && (
-                <p className="text-sm text-amber-600 flex items-center gap-1">
-                  No active FSTs in roster. Add FSTs in the <strong>FST Roster</strong> tab first.
-                </p>
-              )}
-              {activeFSTs.length > 0 && (
-                <p className="text-xs text-muted-foreground">{activeFSTs.length} active FST{activeFSTs.length !== 1 ? "s" : ""} will be evaluated</p>
-              )}
-            </CardContent>
-          </Card>
-
-          {rankError && (
-            <Card className="border-rose-200 bg-rose-50">
-              <CardContent className="pt-4 pb-4 text-sm text-rose-700">{rankError}</CardContent>
-            </Card>
-          )}
-
-          {isRanking && (
-            <Card>
-              <CardContent className="py-12 text-center text-muted-foreground">
-                <Loader2 className="w-8 h-8 animate-spin mx-auto mb-3 text-sky-500" />
-                <p className="font-medium">AI is calculating routes...</p>
-                <p className="text-sm text-muted-foreground mt-1">Estimating distance and travel time for each FST</p>
-              </CardContent>
-            </Card>
-          )}
-
-          {rankings && rankings.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Trophy className="w-4 h-4 text-amber-500" />
-                <span>Ranked from closest to furthest for: <strong className="text-foreground">{svAddress}</strong></span>
-              </div>
-              {rankings.map((r, index) => (
-                <Card key={index} className={`border ${index === 0 ? "border-emerald-200 shadow-emerald-50 shadow-md" : "border-border"}`}>
-                  <CardContent className="py-4 px-5">
-                    <div className="flex items-start gap-4">
-                      {/* Rank badge */}
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold border ${rankColor(index)} shrink-0 mt-0.5`}>
-                        #{index + 1}
-                      </div>
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2 mb-1">
-                          <span className="font-semibold text-foreground text-base">{r.name}</span>
-                          {index === 0 && (
-                            <Badge className="bg-emerald-100 text-emerald-700 border-0 text-xs">Best Match</Badge>
-                          )}
-                        </div>
-                        {/* FST address */}
-                        {(() => {
-                          const fst = activeFSTs.find(f => f.name === r.name);
-                          return fst ? (
-                            <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
-                                <MapPin className="w-3 h-3" />
-                                {fst.shipping_address || `${fst.city}${fst.state ? `, ${fst.state}` : ""} ${fst.zip || ""}`}
-                              </p>
-                          ) : null;
-                        })()}
-                        <p className="text-sm text-muted-foreground">{r.notes}</p>
-                      </div>
-                      {/* Metrics */}
-                      <div className="flex gap-4 shrink-0 text-right">
-                        <div>
-                          <p className="text-xs text-muted-foreground">Distance</p>
-                          <p className="font-bold text-foreground">{r.estimated_miles} mi</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Drive Time</p>
-                          <p className="font-bold text-foreground flex items-center gap-1 justify-end">
-                            <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-                            {r.estimated_hours_display}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-              <p className="text-xs text-muted-foreground text-center pt-1">
-                Estimates are AI-generated based on geographic knowledge. Actual drive times may vary with traffic conditions.
-              </p>
-            </div>
-          )}
+          <FstRouteFinder />
         </TabsContent>
-
         {/* --- FST ROSTER TAB --- */}
         <TabsContent value="roster" className="space-y-4 mt-4">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center gap-3 flex-wrap">
             <p className="text-sm text-muted-foreground">{fsts.length} FST{fsts.length !== 1 ? "s" : ""} total ・ {activeFSTs.length} active</p>
-            <Button
-              onClick={() => { setEditingFST(null); setFstForm(emptyFST); setShowFSTForm(true); }}
-              className="bg-sky-600 hover:bg-sky-700 gap-2"
-            >
-              <Plus className="w-4 h-4" /> Add FST
-            </Button>
+            <div className="flex gap-2">
+              <input
+                ref={importInputRef}
+                type="file"
+                accept=".xlsx,.xlsm,.xls"
+                className="hidden"
+                onChange={handleImportFile}
+              />
+              <Button
+                variant="outline"
+                className="gap-2"
+                disabled={isImporting}
+                onClick={() => importInputRef.current?.click()}
+              >
+                {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                Import from Excel
+              </Button>
+              <Button
+                onClick={() => { setEditingFST(null); setFstForm(emptyFST); setShowFSTForm(true); }}
+                className="bg-sky-600 hover:bg-sky-700 gap-2"
+              >
+                <Plus className="w-4 h-4" /> Add FST
+              </Button>
+            </div>
           </div>
+
+          {importMessage && (
+            <p className={`text-sm ${importMessage.type === "error" ? "text-rose-600" : "text-emerald-700"}`}>
+              {importMessage.text}
+            </p>
+          )}
 
           {fstsLoading ? (
             <Card><CardContent className="py-10 text-center text-muted-foreground">Loading roster...</CardContent></Card>
@@ -348,6 +229,15 @@ function ResourcePlannerPage() {
                             <Phone className="w-3 h-3 shrink-0" />
                             {fst.phone}
                           </p>
+                        )}
+                        {fst.email && (
+                          <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
+                            <Mail className="w-3 h-3 shrink-0" />
+                            {fst.email}
+                          </p>
+                        )}
+                        {fst.fsl_case_no && (
+                          <p className="text-xs text-muted-foreground mt-0.5">FSL Case #: {fst.fsl_case_no}</p>
                         )}
                         {fst.notes && <p className="text-xs text-muted-foreground mt-1 truncate">{fst.notes}</p>}
                       </div>
@@ -404,6 +294,22 @@ function ResourcePlannerPage() {
                   placeholder="(555) 123-4567"
                   value={fstForm.phone}
                   onChange={(e) => setFstForm({ ...fstForm, phone: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  placeholder="name@enphaseenergy.com"
+                  value={fstForm.email}
+                  onChange={(e) => setFstForm({ ...fstForm, email: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>FSL Case No</Label>
+                <Input
+                  value={fstForm.fsl_case_no}
+                  onChange={(e) => setFstForm({ ...fstForm, fsl_case_no: e.target.value })}
                 />
               </div>
               <div className="space-y-1.5">

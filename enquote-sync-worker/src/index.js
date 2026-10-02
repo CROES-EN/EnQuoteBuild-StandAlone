@@ -6,6 +6,13 @@ import { handleInboundBase44 } from "./inbound.js";
 import { handleEntitySnapshot } from "./entity-snapshot.js";
 import { handleAuthSession, handleSyncCredentials } from "./auth-session.js";
 import { handlePresenceHeartbeat, handlePresenceList, handlePresenceRemove } from "./presence.js";
+import { handleFstList, handleFstUpsert } from "./fsts.js";
+import {
+  handleSupervisorDelete,
+  handleSupervisorIndex,
+  handleSupervisorRecord,
+  handleSupervisorUpsert
+} from "./supervisor.js";
 import { handleEnqueue } from "./outbound.js";
 import { handleStatus } from "./status.js";
 import { pushToBase44 } from "./pusher.js";
@@ -29,6 +36,12 @@ export default {
     if (url.pathname === "/api/presence/heartbeat" && request.method === "POST") return handlePresenceHeartbeat(request, env);
     if (url.pathname === "/api/presence" && request.method === "GET") return handlePresenceList(request, env);
     if (url.pathname === "/api/presence/remove" && request.method === "POST") return handlePresenceRemove(request, env);
+    if (url.pathname === "/api/fsts" && request.method === "GET") return handleFstList(request, env);
+    if (url.pathname === "/api/fsts/upsert" && request.method === "POST") return handleFstUpsert(request, env);
+    if (url.pathname === "/api/supervisor/index" && request.method === "GET") return handleSupervisorIndex(request, env);
+    if (url.pathname === "/api/supervisor/record" && request.method === "GET") return handleSupervisorRecord(request, env);
+    if (url.pathname === "/api/supervisor/upsert" && request.method === "POST") return handleSupervisorUpsert(request, env);
+    if (url.pathname === "/api/supervisor/delete" && request.method === "POST") return handleSupervisorDelete(request, env);
     return json({ error: "not_found" }, 404);
   },
   async queue(batch, env) {

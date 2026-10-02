@@ -7,6 +7,7 @@ import {queryClientInstance} from "@/lib/query-client";
 import NavigationTracker from "@/lib/NavigationTracker";
 import {pagesConfig} from "./pages.config";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import FindBar from "@/components/FindBar";
 
 import PageNotFound from "./lib/PageNotFound";
 
@@ -155,6 +156,7 @@ function App() {
           </HashRouter>
           <Toaster />
           <SonnerToaster position="top-right" richColors />
+          <FindBar />
         </QueryClientProvider>
       </AuthProvider>
     </ErrorBoundary>

@@ -1290,6 +1290,23 @@ function repositoryFor(userDataPath) {
         return item;
       });
     },
+    // Applies `mutator` to a copy of a collection's records inside ONE read-modify-write
+    // cycle (a single disk write regardless of how many records change). The mutator
+    // returns the replacement array, or null/undefined to leave the collection untouched.
+    // Bulk operations (e.g. the FST roster seed/import/sync) must use this instead of
+    // looping over createCollectionRecord, which rewrites the whole data file per record.
+    async mutateCollection(name, mutator) {
+      if (!collectionNames.includes(name)) throw new Error(`Unsupported local collection: ${name}`);
+      return serializedWrite(async () => {
+        const data = await read();
+        const next = mutator(structuredClone(data[name] || []));
+        if (!Array.isArray(next)) return { changed: false };
+        data[name] = next;
+        await rotateBackups();
+        await writeInner(data);
+        return { changed: true };
+      });
+    },
     // Outbound sync queue (mentions) - mirrors listPendingOutboundDismissals()/
     // markOutboundDismissalsSynced() above, for the "quoteAlerts" -> Base44 direction.
     async listPendingOutboundMentions() {
@@ -1387,6 +1404,32 @@ function repositoryFor(userDataPath) {
         await rotateBackups();
         await writeInner(data);
         return { id };
+      });
+    },
+    // Applies a record (or a deletion, when `record` is null) received from the shared
+    // Cloudflare store. Replaces the stored record exactly instead of merging field-by-field,
+    // and skips the change if a local save newer than `stamp` landed while the remote copy was
+    // being fetched, so an in-flight sync can never clobber a fresher local edit.
+    async applyRemoteCollectionRecord(name, id, record, stamp) {
+      if (!collectionNames.includes(name)) throw new Error(`Unsupported local collection: ${name}`);
+      return serializedWrite(async () => {
+        const data = await read();
+        const index = data[name].findIndex(item => item.id === id);
+        const existing = index >= 0 ? data[name][index] : null;
+        const existingStamp = existing ? String(existing.updated_date || existing.created_date || "") : "";
+        if (existing && existingStamp > stamp) return { applied: false };
+        if (record) {
+          const item = { ...z.record(z.unknown()).parse(record), id, updated_date: stamp };
+          if (index >= 0) data[name][index] = item;
+          else data[name].push(item);
+        } else if (index >= 0) {
+          data[name].splice(index, 1);
+        } else {
+          return { applied: false };
+        }
+        await rotateBackups();
+        await writeInner(data);
+        return { applied: true };
       });
     },
     // Validates an email/password sign-in against this PC's local credential store. Every

@@ -48,6 +48,7 @@ import {
     EyeOff,
     FileText,
     Hash,
+    MapPin,
     MessageSquarePlus,
     Package,
     Pencil,
@@ -71,6 +72,7 @@ import QuoteActivityLog from "@/components/quotes/QuoteActivityLog";
 import QuoteVersionComparison from "@/components/quotes/QuoteVersionComparison";
 import CareEligibilityBanner from "@/components/quotes/CareEligibilityBanner";
 import BulkMaterialOrderReviewSheet from "@/components/materials/BulkMaterialOrderReviewSheet";
+import FstFinderDialog from "@/components/resourcePlanner/FstFinderDialog";
 
 // Only these users can grant/revoke pre-approval
 const PRE_APPROVAL_USERS = ["smosley@enphaseenergy.com", "REDACTED-USER1@example.invalid"];
@@ -141,6 +143,7 @@ function QuoteDetailsContent() {
  const [decisionCategory, setDecisionCategory] = useState("no_customer_response");
  const [showPaidDialog, setShowPaidDialog] = useState(false);
  const [showBulkMaterialOrderSheet, setShowBulkMaterialOrderSheet] = useState(false);
+ const [showFstFinder, setShowFstFinder] = useState(false);
  const [paidDate, setPaidDate] = useState(format(new Date(), "yyyy-MM-dd"));
  const [stripeTransactionId, setStripeTransactionId] = useState("");
  const [stripeInvoiceId, setStripeInvoiceId] = useState("");
@@ -1381,6 +1384,14 @@ function QuoteDetailsContent() {
  Order Materials
  </Button>
 )}
+ <Button
+ variant="outline"
+ onClick={() => setShowFstFinder(true)}
+ className="border-sky-200 text-sky-700 hover:bg-sky-50"
+ >
+ <MapPin className="w-4 h-4 mr-2" />
+ Find Nearest FST
+ </Button>
  {canEditQuote && (
  <Button
  variant="outline"
@@ -2300,6 +2311,13 @@ function QuoteDetailsContent() {
  </DialogFooter>
  </DialogContent>
  </Dialog>
+
+ <FstFinderDialog
+ open={showFstFinder}
+ onOpenChange={setShowFstFinder}
+ initialAddress={quote.address || quote.site_address || ""}
+ title={`Find Nearest FST${quote.site_id ? ` - ${quote.site_id}` : ""}`}
+ />
 
  <BulkMaterialOrderReviewSheet
  open={showBulkMaterialOrderSheet}
