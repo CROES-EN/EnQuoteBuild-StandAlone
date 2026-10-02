@@ -25,14 +25,22 @@ async function importEntitySnapshot(repository, entities) {
       importedRecordCount: 0,
       quoteSnapshotCount: 0,
       quoteAddedCount: 0,
-      quoteUpdatedCount: 0
+      quoteUpdatedCount: 0,
+      quoteDeletedCount: 0
     };
   }
 
   const snapshot = { version: 1, quotes: [], products: [] };
   let importedRecordCount = 0;
+  let quoteDeletedCount = 0;
 
   for (const entity of entities) {
+    if (entity?.entityType === "Quote" && entity.action === "delete" && entity.localId) {
+      await repository.applyRemoteQuoteDeletion(entity.localId);
+      importedRecordCount += 1;
+      quoteDeletedCount += 1;
+      continue;
+    }
     if (!entity?.localId || !entity.record || typeof entity.record !== "object") continue;
     const record = {
       ...entity.record,
@@ -70,7 +78,10 @@ async function importEntitySnapshot(repository, entities) {
 
   let quoteAddedCount = 0;
   let quoteUpdatedCount = 0;
-  if (importedRecordCount > 0) {
+  const hasRecordsToImport = Object.values(snapshot).some(value =>
+    Array.isArray(value) && value.length > 0
+  );
+  if (hasRecordsToImport) {
     const mergedQuotes = await repository.importData(snapshot);
     const mergedById = new Map();
     for (const quote of mergedQuotes || []) {
@@ -94,7 +105,8 @@ async function importEntitySnapshot(repository, entities) {
     importedRecordCount,
     quoteSnapshotCount: snapshot.quotes.length,
     quoteAddedCount,
-    quoteUpdatedCount
+    quoteUpdatedCount,
+    quoteDeletedCount
   };
 }
 

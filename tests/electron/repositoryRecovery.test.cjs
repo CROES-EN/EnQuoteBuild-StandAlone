@@ -85,3 +85,81 @@ test("preserves malformed JSON before initializing a usable local file", async (
     assert.equal(await fs.readFile(path.join(directory, "Backups", incompatibleBackup), "utf8"), malformed);
   });
 });
+
+test("queues remote quote deletions and prevents snapshots from restoring deleted quotes", async () => {
+  await withUserData(async (directory) => {
+    const repository = repositoryFor(directory);
+    await repository.create({
+      id: "base44-quote-1",
+      base44_id: "base44-quote-1",
+      site_id: "site-1",
+      quote_number: "Q-DELETE"
+    });
+
+    assert.deepEqual(await repository.remove("base44-quote-1"), {
+      id: "base44-quote-1",
+      remoteDeleteQueued: true
+    });
+    assert.deepEqual(await repository.list(), []);
+    const [deleteEntry] = await repository.listPendingOutboundQuoteDeletes();
+    assert.equal(deleteEntry.kind, "delete");
+    assert.equal(deleteEntry.local_id, "base44-quote-1");
+    assert.equal(deleteEntry.remote_id, "base44-quote-1");
+    assert.equal(deleteEntry.quote_number, "Q-DELETE");
+
+    await repository.importData({
+      version: 1,
+      quotes: [{
+        id: "base44-quote-1",
+        site_id: "site-1",
+        quote_number: "Q-DELETE",
+        updated_date: new Date().toISOString()
+      }]
+    });
+    assert.deepEqual(await repository.list(), []);
+
+    assert.deepEqual(await repository.markOutboundQuoteDeletesSynced([
+      { local_id: "base44-quote-1", remote_id: "base44-quote-1" }
+    ]), { updated: 1 });
+    assert.deepEqual(await repository.listPendingOutboundQuoteDeletes(), []);
+  });
+});
+
+test("cancels a never-synced local quote without sending a remote delete", async () => {
+  await withUserData(async (directory) => {
+    const repository = repositoryFor(directory);
+    const quote = await repository.create({
+      id: "demo-quote-1234567890123-abcd",
+      site_id: "site-local",
+      quote_number: "Q-LOCAL"
+    });
+
+    assert.deepEqual(await repository.remove(quote.id), {
+      id: quote.id,
+      remoteDeleteQueued: false
+    });
+    assert.deepEqual(await repository.listPendingOutboundQuotes(), []);
+    assert.deepEqual(await repository.listPendingOutboundQuoteDeletes(), []);
+  });
+});
+
+test("applies remote quote tombstones without queuing a second delete", async () => {
+  await withUserData(async (directory) => {
+    const repository = repositoryFor(directory);
+    await repository.create({
+      id: "demo-quote-1234567890123-abcd",
+      base44_id: "base44-quote-2",
+      site_id: "site-2",
+      quote_number: "Q-REMOTE-DELETE"
+    });
+
+    const result = await repository.applyRemoteQuoteDeletion("base44-quote-2");
+    const data = await repository.exportData();
+
+    assert.deepEqual(result, { id: "base44-quote-2", removed: 1 });
+    assert.deepEqual(await repository.list(), []);
+    assert.deepEqual(data.deletedQuoteIds.sort(), ["base44-quote-2", "demo-quote-1234567890123-abcd"]);
+    assert.deepEqual(data.outboundDeleteQueue, []);
+    assert.deepEqual(data.outboundQueue, []);
+  });
+});

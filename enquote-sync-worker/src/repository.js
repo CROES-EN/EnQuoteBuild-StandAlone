@@ -85,8 +85,31 @@ export async function upsertBase44EntityState(db, { entityType, localId, action,
        ON CONFLICT(entity_type, local_id) DO UPDATE SET
          action = excluded.action,
          record_json = excluded.record_json,
-         synced_at = excluded.synced_at`
+         synced_at = excluded.synced_at
+       WHERE base44_entity_state.action != 'delete'`
     )
     .bind(entityType, localId, action, JSON.stringify(record ?? {}), new Date().toISOString())
     .run();
+}
+
+export async function markBase44QuoteDeleted(db, { localId, remoteId }) {
+  const quoteId = String(remoteId || localId || "");
+  if (!quoteId) throw new Error("A quote id is required to record a deletion.");
+  const deletedAt = new Date().toISOString();
+  await db
+    .prepare(
+      `INSERT INTO base44_entity_state (entity_type, local_id, action, record_json, origin, synced_at)
+       VALUES ('Quote', ?, 'delete', '{}', 'desktop', ?)
+       ON CONFLICT(entity_type, local_id) DO UPDATE SET
+         action = 'delete',
+         record_json = '{}',
+         origin = 'desktop',
+         synced_at = excluded.synced_at`
+    )
+    .bind(quoteId, deletedAt)
+    .run();
+  await db.prepare("DELETE FROM quotes WHERE id = ?").bind(quoteId).run();
+  if (localId && String(localId) !== quoteId) {
+    await db.prepare("DELETE FROM quotes WHERE id = ?").bind(String(localId)).run();
+  }
 }

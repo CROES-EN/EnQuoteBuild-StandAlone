@@ -27,7 +27,8 @@ test("imports entity snapshots in one repository merge with mapped collections",
     importedRecordCount: 3,
     quoteSnapshotCount: 1,
     quoteAddedCount: 1,
-    quoteUpdatedCount: 0
+    quoteUpdatedCount: 0,
+    quoteDeletedCount: 0
   });
   assert.equal(imported.version, 1);
   assert.deepEqual(imported.quotes.map(({ id, base44_id }) => [id, base44_id]), [["quote-1", "quote-1"]]);
@@ -54,7 +55,8 @@ test("reports quote updates accepted by the repository merge", async () => {
     importedRecordCount: 1,
     quoteSnapshotCount: 1,
     quoteAddedCount: 0,
-    quoteUpdatedCount: 1
+    quoteUpdatedCount: 1,
+    quoteDeletedCount: 0
   });
 });
 
@@ -102,7 +104,30 @@ test("does not write when no supported records are present", async () => {
     importedRecordCount: 0,
     quoteSnapshotCount: 0,
     quoteAddedCount: 0,
-    quoteUpdatedCount: 0
+    quoteUpdatedCount: 0,
+    quoteDeletedCount: 0
   });
   assert.equal(called, false);
+});
+
+test("applies quote tombstones without importing a quote record", async () => {
+  const deletions = [];
+  const repository = {
+    async applyRemoteQuoteDeletion(id) {
+      deletions.push(id);
+    }
+  };
+
+  const result = await importEntitySnapshot(repository, [
+    { entityType: "Quote", localId: "base44-quote-1", action: "delete", record: null }
+  ]);
+
+  assert.deepEqual(deletions, ["base44-quote-1"]);
+  assert.deepEqual(result, {
+    importedRecordCount: 1,
+    quoteSnapshotCount: 0,
+    quoteAddedCount: 0,
+    quoteUpdatedCount: 0,
+    quoteDeletedCount: 1
+  });
 });

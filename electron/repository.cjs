@@ -462,11 +462,13 @@ function repositoryFor(userDataPath) {
     if (!isRecord(parsed)) {
       return {
         version: DATA_VERSION,
-        quotes: seedQuotes,
-        products: productSeed,
+        quotes: structuredClone(seedQuotes),
+        products: structuredClone(productSeed),
         meta: { sync_ttl_ms: DEFAULT_SYNC_TTL_MS },
         userCredentials: {},
         outboundQueue: [],
+        outboundDeleteQueue: [],
+        deletedQuoteIds: [],
         outboundDismissalQueue: [],
         outboundMentionQueue: []
       };
@@ -481,6 +483,8 @@ function repositoryFor(userDataPath) {
       meta: isRecord(parsed.meta) ? parsed.meta : {},
       userCredentials: isRecord(parsed.userCredentials) ? parsed.userCredentials : {},
       outboundQueue: Array.isArray(parsed.outboundQueue) ? parsed.outboundQueue : [],
+      outboundDeleteQueue: Array.isArray(parsed.outboundDeleteQueue) ? parsed.outboundDeleteQueue : [],
+      deletedQuoteIds: Array.isArray(parsed.deletedQuoteIds) ? parsed.deletedQuoteIds : [],
       outboundDismissalQueue: Array.isArray(parsed.outboundDismissalQueue) ? parsed.outboundDismissalQueue : [],
       outboundMentionQueue: Array.isArray(parsed.outboundMentionQueue) ? parsed.outboundMentionQueue : []
     };
@@ -505,11 +509,13 @@ function repositoryFor(userDataPath) {
   async function createInitialData() {
     const initial = {
       version: DATA_VERSION,
-      quotes: seedQuotes,
-      products: productSeed,
+      quotes: structuredClone(seedQuotes),
+      products: structuredClone(productSeed),
       meta: { sync_ttl_ms: DEFAULT_SYNC_TTL_MS },
       userCredentials: {},
       outboundQueue: [],
+      outboundDeleteQueue: [],
+      deletedQuoteIds: [],
       outboundDismissalQueue: [],
       outboundMentionQueue: []
     };
@@ -553,6 +559,8 @@ function repositoryFor(userDataPath) {
     parsed.meta.sync_ttl_ms = parsed.meta.sync_ttl_ms || DEFAULT_SYNC_TTL_MS;
     parsed.userCredentials = isRecord(parsed.userCredentials) ? parsed.userCredentials : {};
     parsed.outboundQueue = Array.isArray(parsed.outboundQueue) ? parsed.outboundQueue : [];
+    parsed.outboundDeleteQueue = Array.isArray(parsed.outboundDeleteQueue) ? parsed.outboundDeleteQueue : [];
+    parsed.deletedQuoteIds = Array.isArray(parsed.deletedQuoteIds) ? parsed.deletedQuoteIds : [];
     parsed.outboundDismissalQueue = Array.isArray(parsed.outboundDismissalQueue) ? parsed.outboundDismissalQueue : [];
     parsed.outboundMentionQueue = Array.isArray(parsed.outboundMentionQueue) ? parsed.outboundMentionQueue : [];
     collectionNames.forEach(name => {
@@ -795,18 +803,56 @@ function repositoryFor(userDataPath) {
     },
     async remove(id) {
       const data = await read();
-      const next = data.quotes.filter(quote => quote.id !== id);
-      if (next.length === data.quotes.length) throw new Error("Quote not found.");
-      data.quotes = next;
-      // Drop any not-yet-synced outbound queue entry for this quote too, so deleting a
-      // quote before it reaches Base44 doesn't leave a permanent orphaned queue entry
-      // behind (harmless - listPendingOutboundQuotes() already skips entries whose quote
-      // no longer exists - but there's no reason to let it accumulate forever).
+      const quote = data.quotes.find(item => item.id === id);
+      if (!quote) throw new Error("Quote not found.");
+      const remoteId = quote.base44_id || (!isLocallyCreatedId(id) ? id : null);
+      const deletedIds = new Set(data.deletedQuoteIds.map(String));
+      deletedIds.add(String(id));
+      if (remoteId) deletedIds.add(String(remoteId));
+      data.deletedQuoteIds = Array.from(deletedIds);
+      data.quotes = data.quotes.filter(item => item.id !== id);
       if (Array.isArray(data.outboundQueue)) {
         data.outboundQueue = data.outboundQueue.filter(entry => entry.local_id !== id);
       }
+      if (remoteId || !isLocallyCreatedId(id)) {
+        data.outboundDeleteQueue = Array.isArray(data.outboundDeleteQueue) ? data.outboundDeleteQueue : [];
+        if (!data.outboundDeleteQueue.some(entry => entry.local_id === id && entry.status === "pending")) {
+          data.outboundDeleteQueue.push({
+            kind: "delete",
+            local_id: id,
+            remote_id: remoteId,
+            quote_number: quote.quote_number || null,
+            status: "pending",
+            attempts: 0,
+            enqueued_at: new Date().toISOString(),
+            synced_at: null,
+            last_error: null
+          });
+        }
+      }
       await write(data);
-      return { id };
+      return { id, remoteDeleteQueued: Boolean(remoteId || !isLocallyCreatedId(id)) };
+    },
+    async applyRemoteQuoteDeletion(remoteId) {
+      const key = String(remoteId || "");
+      if (!key) throw new Error("Remote quote deletion is missing its id.");
+      const data = await read();
+      const matchingQuotes = data.quotes.filter(quote =>
+        String(quote.id) === key || String(quote.base44_id || "") === key
+      );
+      const deletedIds = new Set(data.deletedQuoteIds.map(String));
+      deletedIds.add(key);
+      for (const quote of matchingQuotes) deletedIds.add(String(quote.id));
+      data.deletedQuoteIds = Array.from(deletedIds);
+      data.quotes = data.quotes.filter(quote =>
+        String(quote.id) !== key && String(quote.base44_id || "") !== key
+      );
+      const localIds = new Set(matchingQuotes.map(quote => String(quote.id)));
+      localIds.add(key);
+      data.outboundQueue = (data.outboundQueue || []).filter(entry => !localIds.has(String(entry.local_id)));
+      data.outboundDeleteQueue = (data.outboundDeleteQueue || []).filter(entry => !localIds.has(String(entry.local_id)));
+      await write(data);
+      return { id: key, removed: matchingQuotes.length };
     },
     async bulkUpdate(updates) {
       const parsed = z.array(updateSchema).parse(updates);
@@ -843,6 +889,8 @@ function repositoryFor(userDataPath) {
         products: structuredClone(productSeed),
         userCredentials: current.userCredentials || {},
         outboundQueue: current.outboundQueue || [],
+        outboundDeleteQueue: current.outboundDeleteQueue || [],
+        deletedQuoteIds: current.deletedQuoteIds || [],
         users: current.users || []
       };
       collectionNames.forEach(name => { if (name !== 'users') data[name] = structuredClone(collectionDefaults[name]); });
@@ -855,6 +903,11 @@ function repositoryFor(userDataPath) {
     async importData(input) {
       const normalized = normalizeIncomingSnapshot(input);
       const current = await read();
+      const deletedQuoteIds = new Set((current.deletedQuoteIds || []).map(String));
+      normalized.quotes = normalized.quotes.filter(quote =>
+        !deletedQuoteIds.has(String(quote.id || "")) &&
+        !deletedQuoteIds.has(String(quote.base44_id || ""))
+      );
 
       // Merge incoming records into the existing local dataset (deduped by id) instead of
       // overwriting it, so repeated/overlapping snapshots don't discard local-only records
@@ -986,6 +1039,8 @@ function repositoryFor(userDataPath) {
         fsts: z.array(z.record(z.unknown())).optional(),
         userCredentials: z.record(z.unknown()).optional(),
         outboundQueue: z.array(z.record(z.unknown())).optional(),
+        outboundDeleteQueue: z.array(z.record(z.unknown())).optional(),
+        deletedQuoteIds: z.array(z.string()).optional(),
         meta: z.object({
           sync_ttl_ms: z.number().optional(),
           last_imported_at: z.string().optional(),
@@ -1000,6 +1055,8 @@ function repositoryFor(userDataPath) {
         // passwords and pending quotes would silently never reach Base44.
         userCredentials: current.userCredentials || {},
         outboundQueue: current.outboundQueue || [],
+        outboundDeleteQueue: current.outboundDeleteQueue || [],
+        deletedQuoteIds: current.deletedQuoteIds || [],
         outboundDismissalQueue: current.outboundDismissalQueue || [],
         outboundMentionQueue: current.outboundMentionQueue || [],
         meta: {
@@ -1025,6 +1082,40 @@ function repositoryFor(userDataPath) {
           return quote ? { ...entry, quote } : null;
         })
         .filter(Boolean);
+    },
+    async listPendingOutboundQuoteDeletes() {
+      const data = await read();
+      return (data.outboundDeleteQueue || []).filter(entry => entry.status === "pending");
+    },
+    async markOutboundQuoteDeletesSynced(results) {
+      const parsed = z.array(z.object({
+        local_id: z.string().min(1),
+        remote_id: z.string().nullable().optional(),
+        error: z.string().nullable().optional()
+      })).parse(results || []);
+      if (!parsed.length) return { updated: 0 };
+      const data = await read();
+      data.outboundDeleteQueue = data.outboundDeleteQueue || [];
+      let updated = 0;
+      const now = new Date().toISOString();
+      for (const result of parsed) {
+        const entry = data.outboundDeleteQueue.find(item =>
+          item.local_id === result.local_id && item.status === "pending"
+        );
+        if (!entry) continue;
+        if (result.error) {
+          entry.attempts = (entry.attempts || 0) + 1;
+          entry.last_error = result.error;
+          continue;
+        }
+        entry.status = "synced";
+        entry.synced_at = now;
+        entry.remote_id = result.remote_id || entry.remote_id || null;
+        entry.last_error = null;
+        updated += 1;
+      }
+      await write(data);
+      return { updated };
     },
     // Marks entries as synced. Idempotent: acking an unknown or already-synced
     // id is a no-op, so a retried ack can never resurrect or duplicate a quote.
@@ -1061,7 +1152,11 @@ function repositoryFor(userDataPath) {
       return { updated };
     },
     async getOutboundQueueStatus() {
-      const queue = (await read()).outboundQueue || [];
+      const data = await read();
+      const queue = [
+        ...(data.outboundQueue || []),
+        ...(data.outboundDeleteQueue || [])
+      ];
       return {
         pending: queue.filter(entry => entry.status === "pending").length,
         synced: queue.filter(entry => entry.status === "synced").length,

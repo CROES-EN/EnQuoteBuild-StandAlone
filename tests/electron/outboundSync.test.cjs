@@ -39,13 +39,18 @@ function makeRepository() {
       acknowledgements.push(...results);
       return { updated: results.length };
     },
+    async listPendingOutboundQuoteDeletes() { return []; },
+    async markOutboundQuoteDeletesSynced(results) {
+      acknowledgements.push(...results.map(result => ({ ...result, type: "delete" })));
+      return { updated: results.length };
+    },
     async listPendingOutboundDismissals() { return []; },
     async listPendingOutboundMentions() { return []; }
   };
   return repository;
 }
 
-test("pushes outbound quotes through the realtime Worker's enqueue route", async () => {
+test("pushes outbound quotes through the Worker's Base44 route", async () => {
   await withWorker({ ok: true, status: "pushed", remote_id: "base44-1" }, async (workerUrl, getRequest) => {
     const repository = makeRepository();
     const sync = createOutboundSync({
@@ -57,7 +62,7 @@ test("pushes outbound quotes through the realtime Worker's enqueue route", async
     await sync.flush();
 
     const request = getRequest();
-    assert.equal(request.requestPath, "/api/outbound/enqueue");
+    assert.equal(request.requestPath, "/api/inbound/base44");
     assert.equal(request.requestBody.entityType, "quote");
     assert.deepEqual(repository.acknowledgements, [{
       local_id: "local-quote-1",
@@ -92,6 +97,40 @@ test("keeps queued quotes pending until their WebSocket status arrives", async (
     assert.deepEqual(repository.acknowledgements, [{
       local_id: "local-quote-1",
       remote_id: "base44-1"
+    }]);
+  });
+});
+
+test("sends queued quote deletions to the Worker Base44 route and acknowledges success", async () => {
+  await withWorker({ ok: true, status: "deleted", remote_id: "base44-1" }, async (workerUrl, getRequest) => {
+    const repository = makeRepository();
+    repository.listPendingOutboundQuotes = async () => [];
+    repository.listPendingOutboundQuoteDeletes = async () => [{
+      local_id: "local-quote-1",
+      remote_id: "base44-1",
+      quote_number: "Q-1"
+    }];
+    const sync = createOutboundSync({
+      repository,
+      config: { workerUrl, outboundToken: "test-token" },
+      logger: { warn() {}, log() {} }
+    });
+
+    await sync.flush();
+
+    const request = getRequest();
+    assert.equal(request.requestPath, "/api/inbound/base44");
+    assert.deepEqual(request.requestBody, {
+      entityType: "quote",
+      action: "delete",
+      localId: "local-quote-1",
+      remoteId: "base44-1",
+      quoteNumber: "Q-1"
+    });
+    assert.deepEqual(repository.acknowledgements, [{
+      local_id: "local-quote-1",
+      remote_id: "base44-1",
+      type: "delete"
     }]);
   });
 });

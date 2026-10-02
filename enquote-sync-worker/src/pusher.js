@@ -59,14 +59,30 @@ async function findExisting(env, quote) {
   return null;
 }
 
+async function findRemoteQuoteByLocalId(env, localId) {
+  const query = encodeURIComponent(JSON.stringify({ local_quote_id: localId }));
+  const response = await requestJson(
+    `${entityUrl(env, "Quote")}?q=${query}&limit=1`,
+    { headers: authHeaders(env) }
+  );
+  if (!response.ok) throw new RetryableError(`could not locate the Base44 quote: ${response.status}`);
+  const rows = Array.isArray(response.body) ? response.body : response.body?.items;
+  const candidate = Array.isArray(rows) ? rows[0] : null;
+  if (!candidate?.id || candidate.local_quote_id !== localId) return null;
+  return String(candidate.id);
+}
+
 async function fetchRemoteQuote(env, remoteId) {
-  const response = await requestJson(`${entityUrl(env, "Quote")}/${remoteId}`, { headers: authHeaders(env) });
+  const response = await requestJson(`${entityUrl(env, "Quote")}/${encodeURIComponent(String(remoteId))}`, {
+    headers: authHeaders(env)
+  });
   if (response.status === 404) return { ok: false, notFound: true };
   if (!response.ok || !response.body || typeof response.body !== "object") return { ok: false, error: "Could not read Base44's current copy" };
   return { ok: true, quote: response.body };
 }
 
 async function pushCreate(env, item) {
+  if (!item.quote) throw new Error("quote create/update requires a quote payload");
   const existingId = await findExisting(env, item.quote);
   if (existingId) {
     // HARDENING FIX (confirmed real bug tonight - two separate quotes each silently
@@ -111,12 +127,43 @@ async function pushUpdate(env, item) {
   if (!Number.isNaN(remoteUpdatedAt) && !Number.isNaN(localBaseline) && remoteUpdatedAt > localBaseline) {
     return { status: "conflict", conflict_with: remoteCheck.quote.updated_date };
   }
-  const url = `${entityUrl(env, "Quote")}/${item.remoteId}`;
+  const url = `${entityUrl(env, "Quote")}/${encodeURIComponent(String(item.remoteId))}`;
   const response = await requestJson(url, { method: "PUT", headers: authHeaders(env), body: toRemotePayload(item.quote) });
   if (!response.ok) throw new RetryableError(`update failed: ${response.status}`);
   const confirmedId = response.body?.id ? String(response.body.id) : null;
   if (!confirmedId || confirmedId !== String(item.remoteId)) throw new RetryableError(`update not confirmed (expected ${item.remoteId}, got ${confirmedId})`);
   return { status: "pushed", remote_id: confirmedId };
+}
+
+async function pushDelete(env, item) {
+  const localId = String(item.localId || item.quote?.id || "");
+  if (!localId) throw new Error("Quote deletion is missing its local id.");
+  const isLocallyCreated = /^demo-quote-\d{10,}-[a-z0-9]{4,}$/.test(localId);
+  let remoteId = item.remoteId ? String(item.remoteId) : (isLocallyCreated ? null : localId);
+
+  if (!remoteId) {
+    remoteId = await findRemoteQuoteByLocalId(env, localId);
+    if (!remoteId) return { status: "deleted", remote_id: null };
+  }
+
+  const remoteCheck = await fetchRemoteQuote(env, remoteId);
+  if (remoteCheck.notFound) return { status: "deleted", remote_id: remoteId };
+  if (!remoteCheck.ok) throw new RetryableError(`could not verify quote before deletion: ${remoteCheck.error}`);
+  if (isLocallyCreated && remoteCheck.quote.local_quote_id !== localId) {
+    throw new Error("Refusing to delete a Base44 quote that does not match this local quote.");
+  }
+  if (!isLocallyCreated && String(remoteCheck.quote.id || "") !== remoteId) {
+    throw new Error("Refusing to delete a Base44 quote whose id does not match the requested id.");
+  }
+
+  const response = await requestJson(`${entityUrl(env, "Quote")}/${encodeURIComponent(remoteId)}`, {
+    method: "DELETE",
+    headers: authHeaders(env)
+  });
+  if (!response.ok && response.status !== 404) {
+    throw new RetryableError(`delete failed: ${response.status}`);
+  }
+  return { status: "deleted", remote_id: remoteId };
 }
 
 async function pushDismissal(env, item) {
@@ -197,6 +244,7 @@ async function pushGenericEntity(env, entityName, item) {
 export async function performPush(message, env) {
   const { entityType, action, ...rest } = message;
   if (entityType === "quote") {
+    if (action === "delete") return await pushDelete(env, rest);
     return action === "update" ? await pushUpdate(env, rest) : await pushCreate(env, rest);
   }
   if (entityType === "dismissal") return await pushDismissal(env, rest);

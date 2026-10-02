@@ -164,9 +164,15 @@ function QuoteDetailsContent() {
 
  const deleteMutation = useMutation({
  mutationFn: (id) => deleteQuote(id),
- onSuccess: () => {
+ onSuccess: (result) => {
  queryClient.invalidateQueries({ queryKey: ["quotes"] });
+ toast.success(result?.remoteDeleteQueued
+   ? "Quote removed here; deletion is queued to sync with Base44."
+   : "Quote deleted.");
  navigate(createPageUrl("Quotes"));
+ },
+ onError: (error) => {
+ toast.error(error?.message || "Could not delete the quote.");
  }
  });
 

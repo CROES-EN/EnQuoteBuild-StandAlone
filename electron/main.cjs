@@ -989,7 +989,8 @@ let then = whenReady().then(async () => {
             let syncResult = {
                 quoteSnapshotCount: 0,
                 quoteAddedCount: 0,
-                quoteUpdatedCount: 0
+                quoteUpdatedCount: 0,
+                quoteDeletedCount: 0
             };
             if (typeof pollEntitySnapshot === "function") {
                 syncResult = await pollEntitySnapshot();
@@ -1005,7 +1006,9 @@ let then = whenReady().then(async () => {
 
             const result = {
                 ok: true,
-                reason: (syncResult?.quoteAddedCount || 0) + (syncResult?.quoteUpdatedCount || 0) > 0
+                reason: (syncResult?.quoteAddedCount || 0) +
+                    (syncResult?.quoteUpdatedCount || 0) +
+                    (syncResult?.quoteDeletedCount || 0) > 0
                     ? "imported"
                     : (outboundProgress.pushed || 0) > 0
                         ? "synced"
@@ -1018,6 +1021,7 @@ let then = whenReady().then(async () => {
                 quoteSnapshotCount: syncResult?.quoteSnapshotCount ?? 0,
                 quoteAddedCount: syncResult?.quoteAddedCount ?? 0,
                 quoteUpdatedCount: syncResult?.quoteUpdatedCount ?? 0,
+                quoteDeletedCount: syncResult?.quoteDeletedCount ?? 0,
                 outbound: {
                     ...outboundProgress,
                     pending: queueStatus.pending,
@@ -1027,7 +1031,8 @@ let then = whenReady().then(async () => {
             sendProgress({ stage: "complete", outbound: result.outbound, inbound: {
                 quoteSnapshotCount: result.quoteSnapshotCount,
                 quoteAddedCount: result.quoteAddedCount,
-                quoteUpdatedCount: result.quoteUpdatedCount
+                quoteUpdatedCount: result.quoteUpdatedCount,
+                quoteDeletedCount: result.quoteDeletedCount
             } });
             return result;
         } catch (error) {
@@ -1795,7 +1800,8 @@ let then = whenReady().then(async () => {
                     importedRecordCount: 0,
                     quoteSnapshotCount: 0,
                     quoteAddedCount: 0,
-                    quoteUpdatedCount: 0
+                    quoteUpdatedCount: 0,
+                    quoteDeletedCount: 0
                 };
             }
 
@@ -1978,7 +1984,8 @@ let then = whenReady().then(async () => {
                 importedRecordCount: updatedCount,
                 quoteSnapshotCount: 0,
                 quoteAddedCount: 0,
-                quoteUpdatedCount: 0
+                quoteUpdatedCount: 0,
+                quoteDeletedCount: 0
             };
         } catch (error) {
             console.log(`[entity-sync] Poll failed (will retry next cycle): ${error.message}`);

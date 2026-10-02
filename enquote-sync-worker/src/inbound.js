@@ -1,4 +1,7 @@
 import { performPush } from "./pusher.js";
+import { markBase44QuoteDeleted } from "./repository.js";
+import { broadcastQuoteUpdate } from "./realtime.js";
+import { refreshSnapshotCache } from "./snapshot-cache.js";
 import { json } from "./util.js";
 
 // Stage 2: Desktop -> Base44 ONLY. This is the counterpart to
@@ -25,6 +28,21 @@ export async function handleInboundBase44(request, env) {
 
   try {
     const result = await performPush(body, env);
+    if (body.entityType === "quote" && body.action === "delete") {
+      await markBase44QuoteDeleted(env.DB, {
+        localId: body.localId,
+        remoteId: result.remote_id
+      });
+      try {
+        const snapshot = await refreshSnapshotCache(env);
+        await broadcastQuoteUpdate(env, {
+          quoteCount: snapshot.quotes.length,
+          lastSavedAt: snapshot.lastSavedAt
+        });
+      } catch (error) {
+        console.error("[quote-delete] Could not refresh cached snapshot or notify connected apps:", error.message);
+      }
+    }
     return json({
       ok: true,
       status: result.status,

@@ -55,6 +55,7 @@ function createOutboundSync({ repository, config, logger = console, onAfterWrite
   let timer = null;
   const isConfigured = Boolean(workerUrl && outboundToken);
   const enqueueUrl = () => `${String(workerUrl).replace(/\/+$/, "")}/api/outbound/enqueue`;
+  const inboundUrl = () => `${String(workerUrl).replace(/\/+$/, "")}/api/inbound/base44`;
   const authHeaders = () => ({
     Authorization: `Bearer ${outboundToken}`,
     "CF-Access-Client-Id": process.env.CF_ACCESS_CLIENT_ID || "",
@@ -65,14 +66,23 @@ function createOutboundSync({ repository, config, logger = console, onAfterWrite
     return { entityType: "quote", action: entry.kind, localId: entry.local_id, quote: toRemotePayload(entry.quote),
       quoteId: entry.local_id, remoteId: entry.remote_id || null, base44SyncedAt: entry.quote?.base44_synced_at || null, quoteNumber: entry.quote_number || null };
   }
+  function buildQuoteDeleteMessage(entry) {
+    return {
+      entityType: "quote",
+      action: "delete",
+      localId: entry.local_id,
+      remoteId: entry.remote_id || null,
+      quoteNumber: entry.quote_number || null
+    };
+  }
   function buildDismissalMessage(entry) { return { entityType: "dismissal", localId: entry.local_id, quoteId: entry.quote_id }; }
   function buildMentionMessage(entry, localRecord) {
     return { entityType: "mention", localId: entry.local_id, quoteId: entry.quote_id, siteId: localRecord?.site_id || "",
       mentionedEmail: entry.mentioned_email, mentionedBy: localRecord?.mentioned_by || "", message: localRecord?.message || "", priority: localRecord?.priority || "yellow" };
   }
 
-  async function sendOne(message) {
-    const response = await requestJson(enqueueUrl(), { method: "POST", headers: authHeaders(), body: message });
+  async function sendOne(message, url = enqueueUrl()) {
+    const response = await requestJson(url, { method: "POST", headers: authHeaders(), body: message });
     if (!response.ok) return { local_id: message.localId, error: response.error || `HTTP ${response.status}` };
     const result = response.body;
     if (!result.ok) {
@@ -120,7 +130,9 @@ function createOutboundSync({ repository, config, logger = console, onAfterWrite
       for (const entry of eligible) {
         try {
           const message = buildQuoteMessage(entry);
-          const result = await sendOne(message);
+          // /api/outbound/enqueue only stores to D1 and never calls Base44, so quote
+          // creates/edits must go through /api/inbound/base44 to actually reach Base44.
+          const result = await sendOne(message, inboundUrl());
           if (result.queued) {
             awaitingRemoteStatus.set(entry.local_id, result.item_id);
             continue;
@@ -137,6 +149,25 @@ repository.createCollectionRecord("appNotifications", { type: "quote_synced", qu
         } catch (error) { results.push({ local_id: entry.local_id, error: error.message }); }
       }
       if (results.length) await repository.markOutboundSynced(results);
+
+      const pendingQuoteDeletes = await repository.listPendingOutboundQuoteDeletes();
+      let quoteDeleteResults = [];
+      if (pendingQuoteDeletes.length) {
+        quoteDeleteResults = [];
+        for (const entry of pendingQuoteDeletes) {
+          try {
+            const message = buildQuoteDeleteMessage(entry);
+            quoteDeleteResults.push(await sendOne(message, inboundUrl()));
+          } catch (error) {
+            quoteDeleteResults.push({ local_id: entry.local_id, error: error.message });
+          }
+        }
+        await repository.markOutboundQuoteDeletesSynced(quoteDeleteResults);
+        const deleteFailures = quoteDeleteResults.filter(result => result.error);
+        if (deleteFailures.length) {
+          logger.warn(`[outbound-sync] ${deleteFailures.length} quote deletion(s) failed; they remain queued.`, deleteFailures);
+        }
+      }
 
       const pendingDismissals = await repository.listPendingOutboundDismissals();
       if (pendingDismissals.length) {
@@ -167,6 +198,7 @@ repository.createCollectionRecord("appNotifications", { type: "quote_synced", qu
       const failed = results.filter((r) => r.error);
       const conflicts = failed.filter((r) => r.error.startsWith(CONFLICT_PREFIX));
       const otherFailed = failed.length - conflicts.length;
+      const deleteFailures = quoteDeleteResults.filter((result) => result.error).length;
       if (conflicts.length) logger.warn(`[outbound-sync] ${conflicts.length} quote(s) held back due to CONFLICT; they remain queued and will be re-checked.`);
       if (otherFailed) {
 logger.warn(`[outbound-sync] ${otherFailed} quote(s) failed to sync; they remain queued.`);
@@ -174,7 +206,11 @@ failed.filter((r) => !r.error.startsWith(CONFLICT_PREFIX)).forEach((r) => {
 logger.warn(`[outbound-sync] -> local_id=${r.local_id}: ${r.error}`);
 });
 }
-      return { pushed: results.length - failed.length, failed: failed.length, conflicts: conflicts.length };
+      return {
+        pushed: results.length - failed.length + quoteDeleteResults.length - deleteFailures,
+        failed: failed.length + deleteFailures,
+        conflicts: conflicts.length
+      };
     } catch (error) { logger.warn("[outbound-sync] Flush failed:", error.message); return { error: error.message }; }
     finally { running = false; }
   }

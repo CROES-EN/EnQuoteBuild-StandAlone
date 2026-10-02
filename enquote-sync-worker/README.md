@@ -125,6 +125,10 @@ Cloudflare Access sign-in page; after sign-in it should return JSON with
 
 ## Endpoints
 
+When a desktop user deletes a quote, Electron sends the confirmed delete through
+`/api/inbound/base44`. The Worker verifies the Base44 record, deletes it, then stores a
+quote tombstone so future entity snapshots cannot restore it.
+
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
 | POST | `/api/base44/webhook` | X-ENQuote-Signature (HMAC) | Inbound delivery from Base44 |
