@@ -149,7 +149,11 @@ async function pushDelete(env, item) {
   const remoteCheck = await fetchRemoteQuote(env, remoteId);
   if (remoteCheck.notFound) return { status: "deleted", remote_id: remoteId };
   if (!remoteCheck.ok) throw new RetryableError(`could not verify quote before deletion: ${remoteCheck.error}`);
-  if (isLocallyCreated && remoteCheck.quote.local_quote_id !== localId) {
+  const localIdMatches = remoteCheck.quote.local_quote_id === localId;
+  // A confirmed Base44 id plus a matching quote number is equally strong proof; the remote
+  // local_quote_id can be empty or point at a duplicate local copy of the same quote.
+  const quoteNumberMatches = Boolean(item.remoteId && item.quoteNumber && remoteCheck.quote.quote_number === item.quoteNumber);
+  if (isLocallyCreated && !localIdMatches && !quoteNumberMatches) {
     throw new Error("Refusing to delete a Base44 quote that does not match this local quote.");
   }
   if (!isLocallyCreated && String(remoteCheck.quote.id || "") !== remoteId) {

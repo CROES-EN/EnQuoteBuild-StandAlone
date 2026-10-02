@@ -67,6 +67,30 @@ test("refuses to delete a remote quote that does not belong to the local quote",
   }
 });
 
+test("deletes a locally created quote when the confirmed remote id and quote number match", async () => {
+  const methods = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, init) => {
+    methods.push(init.method);
+    if (init.method === "GET") return Response.json({ id: "base44-quote-3", quote_number: "Q-3" });
+    return new Response(null, { status: 204 });
+  };
+
+  try {
+    const result = await performPush({
+      entityType: "quote",
+      action: "delete",
+      localId: "demo-quote-1234567890123-abcd",
+      remoteId: "base44-quote-3",
+      quoteNumber: "Q-3"
+    }, env);
+    assert.deepEqual(result, { status: "deleted", remote_id: "base44-quote-3" });
+    assert.deepEqual(methods, ["GET", "DELETE"]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("finds locally created quotes by local id before deleting", async () => {
   const requests = [];
   const localId = "demo-quote-1234567890123-abcd";
