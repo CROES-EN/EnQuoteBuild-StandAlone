@@ -207,6 +207,29 @@ async function main() {
     return;
   }
 
+  // Picks up a release whose commit and tag were already pushed but whose installer build or upload
+  // failed: node scripts/release-windows.cjs --resume "release notes"
+  if (args.has("--resume")) {
+    const resumeNotes = process.argv.slice(2).filter((arg) => !arg.startsWith("--")).join(" ").trim();
+    if (!resumeNotes) throw new Error("Pass the release notes after --resume.");
+    const resumeToken = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
+    if (!resumeToken) throw new Error("Set GH_TOKEN or GITHUB_TOKEN first.");
+    const resumeVersion = packageJson.version;
+    const tag = `v${resumeVersion}`;
+    if (!run("git", ["ls-remote", "--tags", "origin", `refs/tags/${tag}`], { capture: true })) {
+      throw new Error(`${tag} is not on GitHub yet - run a normal release instead of --resume.`);
+    }
+    if (run("git", ["status", "--porcelain"], { capture: true })) throw new Error("Working tree is not clean.");
+    fs.rmSync(path.join(root, "release", "win-unpacked.tmp"), { recursive: true, force: true });
+    console.log(`Resuming ${tag}: building the Windows installer...`);
+    run("npx", ["electron-builder", "--win", "--publish", "never"], { shell: true });
+    console.log("\nPublishing to GitHub (draft, upload, then publish)...");
+    await publishToGitHub(resumeVersion, resumeNotes, resumeToken);
+    const resumedUrl = await publishReleaseNotes(resumeVersion, resumeNotes, resumeToken);
+    console.log(`\nRelease ${tag} is published: ${resumedUrl}`);
+    return;
+  }
+
   if (args.has("--dry-run")) {
     console.log(`Current version: ${packageJson.version}`);
     console.log(`Next patch version: ${bumpVersion(packageJson.version, "patch")}`);
