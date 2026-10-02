@@ -28,6 +28,13 @@ function run(command, args, options = {}) {
   return options.capture ? result.stdout.trim() : "";
 }
 
+// ENQUOTE_USE_LOCAL_ELECTRON=1 reuses the Electron in node_modules instead of unpacking a fresh copy
+// - a workaround for antivirus/OneDrive locking the freshly unpacked folder ("EPERM ... rename
+// win-unpacked.tmp"), which makes the build fail intermittently.
+function builderArgs() {
+  return ["electron-builder", "--win", "--publish", "never", ...(process.env.ENQUOTE_USE_LOCAL_ELECTRON ? ["--config.electronDist=node_modules/electron/dist"] : [])];
+}
+
 function bumpVersion(version, bump) {
   const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version);
   if (!match) throw new Error(`Expected a stable semantic version, received "${version}".`);
@@ -222,7 +229,7 @@ async function main() {
     if (run("git", ["status", "--porcelain"], { capture: true })) throw new Error("Working tree is not clean.");
     fs.rmSync(path.join(root, "release", "win-unpacked.tmp"), { recursive: true, force: true });
     console.log(`Resuming ${tag}: building the Windows installer...`);
-    run("npx", ["electron-builder", "--win", "--publish", "never"], { shell: true });
+    run("npx", builderArgs(), { shell: true });
     console.log("\nPublishing to GitHub (draft, upload, then publish)...");
     await publishToGitHub(resumeVersion, resumeNotes, resumeToken);
     const resumedUrl = await publishReleaseNotes(resumeVersion, resumeNotes, resumeToken);
@@ -326,7 +333,7 @@ async function main() {
     run("git", ["push", "origin", tag]);
 
     console.log("\nBuilding the Windows installer...");
-    run("npx", ["electron-builder", "--win", "--publish", "never"], { shell: true });
+    run("npx", builderArgs(), { shell: true });
 
     console.log("\nPublishing to GitHub (draft, upload, then publish)...");
     await publishToGitHub(version, notes, token);
