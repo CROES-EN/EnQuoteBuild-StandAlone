@@ -1533,6 +1533,7 @@ let then = whenReady().then(async () => {
             };
 
             const result = await postJson(
+                // TODO: This diagnostic-report route is not implemented by the Worker.
                 `${targetBase}/api/base44/webhook/diagnostic-report`,
                 {
                     "Authorization": `Bearer ${remoteConfig.secret || ""}`,

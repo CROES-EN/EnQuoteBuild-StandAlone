@@ -226,6 +226,7 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
   if (!record) return null;
 
   const draft = isEditing ? editedDraft : (record.draft || {});
+  const draftWithItems = { ...draft, items: draft.items || [] };
   const {
     itemsSubtotal,
     laborCost,
@@ -237,7 +238,7 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
     taxableAfterDiscount,
     taxAmount,
     total: calculatedTotal
-  } = calculateQuoteTotals(draft);
+  } = calculateQuoteTotals(draftWithItems);
   const hasDiscount = discountAmount > 0;
   const hasTax = combinedTaxRate > 0;
 
