@@ -377,15 +377,43 @@ export function resetMyCaseOwnerName() {
   try { localStorage.removeItem(scopedKey(MY_NAME_KEY)); } catch { /* ignore */ }
 }
 
-/** True if the given "Case Owner" value matches the configured "my name" (case-insensitive,
- *  whitespace-trimmed). Always false if "my name" has never been configured, so this can never
- *  accidentally match a blank/unset Case Owner cell against a blank/unset preference. */
-export function isMyCaseMatch(caseOwnerValue, myName) {
-  const name = String(myName ?? getMyCaseOwnerName()).trim();
-  if (!name) return false;
-  const key = String(caseOwnerValue ?? "").trim().toLowerCase();
-  if (!key) return false;
-  return key === name.toLowerCase();
+/** True if the given "Case Owner" value is the signed-in person - by the configured "my name"
+ *  (case-insensitive; "Last, First" and "First Last" are treated the same) OR, when the real
+ *  name is unknown (fresh installs have no synced user record, so the name comes back as the
+ *  email address), by the person's email: "hmackey@..." matches "Heather Mackey" via first
+ *  initial + last name. Always false when neither a name nor an email is known, so a blank
+ *  Case Owner can never match a blank preference. */
+export function isMyCaseMatch(caseOwnerValue, myName, myEmail) {
+  const owner = canonicalPersonName(caseOwnerValue);
+  if (!owner) return false;
+  const name = canonicalPersonName(myName ?? getMyCaseOwnerName());
+  if (name && !name.includes("@") && owner === name) return true;
+  return ownerMatchesEmail(owner, myEmail);
+}
+
+function canonicalPersonName(value) {
+  let text = String(value ?? "").trim();
+  if (!text) return "";
+  if (text.includes(",") && !text.includes("@")) {
+    const [last, first] = text.split(",").map((part) => part.trim());
+    text = `${first} ${last}`;
+  }
+  return text.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function ownerMatchesEmail(canonicalOwner, email) {
+  const local = String(email ?? "").split("@")[0].toLowerCase().replace(/[^a-z]/g, "");
+  if (!local) return false;
+  const parts = canonicalOwner.replace(/[^a-z\s]/g, "").split(" ").filter(Boolean);
+  if (parts.length < 2) return false;
+  const first = parts[0];
+  const last = parts[parts.length - 1];
+  return local === `${first[0]}${last}` || local === `${first}${last}`;
+}
+
+/** Narrows imported Workload rows to the signed-in person's own cases. */
+export function filterRowsToMe(rows, { name, email } = {}) {
+  return (rows || []).filter((row) => isMyCaseMatch(row?.["Case Owner"], name, email));
 }
 
 // ---------------------------------------------------------------------------------------------

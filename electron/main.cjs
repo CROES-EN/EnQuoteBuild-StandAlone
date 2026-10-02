@@ -20,6 +20,10 @@ const { importEntitySnapshot } = require("./entitySnapshotSync.cjs");
 const { applyVerifiedQuoteCreator, applyVerifiedQuoteUpdate, requireVerifiedEmail } = require("./quoteAttribution.cjs");
 const { createPresenceSync } = require("./presenceSync.cjs");
 const { createFstRosterSync } = require("./fstRosterSync.cjs");
+const { createLargeTableStore } = require("./largeTableStore.cjs");
+const { createUserRolesSync } = require("./userRolesSync.cjs");
+const { createUiUpdater } = require("./uiUpdate.cjs");
+const { createErrorReporter } = require("./errorReporter.cjs");
 // The roster itself is NOT bundled (this repo and its installers are public, and the roster
 // holds employees' home addresses and phone numbers). It lives in the private Cloudflare Worker
 // and every install pulls it from there. An optional local fstRosterSeed.json is only honored
@@ -31,7 +35,6 @@ try {
     // No bundled seed - expected for released builds.
 }
 const { createSupervisorSync } = require("./supervisorSync.cjs");
-const { createUpdatePrompt } = require("./updatePrompt.cjs");
 const { createOutboundSync } = require("./outboundSync.cjs");
 const { startRealtimeSync } = require("./realtimeSync.cjs");
 const { openSalesforceReportWindow, closeSalesforceReportWindow } = require("./salesforceImport.cjs");
@@ -75,6 +78,9 @@ let quoteRepository;
 let outboundSync;
 let realtimeSync;
 let supervisorSync;
+let userRolesSync;
+let uiUpdater;
+let errorReporter;
 let dataDirectoryWatcher;
 const presenceSync = createPresenceSync({
     workerUrl: "https://enquote-sync.croeschberger.workers.dev",
@@ -450,29 +456,29 @@ function configureAutoUpdater() {
     let updaterCheckInProgress = false;
     let updateAvailableOrDownloading = false;
     let startupUpdateCheckActive = false;
-    const updatePrompt = createUpdatePrompt({
-        showDialog: async (version) => {
-            const options = {
-                type: "info",
-                title: "Update required",
-                message: `EnQuote ${version} is available.`,
-                detail: "Download now to close EnQuote and reopen it with the updated version, or choose Later to install it the next time you open the app.",
-                buttons: ["Download now", "Later"],
-                defaultId: 0,
-                cancelId: 1,
-                noLink: true
-            };
-            const parent = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
-            const result = parent
-                ? await dialog.showMessageBox(parent, options)
-                : await dialog.showMessageBox(options);
-            return result.response;
-        },
-        downloadUpdate: () => autoUpdater.downloadUpdate(),
-        installUpdate: () => autoUpdater.quitAndInstall(true, true),
-        sendStatus,
-        logger: console
-    });
+    // The update being downloaded, and (once finished) the one waiting for a restart. The app
+    // installs a downloaded update when it is next closed even if nobody clicks "Restart now".
+    let pendingInfo = null;
+    let downloadedInfo = null;
+    let consecutiveFailures = 0;
+    let lastCheckAt = 0;
+    let retryTimer = null;
+
+    const releaseNotesText = (info) => {
+        const notes = info?.releaseNotes;
+        const text = Array.isArray(notes) ? notes.map((entry) => entry?.note || "").join("\n") : String(notes || "");
+        return text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 400);
+    };
+
+    function scheduleRetry() {
+        // Back off 2, 4, then 6 minutes after a failed check/download, then wait for the normal schedule.
+        if (retryTimer || consecutiveFailures === 0 || consecutiveFailures > 3) return;
+        retryTimer = setTimeout(() => {
+            retryTimer = null;
+            controller.checkForUpdates();
+        }, consecutiveFailures * 2 * 60 * 1000);
+        retryTimer.unref?.();
+    }
 
     autoUpdater.on("checking-for-update", () => {
         updaterCheckInProgress = true;
@@ -483,50 +489,52 @@ function configureAutoUpdater() {
     autoUpdater.on("update-available", (info) => {
         updaterCheckInProgress = false;
         updateAvailableOrDownloading = true;
+        pendingInfo = { version: info.version, notes: releaseNotesText(info) };
         console.log("Update available:", info.version);
-        sendStatus("available", { version: info.version });
-        if (!startupUpdateCheckActive) {
-            updatePrompt.offer(info.version).then((result) => {
-                if (result === "deferred" || result === "failed") {
-                    updateAvailableOrDownloading = false;
-                }
-            }).catch((error) => {
-                updateAvailableOrDownloading = false;
-                console.error("[updater] Could not process the in-session update:", error.message);
-            });
-        }
+        sendStatus("available", pendingInfo);
+        // At launch the startup flow below downloads it behind its own splash screen. Otherwise
+        // download quietly in the background - no prompt - and offer "Restart now" once it is ready.
+        if (startupUpdateCheckActive) return;
+        autoUpdater.downloadUpdate().catch((error) => {
+            updateAvailableOrDownloading = false;
+            consecutiveFailures += 1;
+            console.error("[updater] Background download failed:", error.message);
+            sendStatus("error", { message: error.message });
+            scheduleRetry();
+        });
     });
 
     autoUpdater.on("update-not-available", () => {
         updaterCheckInProgress = false;
         updateAvailableOrDownloading = false;
+        consecutiveFailures = 0;
         console.log("EnQuote is up to date.");
         sendStatus("up-to-date");
     });
 
     autoUpdater.on("download-progress", (progress) => {
         console.log(`Update download progress: ${Math.round(progress.percent)}%`);
-        sendStatus("downloading", { percent: Math.round(progress.percent) });
+        sendStatus("downloading", { ...pendingInfo, percent: Math.round(progress.percent) });
     });
 
     autoUpdater.on("error", (error) => {
         updaterCheckInProgress = false;
         updateAvailableOrDownloading = false;
-        updatePrompt.onError();
+        consecutiveFailures += 1;
         console.error("Auto-update error:", error);
         sendStatus("error", { message: String(error) });
+        scheduleRetry();
     });
 
     autoUpdater.on("update-downloaded", () => {
         updateAvailableOrDownloading = false;
+        consecutiveFailures = 0;
+        downloadedInfo = pendingInfo;
         console.log("Update downloaded and ready to install.");
-        sendStatus("ready");
-        if (!startupUpdateCheckActive && updatePrompt.onDownloaded()) {
-            console.log("Installing the requested update and relaunching EnQuote.");
-        }
+        sendStatus("ready", { ...downloadedInfo });
     });
 
-    return {
+    const controller = {
         beginStartupCheck() {
             startupUpdateCheckActive = true;
         },
@@ -534,17 +542,33 @@ function configureAutoUpdater() {
             startupUpdateCheckActive = false;
         },
         checkForUpdates() {
-            if (updaterCheckInProgress || updateAvailableOrDownloading) return;
+            if (updaterCheckInProgress || updateAvailableOrDownloading || downloadedInfo) return;
             updaterCheckInProgress = true;
+            lastCheckAt = Date.now();
             autoUpdater.checkForUpdates().catch((error) => {
                 updaterCheckInProgress = false;
+                consecutiveFailures += 1;
                 console.error("[updater] Background update check failed:", error.message);
+                scheduleRetry();
             });
+        },
+        // Coming back to the window after a while is a good moment to look for a new release.
+        checkIfStale() {
+            if (Date.now() - lastCheckAt > 5 * 60 * 1000) controller.checkForUpdates();
+        },
+        installNow() {
+            if (!downloadedInfo) return false;
+            autoUpdater.quitAndInstall(true, true);
+            return true;
+        },
+        getState() {
+            return downloadedInfo ? { status: "ready", ...downloadedInfo } : null;
         }
     };
+    return controller;
 }
 
-const UPDATE_CHECK_INTERVAL_MS = 15 * 60 * 1000;
+const UPDATE_CHECK_INTERVAL_MS = 10 * 60 * 1000;
 let updateCheckTimer = null;
 let updateCheckController = null;
 
@@ -726,6 +750,67 @@ if (hasSingleInstanceLock) {
 // before this flag is set) and "the user actually closed the real app" (after).
 let mainWindowHasBeenCreated = false;
 
+// --- UI hotfix channel (see uiUpdate.cjs) ---------------------------------------------------
+// Loads the newest verified downloaded UI when one exists for this installed app version, and
+// otherwise the UI bundled in the installer. A downloaded UI that fails to load, crashes, or
+// renders a blank page is marked bad and the bundled UI is loaded instead, so a bad update can
+// never leave the app unusable.
+function loadBundledUi() {
+    const resourceDist = path.join(process.resourcesPath, "dist", "index.html");
+    const packagedDist = path.join(__dirname, "..", "dist", "index.html");
+    if (fs.existsSync(resourceDist)) {
+        mainWindow.loadFile(resourceDist);
+    } else if (fs.existsSync(packagedDist)) {
+        mainWindow.loadFile(packagedDist);
+    } else {
+        console.warn("Renderer index.html not found in resources/dist or packaged dist; attempting packaged path anyway.");
+        mainWindow.loadFile(packagedDist);
+    }
+}
+
+let activeUiGuard = null;
+function loadUi() {
+    if (activeUiGuard) { activeUiGuard(); activeUiGuard = null; }
+    const entry = uiUpdater?.resolveEntry();
+    if (!entry) { loadBundledUi(); return; }
+
+    console.log(`[ui-update] Loading downloaded UI ${entry.uiVersion}.`);
+    const contents = mainWindow.webContents;
+    let settled = false;
+    const fallBack = (reason) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        uiUpdater.markBad(entry.uiVersion, reason);
+        if (mainWindow && !mainWindow.isDestroyed()) loadBundledUi();
+    };
+    const onFailLoad = (_event, _code, description, _url, isMainFrame) => { if (isMainFrame) fallBack(`load failed: ${description}`); };
+    const onGone = (_event, details) => fallBack(`renderer gone: ${details?.reason}`);
+    let blankTimer = null;
+    const onFinished = () => {
+        blankTimer = setTimeout(async () => {
+            try {
+                const children = await contents.executeJavaScript("document.getElementById('root')?.childElementCount || 0");
+                if (!children) fallBack("blank page");
+            } catch (error) {
+                fallBack(`could not inspect page: ${error.message}`);
+            }
+        }, 10000);
+        blankTimer.unref?.();
+    };
+    function cleanup() {
+        contents.removeListener("did-fail-load", onFailLoad);
+        contents.removeListener("render-process-gone", onGone);
+        contents.removeListener("did-finish-load", onFinished);
+        if (blankTimer) clearTimeout(blankTimer);
+    }
+    contents.on("did-fail-load", onFailLoad);
+    contents.on("render-process-gone", onGone);
+    contents.once("did-finish-load", onFinished);
+    activeUiGuard = () => { settled = true; cleanup(); };
+    mainWindow.loadFile(entry.indexPath);
+}
+
 function createWindow() {
     mainWindowHasBeenCreated = true;
     mainWindow = new BrowserWindow({
@@ -776,19 +861,9 @@ function createWindow() {
     });
 
     if (isPackaged) {
-        // When packaged we copy the renderer 'dist' into resources via extraResources.
-        // Try resources/dist first (extraResources), then fallback to packaged dist path.
-        const fs = require("node:fs");
-        const resourceDist = path.join(process.resourcesPath, "dist", "index.html");
-        const packagedDist = path.join(__dirname, "..", "dist", "index.html");
-        if (fs.existsSync(resourceDist)) {
-            mainWindow.loadFile(resourceDist);
-        } else if (fs.existsSync(packagedDist)) {
-            mainWindow.loadFile(packagedDist);
-        } else {
-            console.warn("Renderer index.html not found in resources/dist or packaged dist; attempting packaged path anyway.");
-            mainWindow.loadFile(packagedDist);
-        }
+        // Packaged: the downloaded UI when one is installed, otherwise the bundled one
+        // (copied into resources/dist via extraResources). See loadUi() above.
+        loadUi();
     } else if (process.env.ENQUOTE_REMOTE_URL) {
         mainWindow.loadURL(process.env.ENQUOTE_REMOTE_URL);
     } else {
@@ -815,6 +890,7 @@ function createWindow() {
     mainWindow.webContents.on("render-process-gone", (_event, details) => {
         console.error("[recovery] Renderer process gone:", details.reason);
         if (details.reason === "clean-exit") return;
+        errorReporter?.report({ source: "main:render-process-gone", message: `Renderer process gone: ${details.reason}`, stack: "" });
         setTimeout(() => {
             if (!mainWindow.isDestroyed()) mainWindow.reload();
         }, 500);
@@ -1089,6 +1165,78 @@ let then = whenReady().then(async () => {
             }));
         }
     });
+
+    // Pulls every person's role from Base44 (via the Worker) so a brand-new install knows who
+    // is an admin/approver instead of treating everyone as a submitter. Run once, awaited, right
+    // after sign-in (see applySyncCredentialsOrDisable) and then every 10 minutes.
+    userRolesSync = createUserRolesSync({
+        repository: quoteRepository,
+        workerUrl: "https://enquote-sync.croeschberger.workers.dev",
+        getOutboundToken: () => process.env.OUTBOUND_TOKEN || "",
+        getAccessHeaders: () => ({
+            "CF-Access-Client-Id": process.env.CF_ACCESS_CLIENT_ID || "",
+            "CF-Access-Client-Secret": process.env.CF_ACCESS_CLIENT_SECRET || ""
+        }),
+        onChanged: () => {
+            markOwnWrite();
+            BrowserWindow.getAllWindows().forEach((window) => window.webContents.send("app:data-updated", {
+                at: new Date().toISOString(),
+                changedQuoteNumbers: []
+            }));
+        }
+    });
+
+    // UI hotfix channel: signed UI updates downloaded from the Worker without a new installer.
+    // Packaged builds only. A tester can opt into the beta channel by putting "beta" in
+    // ui-channel.txt in the app data folder.
+    if (isPackaged) {
+        const publicKeyPem = fs.readFileSync(path.join(__dirname, "uiUpdatePublicKey.pem"), "utf8");
+        uiUpdater = createUiUpdater({
+            userDataPath: getPath("userData"),
+            appVersion: getVersion(),
+            publicKeyPem,
+            workerUrl: "https://enquote-sync.croeschberger.workers.dev",
+            getToken: () => process.env.OUTBOUND_TOKEN || "",
+            getAccessHeaders: () => ({
+                "CF-Access-Client-Id": process.env.CF_ACCESS_CLIENT_ID || "",
+                "CF-Access-Client-Secret": process.env.CF_ACCESS_CLIENT_SECRET || ""
+            }),
+            getChannel: () => {
+                try { return fs.readFileSync(path.join(getPath("userData"), "ui-channel.txt"), "utf8").trim(); } catch { return "stable"; }
+            }
+        });
+    }
+    // Installer updates: the window asks for the current state on load (the "ready" event may have
+    // fired before it existed) and can trigger the restart itself.
+    ipcMain.handle("updater:get-state", () => updateCheckController?.getState() || null);
+    ipcMain.handle("updater:install-now", () => ({ ok: Boolean(updateCheckController?.installNow()) }));
+    on("browser-window-focus", () => updateCheckController?.checkIfStale());
+    // Error reports (UI errors forwarded by the window, plus crashes in this process) go to the
+    // Worker so problems are seen without waiting for someone to report them. See errorReporter.cjs.
+    errorReporter = createErrorReporter({
+        workerUrl: "https://enquote-sync.croeschberger.workers.dev",
+        getIdentity: getVerifiedIdentity,
+        getToken: () => process.env.OUTBOUND_TOKEN || "",
+        getAccessHeaders: () => ({
+            "CF-Access-Client-Id": process.env.CF_ACCESS_CLIENT_ID || "",
+            "CF-Access-Client-Secret": process.env.CF_ACCESS_CLIENT_SECRET || ""
+        }),
+        getVersions: () => ({ appVersion: getVersion(), uiVersion: uiUpdater?.getInfo().uiVersion || "" })
+    });
+    ipcMain.on("errors:report", (_event, details) => { errorReporter.report(details); });
+    // The monitor variant observes crashes without changing what Electron does with them.
+    process.on("uncaughtExceptionMonitor", (error, origin) => {
+        errorReporter?.report({ source: `main:${origin}`, message: error?.message, stack: error?.stack });
+    });
+    uiUpdater?.cleanupStale();
+    ipcMain.handle("ui:get-info", () => uiUpdater ? uiUpdater.getInfo() : { appVersion: getVersion(), uiVersion: null });
+    // Reloads the window into the newest downloaded UI (the "Reload now" button on the update banner).
+    ipcMain.handle("ui:apply", () => {
+        if (!uiUpdater || !mainWindow || mainWindow.isDestroyed()) return { ok: false };
+        loadUi();
+        return { ok: true };
+    });
+    ipcMain.handle("ui:check", () => checkForUiUpdate());
 
     // Wraps a repository method so any write it performs is flagged as "our own", suppressing
     // the fs.watch-triggered reload that would otherwise fire a moment later and wipe the
@@ -1586,6 +1734,15 @@ let then = whenReady().then(async () => {
         }),
         onLocalChange: markOwnWrite
     });
+    // Very large report tables (the full Care Subscriptions import) live in their own files, not
+    // in the main data file that every save rewrites. See largeTableStore.cjs.
+    const largeTableStore = createLargeTableStore({
+        directory: path.join(getPath("userData"), "large-tables"),
+        repository: quoteRepository
+    });
+    ipcMain.handle("largeTables:get", (_event, id) => largeTableStore.get(id));
+    ipcMain.handle("largeTables:save", (_event, id, record) => largeTableStore.save(id, record));
+    ipcMain.handle("largeTables:delete", (_event, id) => largeTableStore.delete(id));
     ipcMain.handle("fsts:sync", () => fstRosterSync.sync());
     ipcMain.handle("fsts:import", async (_event, rows) => {
         const summary = await fstRosterSync.importRows(rows);
@@ -2159,6 +2316,20 @@ let then = whenReady().then(async () => {
     // verification succeeds. If this fails for any reason, the user is still signed in
     // (their identity is already confirmed) - sync simply stays disabled for this
     // session, logged clearly, rather than blocking sign-in or crashing.
+    // Checks for a newer UI and, when one was downloaded, tells the open window so it can offer a
+    // reload. Never throws - the current UI keeps running if anything goes wrong.
+    async function checkForUiUpdate() {
+        if (!uiUpdater) return { updated: false, reason: "not-packaged" };
+        const result = await uiUpdater.check();
+        if (result.updated) {
+            BrowserWindow.getAllWindows().forEach((window) => window.webContents.send("ui:update-ready", {
+                uiVersion: result.uiVersion,
+                notes: result.notes || ""
+            }));
+        }
+        return result;
+    }
+
     async function applySyncCredentialsOrDisable() {
         const credentials = await fetchSyncCredentials();
         if (credentials.ok) {
@@ -2172,7 +2343,18 @@ let then = whenReady().then(async () => {
                 console.warn("[cloudflare-auth] No CF Access service token credentials in response - entity-snapshot sync will likely fail until the Worker has them configured.");
             }
             startOutboundSync(credentials.outboundToken);
+            // Roles first, so the first screen already knows who this person is.
+            await userRolesSync?.sync();
+            userRolesSync?.start({ immediate: false });
+            // Fetch any pending UI update before the window opens (capped at 8 seconds) so people
+            // start on the newest UI; keep checking in the background afterwards.
+            if (uiUpdater) {
+                await Promise.race([checkForUiUpdate(), new Promise((resolve) => setTimeout(resolve, 8000))]);
+                const uiTimer = setInterval(() => { void checkForUiUpdate(); }, 15 * 60 * 1000);
+                uiTimer.unref?.();
+            }
             presenceSync.start();
+            errorReporter?.start();
             supervisorSync?.start();
             console.log("[cloudflare-auth] Sync credentials obtained - outbound/entity sync enabled.");
             try {
@@ -2267,5 +2449,7 @@ on("window-all-closed", () => {
 on("before-quit", () => {
     realtimeSync?.stop();
     supervisorSync?.stop();
+    userRolesSync?.stop();
+    errorReporter?.stop();
     presenceSync.remove();
 });

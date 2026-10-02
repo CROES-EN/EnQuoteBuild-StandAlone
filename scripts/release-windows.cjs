@@ -85,6 +85,72 @@ function requestJson(method, requestPath, token, body) {
   });
 }
 
+// Creates the release as a DRAFT, uploads each file one at a time, then publishes it. Letting
+// electron-builder upload in parallel created two releases with the same tag (each upload raced
+// to create it), splitting the files between them. A draft is invisible to the updater, so
+// people never see a half-uploaded release.
+function uploadAsset(uploadUrlTemplate, filePath, token) {
+  const name = path.basename(filePath);
+  const size = fs.statSync(filePath).size;
+  const url = new URL(`${uploadUrlTemplate.replace(/\{\?name,label\}$/, "")}?name=${encodeURIComponent(name)}`);
+  return new Promise((resolve, reject) => {
+    const request = https.request({
+      hostname: url.hostname,
+      path: `${url.pathname}${url.search}`,
+      method: "POST",
+      headers: {
+        Accept: "application/vnd.github+json",
+        "User-Agent": "EnQuote-Windows-Release",
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/octet-stream",
+        "Content-Length": size
+      }
+    }, (response) => {
+      let raw = "";
+      response.setEncoding("utf8");
+      response.on("data", (chunk) => { raw += chunk; });
+      response.on("end", () => {
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          reject(new Error(`Uploading ${name} failed (HTTP ${response.statusCode}): ${raw.slice(0, 300)}`));
+          return;
+        }
+        resolve();
+      });
+    });
+    request.on("error", reject);
+    request.setTimeout(15 * 60 * 1000, () => request.destroy(new Error(`Uploading ${name} timed out.`)));
+    fs.createReadStream(filePath).on("error", reject).pipe(request);
+  });
+}
+
+async function publishToGitHub(version, notes, token) {
+  const tag = `v${version}`;
+  const basePath = `/repos/${owner}/${repository}`;
+  const existing = await requestJson("GET", `${basePath}/releases?per_page=30`, token);
+  if (existing.some((release) => release.tag_name === tag)) {
+    throw new Error(`A GitHub release for ${tag} already exists. Delete it (and re-run) or choose a different version.`);
+  }
+  const releaseDir = path.join(root, "release");
+  const files = [`EnQuote-Setup-${version}.exe.blockmap`, `EnQuote-Setup-${version}.exe`, "latest.yml"].map((name) => path.join(releaseDir, name));
+  for (const file of files) {
+    if (!fs.existsSync(file)) throw new Error(`Expected build output is missing: ${file}`);
+  }
+  const draft = await requestJson("POST", `${basePath}/releases`, token, {
+    tag_name: tag, name: tag, body: `## ${tag}\n\n${notes}`, draft: true, prerelease: false
+  });
+  try {
+    for (const file of files) {
+      console.log(`Uploading ${path.basename(file)}...`);
+      await uploadAsset(draft.upload_url, file, token);
+    }
+    // latest.yml goes up last above, so the release only becomes visible once everything is in.
+    await requestJson("PATCH", `${basePath}/releases/${draft.id}`, token, { draft: false });
+  } catch (error) {
+    console.error(`Upload failed. The draft release ${tag} was left in place on GitHub (it is invisible to users); delete it before retrying.`);
+    throw error;
+  }
+}
+
 async function publishReleaseNotes(version, notes, token) {
   const tag = `v${version}`;
   const basePath = `/repos/${owner}/${repository}`;
@@ -174,11 +240,19 @@ async function main() {
   let releaseCommitted = false;
 
   try {
-    const bump = (await rl.question("Version bump [patch/minor/major] (patch): ")).trim().toLowerCase() || "patch";
-    if (!["patch", "minor", "major"].includes(bump)) {
+    const bump = (await rl.question("Version bump [patch/minor/major] or an exact version like 1.2.0 (patch): ")).trim().toLowerCase() || "patch";
+    if (/^\d+\.\d+\.\d+$/.test(bump)) {
+      const [a, b, c] = bump.split(".").map(Number);
+      const [x, y, z] = packageJson.version.split(".").map(Number);
+      if (a * 1e8 + b * 1e4 + c <= x * 1e8 + y * 1e4 + z) {
+        throw new Error(`Version ${bump} must be newer than the current ${packageJson.version}.`);
+      }
+      version = bump;
+    } else if (["patch", "minor", "major"].includes(bump)) {
+      version = bumpVersion(packageJson.version, bump);
+    } else {
       throw new Error(`Unknown version bump "${bump}".`);
     }
-    version = bumpVersion(packageJson.version, bump);
     const tag = `v${version}`;
     if (run("git", ["tag", "--list", tag], { capture: true })) {
       throw new Error(`Local tag ${tag} already exists; choose a different version bump.`);
@@ -215,6 +289,9 @@ async function main() {
     console.log("\nBuilding renderer...");
     run("npm", ["run", "build"], { shell: true });
 
+    console.log("\nSmoke-testing the build (every page must render cleanly)...");
+    run(process.execPath, [path.join(__dirname, "smoke-test.cjs")]);
+
     console.log("\nCommitting the version bump...");
     run("git", ["add", "--", "package.json", "package-lock.json"]);
     run("git", ["commit", "-m", `Release v${version}`, "-m", coauthor]);
@@ -225,8 +302,11 @@ async function main() {
     run("git", ["push", "origin", `HEAD:${branch}`]);
     run("git", ["push", "origin", tag]);
 
-    console.log("\nBuilding and publishing the Windows installer and updater metadata...");
-    run("npx", ["electron-builder", "--win", "--publish", "always"], { shell: true });
+    console.log("\nBuilding the Windows installer...");
+    run("npx", ["electron-builder", "--win", "--publish", "never"], { shell: true });
+
+    console.log("\nPublishing to GitHub (draft, upload, then publish)...");
+    await publishToGitHub(version, notes, token);
 
     console.log("\nUpdating release notes and verifying updater assets...");
     const releaseUrl = await publishReleaseNotes(version, notes, token);
@@ -243,7 +323,7 @@ async function main() {
     }
     if (releaseCommitted) {
       console.error(`Release source/tag steps may already be complete. Do not delete or recreate the tag blindly; inspect GitHub and the current tag before retrying.`);
-      console.error(`If publishing failed, verify that v${version} exists, then run: npx electron-builder --win --publish always`);
+      console.error(`If publishing failed, check GitHub for a leftover draft release for v${version} (delete it), then re-run the publish step - the installer is already built in release\\.`);
     }
     throw error;
   } finally {

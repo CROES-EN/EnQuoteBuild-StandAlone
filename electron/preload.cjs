@@ -79,6 +79,27 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
     remove: (payload) => invoke("presence:remove", payload),
     list: () => invoke("presence:list")
   },
+  // Fire-and-forget error reports from the UI (see electron/errorReporter.cjs).
+  errors: {
+    report: details => ipcRenderer.send("errors:report", details)
+  },
+  // UI hotfix channel: downloaded UI updates (see electron/uiUpdate.cjs).
+  ui: {
+    getInfo: () => invoke("ui:get-info"),
+    check: () => invoke("ui:check"),
+    apply: () => invoke("ui:apply"),
+    onUpdateReady: (callback) => {
+      const listener = (_event, data) => callback(data);
+      ipcRenderer.on("ui:update-ready", listener);
+      return () => ipcRenderer.removeListener("ui:update-ready", listener);
+    }
+  },
+  // Report tables too big for the main data file (stored one per file).
+  largeTables: {
+    get: id => invoke("largeTables:get", id),
+    save: (id, record) => invoke("largeTables:save", id, record),
+    delete: id => invoke("largeTables:delete", id)
+  },
   // Shared FST roster (seeded locally, kept in sync with other installs via the Worker).
   fsts: {
     sync: () => invoke("fsts:sync"),
@@ -140,7 +161,9 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
 try {
   const { contextBridge: __ub_contextBridge, ipcRenderer: __ub_ipcRenderer } = require("electron");
   __ub_contextBridge.exposeInMainWorld("enquoteUpdater", {
-    onUpdateStatus: (callback) => __ub_ipcRenderer.on("updater:status", (_event, data) => callback(data))
+    onUpdateStatus: (callback) => __ub_ipcRenderer.on("updater:status", (_event, data) => callback(data)),
+    getState: () => __ub_ipcRenderer.invoke("updater:get-state"),
+    installNow: () => __ub_ipcRenderer.invoke("updater:install-now")
   });
 } catch (error) {
   console.error("Failed to expose enquoteUpdater bridge:", error);

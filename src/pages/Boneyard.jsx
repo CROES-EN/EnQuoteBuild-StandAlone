@@ -18,11 +18,10 @@ import {
     DialogTitle
 } from "@/components/ui/dialog";
 import {Textarea} from "@/components/ui/textarea";
-import RoleGuard, {useUserRole} from "@/components/auth/RoleGuard";
+import RoleGuard from "@/components/auth/RoleGuard";
 import StatusBadge from "@/components/quotes/StatusBadge";
 
 function BoneyardContent() {
- const { isAdmin, user } = useUserRole();
  const queryClient = useQueryClient();
  const [search, setSearch] = useState("");
  const [restoreTarget, setRestoreTarget] = useState(null);
@@ -213,7 +212,6 @@ function BoneyardContent() {
  View
  </Button>
  </Link>
- {(isAdmin || user?.email === quote.created_by) && (
  <Button
  size="sm"
  onClick={() => { setRestoreTarget(quote); setRestoreNote(""); }}
@@ -222,7 +220,6 @@ function BoneyardContent() {
  <ArchiveRestore className="w-4 h-4 mr-1.5" />
  Restore
  </Button>
- )}
  </div>
  </div>
  </Card>

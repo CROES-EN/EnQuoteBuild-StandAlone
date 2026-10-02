@@ -27,12 +27,24 @@
 
 import {retryBridgeCall} from "@/features/supervisorDashboard/retryBridgeCall";
 
+import {classifyCareSubscriptionRows} from "@/features/supervisorDashboard/careEligibility";
+
 const COLLECTION = "supervisorReportTables";
+// Report types too big for the main data file; the main process stores each in its own file
+// (electron/largeTableStore.cjs). Everything else in this module treats them like any other
+// report type - only where the bytes live differs.
+const LARGE_REPORT_TYPES = new Set(["care_subscriptions"]);
 const BROWSER_STORAGE_KEY = "enquote_supervisor_report_tables_v1";
 
 function localBridge() {
   return globalThis.window?.enquoteLocal?.collections || null;
 }
+
+function largeBridge() {
+  return globalThis.window?.enquoteLocal?.largeTables || null;
+}
+
+const isLargeType = (reportType) => LARGE_REPORT_TYPES.has(reportType) && Boolean(largeBridge())
 
 // Lets the UI show a small notice when it's not backed by the shared Electron data file
 // (e.g. running via `vite dev` in a plain browser tab) - mirrors opsMetricsStore.js's helper
@@ -65,11 +77,16 @@ function writeBrowserStorage(records) {
 // every manager's dashboard ends up showing the same imported data.
 async function listAll() {
   const bridge = localBridge();
-  if (bridge) return (await bridge.list(COLLECTION)) || [];
+  if (bridge) {
+    const records = (await bridge.list(COLLECTION)) || [];
+    // A large table not yet moved out of the main data file is picked up by its own read path.
+    return largeBridge() ? records.filter((record) => !LARGE_REPORT_TYPES.has(record.id)) : records;
+  }
   return readBrowserStorage();
 }
 
 async function getLocalReportTable(reportType) {
+  if (isLargeType(reportType)) return (await largeBridge().get(reportType)) ?? null;
   const all = await listAll();
   return all.find((item) => item.id === reportType) ?? null;
 }
@@ -156,8 +173,9 @@ export async function saveReportTable(reportType, { columns, rows, sourceFileNam
   const { keyField = null, force = false } = options;
   const record = { id: reportType, reportType, columns, rows, sourceFileName, importedAt, importMethod: importMethod || "manual" };
   const bridge = localBridge();
-  const existing = await listAll();
-  const match = existing.find((item) => item.id === reportType);
+  const large = isLargeType(reportType);
+  const existing = large ? [] : await listAll();
+  const match = large ? await getLocalReportTable(reportType) : existing.find((item) => item.id === reportType);
 
   // Skip the entire save when this import is byte-for-byte identical to what's
   // already stored - covers the common "routine/duplicate re-import of the same
@@ -174,16 +192,66 @@ export async function saveReportTable(reportType, { columns, rows, sourceFileNam
     console.log(`[importedTableStore] "${reportType}": ${diff.newCount} new, ${diff.changedCount} changed, ${diff.unchangedCount} unchanged, ${diff.removedCount} removed - saving.`);
   }
 
-  if (bridge) {
-    if (match) return retryBridgeCall(`collections:update (${reportType})`, () => bridge.update(COLLECTION, reportType, record));
-    return retryBridgeCall(`collections:create (${reportType})`, () => bridge.create(COLLECTION, record));
+  let saved;
+  if (large) {
+    saved = await retryBridgeCall(`largeTables:save (${reportType})`, () => largeBridge().save(reportType, record));
+  } else if (bridge) {
+    if (match) saved = await retryBridgeCall(`collections:update (${reportType})`, () => bridge.update(COLLECTION, reportType, record));
+    else saved = await retryBridgeCall(`collections:create (${reportType})`, () => bridge.create(COLLECTION, record));
+  } else {
+    const next = match
+      ? existing.map((item) => (item.id === reportType ? record : item))
+      : [...existing, record];
+    writeBrowserStorage(next);
+    saved = record;
   }
 
-  const next = match
-    ? existing.map((item) => (item.id === reportType ? record : item))
-    : [...existing, record];
-  writeBrowserStorage(next);
-  return record;
+  if (reportType === CARE_FULL_TYPE) await syncActiveCareTable(record);
+  return saved;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Active Care subscriptions (shared with everyone)
+//
+// The full Care Subscriptions import is ~10 MB (every status, every column, customer emails and
+// phones) - too big to share through the Cloudflare Worker, and meant for supervisors only. So
+// whenever it is saved, a compact "active subscriptions only" copy is derived and stored under
+// its own report type. That copy syncs like every other report table and feeds the read-only
+// Enphase Care page that every user can open.
+// ---------------------------------------------------------------------------------------------
+const CARE_FULL_TYPE = "care_subscriptions";
+export const CARE_ACTIVE_TYPE = "care_active";
+const CARE_ACTIVE_COLUMNS = [
+  "Subscription Id", "Customer First Name", "Customer Last Name", "Customer Address",
+  "Subscription Status", "Plan Amount", "Enlighten Site Id", "Plan Name", "Renewal Date", "Activation Dt"
+];
+
+export function buildActiveCareTable(fullTable) {
+  if (!fullTable?.rows) return null;
+  const columns = CARE_ACTIVE_COLUMNS.filter((column) => (fullTable.columns || []).includes(column));
+  const { realRecords } = classifyCareSubscriptionRows(fullTable.rows);
+  const rows = realRecords
+    .filter((row) => String(row["Subscription Status"] ?? "").trim().toUpperCase() === "ACTIVE")
+    .map((row) => Object.fromEntries(columns.map((column) => [column, row[column]])));
+  return { columns, rows, sourceFileName: fullTable.sourceFileName, importedAt: fullTable.importedAt, importMethod: "derived" };
+}
+
+async function syncActiveCareTable(fullTable) {
+  const derived = buildActiveCareTable(fullTable);
+  if (derived) await saveReportTable(CARE_ACTIVE_TYPE, derived);
+}
+
+/** Keeps the shared active-Care table in step with the full table on machines that hold it. */
+export async function ensureActiveCareTable() {
+  const full = await getLocalReportTable(CARE_FULL_TYPE);
+  if (full) await syncActiveCareTable(full);
+}
+
+/** The table behind the Enphase Care page: the shared active copy, else derived from the full one. */
+export async function getActiveCareTable() {
+  const shared = await getReportTable(CARE_ACTIVE_TYPE);
+  if (shared) return shared;
+  return buildActiveCareTable(await getReportTable(CARE_FULL_TYPE));
 }
 
 /**
@@ -234,17 +302,27 @@ export async function saveStaffingSnapshot({ columns, rows, sourceFileName, impo
 
 /** Returns the stored table for one report type, or null if never imported. */
 export async function getReportTable(reportType) {
-  const all = await listAll();
-  return all.find((item) => item.id === reportType) ?? null;
+  return getLocalReportTable(reportType);
 }
 
 /** Returns { [reportType]: record } for every report type that has been imported at least once. */
 export async function listReportTables() {
   const all = await listAll();
+  if (largeBridge()) {
+    for (const reportType of LARGE_REPORT_TYPES) {
+      const table = await getLocalReportTable(reportType);
+      if (table) all.push(table);
+    }
+  }
   return Object.fromEntries(all.map((r) => [r.reportType, r]));
 }
 
 export async function deleteReportTable(reportType) {
+  if (reportType === CARE_FULL_TYPE) await deleteReportTable(CARE_ACTIVE_TYPE);
+  if (isLargeType(reportType)) {
+    await largeBridge().delete(reportType);
+    return;
+  }
   const bridge = localBridge();
   if (bridge) {
     try {

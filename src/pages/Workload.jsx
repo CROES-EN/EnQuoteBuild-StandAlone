@@ -12,7 +12,7 @@ import {
     AlertDialogTitle
 } from "@/components/ui/alert-dialog";
 import {Trash2, Upload} from "lucide-react";
-import RoleGuard from "@/components/auth/RoleGuard";
+import RoleGuard, {useUserRole} from "@/components/auth/RoleGuard";
 import {deleteReportTable, getReportTable} from "@/features/supervisorDashboard/importedTableStore";
 import ImportAsTableDialog from "@/components/supervisor/ImportAsTableDialog";
 import WorkloadReportTable from "@/components/supervisor/WorkloadReportTable";
@@ -54,6 +54,9 @@ const REPORT_LABEL = "Workload";
  * loss of the user's current filters/sort/column order.
  */
 function WorkloadContent() {
+  // The Workload report is ONE team-wide table shared with every user, so only admins and
+  // approvers may replace or clear it; everyone else just views it (filtered to their own cases).
+  const { isApprover: canManageData } = useUserRole();
   const [table, setTable] = useState(null);
   const [loading, setLoading] = useState(true);
   const [reloading, setReloading] = useState(false);
@@ -114,9 +117,9 @@ function WorkloadContent() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Workload</h1>
           <p className="text-muted-foreground mt-1">
-            Your open Salesforce cases, mirroring your personal case tracker - re-import your
-            export any time to refresh. "Open" is always calculated live from each case's last
-            modified date, so it's never a stale, frozen number.
+            Open Salesforce cases from the team report, showing your own cases by default - use
+            "All Cases" to see the whole team. "Open" is always calculated live from each case's
+            last modified date, so it's never a stale, frozen number.
           </p>
         </div>
       </div>
@@ -124,6 +127,7 @@ function WorkloadContent() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-base">Open Cases</CardTitle>
+          {canManageData && (
           <div className="flex items-center gap-1 rounded-lg border border-border bg-secondary/40 p-1">
             {table && (
               <>
@@ -149,6 +153,7 @@ function WorkloadContent() {
               Import Report
             </Button>
           </div>
+          )}
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -199,7 +204,7 @@ function WorkloadContent() {
 
 export default function Workload() {
   return (
-    <RoleGuard allowedRoles={["submitter", "approver", "admin"]}>
+    <RoleGuard allowedRoles={["submitter", "approver", "admin", "invoicer"]}>
       <WorkloadContent />
     </RoleGuard>
   );

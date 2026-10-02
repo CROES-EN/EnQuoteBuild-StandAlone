@@ -15,7 +15,8 @@ export const ROLE_PAGE_ACCESS = Object.freeze({
     "SVCancelTracker",
     "ResourcePlanner",
     "SiteFlagManager",
-    "InactiveRevenueDashboard"
+    "InactiveRevenueDashboard",
+    "EnphaseCare"
   ],
   approver: [
     "Dashboard",
@@ -30,14 +31,23 @@ export const ROLE_PAGE_ACCESS = Object.freeze({
     "SVCancelTracker",
     "ResourcePlanner",
     "SiteFlagManager",
-    "InactiveRevenueDashboard"
+    "InactiveRevenueDashboard",
+    "EnphaseCare"
   ]
 });
+
+// Tolerates malformed role data (null, a single string, an object) instead of crashing the
+// whole layout: anything that is not an array becomes a list (one role for a string, else none).
+export function toRoleList(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string" && value.trim()) return [value.trim()];
+  return [];
+}
 
 // Admin overrides everything. A user holding several roles is restricted only if every one of
 // their roles is restricted, and then sees the union of those roles' pages.
 export function canAccessPage(userRoles, page, isAdmin) {
-  const roles = userRoles || [];
+  const roles = toRoleList(userRoles);
   if (isAdmin || roles.includes("admin") || roles.includes("super_admin")) return true;
   if (!roles.length) return true;
   if (roles.some(role => !Array.isArray(ROLE_PAGE_ACCESS[role]))) return true;

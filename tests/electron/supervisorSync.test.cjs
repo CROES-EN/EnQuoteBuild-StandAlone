@@ -175,3 +175,30 @@ test("applyRemoteCollectionRecord refuses to clobber a fresher local record", as
     await fs.rm(directory, { recursive: true, force: true });
   }
 });
+
+test("a table too large for the Worker stays local-only without blocking other records", async () => {
+  const cluster = await createCluster();
+  try {
+    const a = await cluster.addMachine();
+    const b = await cluster.addMachine();
+    const warnings = [];
+    a.sync = createSupervisorSync({
+      workerUrl: "https://worker.example",
+      repository: a.repository,
+      pendingDeletesPath: path.join(a.directory, "pending-deletes-2.json"),
+      getIdentity: () => ({ email }),
+      getOutboundToken: () => token,
+      fetchImpl: async () => { throw new Error("the oversized record must never be uploaded"); },
+      logger: { info() {}, error() {}, warn: (message) => warnings.push(message) }
+    });
+    const huge = { id: "care_subscriptions", reportType: "care_subscriptions", columns: ["x"], rows: [{ x: "y".repeat(8_100_000) }] };
+    const created = await a.repository.createCollectionRecord("supervisorReportTables", huge);
+    await a.sync.recordSaved("supervisorReportTables", created);
+    await a.sync.recordSaved("supervisorReportTables", created);
+
+    assert.equal(warnings.filter((message) => message.includes("too large")).length, 1);
+    assert.deepEqual(await b.repository.listCollection("supervisorReportTables"), []);
+  } finally {
+    await cluster.cleanup();
+  }
+});

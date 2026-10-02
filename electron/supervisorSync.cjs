@@ -5,6 +5,8 @@ const DEFAULT_INTERVAL_MS = 60 * 1000;
 const REQUEST_TIMEOUT_MS = 60 * 1000;
 const STAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const EPOCH_STAMP = "1970-01-01T00:00:00.000Z";
+// Must match MAX_RECORD_CHARS in the Worker (enquote-sync-worker/src/supervisor.js).
+const MAX_SYNC_RECORD_CHARS = 8_000_000;
 
 const keyOf = (collection, id) => `${collection}/${id}`;
 
@@ -39,6 +41,7 @@ function createSupervisorSync({
   let timer = null;
   let running = null;
   let rerunRequested = false;
+  const oversizeWarned = new Set();
 
   function readPendingDeletes() {
     try {
@@ -92,6 +95,16 @@ function createSupervisorSync({
   async function pushRecord(collection, record) {
     const email = identityEmail();
     if (!email) throw new Error("Verified Cloudflare identity is unavailable.");
+    // The Worker rejects records over its size cap, so don't re-upload a multi-megabyte table
+    // every cycle just to be refused. It stays local-only; warn once per version of the record.
+    if (JSON.stringify(record).length > MAX_SYNC_RECORD_CHARS) {
+      const marker = `${keyOf(collection, record.id)}@${stampOf(record)}`;
+      if (!oversizeWarned.has(marker)) {
+        oversizeWarned.add(marker);
+        logger.warn(`[supervisor-sync] ${keyOf(collection, record.id)} is too large to share (over ${MAX_SYNC_RECORD_CHARS} characters); keeping it local-only.`);
+      }
+      return { ok: true, skipped: true };
+    }
     return request("POST", "/api/supervisor/upsert", {
       email, collection, id: record.id, updatedAt: stampOf(record), record
     });

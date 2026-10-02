@@ -530,6 +530,7 @@ export default function WorkloadReportTable({ table, onReload, isReloading }) {
   const density = useMemo(() => getRowDensity(), [prefsVersion]);
   const managementNames = useMemo(() => getManagementReviewNames(), [prefsVersion]);
   const myName = useMemo(() => getMyCaseOwnerName(), [prefsVersion]);
+  const [myEmail, setMyEmail] = useState("");
   const cellPadding = density === "compact" ? "py-1" : "py-2";
   const headerPadding = density === "compact" ? "py-1.5" : "py-2";
 
@@ -542,13 +543,21 @@ export default function WorkloadReportTable({ table, onReload, isReloading }) {
   // name remains fully editable afterward in Customize (e.g. if a Salesforce Case Owner value
   // is formatted differently than the signed-in user's real name).
   useEffect(() => {
-    if (getMyCaseOwnerName()) return;
     let cancelled = false;
     (async () => {
       try {
         const user = await getCurrentUser();
-        const resolvedName = user?.full_name || user?.name || "";
-        if (!cancelled && resolvedName) {
+        if (cancelled) return;
+        // Always remember the signed-in email: it lets "my cases" match even when no real
+        // name is known (a fresh install has no synced user record, so the name below comes
+        // back as the email address itself).
+        setMyEmail(user?.email || "");
+        const resolvedName = [user?.full_name, user?.name, user?.display_name]
+          .find((candidate) => candidate && !String(candidate).includes("@")) || "";
+        const savedName = getMyCaseOwnerName();
+        // A previously saved value that is just an email address (from the old behavior) is
+        // replaced as soon as a real name is known.
+        if (resolvedName && (!savedName || savedName.includes("@"))) {
           saveMyCaseOwnerName(resolvedName);
           setPrefsVersion((v) => v + 1);
         }
@@ -576,8 +585,8 @@ export default function WorkloadReportTable({ table, onReload, isReloading }) {
   const scopedRows = useMemo(() => {
     if (!table?.rows) return [];
     if (allCasesMode) return table.rows;
-    return table.rows.filter((row) => isMyCaseMatch(row["Case Owner"], myName));
-  }, [table, allCasesMode, myName]);
+    return table.rows.filter((row) => isMyCaseMatch(row["Case Owner"], myName, myEmail));
+  }, [table, allCasesMode, myName, myEmail]);
 
   const rowsWithOpen = useMemo(() => {
     return scopedRows.map((row) => ({ row, openDays: calcOpenDays(row["Case Date/Time Last Modified"]) }));

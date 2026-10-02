@@ -22,6 +22,7 @@ import PVPanelRMAsPage from "./pages/PVPanelRMAs";
 import InactiveRevenueDashboardPage from "./pages/InactiveRevenueDashboard";
 import InactiveCollectionsPage from "./pages/InactiveCollections";
 import WorkloadPage from "./pages/Workload";
+import EnphaseCarePage from "./pages/EnphaseCare";
 import {AutoDrafter as AutoDrafterPage} from "./pages/AutoDrafter";
 
 import AuthProvider, {useAuth} from "@/lib/AuthContext";
@@ -117,7 +118,12 @@ const AuthenticatedApp = () => {
         <LayoutWrapper currentPageName="SupervisorDashboard">
           <SupervisorDashboardPage />
         </LayoutWrapper>
-      } />      <Route path="/Workload" element={
+      } />      <Route path="/EnphaseCare" element={
+        <LayoutWrapper currentPageName="EnphaseCare">
+          <EnphaseCarePage />
+        </LayoutWrapper>
+      } />
+      <Route path="/Workload" element={
         <LayoutWrapper currentPageName="Workload">
           <WorkloadPage />
         </LayoutWrapper>

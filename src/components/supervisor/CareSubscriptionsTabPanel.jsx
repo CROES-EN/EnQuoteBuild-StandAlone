@@ -1,4 +1,4 @@
-﻿import {useCallback, useEffect, useState} from "react";
+import {useCallback, useEffect, useState} from "react";
 import {Button} from "@/components/ui/button";
 import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
 import {
@@ -19,7 +19,7 @@ import CareDataHygieneReport from "@/components/supervisor/CareDataHygieneReport
 
 const REPORT_TYPE = "care_subscriptions";
 const REPORT_LABEL = "Care Subscriptions";
-const DEFAULT_SUMMARY_FIELDS = [
+export const DEFAULT_SUMMARY_FIELDS = [
   { column: "Enlighten Site Id", label: "Site ID" },
   { column: "Customer First Name", label: "First Name" },
   { column: "Customer Last Name", label: "Last Name" },
@@ -29,7 +29,7 @@ const DEFAULT_SUMMARY_FIELDS = [
 // deliberately - only these 8 columns show until a user turns more on via "Columns":
 // Subscription Id, Customer First Name, Customer Last Name, Customer Address,
 // Subscription Status, Plan Amount, Enlighten Site Id, Estore Sku.
-const DEFAULT_HIDDEN_COLUMNS = [
+export const DEFAULT_HIDDEN_COLUMNS = [
   "Customer Phone", "Customer Email", "Plan Name", "Plan Description", "Created Dt",
   "Paid Dt", "Agreement Dt", "Agreement Week", "Activation Dt", "Activation Week",
   "Renewal Date", "Cancelled At", "Expired At", "Inbound Channel", "Referrer", "Source",

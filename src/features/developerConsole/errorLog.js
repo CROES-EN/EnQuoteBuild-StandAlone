@@ -91,6 +91,18 @@ export async function listErrors() {
  *   ErrorBoundary-caught render errors.
  */
 export async function recordError({ source, message, stack, componentStack }) {
+  // Forward to the shared error reporter first: it is cheap, rate-limited and de-duplicated in
+  // the main process, unlike the local log below which rewrites the data file per error.
+  try {
+    globalThis.window?.enquoteLocal?.errors?.report?.({
+      source: source || "unknown",
+      message,
+      stack: stack || componentStack || "",
+      page: globalThis.window?.location?.hash || ""
+    });
+  } catch {
+    // Reporting must never interfere with local logging.
+  }
   try {
     const entry = {
       id: `err-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,

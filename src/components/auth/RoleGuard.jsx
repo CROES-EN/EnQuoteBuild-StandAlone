@@ -1,6 +1,7 @@
 import {base44} from "@/api/base44Client";
 import {useQuery} from "@tanstack/react-query";
 import {useAuth} from "@/lib/AuthContext";
+import {toRoleList} from "@/lib/rolePageAccess";
 import {Card} from "@/components/ui/card";
 import {Button} from "@/components/ui/button";
 import {LogIn, ShieldAlert} from "lucide-react";
@@ -194,7 +195,7 @@ export default function RoleGuard({ children, allowedRoles }) {
       />
     );
   }
-  const userRoles = [user.app_role, ...(user.additional_roles || [])];
+  const userRoles = [user.app_role, ...toRoleList(user.additional_roles)];
   const isSuperAdmin = userRoles.includes("super_admin");
   if (allowedRoles && !isSuperAdmin && !allowedRoles.some((role) => userRoles.includes(role))) {
     return <AccessDenied role={user.app_role} />;
@@ -207,7 +208,7 @@ export default function RoleGuard({ children, allowedRoles }) {
 // directly (instead of via <RoleGuard>) can also react to a missing session.
 export function useUserRole() {
  const { user, isLoading, needsLogin, navigateToLogin } = useCurrentUserQuery();
- const roles = [user?.app_role, ...(user?.additional_roles || [])].filter(Boolean);
+ const roles = [user?.app_role, ...toRoleList(user?.additional_roles)].filter(Boolean);
  const isSuperAdmin = roles.includes("super_admin");
 
  return {

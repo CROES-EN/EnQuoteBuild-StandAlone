@@ -110,3 +110,37 @@ git commit -m "**notes go here**"
 git push origin master  
 npm run build
 npx electron-builder --publish always
+
+---
+
+## Hotfixes without a full release (UI hotfix channel)
+
+Most fixes only touch the UI (`src/`). Those can go out in about a minute, with no new installer:
+
+```powershell
+npm run publish:ui -- --notes "What changed, shown to people in the update banner"
+```
+
+It checks that `electron/` and `package.json` are identical to the released tag (otherwise it stops: that
+needs a full release), builds, smoke-tests every page, signs the update with `_private\ui-signing-key.pem`
+(**back this file up - without it you can't publish UI updates**), uploads it to the Worker and verifies it
+downloads back intact. Installed copies pick it up within ~15 minutes (or on next launch) and show a
+"Reload now / Later" banner. A downloaded UI that fails to load is discarded automatically and the bundled
+UI takes over.
+
+| Command | What it does |
+|---|---|
+| `npm run publish:ui -- --notes "..." --channel beta` | Testers only. A tester opts in by putting `beta` in `ui-channel.txt` in their app data folder. |
+| `npm run publish:ui -- --promote` | Releases the current beta UI to everyone. |
+| `npm run publish:ui -- --withdraw` | Stops offering the update (installed copies keep what they have). To undo a bad one, publish a fixed UI. |
+| `npm run smoke` | Loads the built `dist\` in a hidden window and visits every page; fails on any crash, error screen or console error. Also runs inside the full release. |
+| `npm run errors` | Shows error reports sent by installed apps (grouped, with counts and who hit them). Options: `-- --days 1 --limit 20`. |
+
+Anything in `electron/` (main process, preload, sync code) still needs a full release (`node scripts\release-windows.cjs`).
+
+**Installer updates** now download quietly in the background; people see a "Restart now / Later" notice and the update
+also installs when they close EnQuote. Failed checks retry after 2, 4 and 6 minutes, and the app checks again when you
+come back to its window.
+
+**Roles** are synced from Base44 through the Worker (`/api/users`) at sign-in and every 10 minutes, so a new install
+knows who is an admin. `Grant-EnQuoteRole.ps1` is no longer needed.

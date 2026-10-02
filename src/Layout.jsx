@@ -23,12 +23,14 @@ import {
   Trash2,
   Users,
   Wallet,
+  HeartHandshake,
   X,
   ZoomIn,
   ZoomOut
 } from "lucide-react";
 import {Link} from "react-router-dom";
 import UpdateStatusBadge from "@/components/UpdateStatusBadge";
+import UiUpdateBanner from "@/components/UiUpdateBanner";
 import {createPageUrl} from "@/utils";
 import {cn} from "@/lib/utils";
 import {useCallback, useEffect, useRef, useState} from "react";
@@ -48,8 +50,14 @@ import {
   stopEodbEmailAutoImportWatcher
 } from "@/features/supervisorDashboard/eodbEmailAutoImportWatcher";
 import {getAutoImportSettings} from "@/features/supervisorDashboard/autoImportSettings";
-import {getReportTable} from "@/features/supervisorDashboard/importedTableStore";
-import {getTiles, getUnseenImportantCount, onSeenChanged} from "@/features/supervisorDashboard/workloadPreferences";
+import {ensureActiveCareTable, getReportTable} from "@/features/supervisorDashboard/importedTableStore";
+import {
+  filterRowsToMe,
+  getMyCaseOwnerName,
+  getTiles,
+  getUnseenImportantCount,
+  onSeenChanged
+} from "@/features/supervisorDashboard/workloadPreferences";
 import appPackage from "../package.json";
 import enquoteLogo from "@/assets/enquote-logo.png";
 import SidebarLogoAnimation from "@/components/SidebarLogoAnimation";
@@ -144,6 +152,7 @@ export default function Layout({ children, currentPageName }) {
     { name: "Rejection Reviews", icon: AlertTriangle, page: "RejectedQuoteReview", roles: ["submitter", "approver", "admin", "invoicer"] },
     { name: "Manager Dashboard", icon: LineChart, page: "ManagerDashboard", roles: ["admin", "submitter", "approver", "invoicer"] },
     { name: "Supervisor Dashboard", icon: Headset, page: "SupervisorDashboard", roles: ["admin", "approver", "submitter", "invoicer"] },
+    { name: "Enphase Care", icon: HeartHandshake, page: "EnphaseCare", roles: ["admin", "approver", "invoicer", "submitter"] },
     { name: "Inactive Revenue", icon: Wallet, page: "InactiveRevenueDashboard", roles: ["admin", "approver", "invoicer", "submitter"] }
   ];
 
@@ -291,6 +300,12 @@ export default function Layout({ children, currentPageName }) {
   // visibility change, matching the same pattern already used by ReportDataTablesPanel.jsx and
   // the Workload page itself.
   const [importantWorkloadCount, setImportantWorkloadCount] = useState(0);
+
+  // On machines that hold the full Care Subscriptions import, keep the compact shared "active
+  // Care" copy (what the Enphase Care page reads) in step with it. A no-op everywhere else.
+  useEffect(() => {
+    ensureActiveCareTable().catch(() => { /* best effort - the full table is untouched */ });
+  }, []);
   useEffect(() => {
     let cancelled = false;
     async function loadImportantCount() {
@@ -298,7 +313,11 @@ export default function Layout({ children, currentPageName }) {
         const workloadTable = await getReportTable("workload");
         if (cancelled) return;
         if (!workloadTable?.rows) { setImportantWorkloadCount(0); return; }
-        setImportantWorkloadCount(getUnseenImportantCount(workloadTable.rows, getTiles()));
+        // The Workload report is shared by everyone, so only count the signed-in person's own cases.
+        const myName = getMyCaseOwnerName() || [user?.full_name, user?.name, user?.display_name]
+          .find((candidate) => candidate && !String(candidate).includes("@")) || "";
+        const myRows = filterRowsToMe(workloadTable.rows, { name: myName, email: user?.email });
+        setImportantWorkloadCount(getUnseenImportantCount(myRows, getTiles()));
       } catch {
         if (!cancelled) setImportantWorkloadCount(0);
       }
@@ -318,7 +337,7 @@ export default function Layout({ children, currentPageName }) {
       window.removeEventListener("focus", handleWorkloadVisibility);
       unsubscribeSeen();
     };
-  }, []);
+  }, [user?.email, user?.full_name]);
 
   // --- Collapsible sidebar (desktop only) + in-app zoom controls - per explicit request.
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -748,6 +767,7 @@ export default function Layout({ children, currentPageName }) {
       />
       <NotificationBell />
       <UpdateStatusBadge />
+      <UiUpdateBanner />
     </div>
   );
 }

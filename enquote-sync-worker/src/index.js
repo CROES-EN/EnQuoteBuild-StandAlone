@@ -7,6 +7,9 @@ import { handleEntitySnapshot } from "./entity-snapshot.js";
 import { handleAuthSession, handleSyncCredentials } from "./auth-session.js";
 import { handlePresenceHeartbeat, handlePresenceList, handlePresenceRemove } from "./presence.js";
 import { handleFstList, handleFstUpsert } from "./fsts.js";
+import { handleUsers } from "./users.js";
+import { handleUiBundle, handleUiManifest } from "./ui-updates.js";
+import { handleErrorList, handleErrorReport } from "./errors.js";
 import {
   handleSupervisorDelete,
   handleSupervisorIndex,
@@ -36,6 +39,11 @@ export default {
     if (url.pathname === "/api/presence/heartbeat" && request.method === "POST") return handlePresenceHeartbeat(request, env);
     if (url.pathname === "/api/presence" && request.method === "GET") return handlePresenceList(request, env);
     if (url.pathname === "/api/presence/remove" && request.method === "POST") return handlePresenceRemove(request, env);
+    if (url.pathname === "/api/users" && request.method === "GET") return handleUsers(request, env);
+    if (url.pathname === "/api/errors" && request.method === "POST") return handleErrorReport(request, env);
+    if (url.pathname === "/api/errors" && request.method === "GET") return handleErrorList(request, env);
+    if (url.pathname === "/api/ui/manifest" && request.method === "GET") return handleUiManifest(request, env);
+    if (url.pathname === "/api/ui/bundle" && request.method === "GET") return handleUiBundle(request, env);
     if (url.pathname === "/api/fsts" && request.method === "GET") return handleFstList(request, env);
     if (url.pathname === "/api/fsts/upsert" && request.method === "POST") return handleFstUpsert(request, env);
     if (url.pathname === "/api/supervisor/index" && request.method === "GET") return handleSupervisorIndex(request, env);
