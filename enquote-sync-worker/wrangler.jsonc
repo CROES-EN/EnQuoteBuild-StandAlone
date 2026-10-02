@@ -19,6 +19,26 @@
       "database_id": "05a146fb-bba9-43a3-a2fe-40473037d19f"
     }
   ],
+  "kv_namespaces": [
+    {
+      "binding": "CACHE",
+      "id": "e64597a33ef344aaa60f8a3b2d4c301f"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "QUOTE_SYNC_ROOM",
+        "class_name": "QuoteSyncRoom"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["QuoteSyncRoom"]
+    }
+  ],
   "queues": {
     "producers": [
       {

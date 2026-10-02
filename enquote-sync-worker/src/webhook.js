@@ -1,5 +1,7 @@
 import { verifySignature, decryptPayload } from "./crypto.js";
 import { applyInboundEvent } from "./repository.js";
+import { broadcastQuoteUpdate } from "./realtime.js";
+import { refreshSnapshotCache } from "./snapshot-cache.js";
 import { json } from "./util.js";
 
 // POST /api/base44/webhook
@@ -33,6 +35,24 @@ export async function handleWebhook(request, env) {
 
   const quotes = payload.snapshot?.entities?.Quote ?? [];
   const result = await applyInboundEvent(env.DB, { id: eventId, quotes });
+
+  if (!result.duplicate) {
+    try {
+      await refreshSnapshotCache(env);
+    } catch (error) {
+      console.error("[snapshot-cache] Could not refresh the quote cache after webhook:", error.message);
+    }
+    if (quotes.length > 0) {
+      try {
+        await broadcastQuoteUpdate(env, {
+          quoteCount: quotes.length,
+          lastSavedAt: new Date().toISOString()
+        });
+      } catch (error) {
+        console.error("[realtime] Could not broadcast the quote update:", error.message);
+      }
+    }
+  }
 
   return json({ ok: true, duplicate: result.duplicate, quotes: quotes.length });
 }

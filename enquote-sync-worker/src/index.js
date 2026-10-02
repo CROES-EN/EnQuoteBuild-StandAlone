@@ -1,6 +1,7 @@
 import { handleWebhook } from "./webhook.js";
 import { handleSnapshot } from "./snapshot.js";
 import { handleSnapshotMeta } from "./snapshot-meta.js";
+import { handleRealtimeSocket, QuoteSyncRoom } from "./realtime.js";
 import { handleInboundBase44 } from "./inbound.js";
 import { handleEntitySnapshot } from "./entity-snapshot.js";
 import { handleAuthSession, handleSyncCredentials } from "./auth-session.js";
@@ -14,6 +15,7 @@ import { json } from "./util.js";
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname === "/ws" && request.method === "GET") return handleRealtimeSocket(request, env);
     if (url.pathname === "/api/base44/webhook" && request.method === "POST") return handleWebhook(request, env);
     if (url.pathname === "/api/base44/webhook/snapshot" && request.method === "GET") return handleSnapshot(request, env);
     if (url.pathname === "/api/base44/webhook/snapshot" && request.method === "GET") return handleSnapshot(request, env);
@@ -42,3 +44,5 @@ export default {
     }
   },
 };
+
+export { QuoteSyncRoom };

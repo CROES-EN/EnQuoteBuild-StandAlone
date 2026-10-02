@@ -45,6 +45,36 @@ Always-on EnQuote ↔ Base44 sync layer on Cloudflare Workers.
    npx wrangler d1 execute enquote-sync --file=./schema.sql --remote
    ```
 
+## Enable cached snapshots and realtime quote updates
+
+The Worker caches quote snapshots in KV and publishes `quotes_updated` messages
+through a Durable Object WebSocket room. Deploy these additive resources from this
+directory:
+
+1. Create the KV namespace and copy the returned namespace ID:
+   ```sh
+   npx wrangler kv namespace create CACHE
+   ```
+2. Put that ID in `wrangler.jsonc` as the `CACHE` namespace ID.
+3. Add the quote and outbound-item indexes:
+   ```sh
+   npx wrangler d1 execute enquote-sync --remote --file=migrations/0001_add_updated_at_index.sql
+   ```
+4. Deploy the Worker and its Durable Object migration:
+   ```sh
+   npx wrangler deploy
+   ```
+
+The `/ws` endpoint requires the per-session `SNAPSHOT_TOKEN`. Electron also sends
+its dynamically issued Cloudflare Access service-token headers on the WebSocket
+handshake. If the handshake still receives HTTP 403, inspect the Access policy for
+the Worker hostname and `/ws` path; only add an Access bypass if the endpoint remains
+protected by the Worker-validated snapshot token.
+
+The desktop keeps its regular polling timers as fallback. When connected, the
+WebSocket only signals that quote data changed; Electron then fetches the authorized
+snapshot and entity data through the existing authenticated HTTP paths.
+
 ## Update your local app
 
 1. Copy `outboundSync.new.cjs` to your app's `electron/outboundSync.cjs`
