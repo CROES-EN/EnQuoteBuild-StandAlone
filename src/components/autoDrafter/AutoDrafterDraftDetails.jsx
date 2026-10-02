@@ -350,6 +350,8 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
       const realQuoteNumber = generateRealQuoteNumber();
       const now = new Date().toISOString();
 
+      const draftTotals = calculateQuoteTotals({ ...draft, items: draft.items || [] });
+
       const newQuote = await createQuote({
         site_id: draft.site_id || record.siteId || "",
         case_number: draft.case_number || caseNumber || "",
@@ -365,6 +367,18 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
         miles_traveled: draft.miles_traveled || 0,
         mileage_rate: draft.mileage_rate,
         items: draft.items || [],
+        // Base44's quote tile reads the stored total, so persist the same calculated
+        // amounts the desktop displays instead of leaving them unset ($0.00).
+        subtotal: Math.round(draftTotals.subtotal * 100) / 100,
+        total: Math.round(draftTotals.total * 100) / 100,
+        discount_type: draft.discount_type,
+        discount_percent: draft.discount_percent,
+        discount_flat_amount: draft.discount_flat_amount,
+        federal_tax_percent: draft.federal_tax_percent,
+        state_tax_percent: draft.state_tax_percent,
+        local_tax_percent: draft.local_tax_percent,
+        labor_mode: draft.labor_mode,
+        flat_labor_fee: draft.flat_labor_fee,
         notes: draft.notes || "",
         quote_number: realQuoteNumber,
         status: "draft_without_internal",
