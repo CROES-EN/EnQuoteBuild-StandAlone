@@ -70,6 +70,27 @@
         "reveal": "always",
         "panel": "shared"
       }
+    },
+    {
+      "label": "Release EnQuote Windows update",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}\\scripts\\release-windows.cjs"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": true,
+        "clear": true
+      },
+      "runOptions": {
+        "instanceLimit": 1
+      }
     }
   ]
 }
