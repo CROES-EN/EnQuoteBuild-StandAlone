@@ -175,8 +175,14 @@ async function publishReleaseNotes(version, notes, token) {
   }
 
   const manifestUrl = `https://github.com/${owner}/${repository}/releases/download/${tag}/latest.yml`;
-  const manifest = await new Promise((resolve, reject) => {
-    https.get(manifestUrl, (response) => {
+  // GitHub serves release downloads through a redirect to its CDN, so follow it.
+  const fetchText = (url, redirectsLeft = 5) => new Promise((resolve, reject) => {
+    https.get(url, (response) => {
+      if ([301, 302, 303, 307, 308].includes(response.statusCode) && response.headers.location && redirectsLeft > 0) {
+        response.resume();
+        resolve(fetchText(new URL(response.headers.location, url).toString(), redirectsLeft - 1));
+        return;
+      }
       if (response.statusCode !== 200) {
         response.resume();
         reject(new Error(`Could not verify the published updater manifest (HTTP ${response.statusCode}).`));
@@ -188,6 +194,7 @@ async function publishReleaseNotes(version, notes, token) {
       response.on("end", () => resolve(content));
     }).on("error", reject);
   });
+  const manifest = await fetchText(manifestUrl);
   if (!new RegExp(`^version:\\s*${version.replaceAll(".", "\\.")}\\s*$`, "m").test(manifest)) {
     throw new Error(`Published latest.yml does not report version ${version}.`);
   }
