@@ -578,18 +578,38 @@ function startPeriodicUpdateChecks() {
     updateCheckTimer.unref?.();
 }
 
-// --- Startup update check (runs before the main window is ever shown) ------------
+// --- Startup splash (shown from launch until the main window opens) ---------------
 //
 // Small, frameless, self-contained splash -- deliberately does NOT depend on the
 // React app/dist build at all (loads inline HTML via a data: URL), so it works
 // identically regardless of build state, and adds no risk to the real app's UI code.
-function createUpdateSplashWindow() {
-    const splash = new BrowserWindow({
+// Covers the otherwise-blank startup (update check, sign-in check, data sync) and shows
+// update download progress. A percent of null shows an animated "working" bar instead.
+let startupSplash = null;
+let startupSplashStatus = { label: "Starting EnQuote\u2026", percent: null };
+
+function applyStartupSplashStatus() {
+    if (!startupSplash || startupSplash.isDestroyed()) return;
+    const { label, percent } = startupSplashStatus;
+    startupSplash.webContents
+        .executeJavaScript(`window.setStatus && window.setStatus(${JSON.stringify(label)}, ${percent === null ? "null" : Math.round(percent)})`)
+        .catch(() => {});
+}
+
+function setStartupSplashStatus(label, percent = null) {
+    startupSplashStatus = { label, percent };
+    applyStartupSplashStatus();
+}
+
+function showStartupSplash() {
+    if (startupSplash && !startupSplash.isDestroyed()) return;
+    startupSplash = new BrowserWindow({
         width: 440,
         height: 220,
         frame: false,
         resizable: false,
         center: true,
+        show: false,
         backgroundColor: "#071426",
         icon: path.join(__dirname, "icon.png"),
         webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true }
@@ -597,28 +617,46 @@ function createUpdateSplashWindow() {
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     body { margin:0; height:100vh; display:flex; flex-direction:column; align-items:center;
       justify-content:center; background:#071426; color:#f5f5f5; font-family:-apple-system,
-      Segoe UI,Arial,sans-serif; }
+      Segoe UI,Arial,sans-serif; user-select:none; }
+    h1 { margin:0 0 18px; font-size:20px; font-weight:600; letter-spacing:0.3px; }
     .bar-track { width:280px; height:8px; border-radius:999px; background:rgba(255,255,255,0.12);
-      overflow:hidden; margin-bottom:14px; }
+      overflow:hidden; margin-bottom:14px; position:relative; }
     .bar-fill { height:100%; width:0%; background:#f97316; border-radius:999px;
       transition:width 0.25s ease-out; }
-    p { margin:0; font-size:14px; opacity:0.85; }
+    .bar-fill.working { width:35%; position:absolute; animation:slide 1.3s ease-in-out infinite; }
+    @keyframes slide { from { left:-35%; } to { left:100%; } }
+    p { margin:0 24px; font-size:14px; opacity:0.85; text-align:center; }
   </style></head><body>
-    <div class="bar-track"><div class="bar-fill" id="bar-fill"></div></div>
-    <p id="status-text">Preparing update&hellip;</p>
+    <h1>EnQuote</h1>
+    <div class="bar-track"><div class="bar-fill working" id="bar-fill"></div></div>
+    <p id="status-text"></p>
     <script>
-      window.updateProgress = function(percent, label) {
-        var clamped = Math.max(0, Math.min(100, Math.round(percent)));
+      window.setStatus = function(label, percent) {
         var fill = document.getElementById("bar-fill");
         var text = document.getElementById("status-text");
-        if (fill) fill.style.width = clamped + "%";
-        if (text) text.textContent = label || ("Downloading update... " + clamped + "%");
+        if (fill) {
+          if (percent === null) {
+            fill.className = "bar-fill working";
+            fill.style.width = "";
+          } else {
+            fill.className = "bar-fill";
+            fill.style.width = Math.max(0, Math.min(100, percent)) + "%";
+          }
+        }
+        if (text) text.textContent = label;
       };
     </script>
   </body></html>`;
-    splash.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(html));
-    splash.once("ready-to-show", () => splash.show());
-    return splash;
+    startupSplash.webContents.once("did-finish-load", applyStartupSplashStatus);
+    startupSplash.once("ready-to-show", () => {
+        if (startupSplash && !startupSplash.isDestroyed()) startupSplash.show();
+    });
+    startupSplash.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(html));
+}
+
+function closeStartupSplash() {
+    if (startupSplash && !startupSplash.isDestroyed()) startupSplash.close();
+    startupSplash = null;
 }
 
 const STARTUP_UPDATE_CHECK_TIMEOUT_MS = 10000;
@@ -657,7 +695,6 @@ async function runStartupUpdateCheck() {
         }
 
         let settled = false;
-        let splash = null;
         let handleDownloadProgress = null;
         let timeoutId = null;
         updateCheckController?.beginStartupCheck();
@@ -677,7 +714,8 @@ async function runStartupUpdateCheck() {
             if (typeof handleDownloadProgress === "function") {
                 autoUpdater.removeListener("download-progress", handleDownloadProgress);
             }
-            if (splash && !splash.isDestroyed()) splash.close();
+            // The splash stays up - startup continues (sign-in check, sync) until the main window opens.
+            setStartupSplashStatus("Starting EnQuote\u2026");
             resolve();
         };
 
@@ -696,12 +734,11 @@ async function runStartupUpdateCheck() {
             clearActiveTimeout();
             timeoutId = setTimeout(finish, STARTUP_UPDATE_DOWNLOAD_MAX_MS);
 
-            splash = createUpdateSplashWindow();
+            showStartupSplash();
+            setStartupSplashStatus("Downloading update\u2026 0%", 0);
             handleDownloadProgress = (progress) => {
-                if (!splash || splash.isDestroyed()) return;
                 const percent = Math.round(progress.percent);
-                splash.webContents.executeJavaScript(`window.updateProgress && window.updateProgress(${percent})`).catch(() => {
-                });
+                setStartupSplashStatus(`Downloading update\u2026 ${percent}%`, percent);
             };
             autoUpdater.on("download-progress", handleDownloadProgress);
             autoUpdater.downloadUpdate().catch((error) => {
@@ -726,7 +763,9 @@ async function runStartupUpdateCheck() {
             // own with no clicks required.
             // Deliberately NOT resolving this promise, since the app is about to exit and
             // createWindow() below should never run in this path.
-            autoUpdater.quitAndInstall(true, true);
+            // The silent install leaves nothing on screen for up to a minute, so say so first.
+            setStartupSplashStatus("Installing update\u2026 EnQuote will close and reopen on its own in about a minute.");
+            setTimeout(() => autoUpdater.quitAndInstall(true, true), 4000);
         });
 
         autoUpdater.checkForUpdates().catch(finish);
@@ -840,6 +879,7 @@ function createWindow() {
             sandbox: true
         }
     });
+    closeStartupSplash();
     // FIX: only auto-open DevTools during local development - never for the packaged/
     // installed app end users run. app.isPackaged is Electron's own built-in flag: false
     // when running from source (npm run desktop:dev, etc.), true for an installed build.
@@ -919,6 +959,9 @@ function createWindow() {
 let then = whenReady().then(async () => {
     if (!hasSingleInstanceLock) return;
     console.log(`[updater] Starting EnQuote ${getVersion()} from ${process.execPath}`);
+    // The installer relaunches EnQuote with --updated right after installing an update.
+    if (process.argv.includes("--updated")) startupSplashStatus = { label: "Finishing update\u2026", percent: null };
+    showStartupSplash();
     updateCheckController = configureAutoUpdater();
 
     // Request/response (not fire-and-forget): the renderer awaits this directly to learn
@@ -2431,6 +2474,7 @@ let then = whenReady().then(async () => {
         const initialCheck = await verifyCloudflareSession();
         if (initialCheck.authenticated) {
             setVerifiedIdentity({ email: initialCheck.email });
+            setStartupSplashStatus("Loading your data\u2026");
             await applySyncCredentialsWithStartupLimit();
             createWindow();
             return;
@@ -2440,9 +2484,12 @@ let then = whenReady().then(async () => {
         // for it to resolve. openCloudflareAuthWindow() ALWAYS resolves (never hangs) -
         // either with a real verified identity, or a reason the flow didn't complete
         // (window closed by the user, network error, access denied, etc).
+        closeStartupSplash();
         const authResult = await openCloudflareAuthWindow();
         if (authResult.authenticated) {
             setVerifiedIdentity({ email: authResult.email });
+            showStartupSplash();
+            setStartupSplashStatus("Loading your data\u2026");
             await applySyncCredentialsWithStartupLimit();
             createWindow();
             return;
