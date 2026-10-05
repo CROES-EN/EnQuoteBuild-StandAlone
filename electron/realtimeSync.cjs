@@ -20,6 +20,8 @@ function startRealtimeSync({
   onQuotesUpdated,
   onOutboundStatus,
   onSupervisorUpdated,
+  // Extra message handlers keyed by message type (tasks_updated, sops_updated, inbox_updated...).
+  handlers = {},
   logger = console,
   WebSocketImpl = WebSocket,
   setIntervalFn = setInterval,
@@ -89,6 +91,18 @@ function startRealtimeSync({
           }
         } catch (error) {
           logger.error("[realtime-sync] Supervisor refresh failed:", error.message);
+        }
+        return;
+      }
+      const extraHandler = typeof message?.type === "string" && Object.hasOwn(handlers, message.type) ? handlers[message.type] : null;
+      if (extraHandler) {
+        try {
+          const result = extraHandler(message);
+          if (result && typeof result.catch === "function") {
+            result.catch((error) => logger.error(`[realtime-sync] ${message.type} handling failed:`, error.message));
+          }
+        } catch (error) {
+          logger.error(`[realtime-sync] ${message.type} handling failed:`, error.message);
         }
         return;
       }

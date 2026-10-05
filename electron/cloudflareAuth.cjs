@@ -427,7 +427,7 @@ async function fetchSyncCredentials() {
       return { ok: false, reason: "malformed_response" };
     }
 
-    console.log(`[cloudflare-auth] Parsed sync-credentials body: ${JSON.stringify({ ok: body?.ok, reason: body?.reason, hasOutboundToken: Boolean(body?.outboundToken), hasSnapshotToken: Boolean(body?.snapshotToken) })}`);
+    console.log(`[cloudflare-auth] Parsed sync-credentials body: ${JSON.stringify({ ok: body?.ok, reason: body?.reason, hasOutboundToken: Boolean(body?.outboundToken), hasSnapshotToken: Boolean(body?.snapshotToken), hasUserToken: Boolean(body?.userToken) })}`);
 
     if (!body || body.ok !== true || !body.outboundToken || !body.snapshotToken) {
       return { ok: false, reason: body?.reason || "missing_credentials" };
@@ -438,7 +438,10 @@ async function fetchSyncCredentials() {
       outboundToken: body.outboundToken,
       snapshotToken: body.snapshotToken,
       cfAccessClientId: body.cfAccessClientId,
-      cfAccessClientSecret: body.cfAccessClientSecret
+      cfAccessClientSecret: body.cfAccessClientSecret,
+      // Signed per-user token for private data (tasks, messages); absent on older Workers.
+      userToken: typeof body.userToken === "string" ? body.userToken : "",
+      inboxKey: typeof body.inboxKey === "string" ? body.inboxKey : ""
     };
   } catch (error) {
     return { ok: false, reason: "network_error", error: error.message };

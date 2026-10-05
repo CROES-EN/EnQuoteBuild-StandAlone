@@ -130,7 +130,13 @@ function uploadAsset(uploadUrlTemplate, filePath, token) {
   });
 }
 
-async function publishToGitHub(version, notes, token) {
+function argValue(name) {
+  const argv = process.argv.slice(2);
+  const index = argv.indexOf(name);
+  return index >= 0 && index + 1 < argv.length ? argv[index + 1] : undefined;
+}
+
+async function publishToGitHub(version, notes, token, prerelease = false) {
   const tag = `v${version}`;
   const basePath = `/repos/${owner}/${repository}`;
   const existing = await requestJson("GET", `${basePath}/releases?per_page=30`, token);
@@ -143,7 +149,7 @@ async function publishToGitHub(version, notes, token) {
     if (!fs.existsSync(file)) throw new Error(`Expected build output is missing: ${file}`);
   }
   const draft = await requestJson("POST", `${basePath}/releases`, token, {
-    tag_name: tag, name: tag, body: `## ${tag}\n\n${notes}`, draft: true, prerelease: false
+    tag_name: tag, name: tag, body: `## ${tag}\n\n${notes}`,     draft: true, prerelease
   });
   try {
     for (const file of files) {
@@ -218,8 +224,11 @@ async function main() {
 
   if (args.has("--help")) {
     console.log("Run without arguments for an interactive Windows release. Use --dry-run to preview the next patch release.");
+    console.log("--prerelease marks the GitHub release as a pre-release, which installed copies do not auto-update to.");
+    console.log("--bump <patch|minor|major|x.y.z> --notes \"...\" --yes answer the prompts non-interactively.");
     return;
   }
+  const prerelease = args.has("--prerelease");
 
   // Picks up a release whose commit and tag were already pushed but whose installer build or upload
   // failed: node scripts/release-windows.cjs --resume "release notes"
@@ -238,7 +247,7 @@ async function main() {
     console.log(`Resuming ${tag}: building the Windows installer...`);
     run("npx", builderArgs(), { shell: true });
     console.log("\nPublishing to GitHub (draft, upload, then publish)...");
-    await publishToGitHub(resumeVersion, resumeNotes, resumeToken);
+    await publishToGitHub(resumeVersion, resumeNotes, resumeToken, prerelease);
     const resumedUrl = await publishReleaseNotes(resumeVersion, resumeNotes, resumeToken);
     console.log(`\nRelease ${tag} is published: ${resumedUrl}`);
     return;
@@ -277,7 +286,7 @@ async function main() {
   let releaseCommitted = false;
 
   try {
-    const bump = (await rl.question("Version bump [patch/minor/major] or an exact version like 1.2.0 (patch): ")).trim().toLowerCase() || "patch";
+    const bump = (argValue("--bump") ?? await rl.question("Version bump [patch/minor/major] or an exact version like 1.2.0 (patch): ")).trim().toLowerCase() || "patch";
     if (/^\d+\.\d+\.\d+$/.test(bump)) {
       const [a, b, c] = bump.split(".").map(Number);
       const [x, y, z] = packageJson.version.split(".").map(Number);
@@ -297,9 +306,10 @@ async function main() {
     if (run("git", ["ls-remote", "--tags", "origin", `refs/tags/${tag}`], { capture: true })) {
       throw new Error(`Remote tag ${tag} already exists; choose a different version bump.`);
     }
-    notes = (await rl.question(`Release notes for v${version}: `)).trim();
+    notes = (argValue("--notes") ?? await rl.question(`Release notes for v${version}: `)).trim();
     if (!notes) throw new Error("Release notes cannot be empty.");
-    const confirmation = (await rl.question(`This will build, commit, tag, push, and publish v${version} from ${branch}. Continue? [y/N] `)).trim().toLowerCase();
+    const kind = prerelease ? "pre-release" : "release";
+    const confirmation = args.has("--yes") ? "y" : (await rl.question(`This will build, commit, tag, push, and publish v${version} as a ${kind} from ${branch}. Continue? [y/N] `)).trim().toLowerCase();
     if (confirmation !== "y" && confirmation !== "yes") {
       console.log("Release cancelled; no files were changed.");
       return;
@@ -343,11 +353,12 @@ async function main() {
     run("npx", builderArgs(), { shell: true });
 
     console.log("\nPublishing to GitHub (draft, upload, then publish)...");
-    await publishToGitHub(version, notes, token);
+    await publishToGitHub(version, notes, token, prerelease);
 
     console.log("\nUpdating release notes and verifying updater assets...");
     const releaseUrl = await publishReleaseNotes(version, notes, token);
-    console.log(`\nRelease v${version} is published: ${releaseUrl}`);
+    console.log(`\n${prerelease ? "Pre-release" : "Release"} v${version} is published: ${releaseUrl}`);
+    if (prerelease) console.log("Installed copies will not auto-update to it; install it manually from the release page. Untick \"pre-release\" on GitHub to roll it out.");
     console.log("Verify the in-app update on a test installation before announcing it to the team.");
   } catch (error) {
     if (packageChanged && !releaseCommitted) {

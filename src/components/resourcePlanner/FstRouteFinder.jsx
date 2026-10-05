@@ -6,35 +6,10 @@ import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
 import {Badge} from "@/components/ui/badge";
 import {Clock, ExternalLink, Loader2, Mail, MapPin, Navigation, Phone, Trophy} from "lucide-react";
 import {useFstRoster} from "@/lib/useFstRoster";
-import {
-  drivingMatrix,
-  formatDuration,
-  geocodeAddress,
-  googleMapsDirectionsUrl,
-  stateFromAddress,
-  straightLineMiles
-} from "@/lib/routing";
+import {formatDuration, googleMapsDirectionsUrl} from "@/lib/routing";
+import {CLOSE_MILES, rankFsts} from "@/features/travel/rankFsts";
 
-const MAX_ROUTED_CANDIDATES = 25;
-// An in-state FST counts as "close" within this straight-line distance of the site;
-// otherwise the search widens to the nearest FSTs in any state.
-export const CLOSE_MILES = 150;
 const VISIBLE_RESULTS = 10;
-
-// Picks the address (and which cached-coordinates field belongs to it) to route from.
-const pickOrigin = (fst, startFrom) => {
-  const home = { address: fst.home_address || "", field: "home_geo" };
-  const ship = { address: fst.shipping_address || "", field: "ship_geo" };
-  const [first, second] = startFrom === "shipping" ? [ship, home] : [home, ship];
-  return first.address ? first : second;
-};
-
-// State of the FST's routing origin: from the address text, else the roster's state fields.
-const originState = (fst, origin) => {
-  const fallback = origin.field === "home_geo" ? fst.home_state || fst.state : fst.state || fst.home_state;
-  const code = String(fallback || "").trim().toUpperCase();
-  return stateFromAddress(origin.address) || (/^[A-Z]{2}$/.test(code) ? code : "");
-};
 
 // Finds and ranks the nearest FSTs to a site address. Used by the Resource Planner tab and
 // embeddable anywhere else (e.g. a quote's detail screen): pass initialAddress to prefill
@@ -53,29 +28,6 @@ export default function FstRouteFinder({ initialAddress = "", autoSearch = false
   const [rankProgress, setRankProgress] = useState("");
   const [rankError, setRankError] = useState(null);
 
-  // Returns cached coordinates for the FST's origin address, geocoding (and caching on
-  // the record) only when the address is new or has changed since the last lookup.
-  // If the preferred address can't be located, the FST's other address is tried.
-  const locateFST = async (fst) => {
-    const preferred = pickOrigin(fst, startFrom);
-    const alternate = preferred.field === "home_geo"
-      ? { address: fst.shipping_address || "", field: "ship_geo" }
-      : { address: fst.home_address || "", field: "home_geo" };
-
-    for (const { address, field } of [preferred, alternate]) {
-      if (!address) continue;
-      const cached = fst[field];
-      if (cached && cached.address === address) {
-        if (cached.lat != null) return { ...cached, address };
-        continue;
-      }
-      const point = await geocodeAddress(address);
-      await updateLocalRecord("fsts", fst.id, { [field]: { address, lat: point?.lat ?? null, lng: point?.lng ?? null } });
-      if (point) return { ...point, address };
-    }
-    return null;
-  };
-
   const handleRank = async () => {
     const target = svAddress.trim();
     if (!target) return;
@@ -88,78 +40,20 @@ export default function FstRouteFinder({ initialAddress = "", autoSearch = false
     setRankError(null);
     setShowAllResults(false);
     try {
-      setRankProgress("Locating site visit address...");
-      const targetPoint = await geocodeAddress(target);
-      if (!targetPoint) {
-        setRankError("Couldn't find that address. Check the street, city and ZIP and try again.");
-        return;
-      }
-
-      const siteState = stateFromAddress(target) || targetPoint.state || "";
-      const entries = activeFSTs.map((fst) => ({ fst, state: originState(fst, pickOrigin(fst, startFrom)) }));
-      const sameState = siteState ? entries.filter((e) => e.state === siteState) : entries;
-      const otherStates = siteState ? entries.filter((e) => e.state !== siteState) : [];
-
-      const located = [];
-      let skipped = 0;
-      let done = 0;
-      const locateAll = async (list) => {
-        for (const entry of list) {
-          done += 1;
-          const origin = pickOrigin(entry.fst, startFrom);
-          if (origin.address && !(entry.fst[origin.field]?.address === origin.address)) {
-            setRankProgress(`Locating FST addresses (${done}/${activeFSTs.length}) - first run only, results are saved...`);
-          }
-          const point = await locateFST(entry.fst);
-          if (point) located.push({ ...entry, point, straight: straightLineMiles(targetPoint, point) });
-          else skipped += 1;
-        }
-      };
-
-      // Same-state FSTs first; other states are only looked up when nothing in-state is close.
-      await locateAll(sameState);
-      let widened = false;
-      if (siteState && !located.some((e) => e.straight <= CLOSE_MILES)) {
-        widened = true;
-        await locateAll(otherStates);
-      }
-      afterRosterWrite();
-
-      if (located.length === 0) {
-        setRankError("None of the FSTs have an address that could be located. Check the roster addresses.");
-        return;
-      }
-
-      setRankProgress("Calculating drive times...");
-      const candidates = located
-        .sort((a, b) => a.straight - b.straight)
-        .slice(0, MAX_ROUTED_CANDIDATES);
-
-      let drives = candidates.map(() => null);
-      try {
-        drives = await drivingMatrix(targetPoint, candidates.map((c) => c.point));
-      } catch {
-        // Routing service unreachable: fall back to straight-line distances below.
-      }
-
-      const results = candidates.map((c, i) => ({
-        fst: c.fst,
-        inState: Boolean(siteState) && c.state === siteState,
-        originAddress: c.point.address,
-        miles: drives[i]?.miles ?? c.straight,
-        minutes: drives[i]?.minutes ?? null,
-        approximate: !drives[i]
-      })).sort((a, b) => {
-        if (a.approximate !== b.approximate) return a.approximate ? 1 : -1;
-        return a.approximate ? a.miles - b.miles : a.minutes - b.minutes;
+      const ranked = await rankFsts({
+        address: target,
+        startFrom,
+        activeFSTs,
+        onProgress: setRankProgress,
+        persistGeo: (fst, field, geo) => updateLocalRecord("fsts", fst.id, { [field]: geo })
       });
-
+      afterRosterWrite();
       setRankedAddress(target);
-      setSkippedCount(skipped);
-      setSearchScope({ state: siteState, widened });
-      setRankings(results);
+      setSkippedCount(ranked.skippedCount);
+      setSearchScope(ranked.searchScope);
+      setRankings(ranked.results);
     } catch (err) {
-      setRankError(`Failed to rank FSTs: ${err?.message || "please try again."}`);
+      setRankError(err?.message || "Failed to rank FSTs: please try again.");
     } finally {
       setIsRanking(false);
       setRankProgress("");
@@ -280,7 +174,8 @@ export default function FstRouteFinder({ initialAddress = "", autoSearch = false
                       )}
                       {r.fst.region && <Badge variant="outline" className="text-xs">{r.fst.region}</Badge>}
                       {searchScope?.widened && !r.inState && <Badge variant="outline" className="text-xs text-sky-700 border-sky-300">Out of state</Badge>}
-                      {r.approximate && <Badge variant="outline" className="text-xs text-amber-700 border-amber-300">Straight-line estimate</Badge>}
+                      {r.zipApproximate && <Badge variant="outline" className="text-xs text-amber-700 border-amber-300">Approximate – matched to ZIP only</Badge>}
+                      {r.routeApproximate && <Badge variant="outline" className="text-xs text-amber-700 border-amber-300">Straight-line estimate</Badge>}
                     </div>
                     <p className="text-xs text-muted-foreground flex items-start gap-1">
                       <MapPin className="w-3 h-3 shrink-0 mt-0.5" />
@@ -309,11 +204,11 @@ export default function FstRouteFinder({ initialAddress = "", autoSearch = false
                   <div className="shrink-0 text-right space-y-2">
                     <div className="flex gap-4">
                       <div>
-                        <p className="text-xs text-muted-foreground">{r.approximate ? "Straight-line" : "Distance"}</p>
+                        <p className="text-xs text-muted-foreground">One-way miles</p>
                         <p className="font-bold text-foreground">{r.miles.toFixed(1)} mi</p>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground">Drive Time</p>
+                        <p className="text-xs text-muted-foreground">One-way time</p>
                         <p className="font-bold text-foreground flex items-center gap-1 justify-end">
                           <Clock className="w-3.5 h-3.5 text-muted-foreground" />
                           {formatDuration(r.minutes)}
@@ -322,14 +217,14 @@ export default function FstRouteFinder({ initialAddress = "", autoSearch = false
                     </div>
                     <div className="flex gap-4 border-t border-border pt-2">
                       <div>
-                        <p className="text-xs text-muted-foreground">Round Trip</p>
-                        <p className="font-semibold text-foreground">{(r.miles * 2).toFixed(1)} mi</p>
+                        <p className="text-xs text-muted-foreground">Round-trip miles</p>
+                        <p className="font-semibold text-foreground">{r.roundTrip.miles.toFixed(1)} mi</p>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground">Round Trip Time</p>
+                        <p className="text-xs text-muted-foreground">Round-trip time</p>
                         <p className="font-semibold text-foreground flex items-center gap-1 justify-end">
                           <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-                          {formatDuration(r.minutes == null ? null : r.minutes * 2)}
+                          {formatDuration(r.roundTrip.minutes)}
                         </p>
                       </div>
                     </div>
@@ -351,7 +246,7 @@ export default function FstRouteFinder({ initialAddress = "", autoSearch = false
             </p>
           )}
           <p className="text-xs text-muted-foreground text-center pt-1">
-            Drive times come from OpenStreetMap routing and don&apos;t include live traffic. Use the Google Maps link for current conditions.
+            Drive times assume normal traffic-free road speeds (OpenStreetMap routing). Use the Google Maps link for current conditions.
           </p>
         </div>
       )}

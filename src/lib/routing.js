@@ -64,13 +64,24 @@ export async function geocodeAddress(address) {
   const cleaned = cleanForGeocoding(address);
   if (!cleaned) return null;
 
+  const localGeo = typeof window !== "undefined" ? window.enquoteLocal?.geo : null;
+  if (localGeo?.geocode) {
+    const result = await localGeo.geocode(cleaned);
+    if (result?.ok) return result;
+    if (result?.reason === "not_found") return null;
+    throw new Error(result?.error || "Geocoding service unavailable");
+  }
+
   const direct = await nominatimSearch({ q: cleaned });
-  if (direct) return direct;
+  if (direct) return { ...direct, precision: "street", source: "osm", matchedAddress: "" };
 
   // Street-level lookups fail on typos/ranges ("6201 - 6261 White Ln"); a ZIP-centroid
   // is still close enough to rank FSTs by.
   const zip = /\b(\d{5})(?:-\d{4})?\b/.exec(cleaned);
-  if (zip) return nominatimSearch({ postalcode: zip[1] });
+  if (zip) {
+    const postal = await nominatimSearch({ postalcode: zip[1] });
+    return postal ? { ...postal, precision: "zip", source: "osm-zip", matchedAddress: "" } : null;
+  }
   return null;
 }
 
@@ -86,6 +97,13 @@ export function straightLineMiles(a, b) {
 // with `destinations`: {miles, minutes} or null where no road route exists
 // (islands, unreachable points).
 export async function drivingMatrix(origin, destinations) {
+  const localGeo = typeof window !== "undefined" ? window.enquoteLocal?.geo : null;
+  if (localGeo?.routes) {
+    const routed = await localGeo.routes({ site: origin, origins: destinations });
+    if (routed?.ok) return routed.results.map((r) => r?.fromSite || null);
+    throw new Error(routed?.error || "Routing service unavailable");
+  }
+
   const results = new Array(destinations.length).fill(null);
 
   for (let start = 0; start < destinations.length; start += OSRM_CHUNK_SIZE) {
@@ -109,6 +127,22 @@ export async function drivingMatrix(origin, destinations) {
   }
 
   return results;
+}
+
+export async function drivingRoundTrips(site, origins) {
+  const localGeo = typeof window !== "undefined" ? window.enquoteLocal?.geo : null;
+  if (localGeo?.routes) {
+    const routed = await localGeo.routes({ site, origins });
+    if (routed?.ok) return routed.results;
+    throw new Error(routed?.error || "Routing service unavailable");
+  }
+
+  const fromSite = await drivingMatrix(site, origins);
+  const toSite = await Promise.all(origins.map(async (origin) => {
+    const [result] = await drivingMatrix(origin, [site]);
+    return result;
+  }));
+  return origins.map((_, i) => (fromSite[i] && toSite[i] ? { toSite: toSite[i], fromSite: fromSite[i] } : null));
 }
 
 export function formatDuration(minutes) {

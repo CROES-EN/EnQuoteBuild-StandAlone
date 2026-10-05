@@ -16,7 +16,10 @@ export const ROLE_PAGE_ACCESS = Object.freeze({
     "ResourcePlanner",
     "SiteFlagManager",
     "InactiveRevenueDashboard",
-    "EnphaseCare"
+    "EnphaseCare",
+    "Tasks",
+    "SOPLibrary",
+    "Messages"
   ],
   approver: [
     "Dashboard",
@@ -32,7 +35,10 @@ export const ROLE_PAGE_ACCESS = Object.freeze({
     "ResourcePlanner",
     "SiteFlagManager",
     "InactiveRevenueDashboard",
-    "EnphaseCare"
+    "EnphaseCare",
+    "Tasks",
+    "SOPLibrary",
+    "Messages"
   ]
 });
 

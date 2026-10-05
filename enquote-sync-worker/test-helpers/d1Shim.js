@@ -2,9 +2,11 @@
 import { DatabaseSync } from "node:sqlite";
 
 // Minimal D1 shim over a real in-memory SQLite database, so tests exercise the Worker's actual SQL.
-export function createSupervisorD1() {
+export function createSupervisorD1(migrations = ["0002_supervisor_records.sql"]) {
   const db = new DatabaseSync(":memory:");
-  db.exec(readFileSync(new URL("../migrations/0002_supervisor_records.sql", import.meta.url), "utf8"));
+  for (const migration of migrations) {
+    db.exec(readFileSync(new URL(`../migrations/${migration}`, import.meta.url), "utf8"));
+  }
   const wrap = (sql) => {
     let params = [];
     const statement = {
@@ -38,4 +40,8 @@ export function createSupervisorD1() {
       }
     }
   };
+}
+
+export function createCollabD1() {
+  return createSupervisorD1(["0005_collab.sql"]);
 }

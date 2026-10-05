@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, dialog } = require("electron");
+const { app, BrowserWindow, ipcMain, shell, dialog, Notification, net } = require("electron");
 // FIX: destructuring these directly off app (e.g. "const { on } = app") strips their
 // "this" binding back to the real app instance, which crashes as soon as they're
 // called (app extends EventEmitter internally, and needs "this" to be app itself).
@@ -24,6 +24,8 @@ const { createLargeTableStore } = require("./largeTableStore.cjs");
 const { createUserRolesSync } = require("./userRolesSync.cjs");
 const { createUiUpdater } = require("./uiUpdate.cjs");
 const { createErrorReporter } = require("./errorReporter.cjs");
+const { setupCollabFeatures } = require("./collabFeatures.cjs");
+const { createGeoService } = require("./geoService.cjs");
 // The roster itself is NOT bundled (this repo and its installers are public, and the roster
 // holds employees' home addresses and phone numbers). It lives in the private Cloudflare Worker
 // and every install pulls it from there. An optional local fstRosterSeed.json is only honored
@@ -81,6 +83,8 @@ let supervisorSync;
 let userRolesSync;
 let uiUpdater;
 let errorReporter;
+let collabFeatures;
+let geoService;
 let dataDirectoryWatcher;
 const presenceSync = createPresenceSync({
     workerUrl: "https://enquote-sync.croeschberger.workers.dev",
@@ -876,7 +880,9 @@ function createWindow() {
             preload: path.join(__dirname, "preload.cjs"),
             contextIsolation: true,
             nodeIntegration: false,
-            sandbox: true
+            sandbox: true,
+            // Chromium's built-in PDF viewer, used to show SOP Library PDFs inside the app.
+            plugins: true
         }
     });
     closeStartupSplash();
@@ -959,6 +965,9 @@ function createWindow() {
 let then = whenReady().then(async () => {
     if (!hasSingleInstanceLock) return;
     console.log(`[updater] Starting EnQuote ${getVersion()} from ${process.execPath}`);
+    // Windows only shows toast notifications for an app id that matches the installer's Start
+    // menu shortcut (electron-builder uses the build appId).
+    if (process.platform === "win32") app.setAppUserModelId(isPackaged ? "com.enphase.enquote.demo" : process.execPath);
     // The installer relaunches EnQuote with --updated right after installing an update.
     if (process.argv.includes("--updated")) startupSplashStatus = { label: "Finishing update\u2026", percent: null };
     showStartupSplash();
@@ -1819,6 +1828,44 @@ let then = whenReady().then(async () => {
 
     ipcMain.handle("presence:remove", () => presenceSync.remove());
     ipcMain.handle("presence:list", () => presenceSync.list());
+    collabFeatures = setupCollabFeatures({
+        ipcMain,
+        Notification,
+        getMainWindow: () => mainWindow,
+        showMainWindow: () => {
+            if (!mainWindow || mainWindow.isDestroyed()) return;
+            if (mainWindow.isMinimized()) mainWindow.restore();
+            mainWindow.show();
+            mainWindow.focus();
+        },
+        storageDir: getPath("userData"),
+        workerUrl: "https://enquote-sync.croeschberger.workers.dev",
+        getEmail: () => getVerifiedIdentity()?.email || "",
+        getOutboundToken: () => process.env.OUTBOUND_TOKEN || "",
+        getAccessHeaders: () => ({
+            "CF-Access-Client-Id": process.env.CF_ACCESS_CLIENT_ID || "",
+            "CF-Access-Client-Secret": process.env.CF_ACCESS_CLIENT_SECRET || ""
+        }),
+        addBellNotification: (record) => quoteRepository.createCollectionRecord("appNotifications", record)
+    });
+    geoService = createGeoService({
+        fetchImpl: (url, init) => net.fetch(url, init),
+        cachePath: path.join(app.getPath("userData"), "geo-cache.json"),
+        logger: console
+    });
+    const isGeoPoint = (point) => Number.isFinite(Number(point?.lat)) && Number.isFinite(Number(point?.lng));
+    ipcMain.handle("geo:geocode", (_event, address) => {
+        if (typeof address !== "string" || !address.trim()) return { ok: false, reason: "not_found" };
+        return geoService.geocode(address);
+    });
+    ipcMain.handle("geo:routes", (_event, payload) => {
+        const site = payload?.site;
+        const origins = Array.isArray(payload?.origins) ? payload.origins : [];
+        if (!isGeoPoint(site) || origins.some((origin) => !isGeoPoint(origin))) {
+            return { ok: false, reason: "invalid_input", error: "site and origins must contain numeric lat/lng" };
+        }
+        return geoService.routes({ site, origins });
+    });
     // Zoom - renderer-triggered equivalents of the Ctrl+/Ctrl-/Ctrl+0 shortcuts above, for a
     // clickable in-app zoom control (see Layout.jsx). Each returns the RESULTING zoom factor so
     // the renderer's displayed percentage always reflects the real, clamped value.
@@ -2393,6 +2440,8 @@ let then = whenReady().then(async () => {
     }
 
     async function applySyncCredentialsOrDisable() {
+        // Reminders are stored locally, so they fire even if the sync service is unreachable.
+        collabFeatures?.startOfflineReminders();
         const credentials = await fetchSyncCredentials();
         if (credentials.ok) {
             process.env.SNAPSHOT_TOKEN = credentials.snapshotToken;
@@ -2420,6 +2469,7 @@ let then = whenReady().then(async () => {
             // The window announces presence itself once the user is signed in (presence:announce).
             errorReporter?.start();
             supervisorSync?.start();
+            collabFeatures?.applyCredentials(credentials);
             console.log("[cloudflare-auth] Sync credentials obtained - outbound/entity sync enabled.");
             try {
                 const snapshot = await fetchRemoteSnapshot(
@@ -2443,7 +2493,8 @@ let then = whenReady().then(async () => {
                 },
                 onQuotesUpdated: () => refreshFromCloudflare(),
                 onOutboundStatus: (data) => outboundSync?.handleRealtimeStatus(data),
-                onSupervisorUpdated: () => supervisorSync?.reconcile()
+                onSupervisorUpdated: () => supervisorSync?.reconcile(),
+                handlers: collabFeatures?.realtimeHandlers || {}
             });
         } else {
             console.warn(`[cloudflare-auth] Could not obtain sync credentials (reason: ${credentials.reason}) - sync disabled this session.`);
@@ -2551,5 +2602,6 @@ on("before-quit", () => {
     supervisorSync?.stop();
     userRolesSync?.stop();
     errorReporter?.stop();
+    collabFeatures?.stop();
     presenceSync.remove();
 });

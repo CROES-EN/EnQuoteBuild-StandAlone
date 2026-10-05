@@ -24,6 +24,9 @@ import InactiveCollectionsPage from "./pages/InactiveCollections";
 import WorkloadPage from "./pages/Workload";
 import EnphaseCarePage from "./pages/EnphaseCare";
 import {AutoDrafter as AutoDrafterPage} from "./pages/AutoDrafter";
+import TasksPage from "./pages/Tasks";
+import SOPLibraryPage from "./pages/SOPLibrary";
+import MessagesPage from "./pages/Messages";
 
 import AuthProvider, {useAuth} from "@/lib/AuthContext";
 import UserNotRegisteredError from "@/components/UserNotRegisteredError";
@@ -141,6 +144,21 @@ const AuthenticatedApp = () => {
       <Route path="/AutoDrafter" element={
         <LayoutWrapper currentPageName="AutoDrafter">
           <AutoDrafterPage />
+        </LayoutWrapper>
+      } />
+      <Route path="/Tasks" element={
+        <LayoutWrapper currentPageName="Tasks">
+          <TasksPage />
+        </LayoutWrapper>
+      } />
+      <Route path="/SOPLibrary" element={
+        <LayoutWrapper currentPageName="SOPLibrary">
+          <SOPLibraryPage />
+        </LayoutWrapper>
+      } />
+      <Route path="/Messages" element={
+        <LayoutWrapper currentPageName="Messages">
+          <MessagesPage />
         </LayoutWrapper>
       } />
       <Route path="*" element={<PageNotFound />} />

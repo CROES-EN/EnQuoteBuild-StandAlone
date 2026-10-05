@@ -10,6 +10,7 @@ import {Switch} from "@/components/ui/switch";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import QuoteItemSelector from "./QuoteItemSelector";
 import QuoteDraftButton from "@/features/quoteDraftAgent/QuoteDraftButton";
+import TravelAutofillButton from "@/features/travel/TravelAutofillButton";
 
 export default function QuoteForm({ quote, products = [], onSave, onSaveDraft, onSaveCopy, onCancel, isLoading, isAdmin }) {
   const [formData, setFormData] = useState({
@@ -190,7 +191,19 @@ export default function QuoteForm({ quote, products = [], onSave, onSaveDraft, o
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end gap-2">
+        <TravelAutofillButton
+          quote={{ ...(quote || {}), ...formData }}
+          onApply={(travelData) => {
+            if (!travelData || typeof travelData !== "object") return;
+            setFormData((current) => ({
+              ...current,
+              travel_hours: travelData.travel_hours,
+              miles_traveled: travelData.miles_traveled,
+              fst_count: travelData.fst_count
+            }));
+          }}
+        />
         <QuoteDraftButton
           quote={{ ...(quote || {}), ...formData }}
           products={Array.isArray(products) ? products : []}

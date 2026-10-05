@@ -8,6 +8,25 @@ import { handleAuthSession, handleSyncCredentials } from "./auth-session.js";
 import { handlePresenceHeartbeat, handlePresenceList, handlePresenceRemove } from "./presence.js";
 import { handleFstList, handleFstUpsert } from "./fsts.js";
 import { handleUsers } from "./users.js";
+import { handleTasksDelete, handleTasksList, handleTasksUpsert } from "./tasks.js";
+import {
+  handleSopFileDownload,
+  handleSopFileUpload,
+  handleSopsDelete,
+  handleSopsList,
+  handleSopsUpsert,
+  handleSopsVersions
+} from "./sops.js";
+import {
+  handleChatConversationCreate,
+  handleChatConversations,
+  handleChatConversationUpdate,
+  handleChatDirectory,
+  handleChatInbox,
+  handleChatMessageSend,
+  handleChatMessages,
+  handleChatRead
+} from "./chat.js";
 import { handleUiBundle, handleUiManifest } from "./ui-updates.js";
 import { handleErrorList, handleErrorReport } from "./errors.js";
 import {
@@ -40,6 +59,27 @@ export default {
     if (url.pathname === "/api/presence" && request.method === "GET") return handlePresenceList(request, env);
     if (url.pathname === "/api/presence/remove" && request.method === "POST") return handlePresenceRemove(request, env);
     if (url.pathname === "/api/users" && request.method === "GET") return handleUsers(request, env);
+    if (url.pathname === "/api/tasks" && request.method === "GET") return handleTasksList(request, env);
+    if (url.pathname === "/api/tasks/upsert" && request.method === "POST") return handleTasksUpsert(request, env);
+    if (url.pathname === "/api/tasks/delete" && request.method === "POST") return handleTasksDelete(request, env);
+    if (url.pathname === "/api/sops" && request.method === "GET") return handleSopsList(request, env);
+    if (url.pathname === "/api/sops/upsert" && request.method === "POST") return handleSopsUpsert(request, env);
+    if (url.pathname === "/api/sops/delete" && request.method === "POST") return handleSopsDelete(request, env);
+    if (url.pathname === "/api/sops/versions" && request.method === "GET") return handleSopsVersions(request, env);
+    if (url.pathname === "/api/sops/files" && request.method === "POST") return handleSopFileUpload(request, env);
+    if (url.pathname.startsWith("/api/sops/files/") && request.method === "GET") {
+      const sha = url.pathname.slice("/api/sops/files/".length);
+      if (!/^[a-f0-9]{64}$/i.test(sha)) return json({ ok: false, error: "invalid_file_id" }, 400);
+      return handleSopFileDownload(request, env, sha);
+    }
+    if (url.pathname === "/api/chat/directory" && request.method === "GET") return handleChatDirectory(request, env);
+    if (url.pathname === "/api/chat/conversations" && request.method === "GET") return handleChatConversations(request, env);
+    if (url.pathname === "/api/chat/conversations" && request.method === "POST") return handleChatConversationCreate(request, env);
+    if (url.pathname === "/api/chat/conversations/update" && request.method === "POST") return handleChatConversationUpdate(request, env);
+    if (url.pathname === "/api/chat/messages" && request.method === "GET") return handleChatMessages(request, env);
+    if (url.pathname === "/api/chat/messages" && request.method === "POST") return handleChatMessageSend(request, env);
+    if (url.pathname === "/api/chat/read" && request.method === "POST") return handleChatRead(request, env);
+    if (url.pathname === "/api/chat/inbox" && request.method === "GET") return handleChatInbox(request, env);
     if (url.pathname === "/api/errors" && request.method === "POST") return handleErrorReport(request, env);
     if (url.pathname === "/api/errors" && request.method === "GET") return handleErrorList(request, env);
     if (url.pathname === "/api/ui/manifest" && request.method === "GET") return handleUiManifest(request, env);

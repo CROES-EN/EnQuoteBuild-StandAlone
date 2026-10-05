@@ -1,5 +1,6 @@
 import { jwtVerify, createRemoteJWKSet } from "jose";
 import { json } from "./util.js";
+import { inboxKeyForEmail, signUserToken } from "./user-token.js";
 
 // Confirmed directly from your Cloudflare Zero Trust dashboard this session.
 const TEAM_DOMAIN = "https://boise-enphase-om.cloudflareaccess.com";
@@ -136,6 +137,10 @@ export async function handleSyncCredentials(request, env, verifyJwt = validateAc
   if (env.CF_ACCESS_CLIENT_ID && env.CF_ACCESS_CLIENT_SECRET) {
     response.cfAccessClientId = env.CF_ACCESS_CLIENT_ID;
     response.cfAccessClientSecret = env.CF_ACCESS_CLIENT_SECRET;
+  }
+  if (env.USER_TOKEN_SECRET) {
+    response.userToken = await signUserToken(result.email, env.USER_TOKEN_SECRET);
+    response.inboxKey = await inboxKeyForEmail(result.email, env.USER_TOKEN_SECRET);
   }
 
   return json(response, 200, headers);

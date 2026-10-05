@@ -3,9 +3,11 @@ import {
   Archive,
   BarChart3,
   Bell,
+  BookOpen,
   Briefcase,
   ChevronsLeft,
   ChevronsRight,
+  ClipboardList,
   FileOutput,
   FileText,
   Headset,
@@ -13,6 +15,7 @@ import {
   LineChart,
   Mail,
   Menu,
+  MessageSquare,
   Package,
   Recycle,
   RefreshCw,
@@ -28,7 +31,8 @@ import {
   ZoomIn,
   ZoomOut
 } from "lucide-react";
-import {Link} from "react-router-dom";
+import {Link, useNavigate} from "react-router-dom";
+import {DragDropContext, Draggable, Droppable} from "@hello-pangea/dnd";
 import UpdateStatusBadge from "@/components/UpdateStatusBadge";
 import UiUpdateBanner from "@/components/UiUpdateBanner";
 import {createPageUrl} from "@/utils";
@@ -64,6 +68,7 @@ import SidebarLogoAnimation from "@/components/SidebarLogoAnimation";
 import DeveloperConsole from "@/components/DeveloperConsole";
 import NotificationBell from "@/components/NotificationBell";
 import {recordError} from "@/features/developerConsole/errorLog";
+import {countAttentionTasks, useChatUnread, useTasks} from "@/features/collab/collabApi";
 
 const isDemoMode = ["mock", "local", "salesforce-mock"].includes(import.meta.env.VITE_DATA_SOURCE);
 const appVersion = appPackage?.version || "0.0.0";
@@ -127,6 +132,35 @@ function formatLastUpdated(date) {
   return `${datePart} ${timePart}`;
 }
 
+// Sidebar tab order is a per-computer preference: a list of page ids. Pages missing from the
+// saved list (e.g. added in a later update) keep their default order after the saved ones.
+const SIDEBAR_ORDER_STORAGE_KEY = "enquote_sidebar_order";
+
+function readSidebarOrder() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SIDEBAR_ORDER_STORAGE_KEY) || "null");
+    return Array.isArray(parsed) ? parsed.filter((id) => typeof id === "string") : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSidebarOrder(order) {
+  try {
+    if (order) localStorage.setItem(SIDEBAR_ORDER_STORAGE_KEY, JSON.stringify(order));
+    else localStorage.removeItem(SIDEBAR_ORDER_STORAGE_KEY);
+  } catch { /* ignore */ }
+}
+
+function applySidebarOrder(items, order) {
+  if (!order?.length) return items;
+  const rank = new Map(order.map((id, index) => [id, index]));
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => (rank.get(a.item.page) ?? order.length + a.index) - (rank.get(b.item.page) ?? order.length + b.index))
+    .map(({ item }) => item);
+}
+
 export default function Layout({ children, currentPageName }) {
   const { isAdmin, roles, user } = useUserRole();
   const { isAuthenticated, isLocalAuthActive, logout } = useAuth();
@@ -134,6 +168,8 @@ export default function Layout({ children, currentPageName }) {
   const navItems = [
     { name: "Dashboard", icon: LayoutDashboard, page: "Dashboard", roles: ["submitter", "approver", "admin", "invoicer"] },
     { name: "Workload", icon: Briefcase, page: "Workload", roles: ["submitter", "approver", "admin", "invoicer"] },
+    { name: "Tasks", icon: ClipboardList, page: "Tasks", roles: ["submitter", "approver", "admin", "invoicer"] },
+    { name: "Messages", icon: MessageSquare, page: "Messages", roles: ["submitter", "approver", "admin", "invoicer"] },
     { name: "Quotes", icon: FileText, page: "Quotes", roles: ["submitter", "approver", "admin", "invoicer"] },
     { name: "Auto-Drafter", icon: Sparkles, page: "AutoDrafter", roles: ["submitter", "approver", "admin", "invoicer"], badge: "beta" },
     { name: "Products & Services", icon: Package, page: "Products", roles: ["submitter", "approver", "admin", "invoicer"] },
@@ -148,6 +184,7 @@ export default function Layout({ children, currentPageName }) {
     { name: "Boneyard", icon: Archive, page: "Boneyard", roles: ["submitter", "approver", "admin", "invoicer"] },
     { name: "SV Cancel Tracker", icon: AlertTriangle, page: "SVCancelTracker", roles: ["submitter", "approver", "admin", "invoicer"] },
     { name: "Resource Planner", icon: Route, page: "ResourcePlanner", roles: ["submitter", "approver", "admin", "invoicer"] },
+    { name: "SOP Library", icon: BookOpen, page: "SOPLibrary", roles: ["submitter", "approver", "admin", "invoicer"] },
     { name: "Site Flags", icon: Siren, page: "SiteFlagManager", roles: ["submitter", "approver", "admin", "invoicer"] },
     { name: "Rejection Reviews", icon: AlertTriangle, page: "RejectedQuoteReview", roles: ["submitter", "approver", "admin", "invoicer"] },
     { name: "Manager Dashboard", icon: LineChart, page: "ManagerDashboard", roles: ["admin", "submitter", "approver", "invoicer"] },
@@ -156,10 +193,31 @@ export default function Layout({ children, currentPageName }) {
     { name: "Inactive Revenue", icon: Wallet, page: "InactiveRevenueDashboard", roles: ["admin", "approver", "invoicer", "submitter"] }
   ];
 
-  const visibleNavItems = navItems.filter(item =>
+  const [sidebarOrder, setSidebarOrder] = useState(() => readSidebarOrder());
+  const orderedNavItems = applySidebarOrder(navItems, sidebarOrder);
+  const visibleNavItems = orderedNavItems.filter(item =>
     (!item.roles || isAdmin || item.roles.some(itemRole => roles.includes(itemRole))) && canAccessPage(roles, item.page, isAdmin)
   );
   const currentPageBlocked = Boolean(currentPageName) && isAuthenticated && !canAccessPage(roles, currentPageName, isAdmin);
+
+  // Moves a tab among the visible ones while tabs hidden for this role keep their saved slots,
+  // so a later role change doesn't scramble the order.
+  function handleNavDragEnd(result) {
+    if (!result.destination || result.destination.index === result.source.index) return;
+    const visibleIds = visibleNavItems.map((item) => item.page);
+    const [moved] = visibleIds.splice(result.source.index, 1);
+    visibleIds.splice(result.destination.index, 0, moved);
+    const visibleSet = new Set(visibleIds);
+    let next = 0;
+    const fullOrder = orderedNavItems.map((item) => (visibleSet.has(item.page) ? visibleIds[next++] : item.page));
+    setSidebarOrder(fullOrder);
+    writeSidebarOrder(fullOrder);
+  }
+
+  function resetSidebarOrder() {
+    setSidebarOrder(null);
+    writeSidebarOrder(null);
+  }
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -300,6 +358,30 @@ export default function Layout({ children, currentPageName }) {
   // visibility change, matching the same pattern already used by ReportDataTablesPanel.jsx and
   // the Workload page itself.
   const [importantWorkloadCount, setImportantWorkloadCount] = useState(0);
+
+  const navigate = useNavigate();
+  const { tasks } = useTasks();
+  const chatUnread = useChatUnread();
+  const [badgeNow, setBadgeNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setBadgeNow(Date.now()), 60000);
+    return () => clearInterval(id);
+  }, []);
+  const navBadgeCounts = {
+    Workload: importantWorkloadCount,
+    Tasks: countAttentionTasks(tasks, badgeNow),
+    Messages: chatUnread
+  };
+
+  // Clicking a Windows reminder/message notification asks the window to open that item.
+  useEffect(() => {
+    const onNavigate = window.enquoteLocal?.navigation?.onNavigate;
+    if (typeof onNavigate !== "function") return undefined;
+    const off = onNavigate((route) => {
+      if (typeof route === "string" && route.startsWith("/")) navigate(route);
+    });
+    return typeof off === "function" ? off : undefined;
+  }, [navigate]);
 
   // On machines that hold the full Care Subscriptions import, keep the compact shared "active
   // Care" copy (what the Enphase Care page reads) in step with it. A no-op everywhere else.
@@ -498,21 +580,33 @@ export default function Layout({ children, currentPageName }) {
             )}
           </button>
 
-          {/* Navigation */}
-          <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto min-h-0">
-            {visibleNavItems.map((item) => {
+          {/* Navigation - drag a tab to reorder it (a plain click still navigates). */}
+          <nav className="flex-1 px-4 py-6 overflow-y-auto min-h-0">
+          <DragDropContext onDragEnd={handleNavDragEnd}>
+          <Droppable droppableId="sidebar-nav">
+          {(dropProvided) => (
+          <div ref={dropProvided.innerRef} {...dropProvided.droppableProps}>
+            {visibleNavItems.map((item, index) => {
               const isActive = currentPageName === item.page;
               return (
+                <Draggable key={item.page} draggableId={item.page} index={index}>
+                {(dragProvided, dragSnapshot) => (
+                <div
+                  ref={dragProvided.innerRef}
+                  {...dragProvided.draggableProps}
+                  className="pb-1"
+                >
                 <Link
-                  key={item.page}
+                  {...dragProvided.dragHandleProps}
                   to={createPageUrl(item.page)}
-                  title={sidebarCollapsed ? item.name : undefined}
+                  title={sidebarCollapsed ? `${item.name} (drag to reorder)` : "Drag to reorder"}
                   className={cn(
                     "relative flex items-center px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200",
                     sidebarCollapsed ? "justify-center gap-0 px-2" : "gap-3",
                     isActive
                       ? "bg-orange-50 text-orange-700"
-                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+                    dragSnapshot.isDragging && "bg-sidebar-accent text-sidebar-foreground shadow-lg ring-2 ring-orange-400/60"
                   )}
                 >
                   <item.icon className={cn("w-5 h-5 shrink-0", isActive ? "text-orange-600" : "text-sidebar-foreground/40")} />
@@ -530,19 +624,36 @@ export default function Layout({ children, currentPageName }) {
                   >
                     {item.name}
                   </span>
-                  {item.page === "Workload" && importantWorkloadCount > 0 && (
+                  {navBadgeCounts[item.page] > 0 && (
                     <span
                       className={cn(
                         "inline-flex items-center justify-center rounded-full bg-red-500 font-semibold text-white transition-all duration-200",
-                        sidebarCollapsed ? "absolute -right-1 -top-1 h-4 min-w-[1rem] px-1 text-[10px]" : "ml-auto h-5 min-w-[1.25rem]px-1.5 text-xs"
+                        sidebarCollapsed ? "absolute -right-1 -top-1 h-4 min-w-[1rem] px-1 text-[10px]" : "ml-auto h-5 min-w-[1.25rem] px-1.5 text-xs"
                       )}
                     >
-                      {importantWorkloadCount}
+                      {navBadgeCounts[item.page] > 99 ? "99+" : navBadgeCounts[item.page]}
                     </span>
                   )}
                 </Link>
+                </div>
+                )}
+                </Draggable>
               );
             })}
+            {dropProvided.placeholder}
+          </div>
+          )}
+          </Droppable>
+          </DragDropContext>
+            {sidebarOrder && !sidebarCollapsed && (
+              <button
+                type="button"
+                onClick={resetSidebarOrder}
+                className="mt-2 w-full rounded-lg px-4 py-1.5 text-left text-xs text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+              >
+                Reset tab order
+              </button>
+            )}
           </nav>
           {/* Footer */}
           <div className="p-4 border-t border-sidebar-border space-y-3">
@@ -721,9 +832,9 @@ export default function Layout({ children, currentPageName }) {
                 >
                   <item.icon className={cn("w-5 h-5", isActive ? "text-orange-600" : "text-muted-foreground")} />
                   {item.name}
-                  {item.page === "Workload" && importantWorkloadCount > 0 && (
+                  {navBadgeCounts[item.page] > 0 && (
                     <span className="ml-auto inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-semibold text-white">
-                      {importantWorkloadCount}
+                      {navBadgeCounts[item.page] > 99 ? "99+" : navBadgeCounts[item.page]}
                     </span>
                   )}                </Link>
               );

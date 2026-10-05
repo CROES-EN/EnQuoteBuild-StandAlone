@@ -28,6 +28,9 @@ function formatNotificationDateTime(isoString) {
 // `message` field, or a generic label, for any such old/malformed record.
 function formatNotificationMessage(n) {
   const time = formatNotificationDateTime(n.occurredAt);
+  if (n.type === "task_due" && n.taskTitle) {
+    return `Reminder: ${n.taskTitle}${n.quoteNumber ? ` (${n.quoteNumber})` : ""} - ${time}`;
+  }
   if (n.type === "quote_updated" && n.quoteNumber) {
     return n.changedBy
       ? `${n.quoteNumber} updated by ${n.changedBy} - ${time}`
@@ -154,6 +157,16 @@ export default function NotificationBell() {
                       <X className="w-3 h-3" />
                       Clear
                     </button>
+                    {n.type === "task_due" && n.taskId && (
+                      <Link
+                        to={`/Tasks?task=${encodeURIComponent(n.taskId)}`}
+                        onClick={() => setOpen(false)}
+                        className="inline-flex items-center gap-0.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:underline"
+                      >
+                        View Task
+                        <ArrowUpRight className="w-3 h-3" />
+                      </Link>
+                    )}
                     {n.quoteId && (
                       <Link
                         to={createPageUrl(`QuoteDetails?id=${n.quoteId}`)}

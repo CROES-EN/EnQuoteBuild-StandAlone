@@ -36,6 +36,7 @@ import {
     DialogTitle
 } from "@/components/ui/dialog";
 import {
+    AlarmClock,
     Archive,
     ArchiveRestore,
     ArrowLeft,
@@ -73,6 +74,9 @@ import QuoteVersionComparison from "@/components/quotes/QuoteVersionComparison";
 import CareEligibilityBanner from "@/components/quotes/CareEligibilityBanner";
 import BulkMaterialOrderReviewSheet from "@/components/materials/BulkMaterialOrderReviewSheet";
 import FstFinderDialog from "@/components/resourcePlanner/FstFinderDialog";
+import TaskDialog from "@/components/collab/TaskDialog";
+import {quoteLabel} from "@/components/collab/QuotePicker";
+import {hasCollabBridge} from "@/features/collab/collabApi";
 
 // Only these users can grant/revoke pre-approval
 const PRE_APPROVAL_USERS = ["smosley@enphaseenergy.com", "REDACTED-USER1@example.invalid"];
@@ -144,6 +148,7 @@ function QuoteDetailsContent() {
  const [showPaidDialog, setShowPaidDialog] = useState(false);
  const [showBulkMaterialOrderSheet, setShowBulkMaterialOrderSheet] = useState(false);
  const [showFstFinder, setShowFstFinder] = useState(false);
+ const [reminderDefaults, setReminderDefaults] = useState(null);
  const [paidDate, setPaidDate] = useState(format(new Date(), "yyyy-MM-dd"));
  const [stripeTransactionId, setStripeTransactionId] = useState("");
  const [stripeInvoiceId, setStripeInvoiceId] = useState("");
@@ -1392,6 +1397,21 @@ function QuoteDetailsContent() {
  <MapPin className="w-4 h-4 mr-2" />
  Find Nearest FST
  </Button>
+ {hasCollabBridge() && (
+ <Button
+ variant="outline"
+ onClick={() => setReminderDefaults({
+ type: "call",
+ title: `Call homeowner${quote.quote_number ? ` re: ${quote.quote_number}` : ""}`,
+ quote_id: String(quote.id),
+ quote_label: quoteLabel(quote)
+ })}
+ className="border-orange-200 text-orange-700 hover:bg-orange-50"
+ >
+ <AlarmClock className="w-4 h-4 mr-2" />
+ Add Call Reminder
+ </Button>
+ )}
  {canEditQuote && (
  <Button
  variant="outline"
@@ -2311,6 +2331,12 @@ function QuoteDetailsContent() {
  </DialogFooter>
  </DialogContent>
  </Dialog>
+
+ <TaskDialog
+ open={Boolean(reminderDefaults)}
+ onOpenChange={(open) => { if (!open) setReminderDefaults(null); }}
+ initial={reminderDefaults}
+ />
 
  <FstFinderDialog
  open={showFstFinder}

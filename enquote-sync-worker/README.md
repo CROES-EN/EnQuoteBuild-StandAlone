@@ -31,6 +31,7 @@ Always-on EnQuote ↔ Base44 sync layer on Cloudflare Workers.
    npx wrangler secret put ENQUOTE_LOCAL_SYNC_ENCRYPTION_KEY
    npx wrangler secret put SNAPSHOT_TOKEN
    npx wrangler secret put OUTBOUND_TOKEN
+   npx wrangler secret put USER_TOKEN_SECRET
    npx wrangler secret put CF_ACCESS_CLIENT_ID
    npx wrangler secret put CF_ACCESS_CLIENT_SECRET
    npx wrangler secret put BASE44_API_KEY
@@ -43,6 +44,7 @@ Always-on EnQuote ↔ Base44 sync layer on Cloudflare Workers.
 5. Apply schema (if not already done):
    ```sh
    npx wrangler d1 execute enquote-sync --file=./schema.sql --remote
+   npx wrangler d1 execute enquote-sync --remote --file=migrations/0005_collab.sql
    ```
 
 ## Enable cached snapshots and realtime quote updates
@@ -111,12 +113,17 @@ Configure these Worker secrets with `npx wrangler secret put <NAME>`:
 | `SNAPSHOT_TOKEN` | App sync | Enables dynamic snapshot sync credentials |
 | `CF_ACCESS_CLIENT_ID` | Entity snapshot sync | Optional Access service-token ID |
 | `CF_ACCESS_CLIENT_SECRET` | Entity snapshot sync | Optional Access service-token secret |
+| `USER_TOKEN_SECRET` | Tasks, SOPs, messages | Signs per-user identity tokens and inbox keys |
 
 The two token secrets are required for the Worker to return sync credentials, but a
 missing token does not invalidate an already verified identity; the app logs that sync
 is disabled. The service-token pair is optional and only needed for background
 entity-snapshot requests. None of these values should be placed in the installer or
 on each user's machine.
+When `USER_TOKEN_SECRET` is configured, `/auth/sync-credentials` also returns a
+30-day `userToken` plus `inboxKey`. The collaboration endpoints require both
+`Authorization: Bearer <OUTBOUND_TOKEN>` and `X-EnQuote-User: <userToken>`; they
+never trust a request-body email for identity.
 
 After updating Worker code or secrets, deploy the Worker with `npx wrangler deploy`.
 An unauthenticated request to `/auth/session` should redirect to the configured
@@ -141,6 +148,38 @@ Presence endpoints use `OUTBOUND_TOKEN`: `POST /api/presence/heartbeat`,
 desktop session. The app sends a heartbeat every 45 seconds; sessions expire after
 two minutes without one so a crash or network interruption cannot leave someone
 shown as online indefinitely.
+
+### Collaboration endpoints
+
+Apply the additive collaboration migration before enabling EnQuote 1.3.0 clients:
+
+```sh
+npx wrangler d1 execute enquote-sync --remote --file=migrations/0005_collab.sql
+```
+
+New authenticated endpoints:
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/tasks?since=` | Personal task changes for the signed-in user |
+| POST | `/api/tasks/upsert` | Last-writer-wins task upsert |
+| POST | `/api/tasks/delete` | Task tombstone delete |
+| GET | `/api/sops?since=` | Shared SOP changes |
+| POST | `/api/sops/upsert` | SOP upsert and version write |
+| POST | `/api/sops/delete` | Soft-delete an SOP |
+| GET | `/api/sops/versions?id=` | SOP version history |
+| POST | `/api/sops/files` | Upload/dedupe SOP file bytes in KV |
+| GET | `/api/sops/files/<sha>` | Download SOP file bytes |
+| GET/POST | `/api/chat/conversations` | List or create DM/group conversations |
+| POST | `/api/chat/conversations/update` | Rename/add members/leave a group |
+| GET/POST | `/api/chat/messages` | Page or send messages |
+| POST | `/api/chat/read` | Mark a conversation read |
+| GET | `/api/chat/inbox?since=` | Poll new inbox messages and unread total |
+| GET | `/api/chat/directory` | Allow-listed chat directory |
+
+Collaboration writes stamp server-side `synced_at` cursors with
+`new Date().toISOString()`. Clients should request rows with `synced_at > since`
+and advance `since` to the maximum cursor returned.
 
 ### Shared Supervisor Dashboard data
 

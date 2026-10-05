@@ -1,6 +1,11 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 const invoke = (channel, ...args) => ipcRenderer.invoke(channel, ...args);
+const subscribe = (channel, callback) => {
+  const listener = (_event, payload) => callback(payload);
+  ipcRenderer.on(channel, listener);
+  return () => ipcRenderer.removeListener(channel, listener);
+};
 
 contextBridge.exposeInMainWorld("enquoteLocal", {
   app: {
@@ -152,6 +157,46 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
       return () => ipcRenderer.removeListener("eodb-email-inbox:new-file", listener);
     },
     reportOutcome: (token, outcome) => ipcRenderer.send("eodb-email-inbox:report-outcome", { token, ...outcome })
+  },
+  geo: {
+    geocode: (address) => invoke("geo:geocode", address),
+    routes: (payload) => invoke("geo:routes", payload)
+  },
+  tasks: {
+    list: () => invoke("tasks:list"),
+    save: (record) => invoke("tasks:save", record),
+    delete: (id) => invoke("tasks:delete", id),
+    syncNow: () => invoke("tasks:syncNow"),
+    onChanged: (callback) => subscribe("tasks:changed", callback),
+    onDue: (callback) => subscribe("tasks:due", callback)
+  },
+  sops: {
+    list: () => invoke("sops:list"),
+    sync: () => invoke("sops:sync"),
+    save: (record, options) => invoke("sops:save", record, options),
+    delete: (id) => invoke("sops:delete", id),
+    versions: (id) => invoke("sops:versions", id),
+    uploadFile: (file) => invoke("sops:uploadFile", file),
+    getFile: (fileId, meta) => invoke("sops:getFile", fileId, meta),
+    onChanged: (callback) => subscribe("sops:changed", callback)
+  },
+  chat: {
+    me: () => invoke("chat:me"),
+    directory: (options) => invoke("chat:directory", options),
+    conversations: () => invoke("chat:conversations"),
+    openDm: (email) => invoke("chat:openDm", email),
+    createGroup: (payload) => invoke("chat:createGroup", payload),
+    updateConversation: (payload) => invoke("chat:updateConversation", payload),
+    messages: (query) => invoke("chat:messages", query),
+    send: (payload) => invoke("chat:send", payload),
+    markRead: (payload) => invoke("chat:markRead", payload),
+    setActiveConversation: (id) => invoke("chat:setActiveConversation", id),
+    onUpdated: (callback) => subscribe("chat:updated", callback),
+    onChanged: (callback) => subscribe("chat:changed", callback)
+  },
+  navigation: {
+    // Main asks the window to open a page (e.g. after clicking a Windows notification).
+    onNavigate: (callback) => subscribe("app:navigate", callback)
   }
 });
 
