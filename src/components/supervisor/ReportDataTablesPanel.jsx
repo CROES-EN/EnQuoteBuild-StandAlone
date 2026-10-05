@@ -294,7 +294,7 @@ export default function ReportDataTablesPanel() {
   const isCareSubscriptions = selectedType === "care_subscriptions";
 
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-[220px_1fr]">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-[220px_minmax(0,1fr)]">
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm">Report Tables</CardTitle>
@@ -321,7 +321,7 @@ export default function ReportDataTablesPanel() {
         </CardContent>
       </Card>
 
-      <div className="space-y-4">
+      <div className="min-w-0 space-y-4">
         {isCareSubscriptions && !loading && (
           <Card>
             <CardHeader className="pb-2">

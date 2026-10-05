@@ -736,7 +736,12 @@ async function runStartupUpdateCheck() {
 let mainWindow;
 if (hasSingleInstanceLock) {
     on("second-instance", () => {
-        if (!mainWindow || mainWindow.isDestroyed()) return;
+        if (!mainWindow || mainWindow.isDestroyed()) {
+            // Startup is still running (or stalled) after sign-in with no window yet - open it now
+            // so relaunching EnQuote always shows something instead of silently doing nothing.
+            if (getVerifiedIdentity()) createWindow();
+            return;
+        }
         if (mainWindow.isMinimized()) mainWindow.restore();
         mainWindow.focus();
     });
@@ -812,6 +817,12 @@ function loadUi() {
 }
 
 function createWindow() {
+    // Startup, a second launch, and the startup watchdog can all ask for the window - only one may exist.
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.focus();
+        return;
+    }
     mainWindowHasBeenCreated = true;
     mainWindow = new BrowserWindow({
         width: 1500,
@@ -897,6 +908,12 @@ function createWindow() {
     });
 
     startPeriodicUpdateChecks();
+
+    // Closing the main window ends EnQuote entirely, even if a Salesforce or sign-in window is
+    // still open - otherwise those keep the process (and its background sync/presence) alive.
+    mainWindow.on("closed", () => {
+        if (process.platform !== "darwin") quit();
+    });
 }
 
 let then = whenReady().then(async () => {
@@ -1751,7 +1768,9 @@ let then = whenReady().then(async () => {
     });
     ipcMain.handle("presence:announce", async (_event, payload) => {
         const result = await presenceSync.heartbeat(payload?.name);
-        if (result.ok) presenceSync.start();
+        // Keep heartbeating even if this first one failed (e.g. the window opened before sync
+        // credentials arrived) - later beats pick the credentials up once they exist.
+        presenceSync.start();
         return result;
     });
 
@@ -2353,7 +2372,9 @@ let then = whenReady().then(async () => {
                 const uiTimer = setInterval(() => { void checkForUiUpdate(); }, 15 * 60 * 1000);
                 uiTimer.unref?.();
             }
-            presenceSync.start();
+            // Presence is NOT started here: this runs before the main window exists, so a
+            // startup that stalls below would report someone as online with no window open.
+            // The window announces presence itself once the user is signed in (presence:announce).
             errorReporter?.start();
             supervisorSync?.start();
             console.log("[cloudflare-auth] Sync credentials obtained - outbound/entity sync enabled.");
@@ -2386,11 +2407,31 @@ let then = whenReady().then(async () => {
         }
     }
 
+    // Startup sync (credentials, roles, UI update, snapshot import) normally takes seconds. If it
+    // stalls - e.g. a locked local data file - open the window anyway and let sync finish in the
+    // background, instead of leaving an invisible process that nothing can close.
+    const STARTUP_SYNC_WAIT_MS = 45 * 1000;
+    async function applySyncCredentialsWithStartupLimit() {
+        let timer;
+        const sync = applySyncCredentialsOrDisable().catch((error) => {
+            console.error("[cloudflare-auth] Startup sync failed:", error?.message || error);
+        });
+        const limit = new Promise((resolve) => {
+            timer = setTimeout(() => {
+                console.warn(`[cloudflare-auth] Startup sync still running after ${STARTUP_SYNC_WAIT_MS / 1000}s - opening the window; sync continues in the background.`);
+                errorReporter?.report({ source: "main:startup", message: "Startup sync exceeded the startup time limit", stack: "" });
+                resolve();
+            }, STARTUP_SYNC_WAIT_MS);
+        });
+        await Promise.race([sync, limit]);
+        clearTimeout(timer);
+    }
+
     async function runCloudflareAuthGate() {
         const initialCheck = await verifyCloudflareSession();
         if (initialCheck.authenticated) {
             setVerifiedIdentity({ email: initialCheck.email });
-            await applySyncCredentialsOrDisable();
+            await applySyncCredentialsWithStartupLimit();
             createWindow();
             return;
         }
@@ -2402,7 +2443,7 @@ let then = whenReady().then(async () => {
         const authResult = await openCloudflareAuthWindow();
         if (authResult.authenticated) {
             setVerifiedIdentity({ email: authResult.email });
-            await applySyncCredentialsOrDisable();
+            await applySyncCredentialsWithStartupLimit();
             createWindow();
             return;
         }
@@ -2446,7 +2487,19 @@ on("window-all-closed", () => {
     }
 });
 
+// Last-resort exit if a normal quit stalls (e.g. a frozen window never finishes closing), so a
+// closed EnQuote can never linger in the background still syncing and showing as online.
+const QUIT_FORCE_EXIT_MS = 5000;
+let quitWatchdogArmed = false;
+
 on("before-quit", () => {
+    if (!quitWatchdogArmed) {
+        quitWatchdogArmed = true;
+        setTimeout(() => {
+            console.warn(`[shutdown] Still running ${QUIT_FORCE_EXIT_MS / 1000}s after quit - forcing exit.`);
+            app.exit(0);
+        }, QUIT_FORCE_EXIT_MS).unref?.();
+    }
     realtimeSync?.stop();
     supervisorSync?.stop();
     userRolesSync?.stop();

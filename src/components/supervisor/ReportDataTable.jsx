@@ -363,7 +363,7 @@ export default function ReportDataTable({ reportType, table, defaultSummaryField
               <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5">
                 {resolvedSummaryFields.length > 0 ? (
                   resolvedSummaryFields.map((field, idx) => (
-                    <span key={field.column} className="truncate text-sm">
+                    <span key={field.column} className="min-w-0 max-w-full truncate text-sm">
                       <span className="text-muted-foreground">{field.label}:</span>{" "}
                       <span className={idx === 0 ? "font-semibold text-foreground" : "text-foreground"}>
                         {row[field.column] || "None"}

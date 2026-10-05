@@ -1,6 +1,7 @@
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const crypto = require("node:crypto");
+const { AsyncLocalStorage } = require("node:async_hooks");
 const { z } = require("zod");
 const { KNOWN_ENQUOTE_USERS } = require("./knownEnquoteUsers.cjs");
 
@@ -600,7 +601,12 @@ function repositoryFor(userDataPath) {
   // with this fix, using the exact same concurrent workload).
   let writeQueue = Promise.resolve();
   let __queueDepth = 0;
+  // Marks async work already running inside the queue. A nested serializedWrite() from that
+  // work (e.g. read() persisting a one-time migration while createCollectionRecord holds the
+  // queue) must run inline - queueing it behind its own caller deadlocks every later read/write.
+  const writeQueueContext = new AsyncLocalStorage();
   function serializedWrite(performWrite) {
+    if (writeQueueContext.getStore()) return performWrite();
     __queueDepth++;
     const __depthAtEnqueue = __queueDepth;
     const __enqueuedAt = Date.now();
@@ -610,7 +616,7 @@ function repositoryFor(userDataPath) {
       if (__waitedMs > 50) {
         logTiming(`[write-timing] Write started after waiting ${__waitedMs}ms behind other queued writes`);
       }
-      const out = await performWrite();
+      const out = await writeQueueContext.run(true, performWrite);
       __queueDepth--;
       return out;
     });
@@ -1046,7 +1052,9 @@ function repositoryFor(userDataPath) {
           last_imported_at: z.string().optional(),
           last_snapshot_id: z.string().nullable().optional(),
           last_saved_at: z.string().optional(),
-          last_import_changed_quotes: z.array(z.string()).optional()
+          last_import_changed_quotes: z.array(z.string()).optional(),
+          sharedPasswordMigrationCompleted: z.boolean().optional(),
+          pendingMigrationDisclosures: z.array(z.unknown()).optional()
         }).optional()
       }).parse({
         ...merged,
@@ -1060,6 +1068,10 @@ function repositoryFor(userDataPath) {
         outboundDismissalQueue: current.outboundDismissalQueue || [],
         outboundMentionQueue: current.outboundMentionQueue || [],
         meta: {
+          // Local-only one-time migration state - dropping it made every later read() re-run
+          // the password migration and rewrite the whole data file.
+          ...(current.meta?.sharedPasswordMigrationCompleted ? { sharedPasswordMigrationCompleted: true } : {}),
+          ...(Array.isArray(current.meta?.pendingMigrationDisclosures) ? { pendingMigrationDisclosures: current.meta.pendingMigrationDisclosures } : {}),
           sync_ttl_ms: DEFAULT_SYNC_TTL_MS,
           last_imported_at: new Date().toISOString(),
           last_snapshot_id: input?.delivery_id || input?.snapshot?.delivery_id || null,

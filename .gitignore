@@ -8,6 +8,7 @@ webhook-events.jsonl
 *.bak
 *.before-*
 *.backup-*
+/DEV_NOTES + Cheat Sheet.MD
 
 # --- EnQuote runtime logs (added by cleanup script) ---
 sync-watchdog.log
@@ -31,3 +32,4 @@ _private/
 /out.txt
 /enquote-release-v102/
 /Grant-EnQuoteRole.ps1
+
