@@ -39,6 +39,7 @@ import {cn} from "@/lib/utils";
 import RoleGuard, {useUserRole} from "@/components/auth/RoleGuard";
 import MaterialOrderForm from "@/components/materials/MaterialOrderForm";
 import MaterialStatusBadge from "@/components/materials/MaterialStatusBadge";
+import {SiteIdLink} from "@/components/links/ExternalIdLinks";
 
 // Qty x Unit Price = Total - matching MaterialOrderForm.jsx's pricing model.
 // Backwards compatible with orders saved before unit_price existed (falls back to
@@ -242,7 +243,7 @@ function MaterialOrdersContent() {
  <div className="flex flex-wrap items-center gap-3 mb-2">
  <MaterialStatusBadge status={order.status} />
  <span className="text-sm font-semibold text-foreground bg-muted px-2 py-0.5 rounded">
- {order.site_id}
+ <SiteIdLink siteId={order.site_id} className="text-sm font-semibold" />
  </span>
  <span className="text-xs text-muted-foreground">
  {format(new Date(order.created_date), "MMM d, yyyy")}
@@ -383,7 +384,7 @@ function MaterialOrdersContent() {
  <DialogHeader>
  <DialogTitle>Delete Order</DialogTitle>
  <DialogDescription>
- Are you sure you want to permanently delete <strong>{deletingOrder?.item_name}</strong> (Site: {deletingOrder?.site_id})? This cannot be undone.
+ Are you sure you want to permanently delete <strong>{deletingOrder?.item_name}</strong> (Site: <SiteIdLink siteId={deletingOrder?.site_id} />)? This cannot be undone.
  </DialogDescription>
  </DialogHeader>
  <DialogFooter>
@@ -405,7 +406,7 @@ function MaterialOrdersContent() {
  <DialogHeader>
  <DialogTitle>{adminAction?.label}</DialogTitle>
  <DialogDescription>
- {adminAction?.order?.item_name} — Site: {adminAction?.order?.site_id}
+ {adminAction?.order?.item_name} — Site: <SiteIdLink siteId={adminAction?.order?.site_id} />
  </DialogDescription>
  </DialogHeader>
  <div>

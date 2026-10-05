@@ -93,7 +93,8 @@ const presenceSync = createPresenceSync({
     getAccessHeaders: () => ({
         "CF-Access-Client-Id": process.env.CF_ACCESS_CLIENT_ID || "",
         "CF-Access-Client-Secret": process.env.CF_ACCESS_CLIENT_SECRET || ""
-    })
+    }),
+    getVersions: () => ({ appVersion: getVersion(), uiVersion: uiUpdater?.getInfo().uiVersion || "" })
 });
 
 // --- Zoom (Ctrl+/Ctrl-/Ctrl+0 + in-app buttons) ---
@@ -1819,7 +1820,7 @@ let then = whenReady().then(async () => {
         return summary;
     });
     ipcMain.handle("presence:announce", async (_event, payload) => {
-        const result = await presenceSync.heartbeat(payload?.name);
+        const result = await presenceSync.heartbeat(payload?.name, payload?.resolvedRole);
         // Keep heartbeating even if this first one failed (e.g. the window opened before sync
         // credentials arrived) - later beats pick the credentials up once they exist.
         presenceSync.start();
@@ -1846,7 +1847,14 @@ let then = whenReady().then(async () => {
             "CF-Access-Client-Id": process.env.CF_ACCESS_CLIENT_ID || "",
             "CF-Access-Client-Secret": process.env.CF_ACCESS_CLIENT_SECRET || ""
         }),
-        addBellNotification: (record) => quoteRepository.createCollectionRecord("appNotifications", record)
+        addBellNotification: (record) => quoteRepository.createCollectionRecord("appNotifications", record),
+        onUsersUpdated: async () => {
+            const result = await userRolesSync?.sync();
+            BrowserWindow.getAllWindows().forEach((window) => window.webContents.send("app:users-changed", {
+                at: new Date().toISOString()
+            }));
+            return result;
+        }
     });
     geoService = createGeoService({
         fetchImpl: (url, init) => net.fetch(url, init),

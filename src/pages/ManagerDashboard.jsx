@@ -1,6 +1,8 @@
-﻿import {useEffect, useState} from "react";
 import {useQuery} from "@tanstack/react-query";
-import {getCurrentUser, getQuotes, getReviews} from "@/api/dataClient";
+import {getQuotes, getReviews} from "@/api/dataClient";
+import {useUserRole} from "@/components/auth/RoleGuard";
+import {canAccessPage} from "@/lib/rolePageAccess";
+import {useAccessPolicy} from "@/features/admin/adminApi";
 import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
 import RejectionRateChart from "@/components/manager/RejectionRateChart";
 import CommonRejectionReasons from "@/components/manager/CommonRejectionReasons";
@@ -12,19 +14,10 @@ import {AlertCircle, Lock, MessageSquare, PieChart, Timer, TrendingDown} from "l
 const ALLOWED_USERS = ["tjm8189", "vseganos"];
 
 export default function ManagerDashboard() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [accessChecked, setAccessChecked] = useState(false);
-
-  useEffect(() => {
-    getCurrentUser().then(user => {
-      setCurrentUser(user);
-      setAccessChecked(true);
-    }).catch(() => setAccessChecked(true));
-  }, []);
-
+  const {user: currentUser, isLoading: accessLoading} = useUserRole();
+  const {policy: accessPolicy} = useAccessPolicy();
   const emailPrefix = currentUser?.email?.split("@")[0]?.toLowerCase() || "";
-  const isAdmin = currentUser?.role === "admin";
-  const isAllowed = isAdmin || ALLOWED_USERS.some(u => emailPrefix.includes(u));
+  const isAllowed = canAccessPage(currentUser, "ManagerDashboard", accessPolicy) || ALLOWED_USERS.some(u => emailPrefix.includes(u));
   const { data: quotes = [], isLoading: loadingQuotes } = useQuery({
     queryKey: ["manager-quotes"],
     queryFn: async () => {
@@ -45,7 +38,7 @@ export default function ManagerDashboard() {
   const overallRejectionRate = totalQuotes > 0 ? Math.round((totalRejected / totalQuotes) * 100) : 0;
   const completedReviews = reviews.filter(r => r.review_status === "completed").length;
 
-  if (!accessChecked || loading) {
+  if (accessLoading || loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-4 border-border border-t-orange-500 rounded-full animate-spin" />

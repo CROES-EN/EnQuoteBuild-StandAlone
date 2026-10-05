@@ -1,7 +1,9 @@
 import {base44} from "@/api/base44Client";
 import {useQuery} from "@tanstack/react-query";
 import {useAuth} from "@/lib/AuthContext";
-import {toRoleList} from "@/lib/rolePageAccess";
+import {canAccessPage, pageFromPathname, toRoleList} from "@/lib/rolePageAccess";
+import {useAccessPolicy} from "@/features/admin/adminApi";
+import {useLocation} from "react-router-dom";
 import {Card} from "@/components/ui/card";
 import {Button} from "@/components/ui/button";
 import {LogIn, ShieldAlert} from "lucide-react";
@@ -159,6 +161,8 @@ function AccessDenied({ role }) {
 
 export default function RoleGuard({ children, allowedRoles }) {
   const { user, isLoading, needsLogin, navigateToLogin, refetchUser } = useCurrentUserQuery();
+  const location = useLocation();
+  const {policy: accessPolicy} = useAccessPolicy();
   // FIX (Denice's "Role Not Assigned" bug, confirmed against her real Base44 record which
   // already had app_role="submitter" set): showing this terminal error the FIRST instant
   // app_role appears missing risks a false alarm if the currentUser fetch simply beat a
@@ -195,9 +199,11 @@ export default function RoleGuard({ children, allowedRoles }) {
       />
     );
   }
-  const userRoles = [user.app_role, ...toRoleList(user.additional_roles)];
-  const isSuperAdmin = userRoles.includes("super_admin");
-  if (allowedRoles && !isSuperAdmin && !allowedRoles.some((role) => userRoles.includes(role))) {
+  const pageName = pageFromPathname(location.pathname);
+  if (!canAccessPage(user, pageName, accessPolicy)) {
+    return <AccessDenied role={user.app_role} />;
+  }
+  if (allowedRoles && !canAccessPage(user, pageName, accessPolicy)) {
     return <AccessDenied role={user.app_role} />;
   }
   return children;

@@ -12,6 +12,7 @@ import {getDaysInCurrentStatus, getDaysOpen} from "@/components/rma/rmaUtils";
 import {ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Columns3, ExternalLink, Inbox, Pencil} from "lucide-react";
 import {format} from "date-fns";
 import {cn} from "@/lib/utils";
+import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
 
 const COLUMNS = [
   { key: "case_owner", label: "Case Owner", visible: true },
@@ -96,6 +97,10 @@ export default function RMAList({ rmas, onEdit, isLoading }) {
             <ExternalLink className="w-3.5 h-3.5" />
           </a>
         ) : "—";
+      case "site_id":
+        return <SiteIdLink siteId={rma.site_id} fallback="—" />;
+      case "case_id":
+        return <CaseNumberLink caseNumber={rma.case_id} fallback="—" />;
       default:
         return rma[key] || "—";
     }

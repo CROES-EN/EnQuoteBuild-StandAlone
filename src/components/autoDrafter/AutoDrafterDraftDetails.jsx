@@ -13,6 +13,7 @@ import {createPageUrl} from "@/utils";
 import {PRODUCT_CATALOG} from "@/features/quoteDraftAgent/productCatalog";
 import {toast} from "sonner";
 import {format} from "date-fns";
+import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
 import {
     AlertTriangle,
     ArrowLeft,
@@ -419,7 +420,7 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
 
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">{record.siteId || draft.site_id || "No Site ID"}</h1>
+          <h1 className="text-3xl font-bold text-foreground"><SiteIdLink siteId={record.siteId || draft.site_id} fallback="No Site ID" className="text-3xl font-bold" /></h1>
           <p className="text-muted-foreground mt-1">
             {isSent ? record.realQuoteNumber : (record.quoteNumber || "No reference")}
           </p>
@@ -504,7 +505,7 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
               </div>
               <div className="flex-1">
                 <p className="text-sm text-muted-foreground">Site ID</p>
-                <p className="font-medium text-foreground">{record.siteId || draft.site_id || "—"}</p>
+                <p className="font-medium text-foreground"><SiteIdLink siteId={record.siteId || draft.site_id} fallback="—" className="font-medium" /></p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -513,7 +514,7 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
               </div>
               <div className="flex-1">
                 <p className="text-sm text-muted-foreground">Case Number</p>
-                <p className="font-medium text-foreground">{draft.case_number || caseNumber || "—"}</p>
+                <p className="font-medium text-foreground"><CaseNumberLink caseNumber={draft.case_number || caseNumber} fallback="—" className="font-medium" /></p>
               </div>
             </div>
             <div className="flex items-center gap-3">

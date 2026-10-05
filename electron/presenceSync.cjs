@@ -10,12 +10,14 @@ function createPresenceSync({
   getIdentity,
   getOutboundToken,
   getAccessHeaders,
+  getVersions = () => ({}),
   intervalMs = DEFAULT_INTERVAL_MS,
   sessionId = crypto.randomUUID(),
   logger = console
 }) {
   let timer = null;
   let presenceName = "";
+  let presenceResolvedRole = "";
 
   async function request(action, name = "") {
     const identity = getIdentity();
@@ -26,10 +28,14 @@ function createPresenceSync({
 
     const isList = action === "list";
     const route = isList ? "/api/presence" : action === "remove" ? "/api/presence/remove" : "/api/presence/heartbeat";
+    const versions = getVersions() || {};
     const payload = isList ? null : JSON.stringify({
       email,
       name: String(name || email).trim().slice(0, 120),
-      sessionId
+      sessionId,
+      appVersion: String(versions.appVersion || "").slice(0, 40),
+      uiVersion: String(versions.uiVersion || "").slice(0, 40),
+      resolvedRole: presenceResolvedRole
     });
 
     return new Promise((resolve, reject) => {
@@ -83,9 +89,12 @@ function createPresenceSync({
     });
   }
 
-  async function heartbeat(name) {
+  async function heartbeat(name, resolvedRole = "") {
     if (typeof name === "string" && name.trim()) {
       presenceName = name.trim().slice(0, 120);
+    }
+    if (typeof resolvedRole === "string" && resolvedRole.trim()) {
+      presenceResolvedRole = resolvedRole.trim().slice(0, 40);
     }
     try {
       return await request("heartbeat", presenceName);

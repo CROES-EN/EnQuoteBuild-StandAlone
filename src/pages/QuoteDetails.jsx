@@ -77,6 +77,7 @@ import FstFinderDialog from "@/components/resourcePlanner/FstFinderDialog";
 import TaskDialog from "@/components/collab/TaskDialog";
 import {quoteLabel} from "@/components/collab/QuotePicker";
 import {hasCollabBridge} from "@/features/collab/collabApi";
+import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
 
 // Only these users can grant/revoke pre-approval
 const PRE_APPROVAL_USERS = ["smosley@enphaseenergy.com", "REDACTED-USER1@example.invalid"];
@@ -1216,7 +1217,7 @@ function QuoteDetailsContent() {
  </Button>
  </Link>
  <div className="flex items-center gap-4 flex-wrap">
- <h1 className="text-3xl font-bold text-foreground">{quote.site_id || "No Site ID"}</h1>
+ <h1 className="text-3xl font-bold text-foreground"><SiteIdLink siteId={quote.site_id} fallback="No Site ID" className="text-3xl font-bold" /></h1>
  <StatusBadge status={quote.status} size="large" />
  <Button 
  onClick={handleDownloadPDF}
@@ -1646,7 +1647,7 @@ function QuoteDetailsContent() {
  </div>
  <div>
  <p className="text-sm text-muted-foreground">Site ID</p>
- <p className="font-medium text-foreground">{quote.site_id}</p>
+ <p className="font-medium text-foreground"><SiteIdLink siteId={quote.site_id} className="font-medium" /></p>
  </div>
  </div>
  )}
@@ -1657,7 +1658,7 @@ function QuoteDetailsContent() {
  </div>
  <div>
  <p className="text-sm text-muted-foreground">Case Number</p>
- <p className="font-medium text-foreground">{quote.case_number}</p>
+ <p className="font-medium text-foreground"><CaseNumberLink caseNumber={quote.case_number} className="font-medium" /></p>
  </div>
  </div>
  )}

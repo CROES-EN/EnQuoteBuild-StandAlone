@@ -1,5 +1,6 @@
 ﻿import {useState} from "react";
 import {Badge} from "@/components/ui/badge";
+import {SiteIdLink} from "@/components/links/ExternalIdLinks";
 
 const KEYWORDS = [
   "pricing", "price", "cost", "labor", "rate", "hours", "scope", "detail", "description",
@@ -58,7 +59,7 @@ export default function CommonRejectionReasons({ quotes }) {
             <div className="divide-y divide-slate-100">
               {kqQuotes.slice(0, 5).map(q => (
                 <div key={q.id} className="px-4 py-2 text-xs">
-                  <span className="font-medium text-foreground">#{q.quote_number} · {q.site_id}</span>
+                  <span className="font-medium text-foreground">#{q.quote_number} · <SiteIdLink siteId={q.site_id} className="font-medium" /></span>
                   <p className="text-muted-foreground mt-0.5 line-clamp-2">{q.rejection_reason}</p>
                 </div>
               ))}

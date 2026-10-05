@@ -4,8 +4,10 @@ import {format, isToday, isYesterday} from "date-fns";
 import {
   AlertCircle,
   FileText,
+  Image,
   Loader2,
   MessageSquare,
+  MoreVertical,
   Paperclip,
   Plus,
   RotateCcw,
@@ -19,11 +21,24 @@ import {Button} from "@/components/ui/button";
 import {Textarea} from "@/components/ui/textarea";
 import {Card, CardContent} from "@/components/ui/card";
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
+import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
+import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
 import {cn} from "@/lib/utils";
 import {createPageUrl} from "@/utils";
 import {chatApi, hasCollabBridge, subscribe} from "@/features/collab/collabApi";
 import QuotePicker, {quoteAttachment} from "@/components/collab/QuotePicker";
+import ChatAppearancePopover from "@/components/messages/ChatAppearancePopover";
 import {displayName, GroupSettingsDialog, NewConversationDialog} from "@/components/messages/ConversationDialogs";
+import {UserAvatar} from "@/components/profile/UserAvatar";
+import {gifsApi} from "@/features/profiles/profileApi";
+import {removeChatMessage as removeChatMessageApi} from "@/features/admin/adminApi";
+import {
+  onChatAppearanceChanged,
+  readableTextColor,
+  readChatAppearance
+} from "@/features/profiles/chatAppearanceStore";
+import {useUserRole} from "@/components/auth/RoleGuard";
+import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
 
 const PAGE_SIZE = 50;
 const MAX_BODY = 4000;
@@ -57,11 +72,22 @@ function conversationTitle(conversation, meEmail, names) {
 }
 
 function AttachmentChip({attachment, onRemove}) {
+  const parsedSiteId = attachment.siteId || attachment.sublabel?.match(/\bSite\s+([^·]+?)(?:\s*·|$)/)?.[1]?.trim() || "";
+  const parsedCaseNumber = attachment.caseNumber || attachment.sublabel?.match(/\bCase\s+([^·]+?)(?:\s*·|$)/)?.[1]?.trim() || "";
+  const linkedSublabel = !onRemove && (parsedSiteId || parsedCaseNumber) ? (
+    <span className="flex min-w-0 flex-wrap items-center gap-x-1 opacity-70">
+      {parsedSiteId && <>Site <SiteIdLink siteId={parsedSiteId} /></>}
+      {parsedSiteId && parsedCaseNumber && <span>·</span>}
+      {parsedCaseNumber && <>Case <CaseNumberLink caseNumber={parsedCaseNumber} /></>}
+    </span>
+  ) : attachment.sublabel ? (
+    <span className="truncate opacity-70">{attachment.sublabel}</span>
+  ) : null;
   const content = (
     <>
       <FileText className="h-3.5 w-3.5 flex-shrink-0" />
       <span className="truncate font-medium">{attachment.label}</span>
-      {attachment.sublabel && <span className="truncate opacity-70">{attachment.sublabel}</span>}
+      {linkedSublabel}
     </>
   );
   const className = "inline-flex max-w-full items-center gap-1.5 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-xs text-indigo-700";
@@ -75,16 +101,91 @@ function AttachmentChip({attachment, onRemove}) {
       </span>
     );
   }
+
   return (
-    <Link to={createPageUrl(`QuoteDetails?id=${encodeURIComponent(attachment.quoteId)}`)} className={cn(className, "hover:bg-indigo-100")}>
-      {content}
-    </Link>
+    <span className={className}>
+      <Link to={createPageUrl(`QuoteDetails?id=${encodeURIComponent(attachment.quoteId)}`)} className="truncate font-medium hover:underline">
+        <FileText className="mr-1.5 inline h-3.5 w-3.5" />
+        {attachment.label}
+      </Link>
+      {linkedSublabel}
+    </span>
+  );
+}
+
+function GifAttachment({attachment}) {
+  const ratio = attachment.width && attachment.height ? attachment.height / attachment.width : 0.75;
+  return (
+    <a href={attachment.url} target="_blank" rel="noreferrer" className="block max-w-[260px] overflow-hidden rounded-xl border border-white/20 bg-black/5">
+      <img
+        src={attachment.url}
+        alt={attachment.title || "GIF"}
+        loading="lazy"
+        className="block w-full object-cover"
+        style={{aspectRatio: ratio ? `${attachment.width || 1} / ${attachment.height || Math.round((attachment.width || 1) * ratio)}` : undefined}}
+      />
+    </a>
+  );
+}
+
+function GiphyPicker({onPick}) {
+  const [query, setQuery] = useState("");
+  const [items, setItems] = useState([]);
+  const [nextOffset, setNextOffset] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const load = useCallback(async ({q = query, offset = 0, append = false} = {}) => {
+    setLoading(true);
+    setError("");
+    try {
+      const result = q.trim() ? await gifsApi.search({q: q.trim(), offset}) : await gifsApi.trending({offset});
+      setItems((current) => (append ? [...current, ...result.gifs] : result.gifs));
+      setNextOffset(result.nextOffset);
+    } catch (loadError) {
+      setError(loadError.message || "Could not load GIFs.");
+    } finally {
+      setLoading(false);
+    }
+  }, [query]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => { void load({q: query, offset: 0, append: false}); }, query ? 300 : 0);
+    return () => clearTimeout(timer);
+  }, [query, load]);
+
+  return (
+    <div className="space-y-3">
+      <input
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        placeholder="Search GIPHY"
+        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-orange-500"
+      />
+      {error && <p className="text-xs text-rose-600">{error}</p>}
+      <div className="grid max-h-80 grid-cols-3 gap-2 overflow-y-auto">
+        {items.map((gif) => (
+          <button key={`${gif.id}-${gif.url}`} type="button" className="overflow-hidden rounded-md bg-muted" onClick={() => onPick(gif)} title={gif.title}>
+            <img src={gif.previewUrl || gif.url} alt={gif.title || "GIF"} loading="lazy" className="h-24 w-full object-cover" />
+          </button>
+        ))}
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Powered by GIPHY</span>
+        {nextOffset != null && (
+          <Button type="button" variant="outline" size="sm" onClick={() => load({offset: nextOffset, append: true})} disabled={loading}>
+            {loading && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}Load more
+          </Button>
+        )}
+      </div>
+    </div>
   );
 }
 
 export default function MessagesPage() {
   const location = useLocation();
   const navigate = useNavigate();
+  const {isAdmin, user} = useUserRole();
   const activeId = new URLSearchParams(location.search).get("c");
   const [meEmail, setMeEmail] = useState("");
   const [directory, setDirectory] = useState([]);
@@ -95,8 +196,10 @@ export default function MessagesPage() {
   const [draft, setDraft] = useState("");
   const [attachments, setAttachments] = useState([]);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [gifOpen, setGifOpen] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [appearance, setAppearance] = useState(() => readChatAppearance());
   const scrollRef = useRef(null);
   const stickToBottom = useRef(true);
   const threadRef = useRef(thread);
@@ -104,6 +207,7 @@ export default function MessagesPage() {
 
   const names = useMemo(() => new Map(directory.map((person) => [person.email, person.name || ""]).filter(([, name]) => name)), [directory]);
   const active = conversations.find((conversation) => conversation.id === activeId) || null;
+  const isChatAdmin = isAdmin || ["admin", "super_admin"].includes(String(user?.app_role || user?.role || "").toLowerCase());
 
   const refreshConversations = useCallback(async () => {
     try {
@@ -181,6 +285,7 @@ export default function MessagesPage() {
   }, [activeId]);
 
   useEffect(() => () => { void chatApi.setActiveConversation(null); }, []);
+  useEffect(() => onChatAppearanceChanged(setAppearance), []);
 
   const loadOlder = async () => {
     const first = thread.messages[0];
@@ -278,6 +383,41 @@ export default function MessagesPage() {
     setPickerOpen(false);
   };
 
+  const addGif = (gif) => {
+    const attachment = {
+      type: "gif",
+      id: gif.id,
+      url: gif.url,
+      previewUrl: gif.previewUrl,
+      title: gif.title,
+      width: gif.width,
+      height: gif.height
+    };
+    setAttachments((list) => (list.length >= MAX_ATTACHMENTS ? list : [...list, attachment]));
+    setGifOpen(false);
+  };
+
+  const removeMessageAsAdmin = async (messageId) => {
+    try {
+      let result;
+      try {
+        result = await removeChatMessageApi(messageId);
+      } catch (apiError) {
+        const adminBridge = globalThis.window?.enquoteLocal?.admin;
+        if (typeof adminBridge?.removeChatMessage !== "function") throw apiError;
+        result = await adminBridge.removeChatMessage(messageId);
+      }
+      if (result?.ok === false) throw new Error(result.error || "Could not remove message.");
+      setThread((state) => ({
+        ...state,
+        messages: state.messages.map((message) => (message.id === messageId ? {...message, body: "[removed by admin]", attachments: []} : message))
+      }));
+      toast.success("Message removed.");
+    } catch (error) {
+      toast.error(error.message || "Could not remove message.");
+    }
+  };
+
   if (!hasCollabBridge()) {
     return (
       <div className="mx-auto max-w-3xl p-6">
@@ -323,7 +463,16 @@ export default function MessagesPage() {
                         conversation.id === activeId ? "bg-orange-50" : "hover:bg-slate-50"
                       )}
                     >
-                      {conversation.kind === "group" ? <Users className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" /> : <MessageSquare className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />}
+                      {conversation.kind === "group" ? (
+                        <span className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500"><Users className="h-4 w-4" /></span>
+                      ) : (
+                        <UserAvatar
+                          email={(conversation.members || []).find((member) => member.email !== meEmail)?.email || meEmail}
+                          name={conversationTitle(conversation, meEmail, names)}
+                          size={32}
+                          className="mt-0.5"
+                        />
+                      )}
                       <span className="min-w-0 flex-1">
                         <span className="flex items-center justify-between gap-2">
                           <span className={cn("truncate text-sm", conversation.unread > 0 ? "font-semibold text-slate-900" : "font-medium text-slate-700")}>
@@ -362,19 +511,29 @@ export default function MessagesPage() {
             <>
               <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-4 py-3">
                 <div className="min-w-0">
-                  <h2 className="truncate font-semibold text-slate-800">{conversationTitle(active, meEmail, names) || "Conversation"}</h2>
+                  <div className="flex items-center gap-2">
+                    {active?.kind !== "group" && <UserAvatar email={(active?.members || []).find((member) => member.email !== meEmail)?.email || meEmail} name={conversationTitle(active, meEmail, names)} size={32} />}
+                    <h2 className="truncate font-semibold text-slate-800">{conversationTitle(active, meEmail, names) || "Conversation"}</h2>
+                  </div>
                   {active?.kind === "group" && (
-                    <p className="truncate text-xs text-slate-500">{(active.members || []).map((member) => displayName(member.email, names)).join(", ")}</p>
+                    <div className="mt-1 flex items-center gap-1 truncate text-xs text-slate-500">
+                      {(active.members || []).slice(0, 6).map((member) => <UserAvatar key={member.email} email={member.email} name={displayName(member.email, names)} size={20} />)}
+                      <span className="truncate">{(active.members || []).map((member) => displayName(member.email, names)).join(", ")}</span>
+                    </div>
                   )}
                 </div>
-                {active?.kind === "group" && (
-                  <Button size="sm" variant="ghost" onClick={() => setSettingsOpen(true)}><Settings className="mr-1 h-4 w-4" /> Group</Button>
-                )}
+                <div className="flex items-center gap-2">
+                  <ChatAppearancePopover appearance={appearance} onChange={setAppearance} />
+                  {active?.kind === "group" && (
+                    <Button size="sm" variant="ghost" onClick={() => setSettingsOpen(true)}><Settings className="mr-1 h-4 w-4" /> Group</Button>
+                  )}
+                </div>
               </div>
 
               <div
                 ref={scrollRef}
                 className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3"
+                style={{backgroundColor: appearance.background}}
                 onScroll={(event) => {
                   const box = event.currentTarget;
                   stickToBottom.current = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
@@ -396,24 +555,45 @@ export default function MessagesPage() {
                       const mine = message.sender === meEmail;
                       const previous = shown[index - 1];
                       const showSender = !mine && active?.kind === "group" && previous?.sender !== message.sender;
+                      const bubbleColor = mine ? appearance.mine : appearance.theirs;
+                      const bubbleText = readableTextColor(bubbleColor);
+                      const removed = message.body === "[removed by admin]" && (message.attachments || []).length === 0;
                       return (
-                        <div key={message.id} className={cn("flex flex-col", mine ? "items-end" : "items-start")}>
-                          {showSender && <span className="mb-0.5 px-1 text-xs font-medium text-slate-500">{displayName(message.sender, names)}</span>}
-                          <div
-                            className={cn(
-                              "max-w-[75%] space-y-1.5 rounded-2xl px-3 py-2 text-sm",
-                              mine ? "bg-orange-600 text-white" : "bg-slate-100 text-slate-800",
-                              message.status === "sending" && "opacity-70",
-                              message.status === "failed" && "bg-rose-100 text-rose-900"
-                            )}
-                          >
-                            {message.body && <p className="whitespace-pre-wrap break-words">{message.body}</p>}
+                        <div key={message.id} className={cn("flex gap-2", mine ? "justify-end" : "justify-start")}>
+                          {!mine && <UserAvatar email={message.sender} name={displayName(message.sender, names)} size={28} className={showSender ? "mt-5" : "mt-1 opacity-0"} />}
+                          <div className={cn("flex max-w-[75%] flex-col", mine ? "items-end" : "items-start")}>
+                            {showSender && <span className="mb-0.5 px-1 text-xs font-medium text-slate-500">{displayName(message.sender, names)}</span>}
+                            <div
+                              className={cn(
+                                "space-y-1.5 rounded-2xl px-3 py-2 text-sm",
+                                message.status === "sending" && "opacity-70",
+                                message.status === "failed" && "bg-rose-100 text-rose-900"
+                              )}
+                              style={message.status === "failed" ? undefined : {backgroundColor: bubbleColor, color: bubbleText}}
+                            >
+                            {message.body && <p className={cn("whitespace-pre-wrap break-words", removed && "italic opacity-70")}>{message.body}</p>}
                             {(message.attachments || []).length > 0 && (
                               <div className="flex flex-col gap-1">
-                                {message.attachments.map((attachment) => <AttachmentChip key={attachment.quoteId} attachment={attachment} />)}
+                                {message.attachments.map((attachment, attachmentIndex) => (
+                                  attachment.type === "gif"
+                                    ? <GifAttachment key={`${attachment.id}-${attachmentIndex}`} attachment={attachment} />
+                                    : <AttachmentChip key={attachment.quoteId} attachment={attachment} />
+                                ))}
                               </div>
                             )}
-                          </div>
+                            </div>
+                            {isChatAdmin && !message.status && !removed && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button type="button" className="mt-0.5 rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="Message options">
+                                    <MoreVertical className="h-3.5 w-3.5" />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align={mine ? "end" : "start"}>
+                                  <DropdownMenuItem className="text-rose-600" onClick={() => removeMessageAsAdmin(message.id)}>Remove message (admin)</DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
                           <span className="mt-0.5 flex items-center gap-2 px-1 text-[11px] text-slate-400">
                             {message.status === "sending" && "Sending..."}
                             {message.status === "failed" && (
@@ -429,6 +609,7 @@ export default function MessagesPage() {
                             )}
                             {!message.status && formatMessageTime(message.createdAt)}
                           </span>
+                          </div>
                         </div>
                       );
                     })}
@@ -439,12 +620,21 @@ export default function MessagesPage() {
               <div className="space-y-2 border-t border-slate-200 p-3">
                 {attachments.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
-                    {attachments.map((attachment) => (
-                      <AttachmentChip
-                        key={attachment.quoteId}
-                        attachment={attachment}
-                        onRemove={() => setAttachments((list) => list.filter((item) => item.quoteId !== attachment.quoteId))}
-                      />
+                    {attachments.map((attachment, index) => (
+                      attachment.type === "gif" ? (
+                        <span key={`${attachment.id}-${index}`} className="inline-flex items-center gap-1.5 rounded-md border border-orange-200 bg-orange-50 px-2 py-1 text-xs text-orange-700">
+                          <Image className="h-3.5 w-3.5" /> GIF
+                          <button type="button" onClick={() => setAttachments((list) => list.filter((_, i) => i !== index))} aria-label="Remove GIF" className="rounded hover:bg-orange-100">
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </span>
+                      ) : (
+                        <AttachmentChip
+                          key={attachment.quoteId}
+                          attachment={attachment}
+                          onRemove={() => setAttachments((list) => list.filter((item) => item.quoteId !== attachment.quoteId))}
+                        />
+                      )
                     ))}
                   </div>
                 )}
@@ -460,6 +650,23 @@ export default function MessagesPage() {
                   >
                     <Paperclip className="h-4 w-4" />
                   </Button>
+                  <Popover open={gifOpen} onOpenChange={setGifOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="outline"
+                        aria-label="Add a GIF"
+                        title="Add a GIF"
+                        disabled={attachments.length >= MAX_ATTACHMENTS}
+                      >
+                        <Image className="h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="w-96">
+                      <GiphyPicker onPick={addGif} />
+                    </PopoverContent>
+                  </Popover>
                   <Textarea
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}

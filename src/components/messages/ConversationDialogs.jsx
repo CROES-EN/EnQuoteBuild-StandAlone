@@ -8,6 +8,7 @@ import {Checkbox} from "@/components/ui/checkbox";
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
 import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import {chatApi} from "@/features/collab/collabApi";
+import {UserAvatar} from "@/components/profile/UserAvatar";
 
 export function displayName(email, names) {
   const key = String(email || "").toLowerCase();
@@ -31,16 +32,20 @@ function PeopleList({people, names, selected, onToggle, single = false, onPick})
         {visible.map((person) => (
           <li key={person.email}>
             {single ? (
-              <button type="button" onClick={() => onPick(person.email)} className="flex w-full flex-col px-3 py-2 text-left hover:bg-slate-50">
-                <span className="text-sm font-medium text-slate-800">{displayName(person.email, names)}</span>
-                <span className="text-xs text-slate-500">{person.email}</span>
+              <button type="button" onClick={() => onPick(person.email)} className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-slate-50">
+                <UserAvatar email={person.email} name={displayName(person.email, names)} size={32} />
+                <span className="flex min-w-0 flex-col">
+                  <span className="truncate text-sm font-medium text-slate-800">{displayName(person.email, names)}</span>
+                  <span className="truncate text-xs text-slate-500">{person.email}</span>
+                </span>
               </button>
             ) : (
               <label className="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-slate-50">
                 <Checkbox checked={selected.has(person.email)} onCheckedChange={(checked) => onToggle(person.email, checked === true)} />
-                <span className="flex flex-col">
-                  <span className="text-sm font-medium text-slate-800">{displayName(person.email, names)}</span>
-                  <span className="text-xs text-slate-500">{person.email}</span>
+                <UserAvatar email={person.email} name={displayName(person.email, names)} size={32} />
+                <span className="flex min-w-0 flex-col">
+                  <span className="truncate text-sm font-medium text-slate-800">{displayName(person.email, names)}</span>
+                  <span className="truncate text-xs text-slate-500">{person.email}</span>
                 </span>
               </label>
             )}
@@ -181,7 +186,10 @@ export function GroupSettingsDialog({open, onOpenChange, conversation, directory
             <Label>Members</Label>
             <div className="flex flex-wrap gap-1.5">
               {(conversation.members || []).map((member) => (
-                <span key={member.email} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700">{displayName(member.email, names)}</span>
+                <span key={member.email} className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 py-1 pl-1 pr-2.5 text-xs text-slate-700">
+                  <UserAvatar email={member.email} name={displayName(member.email, names)} size={20} />
+                  {displayName(member.email, names)}
+                </span>
               ))}
             </div>
           </div>

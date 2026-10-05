@@ -29,7 +29,8 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
       const listener = (_event, payload) => callback(payload);
       ipcRenderer.on("app:data-updated", listener);
       return () => ipcRenderer.removeListener("app:data-updated", listener);
-    }
+    },
+    onUsersChanged: (callback) => subscribe("app:users-changed", callback)
   },
   quotes: {
     list: () => invoke("quotes:list"),
@@ -193,6 +194,33 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
     setActiveConversation: (id) => invoke("chat:setActiveConversation", id),
     onUpdated: (callback) => subscribe("chat:updated", callback),
     onChanged: (callback) => subscribe("chat:changed", callback)
+  },
+  profiles: {
+    list: () => invoke("profiles:list"),
+    setAvatar: (payload) => invoke("profiles:setAvatar", payload),
+    removeAvatar: () => invoke("profiles:removeAvatar"),
+    getAvatar: (avatarId) => invoke("profiles:getAvatar", avatarId),
+    onChanged: (callback) => subscribe("profiles:changed", callback)
+  },
+  gifs: {
+    search: (payload) => invoke("gifs:search", payload),
+    trending: (payload) => invoke("gifs:trending", payload)
+  },
+  admin: {
+    policy: () => invoke("admin:policy"),
+    overview: () => invoke("admin:overview"),
+    setUserOverride: (payload) => invoke("admin:setUserOverride", payload),
+    setRolePages: (payload) => invoke("admin:setRolePages", payload),
+    setAnnouncement: (payload) => invoke("admin:setAnnouncement", payload),
+    sessions: () => invoke("admin:sessions"),
+    clearSessions: (payload) => invoke("admin:clearSessions", payload),
+    command: (payload) => invoke("admin:command", payload),
+    removeChatMessage: (messageId) => invoke("admin:removeChatMessage", messageId),
+    purgeSop: (id) => invoke("admin:purgeSop", id),
+    resetAvatar: (email) => invoke("admin:resetAvatar", email),
+    audit: (payload) => invoke("admin:audit", payload),
+    onPolicyChanged: (callback) => subscribe("admin:policy-changed", callback),
+    onSignOut: (callback) => subscribe("admin:sign-out", callback)
   },
   navigation: {
     // Main asks the window to open a page (e.g. after clicking a Windows notification).

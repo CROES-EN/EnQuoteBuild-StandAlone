@@ -1,82 +1,160 @@
-/**
- * Persists the user's selected theme choice to localStorage. Deliberately simple and separate
- * from every other data store in this app (opsMetricsStore.js, importedTableStore.js, etc.) -
- * this is a pure UI preference, not operational data, so it never touches the Electron-bridge
- * collections API and works identically in both the desktop app and a plain browser tab.
- *
- * FIX (per explicit request - "make sure theme settings are per user"): this previously stored
- * the theme under ONE fixed key shared by everyone signed in on the same PC. Now uses
- * userScopedStorage.js's scopedKey() to namespace the storage key by the CURRENTLY SIGNED-IN
- * user, so each person's theme choice is fully independent, even on a shared PC.
- *
- * v2 FIX: the first version of this fix ALSO auto-migrated the old, shared unscoped value
- * forward into any new user's scoped slot the first time it was read - this was found to be a
- * real bug, confirmed live: signing in as a second person (Kim) on the same PC silently
- * inherited the FIRST person's (Carsten's) previously-set theme, since nothing distinguishes
- * "this is genuinely the same returning person" from "this is someone new reading the old
- * shared key for the first time." Automatic migration has been removed entirely - every user
- * now correctly starts from DEFAULT_THEME_ID until they personally pick their own theme, with
- * zero risk of inheriting a different person's prior choice. The one-time cost: anyone who had
- * already set a theme before this fix shipped will need to re-pick it once - a trivial,
- * one-click action, and a small price for eliminating a real identity-leak bug.
- */
-
-import {DEFAULT_THEME_ID, THEMES} from "@/features/theme/themes";
+import {DEFAULT_THEME_ID, SYSTEM_THEME_ID, THEMES, isCustomThemeId} from "@/features/theme/themes";
 import {scopedKey} from "@/lib/userScopedStorage";
-import {DEFAULT_CUSTOM_COLORS} from "@/features/theme/customThemeBuilder";
+import {DEFAULT_CUSTOM_COLORS, buildCustomTheme, normalizeCustomThemeSettings} from "@/features/theme/customThemeBuilder";
 
 const STORAGE_KEY = "enquote_selected_theme_v1";
+const CUSTOM_COLORS_STORAGE_KEY = "enquote_custom_theme_colors_v1";
+const CUSTOM_THEMES_STORAGE_KEY = "enquote_custom_themes_v2";
+const FOLLOW_SYSTEM_STORAGE_KEY = "enquote_follow_system_theme_v1";
+
+function safeRead(key) {
+  try {
+    return localStorage.getItem(scopedKey(key));
+  } catch {
+    return null;
+  }
+}
+
+function safeWrite(key, value) {
+  try {
+    localStorage.setItem(scopedKey(key), value);
+  } catch {
+    // In-memory UI state still works if storage is unavailable.
+  }
+}
+
+function makeCustomId() {
+  return `custom:${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+}
 
 export function getSavedThemeId() {
-  try {
-    const saved = localStorage.getItem(scopedKey(STORAGE_KEY));
-    if (saved && THEMES[saved]) return saved;
-  } catch {
-    // localStorage unavailable (e.g. some restricted contexts) - fall back to default silently.
-  }
+  const follow = getFollowSystemThemeSettings();
+  if (follow.enabled) return SYSTEM_THEME_ID;
+  const saved = safeRead(STORAGE_KEY);
+  if (saved && (THEMES[saved] || isCustomThemeId(saved))) return saved;
   return DEFAULT_THEME_ID;
 }
 
 export function saveThemeId(themeId) {
-  try {
-    localStorage.setItem(scopedKey(STORAGE_KEY), themeId);
-  } catch {
-    // Ignore write failures - the in-memory selection still works for this session.
+  if (themeId === SYSTEM_THEME_ID) {
+    saveFollowSystemThemeSettings({ ...getFollowSystemThemeSettings(), enabled: true });
+    return;
   }
+  saveFollowSystemThemeSettings({ ...getFollowSystemThemeSettings(), enabled: false });
+  safeWrite(STORAGE_KEY, THEMES[themeId] || isCustomThemeId(themeId) ? themeId : DEFAULT_THEME_ID);
 }
 
-// Per-user storage for the 3 colors behind the "custom" theme (see customThemeBuilder.js
-// for how these are turned into a full theme). Uses the exact same scopedKey() pattern as
-// the theme choice above, for the same reason - each signed-in user's custom colors must
-// be fully independent, with zero risk of one person's picks leaking into another's
-// session (see the v2 fix note at the top of this file for why NO automatic migration of
-// old/shared values is ever performed - the same reasoning applies here).
-const CUSTOM_COLORS_STORAGE_KEY = "enquote_custom_theme_colors_v1";
-
 export function getSavedCustomColors() {
-  try {
-    const saved = localStorage.getItem(scopedKey(CUSTOM_COLORS_STORAGE_KEY));
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (
-        parsed &&
-        typeof parsed.background === "string" &&
-        typeof parsed.sidebar === "string" &&
-        typeof parsed.primary === "string"
-      ) {
-        return parsed;
-      }
+  const saved = safeRead(CUSTOM_COLORS_STORAGE_KEY);
+  if (saved) {
+    try {
+      return normalizeCustomThemeSettings(JSON.parse(saved));
+    } catch {
+      // Fall through to defaults.
     }
-  } catch {
-    // Ignore parse/storage errors - fall back to sensible defaults below.
   }
   return { ...DEFAULT_CUSTOM_COLORS };
 }
 
 export function saveCustomColors(colors) {
-  try {
-    localStorage.setItem(scopedKey(CUSTOM_COLORS_STORAGE_KEY), JSON.stringify(colors));
-  } catch {
-    // Ignore write failures - the in-memory selection still works for this session.
+  safeWrite(CUSTOM_COLORS_STORAGE_KEY, JSON.stringify(normalizeCustomThemeSettings(colors)));
+}
+
+export function getSavedCustomThemes() {
+  const saved = safeRead(CUSTOM_THEMES_STORAGE_KEY);
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter((theme) => theme && typeof theme.id === "string" && isCustomThemeId(theme.id))
+          .map((theme) => ({ ...theme, settings: normalizeCustomThemeSettings(theme.settings || theme) }));
+      }
+    } catch {
+      // Fall through to seeded legacy custom theme.
+    }
   }
+  return [{ id: "custom", settings: getSavedCustomColors() }];
+}
+
+export function saveCustomThemes(themes) {
+  const normalized = themes.map((theme) => ({
+    id: isCustomThemeId(theme.id) ? theme.id : makeCustomId(),
+    settings: normalizeCustomThemeSettings(theme.settings || theme)
+  }));
+  if (!normalized.some((theme) => theme.id === "custom")) {
+    normalized.unshift({ id: "custom", settings: getSavedCustomColors() });
+  }
+  safeWrite(CUSTOM_THEMES_STORAGE_KEY, JSON.stringify(normalized));
+  const legacy = normalized.find((theme) => theme.id === "custom") || normalized[0];
+  if (legacy) saveCustomColors(legacy.settings);
+  return normalized;
+}
+
+export function upsertCustomTheme(theme) {
+  const themes = getSavedCustomThemes();
+  const id = theme.id || makeCustomId();
+  const nextTheme = { id, settings: normalizeCustomThemeSettings(theme.settings || theme) };
+  const next = themes.some((existing) => existing.id === id)
+    ? themes.map((existing) => (existing.id === id ? nextTheme : existing))
+    : [...themes, nextTheme];
+  saveCustomThemes(next);
+  return nextTheme;
+}
+
+export function deleteCustomTheme(customThemeId) {
+  if (customThemeId === "custom") return getSavedCustomThemes();
+  const next = getSavedCustomThemes().filter((theme) => theme.id !== customThemeId);
+  return saveCustomThemes(next.length ? next : [{ id: "custom", settings: { ...DEFAULT_CUSTOM_COLORS } }]);
+}
+
+export function getCustomThemeById(themeId) {
+  const themes = getSavedCustomThemes();
+  return themes.find((theme) => theme.id === themeId) || themes.find((theme) => theme.id === "custom") || { id: "custom", settings: getSavedCustomColors() };
+}
+
+export function exportCustomTheme(themeId) {
+  const theme = getCustomThemeById(themeId);
+  return JSON.stringify({ version: 1, type: "enquote-theme", id: theme.id, settings: theme.settings }, null, 2);
+}
+
+export function importCustomTheme(json) {
+  const parsed = JSON.parse(json);
+  const settings = normalizeCustomThemeSettings(parsed.settings || parsed);
+  return upsertCustomTheme({ id: parsed.id && isCustomThemeId(parsed.id) && parsed.id !== "custom" ? parsed.id : makeCustomId(), settings });
+}
+
+export function getFollowSystemThemeSettings() {
+  const saved = safeRead(FOLLOW_SYSTEM_STORAGE_KEY);
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      return {
+        enabled: Boolean(parsed.enabled),
+        lightThemeId: isThemeChoiceForMode(parsed.lightThemeId, false) ? parsed.lightThemeId : DEFAULT_THEME_ID,
+        darkThemeId: isThemeChoiceForMode(parsed.darkThemeId, true) ? parsed.darkThemeId : "dark-plus"
+      };
+    } catch {
+      // Fall through.
+    }
+  }
+  return { enabled: false, lightThemeId: DEFAULT_THEME_ID, darkThemeId: "dark-plus" };
+}
+
+function isThemeChoiceForMode(themeId, isDark) {
+  if (THEMES[themeId]) return Boolean(THEMES[themeId].isDark) === isDark;
+  if (!isCustomThemeId(themeId)) return false;
+  try {
+    return buildCustomTheme(getCustomThemeById(themeId).settings).isDark === isDark;
+  } catch {
+    return false;
+  }
+}
+
+export function saveFollowSystemThemeSettings(settings) {
+  safeWrite(FOLLOW_SYSTEM_STORAGE_KEY, JSON.stringify({
+    enabled: Boolean(settings.enabled),
+    lightThemeId: isThemeChoiceForMode(settings.lightThemeId, false) ? settings.lightThemeId : DEFAULT_THEME_ID,
+    darkThemeId: isThemeChoiceForMode(settings.darkThemeId, true) ? settings.darkThemeId : "dark-plus"
+  }));
 }

@@ -4,13 +4,14 @@ import {useQuery} from "@tanstack/react-query";
 import {Card} from "@/components/ui/card";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
-import {Link, useLocation} from "react-router-dom";
+import {Link, useLocation, useNavigate} from "react-router-dom";
 import {createPageUrl} from "@/utils";
 import {ArrowLeft, FileText, FolderCheck, FolderOpen, Search} from "lucide-react";
 import {cn} from "@/lib/utils";
 import StatusBadge from "@/components/quotes/StatusBadge";
 import RoleGuard from "@/components/auth/RoleGuard";
 import {format} from "date-fns";
+import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
 
 const OPEN_STATUSES = [
  { value: "draft_without_internal", label: "Draft w/o Internal", color: "bg-muted" },
@@ -31,6 +32,7 @@ const CLOSED_STATUSES = [
 
 function QuoteOverviewContent() {
  const location = useLocation();
+ const navigate = useNavigate();
  const urlParams = new URLSearchParams(location.search);
  const bucket = urlParams.get("bucket") === "closed" ? "closed" : "open";
 
@@ -153,18 +155,29 @@ function QuoteOverviewContent() {
  </div>
  <div className="space-y-2">
  {group.map(quote => (
- <Link key={quote.id} to={createPageUrl(`QuoteDetails?id=${quote.id}`)}>
+ <div
+ key={quote.id}
+ role="link"
+ tabIndex={0}
+ onClick={() => navigate(createPageUrl(`QuoteDetails?id=${quote.id}`))}
+ onKeyDown={(event) => {
+ if (event.key === "Enter" || event.key === " ") {
+ event.preventDefault();
+ navigate(createPageUrl(`QuoteDetails?id=${quote.id}`));
+ }
+ }}
+ >
  <Card className={cn("p-4 border-border hover:shadow-md hover:border-indigo-300 transition-all cursor-pointer", color)}>
  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
  <div className="flex items-center gap-3">
  <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
  <div>
- <span className="font-semibold text-foreground">{quote.site_id || "—"}</span>
+ <span className="font-semibold text-foreground"><SiteIdLink siteId={quote.site_id} fallback="—" className="font-semibold" /></span>
  {quote.quote_number && (
  <span className="text-sm text-muted-foreground ml-2">{quote.quote_number}</span>
  )}
  {quote.case_number && (
- <span className="text-xs text-muted-foreground ml-2">Case: {quote.case_number}</span>
+ <span className="text-xs text-muted-foreground ml-2">Case: <CaseNumberLink caseNumber={quote.case_number} className="text-xs" /></span>
  )}
  </div>
  </div>
@@ -174,7 +187,7 @@ function QuoteOverviewContent() {
  </div>
  </div>
  </Card>
- </Link>
+ </div>
  ))}
  </div>
  </div>

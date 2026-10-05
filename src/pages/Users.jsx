@@ -1,4 +1,4 @@
-﻿import {useState} from "react";
+import {useState} from "react";
 import {base44} from "@/api/base44Client";
 import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 import {Input} from "@/components/ui/input";
@@ -19,6 +19,8 @@ import {Clock, Mail, Search, Send, UserPlus, Users as UsersIcon, X} from "lucide
 import {format} from "date-fns";
 import {cn} from "@/lib/utils";
 import {toast} from "sonner";
+import AdminMenu from "@/features/admin/AdminMenu";
+import * as adminApi from "@/features/admin/adminApi";
 import UserCard from "@/components/users/UserCard";
 import UserForm from "@/components/users/UserForm";
 import RoleGuard, {useUserRole} from "@/components/auth/RoleGuard";
@@ -35,7 +37,7 @@ const roleFilters = [
 
 function UsersContent() {
  const queryClient = useQueryClient();
- const { user: currentUser } = useUserRole();
+ const { user: currentUser, isAdmin } = useUserRole();
  const [search, setSearch] = useState("");
  const [roleFilter, setRoleFilter] = useState("all");
  const [showForm, setShowForm] = useState(false);
@@ -65,17 +67,31 @@ function UsersContent() {
 
  const updateMutation = useMutation({
  mutationFn: async ({ userId, data }) => {
- if (userId === currentUser?.id) {
- return base44.auth.updateMe(data);
+ const target = users.find((candidate) => candidate.id === userId || candidate.email === editingUser?.email) || editingUser;
+ if (!target?.email) throw new Error("That user does not have an email address.");
+ const { app_role, additional_roles, ...profileData } = data;
+ await adminApi.setUserOverride({
+ email: target.email,
+ app_role,
+ additional_roles: additional_roles || [],
+ allow_pages: target.allow_pages || [],
+ deny_pages: target.deny_pages || []
+ });
+ const localProfileChanges = Object.fromEntries(Object.entries(profileData).filter(([, value]) => value !== undefined));
+ if (Object.keys(localProfileChanges).length && userId !== currentUser?.id) {
+ await updateLocalRecord("users", userId, localProfileChanges);
+ } else if (Object.keys(localProfileChanges).length && userId === currentUser?.id) {
+ await base44.auth.updateMe(localProfileChanges);
  }
- return updateLocalRecord("users", userId, data);
+ return adminApi.overview().catch(() => null);
  },
- onSuccess: () => {
+ onSuccess: (overview) => {
+ if (overview?.users) queryClient.setQueryData(["users"], overview.users);
  queryClient.invalidateQueries({ queryKey: ["users"] });
  queryClient.invalidateQueries({ queryKey: ["currentUser"] });
  setShowForm(false);
  setEditingUser(null);
- toast.success("User updated successfully!");
+ toast.success("User role override saved successfully!");
  },
  onError: (error) => {
  toast.error(error.message || "Failed to update user");
@@ -288,6 +304,8 @@ function UsersContent() {
  <p className="text-2xl font-bold text-amber-600 mt-1">{stats.pending}</p>
  </Card>
  </div>
+
+ {isAdmin && <AdminMenu users={users} />}
 
  {/* Pending Invitations Section */}
  {invitations.length > 0 && (

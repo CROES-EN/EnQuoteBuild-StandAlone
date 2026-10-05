@@ -4,6 +4,7 @@ import {Link} from "react-router-dom";
 import {createPageUrl} from "@/utils";
 import {AlertTriangle, ArrowRight, Clock} from "lucide-react";
 import {differenceInHours, format, parseISO} from "date-fns";
+import {SiteIdLink} from "@/components/links/ExternalIdLinks";
 
 const STUCK_STATUSES = [
   { key: "submitted", label: "Quote Pending Approval", color: "bg-blue-100 text-blue-700" },
@@ -82,7 +83,7 @@ export default function StuckQuotes({ quotes }) {
                 const statusCfg = STUCK_STATUSES.find(s => s.key === q.status);
                 return (
                   <tr key={q.id} className={`border-b border-slate-50 hover:bg-secondary ${isUrgent ? "bg-rose-50/40" : ""}`}>
-                    <td className="py-3 px-3 font-medium text-foreground">{q.site_id}</td>
+                    <td className="py-3 px-3 font-medium text-foreground"><SiteIdLink siteId={q.site_id} className="font-medium" /></td>
                     <td className="py-3 px-3">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusCfg?.color || "bg-muted text-muted-foreground"}`}>
                         {statusCfg?.label || q.status}

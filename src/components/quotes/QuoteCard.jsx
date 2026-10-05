@@ -1,7 +1,7 @@
 import {Card} from "@/components/ui/card";
 import {format} from "date-fns";
 import {Calendar, FileText, ShieldCheck, User} from "lucide-react";
-import {Link} from "react-router-dom";
+import {useNavigate} from "react-router-dom";
 import {createPageUrl} from "@/utils";
 import {calculateQuoteTotals} from "@/utils/quoteCalculations";
 import {getEffectiveLevel} from "@/utils/quoteSLA";
@@ -11,8 +11,10 @@ import {motion} from "framer-motion";
 import {Checkbox} from "@/components/ui/checkbox";
 import {useCareEligibilityIndex} from "@/features/supervisorDashboard/careEligibilityCache";
 import {getEligibilityFromIndex} from "@/features/supervisorDashboard/careEligibility";
+import {SiteIdLink} from "@/components/links/ExternalIdLinks";
 
 export default function QuoteCard({ quote, index = 0, selectable = false, isSelected = false, onToggleSelect, alert = null, hasMention = false, mentionPriority, mentionMessage, mentionedBy, onClearAlert }) {
+  const navigate = useNavigate();
   const { total: calculatedTotal } = calculateQuoteTotals(quote);
   const effectiveLevel = getEffectiveLevel(alert, hasMention, mentionPriority);
   const careIndex = useCareEligibilityIndex();
@@ -32,7 +34,17 @@ export default function QuoteCard({ quote, index = 0, selectable = false, isSele
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05 }}
     >
-      <Link to={createPageUrl(`QuoteDetails?id=${quote.id}`)}>
+      <div
+        role="link"
+        tabIndex={0}
+        onClick={() => navigate(createPageUrl(`QuoteDetails?id=${quote.id}`))}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            navigate(createPageUrl(`QuoteDetails?id=${quote.id}`));
+          }
+        }}
+      >
         <Card className={`p-5 hover:shadow-lg transition-all duration-300 border-border hover:border-indigo-200 group cursor-pointer ${stripeClass} ${isSelected ? "ring-2 ring-indigo-400 border-indigo-400" : ""}`}>
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -49,7 +61,7 @@ export default function QuoteCard({ quote, index = 0, selectable = false, isSele
               </div>
               <div>
                 <h3 className="font-semibold text-foreground group-hover:text-indigo-600 transition-colors">
-                  {quote.site_id || "No Site ID"}
+                  <SiteIdLink siteId={quote.site_id} fallback="No Site ID" className="font-semibold" />
                 </h3>
                 <p className="text-sm text-muted-foreground">{quote.quote_number || "No reference"}</p>
               </div>
@@ -104,7 +116,7 @@ export default function QuoteCard({ quote, index = 0, selectable = false, isSele
             </span>
           </div>
         </Card>
-      </Link>
+      </div>
     </motion.div>
   );
 }

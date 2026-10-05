@@ -8,6 +8,7 @@ import {AlertTriangle, CheckCircle2, Package, Trash2, UserCheck, UserX} from "lu
 import {toast} from "sonner";
 import {createLocalRecord, getCurrentUser, listLocalCollection} from "@/api/dataClient";
 import {calculateQuoteTotals} from "@/utils/quoteCalculations";
+import {SiteIdLink} from "@/components/links/ExternalIdLinks";
 
 /**
  * Bulk "Order Materials" review sheet - opened from Quote Details when a quote is
@@ -159,7 +160,7 @@ export default function BulkMaterialOrderReviewSheet({ open, onOpenChange, quote
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <Package className="w-5 h-5 text-indigo-600" />
-            Order Materials {quote?.site_id ? `- ${quote.site_id}` : ""}
+            Order Materials {quote?.site_id ? <>- <SiteIdLink siteId={quote.site_id} /></> : ""}
           </SheetTitle>
         </SheetHeader>
 

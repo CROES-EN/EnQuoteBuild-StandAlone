@@ -31,12 +31,13 @@ test("presence sync uses the verified identity for heartbeat, list, and removal"
     getIdentity: () => ({ email: "Shane@EnphaseEnergy.com" }),
     getOutboundToken: () => "outbound-test-token",
     getAccessHeaders: () => ({ "CF-Access-Client-Id": "service-client-id" }),
+    getVersions: () => ({ appVersion: "1.4.0", uiVersion: "ui-20261005" }),
     sessionId: "session-test",
     logger: { warn() {} }
   });
 
   try {
-    const heartbeat = await sync.heartbeat("Shane");
+    const heartbeat = await sync.heartbeat("Shane", "admin");
     assert.equal(heartbeat.ok, true);
     assert.equal(requests[0].url, "/api/presence/heartbeat");
     assert.equal(requests[0].authorization, "Bearer outbound-test-token");
@@ -44,11 +45,15 @@ test("presence sync uses the verified identity for heartbeat, list, and removal"
     assert.deepEqual(requests[0].body, {
       email: "shane@enphaseenergy.com",
       name: "Shane",
-      sessionId: "session-test"
+      sessionId: "session-test",
+      appVersion: "1.4.0",
+      uiVersion: "ui-20261005",
+      resolvedRole: "admin"
     });
 
     await sync.heartbeat();
     assert.equal(requests[1].body.name, "Shane");
+    assert.equal(requests[1].body.resolvedRole, "admin");
 
     const list = await sync.list();
     assert.equal(list.sessions[0].email, "shane@enphaseenergy.com");

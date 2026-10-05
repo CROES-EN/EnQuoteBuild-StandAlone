@@ -10,6 +10,7 @@ import {AlertCircle, CheckCheck, ChevronDown, ChevronUp, Clock, Loader2, Message
 import {differenceInDays, parseISO} from "date-fns";
 import LogFollowUpDialog from "@/components/quotes/LogFollowUpDialog";
 import {INVOICE_PAID_ALERT_CUTOFF} from "@/utils/quoteSLA";
+import {SiteIdLink} from "@/components/links/ExternalIdLinks";
 
 const STATUS_THRESHOLDS = {
   draft_without_internal: 3,
@@ -213,18 +214,21 @@ export default function StatusAlerts({ quotes }) {
           <div className="space-y-2 max-h-72 overflow-y-auto">
             {alerts.map((alert, index) => (
               <div key={index} className="flex items-center justify-between p-2 rounded bg-card hover:bg-warning/10 transition-colors group">
-                <Link
-                  to={createPageUrl(`QuoteDetails?id=${alert.quote.id}`)}
-                  className="flex items-center gap-2 flex-1 min-w-0"
-                >
+                <div className="flex items-center gap-2 flex-1 min-w-0">
                   <Clock className="w-4 h-4 text-amber-600 shrink-0" />
                   <span className="text-sm font-medium text-foreground truncate">
-                    {alert.quote.site_id || alert.quote.quote_number}
+                    {alert.quote.site_id ? <SiteIdLink siteId={alert.quote.site_id} className="font-medium" /> : alert.quote.quote_number}
                   </span>
                   <span className="text-xs text-muted-foreground shrink-0">
                     {STATUS_LABELS[alert.status] || alert.status}
                   </span>
-                </Link>
+                  <Link
+                    to={createPageUrl(`QuoteDetails?id=${alert.quote.id}`)}
+                    className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
+                  >
+                    View
+                  </Link>
+                </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <Button
                     size="sm"

@@ -79,17 +79,47 @@ function validateAttachments(value) {
   if (!Array.isArray(value) || value.length > 10) return "invalid_attachments";
   const out = [];
   for (const item of value) {
-    if (!item || typeof item !== "object" || item.type !== "quote") return "invalid_attachment_type";
-    const attachment = { type: "quote" };
-    for (const key of ["quoteId", "label", "sublabel"]) {
-      if (typeof item[key] !== "string") return "invalid_attachment";
-      const text = item[key];
-      if (text.length > 200) return "invalid_attachment";
-      attachment[key] = text;
+    if (!item || typeof item !== "object") return "invalid_attachment_type";
+    if (item.type === "quote") {
+      const attachment = { type: "quote" };
+      for (const key of ["quoteId", "label", "sublabel"]) {
+        if (typeof item[key] !== "string") return "invalid_attachment";
+        const text = item[key];
+        if (text.length > 200) return "invalid_attachment";
+        attachment[key] = text;
+      }
+      out.push(attachment);
+    } else if (item.type === "gif") {
+      if (typeof item.id !== "string" || !item.id || item.id.length > 100) return "invalid_attachment";
+      const url = validateGifUrl(item.url);
+      const previewUrl = item.previewUrl ? validateGifUrl(item.previewUrl) : "";
+      if (!url || (item.previewUrl && !previewUrl)) return "invalid_attachment";
+      out.push({
+        type: "gif",
+        id: item.id,
+        url,
+        ...(previewUrl ? { previewUrl } : {}),
+        ...(typeof item.title === "string" ? { title: item.title.slice(0, 200) } : {}),
+        width: Number(item.width) || null,
+        height: Number(item.height) || null
+      });
+    } else {
+      return "invalid_attachment_type";
     }
-    out.push(attachment);
   }
   return out;
+}
+
+function validateGifUrl(value) {
+  if (typeof value !== "string" || value.length > 500) return "";
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== "https:") return "";
+    if (!/^(i\.giphy\.com|media[0-9]*\.giphy\.com)$/i.test(parsed.hostname)) return "";
+    return parsed.href;
+  } catch {
+    return "";
+  }
 }
 
 function messageShape(row) {
@@ -270,7 +300,7 @@ export async function handleChatMessageSend(request, env) {
   const text = typeof body?.body === "string" ? body.body.trim() : "";
   if (text.length > 4000 || (!text && attachments.length === 0)) return json({ ok: false, error: "invalid_body" }, 400);
   const at = nowIso();
-  const preview = text.slice(0, 200);
+  const preview = text ? text.slice(0, 200) : (attachments.some((item) => item.type === "gif") ? "GIF" : "");
   await env.DB.batch([
     env.DB.prepare("INSERT INTO chat_messages (id, conversation_id, sender, body, attachments, created_at) VALUES (?, ?, ?, ?, ?, ?)").bind(clientId, conversationId, user.email, text, JSON.stringify(attachments), at),
     env.DB.prepare("UPDATE chat_conversations SET updated_at = ?, last_message_at = ?, last_message_preview = ?, last_sender = ? WHERE id = ?").bind(at, at, preview, user.email, conversationId),

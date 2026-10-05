@@ -6,6 +6,7 @@ import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {Check, ChevronDown, ChevronUp, Pencil, X} from "lucide-react";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue,} from "@/components/ui/select";
+import {SiteIdLink} from "@/components/links/ExternalIdLinks";
 
 // Keywords that indicate HO engagement issues — boneyard-type reasons
 const HO_ENGAGEMENT_KEYWORDS = [
@@ -102,7 +103,7 @@ function QuoteCommentThread({ review }) {
         <div className="flex-1 min-w-0">
           <p className="text-xs font-medium text-foreground truncate">
             #{review.quote_number || review.quote_id?.slice(0, 8)}
-            {review.site_id && <span className="text-muted-foreground ml-1">· {review.site_id}</span>}
+            {review.site_id && <span className="text-muted-foreground ml-1">· <SiteIdLink siteId={review.site_id} /></span>}
           </p>
           {!open && review.coaching_notes && (
             <p className="text-xs text-muted-foreground truncate mt-0.5">{review.coaching_notes}</p>
@@ -176,7 +177,7 @@ function RecatRow({ review, canEdit, quote }) {
           <div className="min-w-0 flex-1">
             <p className="text-xs font-medium text-foreground truncate">
               #{review.quote_number || review.quote_id?.slice(0, 8)}
-              {review.site_id && <span className="text-muted-foreground ml-1">· {review.site_id}</span>}
+              {review.site_id && <span className="text-muted-foreground ml-1">· <SiteIdLink siteId={review.site_id} /></span>}
             </p>
             {review.coaching_notes && (
               <p className="text-xs text-muted-foreground truncate mt-0.5">{review.coaching_notes}</p>

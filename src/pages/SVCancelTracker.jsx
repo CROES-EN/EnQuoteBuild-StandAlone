@@ -11,6 +11,7 @@ import {Label} from "@/components/ui/label";
 import {AlertTriangle, Calendar, Plus, User} from "lucide-react";
 import {format} from "date-fns";
 import RoleGuard from "@/components/auth/RoleGuard";
+import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
 
 function SVCancelTrackerPage() {
   const queryClient = useQueryClient();
@@ -207,11 +208,11 @@ function SVCancelTrackerPage() {
                   <div className="flex-1 min-w-0 grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-1">
                     <div>
                       <p className="text-xs text-muted-foreground">Site ID</p>
-                      <p className="font-semibold text-foreground">{record.site_id}</p>
+                      <p className="font-semibold text-foreground"><SiteIdLink siteId={record.site_id} className="font-semibold" /></p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Case ID</p>
-                      <p className="font-medium text-foreground">{record.case_id}</p>
+                      <p className="font-medium text-foreground"><CaseNumberLink caseNumber={record.case_id} className="font-medium" /></p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Cancels</p>

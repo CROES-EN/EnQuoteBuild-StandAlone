@@ -1,11 +1,12 @@
 import {useCallback, useEffect, useState} from "react";
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import {Button} from "@/components/ui/button";
-import {AlertOctagon, AlertTriangle, Database, Info, KeyRound, RefreshCw, Trash2, Users} from "lucide-react";
+import {AlertOctagon, AlertTriangle, Database, Info, KeyRound, RefreshCw, Trash2} from "lucide-react";
 import {clearErrors, listErrors} from "@/features/developerConsole/errorLog";
 import {useQueryClient} from "@tanstack/react-query";
 import {toast} from "sonner";
 import {AdminResetPasswordButton} from "@/features/developerConsole/AdminPasswordReset.jsx";
+import {UserAvatar} from "@/components/profile/UserAvatar";
 
 const REPORT_SEVERITY_ORDER = { critical: 0, known_issue: 1, needs_investigation: 2, warning: 3, info: 4 };
 const REPORT_SEVERITY_LABEL = {
@@ -16,11 +17,11 @@ const REPORT_SEVERITY_LABEL = {
   info: "Info"
 };
 const REPORT_SEVERITY_STYLE = {
-  critical: "bg-red-100 text-red-700",
-  known_issue: "bg-orange-100 text-orange-700",
-  needs_investigation: "bg-amber-100 text-amber-700",
-  warning: "bg-yellow-100 text-yellow-700",
-  info: "bg-slate-100 text-slate-600"
+  critical: "bg-destructive/15 text-destructive",
+  known_issue: "bg-warning/15 text-foreground",
+  needs_investigation: "bg-warning/15 text-foreground",
+  warning: "bg-warning/15 text-foreground",
+  info: "bg-muted text-muted-foreground"
 };
 
 function SeverityBadge({ severity }) {
@@ -179,7 +180,7 @@ export default function DeveloperConsole({
       <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <AlertOctagon className="w-5 h-5 text-indigo-600" />
+            <AlertOctagon className="w-5 h-5 text-primary" />
             Developer Console
           </DialogTitle>
           <DialogDescription>
@@ -202,7 +203,7 @@ export default function DeveloperConsole({
               type="button"
               onClick={() => setActiveTab(tab.key)}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
-                activeTab === tab.key ? "bg-indigo-100 text-indigo-700" : "text-muted-foreground hover:bg-accent"
+                activeTab === tab.key ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent"
               }`}
             >
               {tab.label}
@@ -231,7 +232,7 @@ export default function DeveloperConsole({
               appErrors.map((err) => (
                 <div key={err.id} className="rounded-lg border border-border bg-card p-3 text-xs font-mono">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="font-semibold text-red-600">{err.source}</span>
+                    <span className="font-semibold text-destructive">{err.source}</span>
                     <span className="text-muted-foreground">{new Date(err.occurredAt).toLocaleString()}</span>
                   </div>
                   <p className="text-foreground break-words">{err.message}</p>
@@ -251,15 +252,15 @@ export default function DeveloperConsole({
                 <div
                   key={e.seq}
                   className={`flex items-start gap-2 p-2 rounded-lg text-xs font-mono ${
-                    e.level === "error" ? "bg-red-50" : e.level === "warn" ? "bg-amber-50" : "bg-card border border-border"
+                    e.level === "error" ? "border border-destructive/30 bg-destructive/10" : e.level === "warn" ? "border border-warning/30 bg-warning/10" : "bg-card border border-border"
                   }`}
                 >
                   {e.level === "error" ? (
-                    <AlertOctagon className="w-3.5 h-3.5 text-red-500 shrink-0 mt-0.5" />
+                    <AlertOctagon className="w-3.5 h-3.5 text-destructive shrink-0 mt-0.5" />
                   ) : e.level === "warn" ? (
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                    <AlertTriangle className="w-3.5 h-3.5 text-warning shrink-0 mt-0.5" />
                   ) : (
-                    <Info className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                    <Info className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
                   )}
                   <div className="flex-1 min-w-0">
                     <span className="text-muted-foreground">{new Date(e.time).toLocaleTimeString()}</span>{" "}
@@ -301,7 +302,7 @@ export default function DeveloperConsole({
                 .sort((a, b) => new Date(b.signedInAt) - new Date(a.signedInAt))
                 .map((session) => (
                   <div key={session.email} className="flex items-center gap-3 rounded-lg border border-border bg-card p-3 text-sm">
-                    <Users className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <UserAvatar email={session.email} name={session.name || session.email} size={28} />
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-foreground truncate">{session.name || session.email}</p>
                       <p className="text-[11px] text-muted-foreground">

@@ -8,6 +8,8 @@ import {
     setColumnVisibility
 } from "@/features/supervisorDashboard/tableColumnPreferences";
 import {useVirtualizer} from "@tanstack/react-virtual";
+import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
+import {caseIdFromRow, isCaseNumberColumn, isEnlightenSiteIdColumn} from "@/lib/externalLinks";
 
 /**
  * A true spreadsheet-style grid for browsing one imported report table AS-IS - every column
@@ -118,6 +120,20 @@ export default function SpreadsheetGridTable({ reportType = "incorta_input", tab
   function handleResetColumns() {
     resetColumnVisibility(reportType);
     forceRerender((n) => n + 1);
+  }
+
+  function renderCellValue(row, column) {
+    const value = row[column];
+    if (value === "" || value === null || value === undefined) {
+      return <span className="text-muted-foreground">--</span>;
+    }
+    if (isCaseNumberColumn(column)) {
+      return <CaseNumberLink caseNumber={value} caseId={caseIdFromRow(row)} fallback={<span className="text-muted-foreground">--</span>} />;
+    }
+    if (isEnlightenSiteIdColumn(column)) {
+      return <SiteIdLink siteId={value} fallback={<span className="text-muted-foreground">--</span>} />;
+    }
+    return String(value);
   }
 
   if (!table) {
@@ -247,11 +263,7 @@ export default function SpreadsheetGridTable({ reportType = "incorta_input", tab
                       <tr key={virtualRow.index} className="odd:bg-card even:bg-secondary/40 hover:bg-indigo-50">
                         {visibleColumns.map((col) => (
                           <td key={col} className="whitespace-nowrap border-b border-border/50 px-3 py-1.5 text-foreground">
-                            {row[col] === "" || row[col] === null || row[col] === undefined ? (
-                              <span className="text-muted-foreground">--</span>
-                            ) : (
-                              String(row[col])
-                            )}
+                            {renderCellValue(row, col)}
                           </td>
                         ))}
                       </tr>

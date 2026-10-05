@@ -1,6 +1,7 @@
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import {Badge} from "@/components/ui/badge";
 import {AlertTriangle, Info, ShieldAlert, ShieldCheck} from "lucide-react";
+import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
 
 /**
  * GeneratedDraftPreviewDialog - read-only preview of a single Auto-Drafter
@@ -83,8 +84,8 @@ export default function GeneratedDraftPreviewDialog({ open, onOpenChange, draft,
           <div>
             <h4 className="mb-1 font-semibold text-foreground">Site</h4>
             <p className="text-muted-foreground">
-              {draft.site_id ? `Site ${draft.site_id}` : "Site ID not found"}
-              {draft.case_number ? ` · Case #${draft.case_number}` : ""}
+              {draft.site_id ? <>Site <SiteIdLink siteId={draft.site_id} /></> : "Site ID not found"}
+              {draft.case_number ? <> · Case #<CaseNumberLink caseNumber={draft.case_number} /></> : ""}
             </p>
             <p className="text-muted-foreground">{draft.customer}</p>
             <p className="text-muted-foreground">{draft.site_address}</p>

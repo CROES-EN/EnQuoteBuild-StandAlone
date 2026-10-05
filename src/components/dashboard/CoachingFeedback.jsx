@@ -5,6 +5,7 @@ import {Card} from "@/components/ui/card";
 import {Button} from "@/components/ui/button";
 import {Badge} from "@/components/ui/badge";
 import {CheckCheck, CheckCircle, ChevronDown, ChevronRight, Clock, GraduationCap, X} from "lucide-react";
+import {SiteIdLink} from "@/components/links/ExternalIdLinks";
 
 /**
  * A review is considered "cleared" (hidden from dashboard) when the
@@ -120,7 +121,7 @@ export default function CoachingFeedback({ currentUserEmail }) {
                     }
                     <span className="font-medium text-foreground text-sm">
                       Quote {review.quote_number || review.quote_id}
-                      {review.site_id && <span className="text-muted-foreground font-normal"> — Site {review.site_id}</span>}
+                      {review.site_id && <span className="text-muted-foreground font-normal"> — Site <SiteIdLink siteId={review.site_id} /></span>}
                     </span>
                     {!isRead && (
                       <Badge className="bg-amber-100 text-amber-700 border border-amber-300 text-xs">New Feedback</Badge>

@@ -3,6 +3,7 @@ import {useQuery} from "@tanstack/react-query";
 import {getQuotes} from "@/api/dataClient";
 import {Input} from "@/components/ui/input";
 import {Loader2, Search} from "lucide-react";
+import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
 
 export function quoteLabel(quote) {
   return quote?.quote_number ? String(quote.quote_number) : `Draft${quote?.site_id ? ` (Site ${quote.site_id})` : ""}`;
@@ -18,6 +19,8 @@ export function quoteAttachment(quote) {
   return {
     type: "quote",
     quoteId: String(quote.id),
+    siteId: quote.site_id || "",
+    caseNumber: quote.case_number || "",
     label: quoteLabel(quote).slice(0, 200),
     sublabel: quoteSublabel(quote).slice(0, 200)
   };
@@ -55,15 +58,30 @@ export default function QuotePicker({ onPick, excludeIds = [] }) {
         ) : results.length === 0 ? (
           <p className="p-4 text-center text-sm text-muted-foreground">No matching quotes.</p>
         ) : results.map((quote) => (
-          <button
+          <div
             key={quote.id}
-            type="button"
+            role="button"
+            tabIndex={0}
             onClick={() => onPick(quote)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onPick(quote);
+              }
+            }}
             className="block w-full border-b border-border px-3 py-2 text-left last:border-b-0 hover:bg-accent"
           >
-            <div className="text-sm font-medium text-foreground">{quoteLabel(quote)}</div>
-            <div className="text-xs text-muted-foreground">{quoteSublabel(quote)}</div>
-          </button>
+            <div className="text-sm font-medium text-foreground">
+              {quote.quote_number ? quoteLabel(quote) : <>Draft{quote.site_id ? <> (Site <SiteIdLink siteId={quote.site_id} />)</> : ""}</>}
+            </div>
+            <div className="flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
+              {quote.site_id && <>Site <SiteIdLink siteId={quote.site_id} /></>}
+              {quote.site_id && quote.case_number && <span>·</span>}
+              {quote.case_number && <>Case <CaseNumberLink caseNumber={quote.case_number} /></>}
+              {(quote.site_id || quote.case_number) && quote.status && <span>·</span>}
+              {quote.status && <span>{quote.status}</span>}
+            </div>
+          </div>
         ))}
       </div>
     </div>

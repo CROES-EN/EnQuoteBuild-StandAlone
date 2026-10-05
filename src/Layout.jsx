@@ -44,6 +44,7 @@ import {Button} from "@/components/ui/button";
 import {useUserRole} from "@/components/auth/RoleGuard";
 import {useAuth} from "@/lib/AuthContext";
 import {canAccessPage} from "@/lib/rolePageAccess";
+import {useAccessPolicy} from "@/features/admin/adminApi";
 import AutoAssignRole from "@/components/auth/AutoAssignRole";
 import RefreshStatusDialog from "@/components/RefreshStatusDialog";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
@@ -69,6 +70,7 @@ import DeveloperConsole from "@/components/DeveloperConsole";
 import NotificationBell from "@/components/NotificationBell";
 import {recordError} from "@/features/developerConsole/errorLog";
 import {countAttentionTasks, useChatUnread, useTasks} from "@/features/collab/collabApi";
+import {ProfilePicturePicker} from "@/components/profile/UserAvatar";
 
 const isDemoMode = ["mock", "local", "salesforce-mock"].includes(import.meta.env.VITE_DATA_SOURCE);
 const appVersion = appPackage?.version || "0.0.0";
@@ -193,12 +195,15 @@ export default function Layout({ children, currentPageName }) {
     { name: "Inactive Revenue", icon: Wallet, page: "InactiveRevenueDashboard", roles: ["admin", "approver", "invoicer", "submitter"] }
   ];
 
+  const {policy: accessPolicy} = useAccessPolicy();
+  const announcement = accessPolicy?.announcement || null;
+  const [dismissedAnnouncementId, setDismissedAnnouncementId] = useState(() => {
+    try { return localStorage.getItem("enquote_dismissed_announcement_id") || ""; } catch { return ""; }
+  });
   const [sidebarOrder, setSidebarOrder] = useState(() => readSidebarOrder());
   const orderedNavItems = applySidebarOrder(navItems, sidebarOrder);
-  const visibleNavItems = orderedNavItems.filter(item =>
-    (!item.roles || isAdmin || item.roles.some(itemRole => roles.includes(itemRole))) && canAccessPage(roles, item.page, isAdmin)
-  );
-  const currentPageBlocked = Boolean(currentPageName) && isAuthenticated && !canAccessPage(roles, currentPageName, isAdmin);
+  const visibleNavItems = orderedNavItems.filter(item => canAccessPage(user, item.page, accessPolicy));
+  const currentPageBlocked = Boolean(currentPageName) && isAuthenticated && !canAccessPage(user, currentPageName, accessPolicy);
 
   // Moves a tab among the visible ones while tabs hidden for this role keep their saved slots,
   // so a later role change doesn't scramble the order.
@@ -540,6 +545,11 @@ export default function Layout({ children, currentPageName }) {
     logout();
   }
 
+  function dismissAnnouncement(id) {
+    setDismissedAnnouncementId(id);
+    try { localStorage.setItem("enquote_dismissed_announcement_id", id); } catch { /* ignore */ }
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Desktop Sidebar */}
@@ -658,27 +668,26 @@ export default function Layout({ children, currentPageName }) {
           {/* Footer */}
           <div className="p-4 border-t border-sidebar-border space-y-3">
             {isLocalAuthActive && user?.email && (
-              <button
-                type="button"
-                onClick={handleSwitchAccount}
+              <div
                 title={sidebarCollapsed ? `${user.full_name || user.email} - Switch account` : undefined}
                 className={cn(
-                  "text-left rounded-xl bg-sidebar-accent hover:bg-sidebar-accent/70 transition",
+                  "rounded-xl bg-sidebar-accent transition",
                   sidebarCollapsed ? "flex w-full items-center justify-center p-0" : "w-full px-4 py-2.5"
                 )}
               >
                 {sidebarCollapsed ? (
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-sidebar-border text-sm font-semibold text-sidebar-foreground">
-                    {(user.full_name || user.email || "?").trim().charAt(0).toUpperCase()}
-                  </span>
+                  <ProfilePicturePicker email={user.email} name={user.full_name || user.email} compact />
                 ) : (
-                  <>
-                    <p className="text-xs text-muted-foreground">Signed in as</p>
-                    <p className="text-sm font-medium text-sidebar-foreground truncate">{user.full_name || user.email}</p>
-                    <p className="text-xs text-primary mt-0.5">Switch account</p>
-                  </>
+                  <div className="flex items-center gap-3">
+                    <ProfilePicturePicker email={user.email} name={user.full_name || user.email} />
+                    <button type="button" onClick={handleSwitchAccount} className="min-w-0 text-left">
+                      <p className="text-xs text-muted-foreground">Signed in as</p>
+                      <p className="text-sm font-medium text-sidebar-foreground truncate">{user.full_name || user.email}</p>
+                      <p className="text-xs text-primary mt-0.5">Switch account</p>
+                    </button>
+                  </div>
                 )}
-              </button>
+              </div>
             )}
             <div className="space-y-1.5">
               <button
@@ -844,6 +853,24 @@ export default function Layout({ children, currentPageName }) {
       )}
       {/* Main Content */}
       <main className={cn("transition-[padding] duration-300 ease-in-out", isAuthenticated && (sidebarCollapsed ? "lg:pl-20" : "lg:pl-64"), isAuthenticated && "pt-16 lg:pt-0")}>
+        {announcement?.text && (announcement.level === "urgent" || dismissedAnnouncementId !== announcement.id) && (
+          <div className={cn(
+            "mx-4 mt-4 rounded-lg border px-4 py-3 text-sm shadow-sm",
+            announcement.level === "urgent" ? "border-red-300 bg-red-50 text-red-900" :
+              announcement.level === "warning" ? "border-amber-300 bg-amber-50 text-amber-900" :
+                "border-blue-300 bg-blue-50 text-blue-900"
+          )}>
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-4 w-4 flex-none" />
+              <div className="flex-1 whitespace-pre-wrap">{announcement.text}</div>
+              {announcement.level !== "urgent" && (
+                <button type="button" className="text-current opacity-70 hover:opacity-100" onClick={() => dismissAnnouncement(announcement.id)}>
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
         <ErrorBoundary>
           {currentPageBlocked ? (
             <div className="flex min-h-[60vh] items-center justify-center p-6 text-center">

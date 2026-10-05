@@ -72,6 +72,13 @@ function createSopLibrary({
       if (!row?.id) continue;
       const existing = current.docs[row.id];
       if (existing && existing.updatedAt >= row.updatedAt) continue;
+      if (row.deleted && row.record == null) {
+        if (current.docs[row.id]) {
+          delete current.docs[row.id];
+          changedAny = true;
+        }
+        continue;
+      }
       current.docs[row.id] = {
         id: row.id,
         updatedAt: row.updatedAt,

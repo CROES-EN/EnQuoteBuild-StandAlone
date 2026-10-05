@@ -20,6 +20,7 @@ import {
 import {Textarea} from "@/components/ui/textarea";
 import RoleGuard from "@/components/auth/RoleGuard";
 import StatusBadge from "@/components/quotes/StatusBadge";
+import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
 
 function BoneyardContent() {
  const queryClient = useQueryClient();
@@ -156,12 +157,7 @@ function BoneyardContent() {
  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
  <div className="flex-1 min-w-0">
  <div className="flex items-center gap-3 flex-wrap mb-2">
- <Link
- to={createPageUrl(`QuoteDetails?id=${quote.id}`)}
- className="text-lg font-semibold text-foreground hover:text-indigo-600 transition-colors"
- >
- {quote.site_id || "No Site ID"}
- </Link>
+ <SiteIdLink siteId={quote.site_id} fallback="No Site ID" className="text-lg font-semibold" />
  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
  <Archive className="w-3 h-3" /> On Hold
  </span>
@@ -173,7 +169,7 @@ function BoneyardContent() {
  </div>
  <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
  {quote.case_number && (
- <span>Case: <span className="font-medium text-foreground">{quote.case_number}</span></span>
+ <span>Case: <CaseNumberLink caseNumber={quote.case_number} className="font-medium" /></span>
  )}
  {quote.quote_number && (
  <span>Quote #: <span className="font-medium text-foreground">{quote.quote_number}</span></span>
@@ -234,7 +230,7 @@ function BoneyardContent() {
  <DialogHeader>
  <DialogTitle>Restore Quote from Boneyard</DialogTitle>
  <DialogDescription>
- This will move <strong>{restoreTarget?.site_id}</strong> back into active production
+ This will move <strong><SiteIdLink siteId={restoreTarget?.site_id} /></strong> back into active production
  {restoreTarget?.pre_hold_status && (
  <> with status <strong>"{restoreTarget.pre_hold_status.replace(/_/g, " ")}"</strong></>
  )}, and re-include it in SLA &amp; revenue reporting.

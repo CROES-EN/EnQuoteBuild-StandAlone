@@ -44,6 +44,8 @@ import {
     setColumnOrder as saveColumnOrderPref,
     setMyCaseOwnerName as saveMyCaseOwnerName
 } from "@/features/supervisorDashboard/workloadPreferences";
+import {ALWAYS_HIDDEN_WORKLOAD_COLUMNS} from "@/features/supervisorDashboard/workloadPreferences";
+import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
 import WorkloadSettingsPanel from "@/components/supervisor/WorkloadSettingsPanel";
 import {getCurrentUser} from "@/api/dataClient";
 
@@ -122,7 +124,11 @@ function RowDetailsDialog({ open, onOpenChange, columns, row }) {
             <div key={col} className="grid grid-cols-3 gap-4 py-2.5 text-sm">
               <dt className="col-span-1 font-medium text-muted-foreground">{col}</dt>
               <dd className="col-span-2 whitespace-pre-wrap break-words text-foreground">
-                {row?.[col] || "None"}
+                {col === "Case Number" && row?.[col] ? (
+                  <CaseNumberLink caseNumber={row[col]} caseId={row["Case ID"]} />
+                ) : col === "Enlighten Site ID" && row?.[col] ? (
+                  <SiteIdLink siteId={row[col]} />
+                ) : (row?.[col] || "None")}
               </dd>
             </div>
           ))}
@@ -152,22 +158,26 @@ function QuoteMatchesDialog({ matches, onOpenChange }) {
         </DialogHeader>
         <div className="space-y-2">
           {(matches || []).map((q) => (
-            <Link
+            <div
               key={q.id}
-              to={`${createPageUrl("QuoteDetails")}?id=${q.id}`}
               className="flex items-center justify-between gap-3 rounded-lg border border-border bg-secondary px-3 py-2.5 transition-colors hover:border-indigo-200 hover:bg-indigo-50"
             >
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium text-foreground">
-                  {q.site_id || q.quote_number || "(no site ID)"}
+                  {q.site_id ? <SiteIdLink siteId={q.site_id} className="font-medium" /> : (q.quote_number || "(no site ID)")}
                 </p>
                 <p className="truncate text-xs text-muted-foreground">
-                  {q.case_number ? `Case ${q.case_number} - ` : ""}
+                  {q.case_number ? <>Case <CaseNumberLink caseNumber={q.case_number} /> - </> : ""}
                   Updated {q.updated_date ? new Date(q.updated_date).toLocaleDateString() : "unknown date"}
                 </p>
               </div>
-              <StatusBadge status={q.status} size="small" />
-            </Link>
+              <Link
+                to={`${createPageUrl("QuoteDetails")}?id=${q.id}`}
+                className="shrink-0"
+              >
+                <StatusBadge status={q.status} size="small" />
+              </Link>
+            </div>
           ))}
           {(!matches || matches.length === 0) && (
             <p className="py-6 text-center text-sm text-muted-foreground">No matching quotes.</p>
@@ -1223,12 +1233,14 @@ export default function WorkloadReportTable({ table, onReload, isReloading }) {
                           <ColorPill classes={getProjectPicklistBadgeClasses(row[col])} />
                         ) : col === "Enlighten Site ID" ? (
                           <div className="flex items-center gap-1.5">
-                            <span>{row[col] || "--"}</span>
+                            <SiteIdLink siteId={row[col]} fallback={<span>--</span>} />
                             <CareBadge eligibility={careEligibility} />
                           </div>
+                        ) : col === "Case Number" && !showQuoteBadge ? (
+                          <CaseNumberLink caseNumber={row[col]} caseId={row["Case ID"]} fallback={<span className="text-muted-foreground">--</span>} />
                         ) : showQuoteBadge ? (
                           <div className="flex items-center gap-1.5">
-                            <span>{row[col] || "--"}</span>
+                            <CaseNumberLink caseNumber={row[col]} caseId={row["Case ID"]} fallback={<span>--</span>} />
                             {/* Per explicit request: always shows the exact total match count
                                 (+1 for one quote, +2 for two, etc.). Opens a real list of every
                                 matched quote (see QuoteMatchesDialog above) instead of silently
@@ -1291,7 +1303,7 @@ export default function WorkloadReportTable({ table, onReload, isReloading }) {
       <RowDetailsDialog
         open={Boolean(detailsRow)}
         onOpenChange={(open) => !open && setDetailsRow(null)}
-        columns={table.columns}
+        columns={table.columns.filter((col) => !ALWAYS_HIDDEN_WORKLOAD_COLUMNS.has(col))}
         row={detailsRow}
       />
 

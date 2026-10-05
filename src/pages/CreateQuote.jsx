@@ -4,6 +4,7 @@ import {createQuote, getCurrentUser, getProducts, getQuotes, isLocalDataSource} 
 import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 import {Link, useNavigate} from "react-router-dom";
 import {createPageUrl} from "@/utils";
+import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
 import {ArrowLeft} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {Card} from "@/components/ui/card";
@@ -185,12 +186,12 @@ function CreateQuoteContent() {
  <div className="grid grid-cols-2 gap-4 text-sm">
  <div>
  <p className="text-muted-foreground">Site ID</p>
- <p className="font-medium text-foreground">{quoteData.site_id}</p>
+ <p className="font-medium text-foreground"><SiteIdLink siteId={quoteData.site_id} className="font-medium" /></p>
  </div>
  {quoteData.case_number && (
  <div>
  <p className="text-muted-foreground">Case Number</p>
- <p className="font-medium text-foreground">{quoteData.case_number}</p>
+ <p className="font-medium text-foreground"><CaseNumberLink caseNumber={quoteData.case_number} className="font-medium" /></p>
  </div>
  )}
  {quoteData.picklist && (

@@ -1,241 +1,293 @@
-/**
- * customThemeBuilder.js
- *
- * Turns 3 user-picked hex colors (Background, Sidebar, Primary/Accent) into a full
- * shadcn-compatible theme `variables` object - the same shape every entry in themes.js
- * already has (e.g. THEMES["monokai"].variables).
- *
- * WHY DERIVE THE REST INSTEAD OF ASKING FOR MORE COLORS:
- * Every existing theme (Monokai, Rose Gold, etc.) was hand-tuned by a human picking ~26
- * separate HSL values so text stays readable and borders/muted areas look intentional.
- * Asking a user to pick 26 colors themselves would be tedious and error-prone (e.g. picking
- * white text on a white background). Instead, this derives the other values using simple,
- * predictable rules:
- *   - Text color (foreground) is chosen automatically (near-black or near-white) based on
- *     how light or dark the background is, so it's ALWAYS readable - never picked directly.
- *   - Muted/border/input tones are small lightness steps away from the background, in the
- *     direction that increases contrast (lighten a dark background's tones, darken a light
- *     background's tones) - this is exactly what "light+ 5% lighter card" style theming
- *     tools do.
- *   - The sidebar gets its own foreground/accent derived the same way, independently, since
- *     it's a visually distinct region that may be a very different lightness than the main
- *     background (e.g. a light background with a dark sidebar, as several existing themes
- *     already do).
- */
+const AA_CONTRAST = 4.5;
 
-// --- Color space conversion -------------------------------------------------------------
-// shadcn's CSS variables are stored as "H S% L%" (space-separated, no hsl() wrapper) -
-// see the big comment at the top of themes.js. Browsers give/accept colors as hex
-// (#rrggbb) in a native <input type="color"> picker, so this converts one direction.
+export const DENSITY_OPTIONS = {
+  comfortable: { label: "Comfortable", scale: 1, fontScale: 1 },
+  cozy: { label: "Cozy", scale: 0.94, fontScale: 0.98 },
+  compact: { label: "Compact", scale: 0.88, fontScale: 0.95 }
+};
 
-/**
- * Converts a hex color string (e.g. "#4f46e5" or "4f46e5") into { h, s, l } where h is in
- * degrees (0-360) and s/l are percentages (0-100), rounded to whole numbers (matching the
- * precision already used throughout themes.js, e.g. "243 75% 59%").
- */
-export function hexToHsl(hex) {
+export const DEFAULT_CUSTOM_COLORS = {
+  name: "My Theme",
+  mode: "light",
+  backgroundTint: "#f8fafc",
+  background: "#f8fafc",
+  sidebar: "#1e1e2e",
+  primary: "#4f46e5",
+  accent: "#0ea5e9",
+  radius: 0.65,
+  density: "comfortable",
+  fontScale: 1
+};
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, Number.isFinite(value) ? value : min));
+}
+
+function clampPercent(value) {
+  return clamp(value, 0, 100);
+}
+
+export function normalizeHex(hex, fallback = "#000000") {
   const cleaned = String(hex || "").trim().replace(/^#/, "");
-  const normalized =
-    cleaned.length === 3
-      ? cleaned.split("").map((c) => c + c).join("")
-      : cleaned.padEnd(6, "0").slice(0, 6);
+  const expanded = cleaned.length === 3 ? cleaned.split("").map((char) => char + char).join("") : cleaned;
+  if (!/^[0-9a-fA-F]{6}$/.test(expanded)) return fallback;
+  return `#${expanded.toLowerCase()}`;
+}
 
-  const r = parseInt(normalized.slice(0, 2), 16) / 255;
-  const g = parseInt(normalized.slice(2, 4), 16) / 255;
-  const b = parseInt(normalized.slice(4, 6), 16) / 255;
+export function hexToRgb(hex) {
+  const normalized = normalizeHex(hex);
+  return {
+    r: parseInt(normalized.slice(1, 3), 16),
+    g: parseInt(normalized.slice(3, 5), 16),
+    b: parseInt(normalized.slice(5, 7), 16)
+  };
+}
 
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
+export function rgbToHex({ r, g, b }) {
+  return `#${[r, g, b].map((part) => clamp(Math.round(part), 0, 255).toString(16).padStart(2, "0")).join("")}`;
+}
+
+export function rgbToHsl({ r, g, b }) {
+  const red = clamp(r, 0, 255) / 255;
+  const green = clamp(g, 0, 255) / 255;
+  const blue = clamp(b, 0, 255) / 255;
+  const max = Math.max(red, green, blue);
+  const min = Math.min(red, green, blue);
   const l = (max + min) / 2;
-
   let h = 0;
   let s = 0;
 
   if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    const delta = max - min;
+    s = l > 0.5 ? delta / (2 - max - min) : delta / (max + min);
     switch (max) {
-      case r:
-        h = ((g - b) / d + (g < b ? 6 : 0)) * 60;
+      case red:
+        h = ((green - blue) / delta + (green < blue ? 6 : 0)) * 60;
         break;
-      case g:
-        h = ((b - r) / d + 2) * 60;
+      case green:
+        h = ((blue - red) / delta + 2) * 60;
         break;
       default:
-        h = ((r - g) / d + 4) * 60;
+        h = ((red - green) / delta + 4) * 60;
         break;
     }
   }
 
+  return { h: Math.round(h), s: Math.round(s * 100), l: Math.round(l * 100) };
+}
+
+export function hexToHsl(hex) {
+  return rgbToHsl(hexToRgb(hex));
+}
+
+export function hslToRgb({ h, s, l }) {
+  const hue = (((Number(h) || 0) % 360) + 360) % 360;
+  const sat = clampPercent(Number(s) || 0) / 100;
+  const light = clampPercent(Number(l) || 0) / 100;
+
+  if (sat === 0) {
+    const value = Math.round(light * 255);
+    return { r: value, g: value, b: value };
+  }
+
+  const q = light < 0.5 ? light * (1 + sat) : light + sat - light * sat;
+  const p = 2 * light - q;
+  const hueToRgb = (t) => {
+    let next = t;
+    if (next < 0) next += 1;
+    if (next > 1) next -= 1;
+    if (next < 1 / 6) return p + (q - p) * 6 * next;
+    if (next < 1 / 2) return q;
+    if (next < 2 / 3) return p + (q - p) * (2 / 3 - next) * 6;
+    return p;
+  };
+
+  const normalizedHue = hue / 360;
   return {
-    h: Math.round(h),
-    s: Math.round(s * 100),
-    l: Math.round(l * 100)
+    r: Math.round(hueToRgb(normalizedHue + 1 / 3) * 255),
+    g: Math.round(hueToRgb(normalizedHue) * 255),
+    b: Math.round(hueToRgb(normalizedHue - 1 / 3) * 255)
   };
 }
 
-/** Formats an { h, s, l } object as the "H S% L%" string shadcn's CSS variables expect. */
+export function hslToHex(hsl) {
+  return rgbToHex(hslToRgb(hsl));
+}
+
 export function hslToVarString({ h, s, l }) {
-  return `${h} ${s}% ${l}%`;
+  return `${Math.round((((Number(h) || 0) % 360) + 360) % 360)} ${Math.round(clampPercent(Number(s) || 0))}% ${Math.round(clampPercent(Number(l) || 0))}%`;
 }
 
-/** Clamps a number between 0 and 100 - used to keep derived lightness values valid. */
-function clampPercent(value) {
-  return Math.max(0, Math.min(100, value));
+export function parseHslVar(value) {
+  const match = String(value || "").match(/(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)%\s+(-?\d+(?:\.\d+)?)%/);
+  if (!match) return { h: 0, s: 0, l: 0 };
+  return { h: Number(match[1]), s: Number(match[2]), l: Number(match[3]) };
 }
 
-/**
- * Nudges a color's LIGHTNESS toward a "safe" zone for large surface areas (a page
- * background or sidebar background) - genuinely dark (<= 20%) or genuinely light
- * (>= 85%) - leaving it untouched if it's already in either zone.
- *
- * WHY THIS MATTERS: every hand-authored theme in themes.js (Monokai, Midnight Slate,
- * etc.) follows this rule already, even when its nominal HSL saturation is fairly high -
- * e.g. Midnight Slate's background is "222 47% 8%" (47% saturation is NOT low), but at
- * only 8% lightness it still reads as calm near-black, because a color's PERCEIVED
- * vividness depends on both saturation and how far lightness sits from 50% - a color at
- * 50% lightness + high saturation (e.g. a "pure" picked blue or purple) is the single
- * most visually loud combination possible, and no amount of adjusting derived
- * cards/borders/muted tones can compensate for a huge background area using that
- * combination - they're all still anchored to the same overpowering base hue.
- *
- * Only backgrounds/sidebars go through this - --primary (buttons, links, active-state
- * highlights) is deliberately left fully vivid, exactly like every hand-authored theme's
- * own --primary value.
- */
-function toSafeSurfaceLightness(hsl) {
-  const SAFE_DARK_MAX = 20;
-  const SAFE_LIGHT_MIN = 85;
-  if (hsl.l <= SAFE_DARK_MAX || hsl.l >= SAFE_LIGHT_MIN) {
-    return hsl; // Already a safe, calm surface lightness - pass through unchanged.
-  }
-  // Sits in the "loud" middle zone - snap toward whichever safe zone is nearer, keeping
-  // the hue itself intact so the surface still reflects the color family the user picked
-  // (e.g. a mid-tone blue becomes a dark navy, not an unrelated dark gray).
-  return { h: hsl.h, s: hsl.s, l: hsl.l < 50 ? SAFE_DARK_MAX : SAFE_LIGHT_MIN };
+export function relativeLuminance(input) {
+  const { r, g, b } = typeof input === "string" ? hexToRgb(input) : input;
+  const channel = (value) => {
+    const normalized = clamp(value, 0, 255) / 255;
+    return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
 }
 
-/**
- * Given a base color's HSL, returns readable foreground text HSL: near-white for a dark
- * base, near-black for a light base. Matches the pattern already visible across every
- * hand-authored theme in themes.js (e.g. dark themes use "0 0% 8x%" foregrounds, light
- * themes use very low lightness foregrounds).
- */
-function pickForeground(baseHsl) {
-  return baseHsl.l > 55
-    ? { h: baseHsl.h, s: Math.min(baseHsl.s, 30), l: 12 } // dark text on a light base
-    : { h: baseHsl.h, s: Math.min(baseHsl.s, 20), l: 95 }; // light text on a dark base
+export function contrastRatio(colorA, colorB) {
+  const first = relativeLuminance(colorA);
+  const second = relativeLuminance(colorB);
+  const lighter = Math.max(first, second);
+  const darker = Math.min(first, second);
+  return (lighter + 0.05) / (darker + 0.05);
 }
 
-/**
- * Derives a "one step further" tone from a base color - used for cards/muted/border/
- * sidebar-accent areas. Two things are deliberately done here, not just a lightness shift:
- *
- *   1. SATURATION IS CAPPED, not carried through unchanged. A surface derived from a
- *      strongly saturated base color (e.g. a vivid red) previously kept that same high
- *      saturation, so every derived panel/border/box ended up reading as "just another
- *      shade of red" - nothing looked like a distinct surface, it all visually blended
- *      together. Capping saturation makes these read as neutral panels instead, the same
- *      way VS Code's own dark themes keep side-panels/borders muted gray-ish even when the
- *      accent color itself is vivid.
- *   2. THE LIGHTNESS STEP IS LARGER than before (was too subtle to notice, especially once
- *      saturation was also fighting for attention).
- *
- * On a light base, steps DARKER (more contrast against white); on a dark base, steps
- * LIGHTER (more contrast against black). `amount` is in lightness percentage points.
- * `maxSaturation` caps how saturated the derived surface is allowed to be (0-100).
- */
-function deriveStep(baseHsl, amount, maxSaturation = 100) {
-  const isLightBase = baseHsl.l > 55;
-  const nextLightness = clampPercent(isLightBase ? baseHsl.l - amount : baseHsl.l + amount);
-  return { h: baseHsl.h, s: Math.min(baseHsl.s, maxSaturation), l: nextLightness };
+export function readableForegroundHex(backgroundHex, minimum = AA_CONTRAST) {
+  const dark = "#111827";
+  const light = "#f8fafc";
+  const darkContrast = contrastRatio(backgroundHex, dark);
+  const lightContrast = contrastRatio(backgroundHex, light);
+  const best = darkContrast >= lightContrast ? dark : light;
+  if (Math.max(darkContrast, lightContrast) >= minimum) return best;
+  return contrastRatio(backgroundHex, "#000000") >= contrastRatio(backgroundHex, "#ffffff") ? "#000000" : "#ffffff";
 }
 
-/**
- * Builds a full shadcn `variables` object (same shape as every THEMES[...].variables
- * entry) from exactly 3 user-picked hex colors.
- *
- * @param {Object} colors
- * @param {string} colors.background - main app background, hex (e.g. "#f8fafc")
- * @param {string} colors.sidebar - sidebar background, hex (e.g. "#1e1e2e")
- * @param {string} colors.primary - primary/accent color used for buttons, links,
- *   active nav highlight, etc., hex (e.g. "#4f46e5")
- * @returns {{ variables: Object, isDark: boolean, previewColors: string[] }}
- */
-export function buildCustomTheme(colors) {
-  // Background/sidebar are large surface areas - remapped into a safe lightness zone
-  // (see toSafeSurfaceLightness() above) if the raw pick is a "loud" mid-tone. Primary is
-  // deliberately NOT remapped - it's meant to be vivid, used only for small accents like
-  // buttons/links/active highlights, not a huge surface area.
-  const backgroundHsl = toSafeSurfaceLightness(hexToHsl(colors.background));
-  const sidebarHsl = toSafeSurfaceLightness(hexToHsl(colors.sidebar));
-  const primaryHsl = hexToHsl(colors.primary);
+export function readableForegroundHsl(backgroundHsl, minimum = AA_CONTRAST) {
+  return hexToHsl(readableForegroundHex(hslToHex(backgroundHsl), minimum));
+}
 
-  const foreground = pickForeground(backgroundHsl);
-  const sidebarForeground = pickForeground(sidebarHsl);
-  const primaryForeground = pickForeground(primaryHsl);
+function toneFrom(base, lightness, saturationCap = 100) {
+  return { h: base.h, s: Math.min(base.s, saturationCap), l: clampPercent(lightness) };
+}
 
-  // Card/secondary/muted/border are all "neutral panel" surfaces - capped at a modest
-  // saturation regardless of how vivid the picked background is, so a strongly-colored
-  // background (e.g. a saturated red) still produces visibly distinct, calm surfaces
-  // instead of every panel reading as "another shade of the same color."
-  const card = deriveStep(backgroundHsl, 6, 25);
-  const secondary = deriveStep(backgroundHsl, 10, 18);
-  const muted = deriveStep(backgroundHsl, 10, 18);
-  const border = deriveStep(backgroundHsl, 18, 20);
+function modeFromSettings(settings) {
+  if (settings.mode === "dark" || settings.mode === "light") return settings.mode;
+  const source = settings.backgroundTint || settings.background || DEFAULT_CUSTOM_COLORS.backgroundTint;
+  return hexToHsl(source).l < 50 ? "dark" : "light";
+}
 
-  // Sidebar accent/border get the same treatment - this is what fixes boxes like "Signed
-  // in as" or "Refresh App" blending invisibly into a saturated sidebar background.
-  const sidebarAccent = deriveStep(sidebarHsl, 14, 30);
-  const sidebarBorder = deriveStep(sidebarHsl, 20, 25);
+export function normalizeCustomThemeSettings(settings = {}) {
+  const mode = modeFromSettings(settings);
+  const density = DENSITY_OPTIONS[settings.density] ? settings.density : DEFAULT_CUSTOM_COLORS.density;
+  const fontScale = clamp(Number(settings.fontScale ?? DENSITY_OPTIONS[density].fontScale), 0.9, 1.12);
+  return {
+    name: String(settings.name || DEFAULT_CUSTOM_COLORS.name).slice(0, 48),
+    mode,
+    backgroundTint: normalizeHex(settings.backgroundTint || settings.background || DEFAULT_CUSTOM_COLORS.backgroundTint, DEFAULT_CUSTOM_COLORS.backgroundTint),
+    sidebar: normalizeHex(settings.sidebar || DEFAULT_CUSTOM_COLORS.sidebar, DEFAULT_CUSTOM_COLORS.sidebar),
+    primary: normalizeHex(settings.primary || DEFAULT_CUSTOM_COLORS.primary, DEFAULT_CUSTOM_COLORS.primary),
+    accent: normalizeHex(settings.accent || settings.primary || DEFAULT_CUSTOM_COLORS.accent, DEFAULT_CUSTOM_COLORS.accent),
+    radius: clamp(Number(settings.radius ?? DEFAULT_CUSTOM_COLORS.radius), 0, 1.5),
+    density,
+    fontScale
+  };
+}
+
+export function buildPresetTheme({ mode = "light", background, sidebar, primary, accent, radius = 0.5, density = "comfortable", fontScale } = {}) {
+  return buildCustomTheme({
+    mode,
+    backgroundTint: background,
+    sidebar,
+    primary,
+    accent: accent || primary,
+    radius,
+    density,
+    fontScale
+  });
+}
+
+export function buildCustomTheme(settings = {}) {
+  const normalized = normalizeCustomThemeSettings(settings);
+  const isDark = normalized.mode === "dark";
+  const tint = hexToHsl(normalized.backgroundTint);
+  const sidebarPick = hexToHsl(normalized.sidebar);
+  const primary = hexToHsl(normalized.primary);
+  const accent = hexToHsl(normalized.accent);
+
+  const background = toneFrom(tint, isDark ? clamp(tint.l, 6, 14) : clamp(tint.l, 94, 99), isDark ? 35 : 28);
+  const foreground = readableForegroundHsl(background);
+  const card = toneFrom(background, isDark ? background.l + 4 : Math.max(98, background.l + 1), isDark ? 30 : 18);
+  const popover = toneFrom(background, isDark ? background.l + 5 : 100, isDark ? 32 : 18);
+  const secondary = toneFrom(background, isDark ? background.l + 9 : background.l - 5, isDark ? 24 : 22);
+  const muted = toneFrom(background, isDark ? background.l + 10 : background.l - 4, isDark ? 18 : 16);
+  const border = toneFrom(background, isDark ? background.l + 16 : background.l - 13, isDark ? 22 : 18);
+  const mutedForeground = toneFrom(foreground, isDark ? 70 : 37, 10);
+
+  const sidebar = toneFrom(sidebarPick, isDark ? clamp(sidebarPick.l, 5, 18) : (sidebarPick.l < 50 ? clamp(sidebarPick.l, 12, 26) : clamp(sidebarPick.l, 94, 99)), isDark ? 38 : 45);
+  const sidebarForeground = readableForegroundHsl(sidebar);
+  const sidebarAccent = toneFrom(sidebar, sidebar.l < 50 ? sidebar.l + 12 : sidebar.l - 8, sidebar.s < 8 ? 14 : Math.min(sidebar.s, 36));
+  const sidebarBorder = toneFrom(sidebar, sidebar.l < 50 ? sidebar.l + 18 : sidebar.l - 14, Math.min(sidebar.s, 28));
+
+  const primaryForeground = readableForegroundHsl(primary);
+  const accentForeground = readableForegroundHsl(accent);
+  const destructive = isDark ? { h: 0, s: 72, l: 46 } : { h: 0, s: 78, l: 52 };
+  const warning = isDark ? { h: 38, s: 72, l: 58 } : { h: 35, s: 82, l: 45 };
+  const densityOption = DENSITY_OPTIONS[normalized.density] || DENSITY_OPTIONS.comfortable;
 
   const variables = {
-    "--background": hslToVarString(backgroundHsl),
+    "--background": hslToVarString(background),
     "--foreground": hslToVarString(foreground),
     "--card": hslToVarString(card),
-    "--card-foreground": hslToVarString(foreground),
-    "--popover": hslToVarString(card),
-    "--popover-foreground": hslToVarString(foreground),
-    "--primary": hslToVarString(primaryHsl),
+    "--card-foreground": hslToVarString(readableForegroundHsl(card)),
+    "--popover": hslToVarString(popover),
+    "--popover-foreground": hslToVarString(readableForegroundHsl(popover)),
+    "--primary": hslToVarString(primary),
     "--primary-foreground": hslToVarString(primaryForeground),
     "--secondary": hslToVarString(secondary),
-    "--secondary-foreground": hslToVarString(foreground),
+    "--secondary-foreground": hslToVarString(readableForegroundHsl(secondary)),
     "--muted": hslToVarString(muted),
-    // Deliberately near-neutral (very low saturation) regardless of the picked hue, so
-    // secondary/muted text reads as calm gray text - not a low-contrast tint of whatever
-    // color the user picked - while still landing on the correct side (lighter text on a
-    // dark background, darker text on a light background) for real readability.
-    "--muted-foreground": hslToVarString({ h: foreground.h, s: 8, l: foreground.l > 50 ? 68 : 42 }),
-    "--accent": hslToVarString(primaryHsl),
-    "--accent-foreground": hslToVarString(primaryForeground),
-    // Destructive (error/delete) stays a fixed, familiar red regardless of the custom
-    // palette - consistent with every other theme in themes.js, none of which derive
-    // destructive from their own base colors either.
-    "--destructive": "0 84.2% 60.2%",
-    "--destructive-foreground": "0 0% 98%",
+    "--muted-foreground": hslToVarString(mutedForeground),
+    "--accent": hslToVarString(accent),
+    "--accent-foreground": hslToVarString(accentForeground),
+    "--destructive": hslToVarString(destructive),
+    "--destructive-foreground": hslToVarString(readableForegroundHsl(destructive)),
+    "--warning": hslToVarString(warning),
+    "--warning-foreground": hslToVarString(readableForegroundHsl(warning)),
     "--border": hslToVarString(border),
     "--input": hslToVarString(border),
-    "--ring": hslToVarString(primaryHsl),
-    "--sidebar-background": hslToVarString(sidebarHsl),
+    "--ring": hslToVarString(primary),
+    "--chart-1": hslToVarString(primary),
+    "--chart-2": hslToVarString(accent),
+    "--chart-3": hslToVarString({ h: (primary.h + 75) % 360, s: Math.max(45, primary.s), l: isDark ? 58 : 44 }),
+    "--chart-4": hslToVarString({ h: (accent.h + 120) % 360, s: Math.max(42, accent.s), l: isDark ? 62 : 48 }),
+    "--chart-5": hslToVarString({ h: (primary.h + 220) % 360, s: Math.max(44, primary.s), l: isDark ? 64 : 46 }),
+    "--radius": `${normalized.radius}rem`,
+    "--density-scale": String(densityOption.scale),
+    "--font-scale": String(normalized.fontScale),
+    "--sidebar-background": hslToVarString(sidebar),
     "--sidebar-foreground": hslToVarString(sidebarForeground),
-    "--sidebar-primary": hslToVarString(primaryHsl),
+    "--sidebar-primary": hslToVarString(primary),
     "--sidebar-primary-foreground": hslToVarString(primaryForeground),
     "--sidebar-accent": hslToVarString(sidebarAccent),
-    "--sidebar-accent-foreground": hslToVarString(sidebarForeground),
+    "--sidebar-accent-foreground": hslToVarString(readableForegroundHsl(sidebarAccent)),
     "--sidebar-border": hslToVarString(sidebarBorder),
-    "--sidebar-ring": hslToVarString(primaryHsl)
+    "--sidebar-ring": hslToVarString(primary)
   };
 
   return {
     variables,
-    isDark: backgroundHsl.l < 50,
-    previewColors: [colors.background, colors.sidebar, colors.primary]
+    isDark,
+    previewColors: [hslToHex(background), hslToHex(sidebar), normalized.primary],
+    settings: normalized
   };
 }
 
-/** Sensible starting colors when a user opens the custom color pickers for the first time. */
-export const DEFAULT_CUSTOM_COLORS = {
-  background: "#f8fafc",
-  sidebar: "#1e1e2e",
-  primary: "#4f46e5"
-};
+export function themeMeetsAa(themeLike, minimum = AA_CONTRAST) {
+  const variables = themeLike.variables || themeLike;
+  const pairs = [
+    ["--background", "--foreground"],
+    ["--card", "--card-foreground"],
+    ["--popover", "--popover-foreground"],
+    ["--primary", "--primary-foreground"],
+    ["--secondary", "--secondary-foreground"],
+    ["--accent", "--accent-foreground"],
+    ["--destructive", "--destructive-foreground"],
+    ["--sidebar-background", "--sidebar-foreground"],
+    ["--sidebar-primary", "--sidebar-primary-foreground"],
+    ["--sidebar-accent", "--sidebar-accent-foreground"]
+  ];
+  return pairs.every(([backgroundKey, foregroundKey]) => {
+    const background = hslToHex(parseHslVar(variables[backgroundKey]));
+    const foreground = hslToHex(parseHslVar(variables[foregroundKey]));
+    return contrastRatio(background, foreground) >= minimum;
+  });
+}

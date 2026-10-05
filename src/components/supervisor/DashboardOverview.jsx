@@ -89,6 +89,7 @@ import {
 
 import MetricsTrendCharts from "@/components/supervisor/MetricsTrendCharts";
 import MetricsHistoryTable from "@/components/supervisor/MetricsHistoryTable";
+import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
 
 // Display text used whenever a value is blank, missing, or not applicable - a plain word instead
 // of a dash/em-dash character, both for readability and to avoid any special-character encoding
@@ -352,7 +353,7 @@ function QuotesRequestedDialog({ open, onOpenChange, rows }) {
           <TableBody>
             {sortedRows.map((row, i) => (
               <TableRow key={i}>
-                <TableCell>{row["Case Number"] || BLANK_DISPLAY}</TableCell>
+                <TableCell><CaseNumberLink caseNumber={row["Case Number"]} caseId={row["Case ID"]} fallback={BLANK_DISPLAY} /></TableCell>
                 <TableCell>{row["Case Owner"] || BLANK_DISPLAY}</TableCell>
                 <TableCell className="max-w-xs truncate" title={String(row["Subject"] ?? "")}>{row["Subject"] || BLANK_DISPLAY}</TableCell>
                 <TableCell>{row["Date/Time Opened"] || BLANK_DISPLAY}</TableCell>
@@ -475,7 +476,7 @@ function QuoteBacklogAlertDialog({ open, onOpenChange, rows }) {
           <TableBody>
             {sortedRows.map(({ quote, alert }) => (
               <TableRow key={quote.id}>
-                <TableCell>{quote.site_id || BLANK_DISPLAY}</TableCell>
+                <TableCell><SiteIdLink siteId={quote.site_id} fallback={BLANK_DISPLAY} /></TableCell>
                 <TableCell>{quote.status || BLANK_DISPLAY}</TableCell>
                 <TableCell>{alert.name || BLANK_DISPLAY}</TableCell>
                 <TableCell className={alert.level === "red" ? "text-rose-600 font-semibold" : "text-amber-600 font-semibold"}>
@@ -1005,7 +1006,7 @@ function EmailCaseRecordsDialog({ open, onOpenChange, rows }) {
             <TableBody>
               {sortedRows.map((r) => (
                 <TableRow key={r.caseNumber}>
-                  <TableCell className="font-medium">{r.caseNumber}</TableCell>
+                  <TableCell className="font-medium"><CaseNumberLink caseNumber={r.caseNumber} fallback={BLANK_DISPLAY} className="font-medium" /></TableCell>
                   <TableCell>{r.ownerName || BLANK_DISPLAY}</TableCell>
                   <TableCell className="max-w-xs truncate" title={r.subject || ""}>{r.subject || BLANK_DISPLAY}</TableCell>
                   <TableCell>{r.status || BLANK_DISPLAY}</TableCell>
@@ -2086,4 +2087,3 @@ export default function DashboardOverview({
     </div>
   );
 }
-

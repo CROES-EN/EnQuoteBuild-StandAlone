@@ -32,18 +32,24 @@ export async function handlePresenceHeartbeat(request, env) {
   const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
   const sessionId = typeof body?.sessionId === "string" ? body.sessionId.trim() : "";
   const name = typeof body?.name === "string" ? body.name.trim().slice(0, 120) : "";
+  const appVersion = typeof body?.appVersion === "string" ? body.appVersion.trim().slice(0, 40) : "";
+  const uiVersion = typeof body?.uiVersion === "string" ? body.uiVersion.trim().slice(0, 40) : "";
+  const resolvedRole = typeof body?.resolvedRole === "string" ? body.resolvedRole.trim().slice(0, 40) : "";
   if (!email || !sessionId) return json({ ok: false, error: "missing_presence_identity" }, 400);
   if (!isAllowedEmail(email, env)) return json({ ok: false, error: "email_not_allowed" }, 403);
 
   const now = new Date().toISOString();
   await env.DB.prepare(`
-    INSERT INTO presence_sessions (session_id, email, name, signed_in_at, last_seen_at)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO presence_sessions (session_id, email, name, signed_in_at, last_seen_at, app_version, ui_version, resolved_role)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(session_id) DO UPDATE SET
       email = excluded.email,
       name = excluded.name,
-      last_seen_at = excluded.last_seen_at
-  `).bind(sessionId, email, name || email, now, now).run();
+      last_seen_at = excluded.last_seen_at,
+      app_version = excluded.app_version,
+      ui_version = excluded.ui_version,
+      resolved_role = excluded.resolved_role
+  `).bind(sessionId, email, name || email, now, now, appVersion, uiVersion, resolvedRole).run();
 
   return json({ ok: true, lastSeenAt: now });
 }

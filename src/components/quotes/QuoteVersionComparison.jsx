@@ -7,9 +7,11 @@ import {Dialog, DialogContent, DialogHeader, DialogTitle,} from "@/components/ui
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue,} from "@/components/ui/select";
 import {AlertCircle, GitCompare, XCircle} from "lucide-react";
 import {Badge} from "@/components/ui/badge";
+import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
 
-function FieldComparison({ label, oldValue, newValue }) {
+function FieldComparison({ label, oldValue, newValue, renderValue }) {
   const hasChanged = JSON.stringify(oldValue) !== JSON.stringify(newValue);
+  const render = renderValue || ((value) => String(value || '-'));
   
   if (!hasChanged) return null;
   
@@ -19,11 +21,11 @@ function FieldComparison({ label, oldValue, newValue }) {
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-rose-50 rounded-lg p-3">
           <p className="text-xs text-rose-600 font-medium mb-1">Previous</p>
-          <p className="text-sm text-foreground">{String(oldValue || '-')}</p>
+          <p className="text-sm text-foreground">{render(oldValue)}</p>
         </div>
         <div className="bg-emerald-50 rounded-lg p-3">
           <p className="text-xs text-emerald-600 font-medium mb-1">Updated</p>
-          <p className="text-sm text-foreground">{String(newValue || '-')}</p>
+          <p className="text-sm text-foreground">{render(newValue)}</p>
         </div>
       </div>
     </div>
@@ -207,12 +209,14 @@ export default function QuoteVersionComparison({ quote }) {
                     label="Site ID"
                     oldValue={compareVersion.site_id}
                     newValue={quote.site_id}
+                    renderValue={(value) => <SiteIdLink siteId={value} fallback="-" />}
                   />
                   
                   <FieldComparison 
                     label="Case Number"
                     oldValue={compareVersion.case_number}
                     newValue={quote.case_number}
+                    renderValue={(value) => <CaseNumberLink caseNumber={value} fallback="-" />}
                   />
                   
                   <FieldComparison 

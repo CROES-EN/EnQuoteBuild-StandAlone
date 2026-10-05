@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 export function createSupervisorD1(migrations = ["0002_supervisor_records.sql"]) {
   const db = new DatabaseSync(":memory:");
   for (const migration of migrations) {
-    db.exec(readFileSync(new URL(`../migrations/${migration}`, import.meta.url), "utf8"));
+    db.exec(typeof migration === "string" ? readFileSync(new URL(`../migrations/${migration}`, import.meta.url), "utf8") : migration.sql);
   }
   const wrap = (sql) => {
     let params = [];
@@ -44,4 +44,14 @@ export function createSupervisorD1(migrations = ["0002_supervisor_records.sql"])
 
 export function createCollabD1() {
   return createSupervisorD1(["0005_collab.sql"]);
+}
+
+// 0006 alters presence_sessions, which lives in schema.sql rather than a migration.
+const PRESENCE_TABLE_SQL = `CREATE TABLE IF NOT EXISTS presence_sessions (
+  session_id TEXT PRIMARY KEY, email TEXT NOT NULL, name TEXT NOT NULL,
+  signed_in_at TEXT NOT NULL, last_seen_at TEXT NOT NULL
+);`;
+
+export function createAdminD1() {
+  return createSupervisorD1(["0005_collab.sql", { sql: PRESENCE_TABLE_SQL }, "0006_admin_profiles.sql"]);
 }

@@ -1,231 +1,309 @@
-import {useState} from "react";
-import {Check, Palette, Pencil} from "lucide-react";
+import {useMemo, useState} from "react";
+import {Check, Copy, Palette, RotateCcw, Save, Trash2, Upload} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
+import {Switch} from "@/components/ui/switch";
 import {cn} from "@/lib/utils";
 import {useTheme} from "@/features/theme/ThemeContext";
-import {getSavedCustomColors, saveCustomColors} from "@/features/theme/themeStore";
+import {SYSTEM_THEME_ID} from "@/features/theme/themes";
+import {
+  deleteCustomTheme,
+  exportCustomTheme,
+  getFollowSystemThemeSettings,
+  getSavedCustomThemes,
+  importCustomTheme,
+  saveFollowSystemThemeSettings,
+  upsertCustomTheme
+} from "@/features/theme/themeStore";
+import {DEFAULT_CUSTOM_COLORS, DENSITY_OPTIONS, buildCustomTheme, normalizeCustomThemeSettings} from "@/features/theme/customThemeBuilder";
 
-/**
- * Theme picker dropdown, styled after VS Code's own "Preferences: Color Theme" quick-pick list -
- * each entry shows a small three-color swatch preview (background / secondary / accent) plus
- * the theme name and short description, with a checkmark on the currently active theme.
- *
- * Supports two trigger styles so this one component can be dropped into both the desktop
- * sidebar footer AND the mobile header without needing a second component:
- *   - Default (iconOnly=false): full-width bordered button matching Layout.jsx's existing
- *     "Refresh App" button style exactly (border-slate-200 bg-white rounded-xl, etc.)
- *   - iconOnly=true: compact icon-only ghost button matching the existing mobile header
- *     refresh icon button style
- */
-export default function ThemeSwitcher({ iconOnly = false, className }) {
-  const { themeId, themes, setThemeId, refreshCustomTheme } = useTheme();
-  const [open, setOpen] = useState(false);
-  const [customColors, setCustomColors] = useState(() => getSavedCustomColors());
-  const [customPanelOpen, setCustomPanelOpen] = useState(false);
-
-  // Saves a single custom color field and applies it immediately. If "custom" isn't
-  // already the active theme, switching to it (via setThemeId) triggers
-  // ThemeContext's normal apply effect. If "custom" IS already active, changing themeId
-  // to the same value wouldn't re-run that effect - so refreshCustomTheme() is called
-  // instead, which re-applies right now using the freshly-saved color.
-  function handleColorChange(colorKey, hexValue) {
-    const next = { ...customColors, [colorKey]: hexValue };
-    setCustomColors(next);
-    saveCustomColors(next);
-    if (themeId === "custom") {
-      refreshCustomTheme();
-    } else {
-      setThemeId("custom");
-    }
-  }
-
-    return (
-    <>
-      {/* Injected once per rendered dropdown instance - negligible cost, and keeps every
-          flashy animation fully self-contained in this one file rather than requiring an
-          edit to a global stylesheet (index.css) this component doesn't otherwise touch. */}
-      <style>{`
-        @keyframes enquoteShimmerSweep {
-          from { transform: translateX(-120%); }
-          to { transform: translateX(120%); }
-        }
-        @keyframes enquoteGlowPulse {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.55); }
-          50% { box-shadow: 0 0 10px 3px rgba(99, 102, 241, 0.55); }
-        }
-        @keyframes enquotePopIn {
-          0% { transform: scale(0.3); opacity: 0; }
-          60% { transform: scale(1.2); opacity: 1; }
-          100% { transform: scale(1); }
-        }
-        @keyframes enquoteGradientShift {
-          0%, 100% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-        }
-        .enquote-theme-swatch {
-          position: relative;
-          overflow: hidden;
-        }
-        .enquote-swatch-shimmer-el {
-          position: absolute;
-          inset: 0;
-          pointer-events: none;
-          background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.65) 50%, transparent 70%);
-          transform: translateX(-120%);
-        }
-        .enquote-theme-swatch:hover .enquote-swatch-shimmer-el {
-          animation: enquoteShimmerSweep 0.8s ease-in-out;
-        }
-        .enquote-swatch-active-glow {
-          animation: enquoteGlowPulse 2s ease-in-out infinite;
-        }
-        .enquote-check-pop {
-          animation: enquotePopIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-        .enquote-gradient-bar {
-          background-size: 200% 100%;
-          animation: enquoteGradientShift 3s ease-in-out infinite;
-        }
-      `}</style>
-      <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        {iconOnly ? (
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Change color theme"
-            title="Change color theme"
-            className={className}
-          >
-            <Palette className="w-5 h-5" />
-          </Button>
-        ) : (
-          <button
-            type="button"
-            className={cn(
-              "w-full inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50",
-              className
-            )}
-          >
-            <Palette className="w-4 h-4" />
-            Theme
-          </button>
-        )}
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
-        <DropdownMenuLabel className="text-xs text-slate-400">
-          Color Theme
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-                        {themes.map((theme) => {
-          const isActive = theme.id === themeId;
-          const isCustom = theme.id === "custom";
-          // "custom"'s swatch always reflects whatever colors are CURRENTLY saved, not
-          // the placeholder previewColors baked into themes.js (those are only a
-          // fallback default, never meant to be shown once real colors exist).
-          const previewColors = isCustom
-            ? [customColors.background, customColors.sidebar, customColors.primary]
-            : theme.previewColors;
-          return (
-            <div key={theme.id}>
-              <DropdownMenuItem
-                onSelect={(event) => {
-                  // Keeps the dropdown open for "custom" so the user can immediately
-                  // click the pencil icon and adjust colors right after selecting it,
-                  // instead of the menu closing and requiring a second click to reopen.
-                  if (isCustom) event.preventDefault();
-                  setThemeId(theme.id);
-                }}
-                className="flex items-center gap-3 py-2"
-              >
-                <span
-                  className={cn(
-                    "enquote-theme-swatch flex shrink-0 rounded border border-slate-200",
-                    isActive && "enquote-swatch-active-glow"
-                  )}
-                >
-                  {previewColors.map((color, i) => (
-                    <span
-                      key={i}
-                      className="block h-5 w-3"
-                      style={{ backgroundColor: color }}
-                    />
-                  ))}
-                  <span aria-hidden="true" className="enquote-swatch-shimmer-el" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-slate-800">
-                    {theme.name}
-                  </span>
-                  <span className="block truncate text-xs text-slate-400">
-                    {theme.description}
-                  </span>
-                </span>
-                {isCustom && (
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      setCustomPanelOpen((prev) => !prev);
-                    }}
-                    className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                    aria-label="Edit custom colors"
-                    title="Edit custom colors"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </button>
-                )}
-                {isActive && <Check className="enquote-check-pop h-4 w-4 shrink-0 text-indigo-600" />}
-              </DropdownMenuItem>
-              {isCustom && customPanelOpen && (
-                <div
-                  className="space-y-2 px-3 pb-2 pt-1"
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  {/* Live animated blended preview of all 3 currently-picked colors -
-                      updates instantly as any color picker below changes, so the user
-                      gets an at-a-glance sense of the combination before committing. */}
-                  <div
-                    className="enquote-gradient-bar h-2.5 w-full rounded-full shadow-sm"
-                    style={{
-                      backgroundImage: `linear-gradient(90deg, ${customColors.background}, ${customColors.sidebar}, ${customColors.primary})`
-                    }}
-                  />
-                  {[
-                    { key: "background", label: "Background" },
-                    { key: "sidebar", label: "Sidebar" },
-                    { key: "primary", label: "Primary" }
-                  ].map((field) => (
-                    <label
-                      key={field.key}
-                      className="flex items-center justify-between gap-2 text-xs text-slate-500"
-                    >
-                      {field.label}
-                      <input
-                        type="color"
-                        value={customColors[field.key]}
-                        onChange={(event) => handleColorChange(field.key, event.target.value)}
-                        className="h-6 w-10 cursor-pointer rounded border border-slate-200"
-                      />
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
-            </DropdownMenuContent>
-    </DropdownMenu>
-    </>
+function ThemeCard({ theme, active, onSelect }) {
+  const preview = theme.previewColors || ["#f8fafc", "#1e293b", "#4f46e5"];
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        "group relative rounded-xl border bg-card p-2 text-left text-card-foreground shadow-sm transition hover:-translate-y-0.5 hover:border-primary/70 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-ring",
+        active ? "border-primary ring-2 ring-primary/30" : "border-border"
+      )}
+      aria-pressed={active}
+    >
+      <span className="mb-2 grid h-12 grid-cols-3 overflow-hidden rounded-lg border border-border">
+        {preview.map((color, index) => <span key={`${theme.id}-${index}`} style={{ backgroundColor: color }} />)}
+      </span>
+      <span className="block truncate text-sm font-semibold">{theme.name}</span>
+      <span className="block truncate text-xs text-muted-foreground">{theme.description}</span>
+      {active && <Check className="absolute right-2 top-2 h-4 w-4 rounded-full bg-primary p-0.5 text-primary-foreground" />}
+    </button>
   );
 }
 
+function Field({ label, children }) {
+  return (
+    <label className="grid gap-1 text-xs font-medium text-muted-foreground">
+      <span>{label}</span>
+      {children}
+    </label>
+  );
+}
+
+export default function ThemeSwitcher({ iconOnly = false, className }) {
+  const { themeId, effectiveThemeId, themes, setThemeId, refreshCustomTheme } = useTheme();
+  const [open, setOpen] = useState(false);
+  const [builderOpen, setBuilderOpen] = useState(false);
+  const [showImportExport, setShowImportExport] = useState(false);
+  const [customThemes, setCustomThemes] = useState(() => getSavedCustomThemes());
+  const [editing, setEditing] = useState(() => customThemes[0] || { id: "custom", settings: DEFAULT_CUSTOM_COLORS });
+  const [settings, setSettings] = useState(() => normalizeCustomThemeSettings(editing.settings));
+  const [importExportText, setImportExportText] = useState("");
+  const [followSettings, setFollowSettings] = useState(() => getFollowSystemThemeSettings());
+
+  const lightThemes = useMemo(() => themes.filter((theme) => !theme.isDark && theme.id !== "custom"), [themes]);
+  const darkThemes = useMemo(() => themes.filter((theme) => theme.isDark), [themes]);
+  const customCards = useMemo(() => customThemes.map((theme) => {
+    const built = buildCustomTheme(theme.settings);
+    return {
+      id: theme.id,
+      name: theme.settings.name || "Custom Theme",
+      description: `${theme.settings.mode === "dark" ? "Dark" : "Light"} custom • ${DENSITY_OPTIONS[theme.settings.density]?.label || "Comfortable"}`,
+      isDark: built.isDark,
+      previewColors: built.previewColors
+    };
+  }), [customThemes]);
+  const allCards = useMemo(() => [...lightThemes, ...darkThemes, ...customCards], [lightThemes, darkThemes, customCards]);
+  const activeThemeName = allCards.find((theme) => theme.id === effectiveThemeId)?.name || "Light+ (Default)";
+  const matchWindows = themeId === SYSTEM_THEME_ID;
+
+  function persistCustom(nextSettings, id = editing.id) {
+    const saved = upsertCustomTheme({ id, settings: nextSettings });
+    const nextThemes = getSavedCustomThemes();
+    setCustomThemes(nextThemes);
+    setEditing(saved);
+    setSettings(saved.settings);
+    refreshCustomTheme();
+    return saved;
+  }
+
+  function updateSetting(key, value) {
+    const next = normalizeCustomThemeSettings({ ...settings, [key]: value });
+    setSettings(next);
+    persistCustom(next);
+    setThemeId(editing.id);
+  }
+
+  function createCustomTheme() {
+    const saved = upsertCustomTheme({ settings: { ...settings, name: settings.name || "New Theme" } });
+    setCustomThemes(getSavedCustomThemes());
+    setEditing(saved);
+    setSettings(saved.settings);
+    setThemeId(saved.id);
+    refreshCustomTheme();
+  }
+
+  function openBuilder(theme = editing) {
+    setEditing(theme);
+    setSettings(normalizeCustomThemeSettings(theme.settings));
+    setShowImportExport(false);
+    setBuilderOpen(true);
+  }
+
+  function selectCustom(id) {
+    const found = customThemes.find((theme) => theme.id === id) || customThemes[0];
+    setEditing(found);
+    setSettings(found.settings);
+    applyTheme({ id: found.id, isDark: found.settings.mode === "dark" });
+  }
+
+  function removeCustom(id) {
+    const nextThemes = deleteCustomTheme(id);
+    setCustomThemes(nextThemes);
+    const next = nextThemes[0];
+    setEditing(next);
+    setSettings(next.settings);
+    if (themeId === id) setThemeId(next.id);
+  }
+
+  function saveFollowSettings(next) {
+    setFollowSettings(next);
+    saveFollowSystemThemeSettings(next);
+    if (next.enabled) setThemeId(SYSTEM_THEME_ID);
+  }
+
+  function toggleMatchWindows(checked) {
+    const next = { ...followSettings, enabled: checked };
+    setFollowSettings(next);
+    saveFollowSystemThemeSettings(next);
+    setThemeId(checked ? SYSTEM_THEME_ID : effectiveThemeId);
+  }
+
+  function applyTheme(theme) {
+    if (matchWindows) {
+      saveFollowSettings({
+        ...followSettings,
+        enabled: true,
+        [theme.isDark ? "darkThemeId" : "lightThemeId"]: theme.id
+      });
+      return;
+    }
+    setThemeId(theme.id);
+  }
+
+  function copyExport() {
+    const text = exportCustomTheme(editing.id);
+    setImportExportText(text);
+    globalThis.navigator?.clipboard?.writeText?.(text).catch(() => {});
+  }
+
+  function importTheme() {
+    if (!importExportText.trim()) return;
+    try {
+      const imported = importCustomTheme(importExportText);
+      setCustomThemes(getSavedCustomThemes());
+      setEditing(imported);
+      setSettings(imported.settings);
+      setThemeId(imported.id);
+      refreshCustomTheme();
+    } catch {
+      setImportExportText("Could not import theme JSON. Paste an exported EnQuote theme or a valid settings object.");
+    }
+  }
+
+  return (
+    <>
+      <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenuTrigger asChild>
+          {iconOnly ? (
+            <Button variant="ghost" size="icon" aria-label="Change color theme" title="Change color theme" className={className}>
+              <Palette className="h-5 w-5" />
+            </Button>
+          ) : (
+            <button
+              type="button"
+              className={cn(
+                "inline-flex w-full items-center justify-center gap-2 rounded-xl border border-sidebar-border bg-sidebar-accent px-3 py-2 text-sm font-medium text-sidebar-accent-foreground transition hover:bg-sidebar-accent/80 focus:outline-none focus:ring-2 focus:ring-sidebar-ring",
+                className
+              )}
+            >
+              <Palette className="h-4 w-4" />
+              Theme
+            </button>
+          )}
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="max-h-[88vh] w-[min(42rem,calc(100vw-1rem))] overflow-y-auto border-border bg-popover p-3 text-popover-foreground">
+          <DropdownMenuLabel className="flex items-center justify-between gap-3 px-1 text-sm">
+            <span>Theme</span>
+            <span className="text-xs font-normal text-muted-foreground">Current: {activeThemeName}</span>
+          </DropdownMenuLabel>
+          <p className="px-1 pb-2 text-xs text-muted-foreground">Pick a look for EnQuote. Changes apply right away.</p>
+          <DropdownMenuSeparator className="bg-border" />
+
+        <section className="space-y-2 py-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Light</h3>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {lightThemes.map((theme) => <ThemeCard key={theme.id} theme={theme} active={effectiveThemeId === theme.id} onSelect={() => applyTheme(theme)} />)}
+          </div>
+        </section>
+
+        <section className="space-y-2 py-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dark</h3>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {darkThemes.map((theme) => <ThemeCard key={theme.id} theme={theme} active={effectiveThemeId === theme.id} onSelect={() => applyTheme(theme)} />)}
+          </div>
+        </section>
+
+        <section className="space-y-3 py-2">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">My themes</h3>
+            <Button type="button" size="sm" variant="outline" onClick={() => openBuilder(editing)}>Create your own theme</Button>
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {customCards.map((theme) => <ThemeCard key={theme.id} theme={theme} active={effectiveThemeId === theme.id} onSelect={() => selectCustom(theme.id)} />)}
+          </div>
+        </section>
+
+        <section className="space-y-2 rounded-xl border border-border bg-muted/30 p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium">Match Windows light/dark mode</p>
+              <p className="text-xs text-muted-foreground">EnQuote will switch when Windows switches.</p>
+            </div>
+            <Switch checked={matchWindows} onCheckedChange={toggleMatchWindows} aria-label="Match Windows light/dark mode" />
+          </div>
+          {matchWindows && (
+            <div className="grid gap-2 pt-2 sm:grid-cols-2">
+              <Field label="When Windows is light, use…">
+                <select className="rounded-md border border-input bg-background px-2 py-1.5 text-sm" value={followSettings.lightThemeId} onChange={(event) => saveFollowSettings({ ...followSettings, lightThemeId: event.target.value })}>
+                  {lightThemes.map((theme) => <option key={theme.id} value={theme.id}>{theme.name}</option>)}
+                </select>
+              </Field>
+              <Field label="When Windows is dark, use…">
+                <select className="rounded-md border border-input bg-background px-2 py-1.5 text-sm" value={followSettings.darkThemeId} onChange={(event) => saveFollowSettings({ ...followSettings, darkThemeId: event.target.value })}>
+                  {darkThemes.map((theme) => <option key={theme.id} value={theme.id}>{theme.name}</option>)}
+                </select>
+              </Field>
+              <p className="text-xs text-muted-foreground sm:col-span-2">Tip: while matching Windows, clicking a card updates the light or dark choice.</p>
+            </div>
+          )}
+        </section>
+
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <Dialog open={builderOpen} onOpenChange={setBuilderOpen}>
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create your own theme</DialogTitle>
+            <DialogDescription>Choose a few colors and EnQuote fills in the rest. Changes preview right away.</DialogDescription>
+          </DialogHeader>
+          <div className="rounded-xl border border-border bg-card p-3 text-card-foreground">
+            <div className="mb-3 grid h-16 grid-cols-3 overflow-hidden rounded-lg border border-border">
+              {buildCustomTheme(settings).previewColors.map((color, index) => <span key={index} style={{ backgroundColor: color }} />)}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Name"><input className="rounded-md border border-input bg-background px-2 py-1.5 text-sm" value={settings.name} onChange={(event) => updateSetting("name", event.target.value)} /></Field>
+              <Field label="Base"><select className="rounded-md border border-input bg-background px-2 py-1.5 text-sm" value={settings.mode} onChange={(event) => updateSetting("mode", event.target.value)}><option value="light">Light</option><option value="dark">Dark</option></select></Field>
+              <Field label="Primary"><input type="color" className="h-9 w-full rounded-md border border-input bg-background" value={settings.primary} onChange={(event) => updateSetting("primary", event.target.value)} /></Field>
+              <Field label="Accent"><input type="color" className="h-9 w-full rounded-md border border-input bg-background" value={settings.accent} onChange={(event) => updateSetting("accent", event.target.value)} /></Field>
+              <Field label="Background tint"><input type="color" className="h-9 w-full rounded-md border border-input bg-background" value={settings.backgroundTint} onChange={(event) => updateSetting("backgroundTint", event.target.value)} /></Field>
+              <Field label="Sidebar"><input type="color" className="h-9 w-full rounded-md border border-input bg-background" value={settings.sidebar} onChange={(event) => updateSetting("sidebar", event.target.value)} /></Field>
+              <Field label="Corner radius"><input type="range" min="0" max="1.5" step="0.05" value={settings.radius} onChange={(event) => updateSetting("radius", Number(event.target.value))} /></Field>
+              <Field label="Density"><select className="rounded-md border border-input bg-background px-2 py-1.5 text-sm" value={settings.density} onChange={(event) => updateSetting("density", event.target.value)}>{Object.entries(DENSITY_OPTIONS).map(([key, option]) => <option key={key} value={key}>{option.label}</option>)}</select></Field>
+              <Field label={`Font scale (${Math.round(settings.fontScale * 100)}%)`}><input type="range" min="0.9" max="1.12" step="0.01" value={settings.fontScale} onChange={(event) => updateSetting("fontScale", Number(event.target.value))} /></Field>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button type="button" size="sm" onClick={() => { persistCustom(settings); setThemeId(editing.id); }}><Save className="mr-1.5 h-3.5 w-3.5" /> Save</Button>
+              <Button type="button" size="sm" variant="outline" onClick={createCustomTheme}><Save className="mr-1.5 h-3.5 w-3.5" /> Save as new</Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => updateSetting("mode", settings.mode === "dark" ? "light" : "dark")}><RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Toggle base</Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => { const reset = normalizeCustomThemeSettings(DEFAULT_CUSTOM_COLORS); setSettings(reset); persistCustom(reset); }}><RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Reset</Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => setShowImportExport((value) => !value)}>{showImportExport ? "Hide" : "Import / export"}</Button>
+              {editing.id !== "custom" && <Button type="button" size="sm" variant="destructive" onClick={() => removeCustom(editing.id)}><Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete</Button>}
+            </div>
+            {showImportExport && (
+              <div className="mt-3 grid gap-2">
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" size="sm" variant="outline" onClick={copyExport}><Copy className="mr-1.5 h-3.5 w-3.5" /> Copy export</Button>
+                  <Button type="button" size="sm" variant="outline" onClick={importTheme}><Upload className="mr-1.5 h-3.5 w-3.5" /> Import JSON</Button>
+                </div>
+                <textarea className="min-h-20 rounded-md border border-input bg-background p-2 text-xs" placeholder="Paste a theme here to import, or copy the export text." value={importExportText} onChange={(event) => setImportExportText(event.target.value)} />
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}

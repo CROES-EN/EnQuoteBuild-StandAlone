@@ -6,6 +6,7 @@ import {Textarea} from "@/components/ui/textarea";
 import {Badge} from "@/components/ui/badge";
 import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
 import {Separator} from "@/components/ui/separator";
+import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
 import {
     AlertCircle,
     CheckCircle2,
@@ -111,7 +112,7 @@ export default function QuoteReviewPanel({ quote, currentUser, onClose }) {
           <h2 className="text-xl font-bold text-foreground">
             Quote #{quote.quote_number || "—"}
           </h2>
-          <p className="text-sm text-muted-foreground">Site ID: {quote.site_id}</p>
+          <p className="text-sm text-muted-foreground">Site ID: <SiteIdLink siteId={quote.site_id} /></p>
         </div>
         <Badge className={statusColors[reviewStatus]}>
           {reviewStatus === "pending" && <Clock className="w-3 h-3 mr-1" />}
@@ -169,7 +170,7 @@ export default function QuoteReviewPanel({ quote, currentUser, onClose }) {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <p className="text-xs text-muted-foreground">Case Number</p>
-                <p className="font-medium">{quote.case_number || "—"}</p>
+                <p className="font-medium"><CaseNumberLink caseNumber={quote.case_number} fallback="—" className="font-medium" /></p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Valid Until</p>

@@ -1,61 +1,63 @@
-// Hard-coded tab access per role. This is an allow-list: a restricted role sees ONLY the pages
-// listed here, so any page added in the future stays hidden from it until added below.
-// Admins are never restricted, and a role not listed here (e.g. invoicer) is unrestricted.
-export const ROLE_PAGE_ACCESS = Object.freeze({
+export const ALL_PAGES = Object.freeze([
+  "Dashboard", "Workload", "Tasks", "Messages", "Quotes", "CreateQuote", "EditQuote", "QuoteDetails",
+  "QuoteOverview", "AutoDrafter", "Products", "MaterialOrders", "PVPanelRMAs", "SLAReporting",
+  "Boneyard", "SVCancelTracker", "ResourcePlanner", "SOPLibrary", "SiteFlagManager", "EnphaseCare",
+  "InactiveRevenueDashboard", "InactiveCollections", "RevenueAnalytics", "Users", "QuoteDeletionRequests",
+  "EmailNotifications", "FollowUpSettings", "PDFTemplateSettings", "ManagerDashboard", "SupervisorDashboard",
+  "RejectedQuoteReview"
+]);
+
+// Matches the pre-1.4.0 effective access exactly (old allow-list ∩ each page's RoleGuard), so nothing
+// changes until an admin edits the matrix in the Admin Menu.
+export const DEFAULT_ROLE_PAGES = Object.freeze({
   submitter: [
-    "Dashboard",
-    "Workload",
-    "Quotes",
-    "AutoDrafter",
-    "Products",
-    "MaterialOrders",
-    "PVPanelRMAs",
-    "SLAReporting",
-    "Boneyard",
-    "SVCancelTracker",
-    "ResourcePlanner",
-    "SiteFlagManager",
-    "InactiveRevenueDashboard",
-    "EnphaseCare",
-    "Tasks",
-    "SOPLibrary",
-    "Messages"
+    "Dashboard", "Workload", "Tasks", "Messages", "Quotes", "AutoDrafter", "Products", "MaterialOrders",
+    "PVPanelRMAs", "SLAReporting", "Boneyard", "SVCancelTracker", "ResourcePlanner", "SOPLibrary",
+    "SiteFlagManager", "EnphaseCare"
   ],
   approver: [
-    "Dashboard",
-    "Workload",
-    "Quotes",
-    "AutoDrafter",
-    "Products",
-    "MaterialOrders",
-    "PVPanelRMAs",
-    "SLAReporting",
-    "Boneyard",
-    "SVCancelTracker",
-    "ResourcePlanner",
-    "SiteFlagManager",
-    "InactiveRevenueDashboard",
-    "EnphaseCare",
-    "Tasks",
-    "SOPLibrary",
-    "Messages"
-  ]
+    "Dashboard", "Workload", "Tasks", "Messages", "Quotes", "AutoDrafter", "Products", "MaterialOrders",
+    "PVPanelRMAs", "SLAReporting", "Boneyard", "SVCancelTracker", "ResourcePlanner", "SOPLibrary",
+    "SiteFlagManager", "EnphaseCare", "InactiveRevenueDashboard"
+  ],
+  invoicer: [
+    "Dashboard", "Workload", "Tasks", "Messages", "Quotes", "QuoteDetails", "QuoteOverview", "AutoDrafter",
+    "Boneyard", "SOPLibrary", "RejectedQuoteReview", "EnphaseCare", "InactiveRevenueDashboard", "InactiveCollections"
+  ],
+  admin: ALL_PAGES,
+  super_admin: ALL_PAGES
 });
 
-// Tolerates malformed role data (null, a single string, an object) instead of crashing the
-// whole layout: anything that is not an array becomes a list (one role for a string, else none).
+const ADMIN_ROLES = new Set(["admin", "super_admin"]);
+
 export function toRoleList(value) {
-  if (Array.isArray(value)) return value;
+  if (Array.isArray(value)) return value.map((role) => String(role || "").trim()).filter(Boolean);
   if (typeof value === "string" && value.trim()) return [value.trim()];
   return [];
 }
 
-// Admin overrides everything. A user holding several roles is restricted only if every one of
-// their roles is restricted, and then sees the union of those roles' pages.
-export function canAccessPage(userRoles, page, isAdmin) {
-  const roles = toRoleList(userRoles);
-  if (isAdmin || roles.includes("admin") || roles.includes("super_admin")) return true;
-  if (!roles.length) return true;
-  if (roles.some(role => !Array.isArray(ROLE_PAGE_ACCESS[role]))) return true;
-  return roles.some(role => ROLE_PAGE_ACCESS[role].includes(page));
+export function rolesForUser(userOrRoles) {
+  if (Array.isArray(userOrRoles) || typeof userOrRoles === "string") return toRoleList(userOrRoles);
+  return toRoleList([userOrRoles?.app_role, ...toRoleList(userOrRoles?.additional_roles)]);
+}
+
+export function canAccessPage(userOrRoles, page, policy = null) {
+  const pageName = String(page || "").trim();
+  if (!pageName) return true;
+  const user = Array.isArray(userOrRoles) || typeof userOrRoles === "string" ? null : userOrRoles;
+  const roles = rolesForUser(userOrRoles);
+  const denyPages = new Set(toRoleList(user?.deny_pages));
+  const allowPages = new Set(toRoleList(user?.allow_pages));
+  if (denyPages.has(pageName)) return false;
+  if (allowPages.has(pageName)) return true;
+  if (roles.some((role) => ADMIN_ROLES.has(role))) return true;
+  if (!roles.length) return false;
+  const rolePages = policy?.rolePages || DEFAULT_ROLE_PAGES;
+  return roles.some((role) => toRoleList(rolePages?.[role]).includes(pageName));
+}
+
+export function pageFromPathname(pathname) {
+  const clean = String(pathname || "").split("?")[0].split("#")[0].replace(/^\/+/, "");
+  if (!clean) return "Dashboard";
+  return clean.split("/")[0] || "Dashboard";
 }

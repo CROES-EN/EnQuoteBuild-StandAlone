@@ -28,6 +28,7 @@ import QuoteReviewPanel from "@/components/quotes/QuoteReviewPanel";
 import RejectionOverview from "@/components/rejection/RejectionOverview";
 import RejectionInterpretations from "@/components/rejection/RejectionInterpretations";
 import SiteRejectionProgressPanel from "@/components/rejection/SiteRejectionProgressPanel";
+import {SiteIdLink} from "@/components/links/ExternalIdLinks";
 
 const ALLOWED_REVIEWERS = ["smosley", "tmeyer", "dankenman", "tjm8189", "vseganos"];
 
@@ -404,7 +405,7 @@ export default function RejectedQuoteReview() {
                           )}
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <p className="font-semibold text-foreground">Site: {siteId}</p>
+                              <p className="font-semibold text-foreground">Site: <SiteIdLink siteId={siteId} className="font-semibold" /></p>
                               {(hasMultiple || totalRejections > 1) && (
                                 <Badge className="bg-orange-100 text-orange-700 text-xs border border-orange-200">
                                   {totalRejections} rejections · {siteQuotes.length} version{siteQuotes.length > 1 ? "s" : ""}
@@ -481,7 +482,7 @@ export default function RejectedQuoteReview() {
         <SheetContent className="w-full sm:max-w-3xl overflow-y-auto">
           <SheetHeader className="mb-4">
             <SheetTitle className="flex items-center gap-2">
-              <Layers className="w-5 h-5 text-orange-500" /> Rejection Progress — Site {selectedSite}
+              <Layers className="w-5 h-5 text-orange-500" /> Rejection Progress — Site <SiteIdLink siteId={selectedSite} />
             </SheetTitle>
           </SheetHeader>
           {selectedSite && (

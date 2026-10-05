@@ -13,6 +13,7 @@ import {generateQuoteDraft} from "@/features/quoteDraftAgent/draftEngine";
 import {saveGeneratedDraft} from "@/features/autoDrafter/autoDrafterDraftsStore";
 import {useCareEligibilityIndex} from "@/features/supervisorDashboard/careEligibilityCache";
 import {getEligibilityFromIndex} from "@/features/supervisorDashboard/careEligibility";
+import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
 
 /**
  * AutoDrafterCaseTile - a quote-page-style tile for a single raw Salesforce case row,
@@ -171,7 +172,18 @@ export default ({
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: index * 0.03 }}
       >
-        <button type="button" className="block w-full text-left" onClick={() => onViewDraft?.()}>
+        <div
+          role="button"
+          tabIndex={0}
+          className="block w-full text-left"
+          onClick={() => onViewDraft?.()}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              onViewDraft?.();
+            }
+          }}
+        >
           <Card className="p-5 hover:shadow-lg transition-all duration-300 border-border hover:border-indigo-200 group cursor-pointer h-full flex flex-col">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
@@ -180,7 +192,7 @@ export default ({
                 </div>
                 <div>
                   <h3 className="font-semibold text-foreground group-hover:text-indigo-600 transition-colors">
-                    {savedDraftRecord.siteId || "No Site ID"}
+                    <SiteIdLink siteId={savedDraftRecord.siteId} fallback="No Site ID" className="font-semibold" />
                   </h3>
                   <p className="text-sm text-muted-foreground">{displayReference || "No reference"}</p>
                 </div>
@@ -222,7 +234,7 @@ export default ({
               </span>
             </div>
           </Card>
-        </button>
+        </div>
       </motion.div>
     );
   }
@@ -242,7 +254,7 @@ export default ({
             </div>
             <div>
               <h3 className="font-semibold text-foreground group-hover:text-violet-600 transition-colors flex items-center gap-1.5">
-                {customerName || (siteId ? `Site ${siteId}` : "Unknown Customer")}
+                {customerName || (siteId ? <>Site <SiteIdLink siteId={siteId} /></> : "Unknown Customer")}
                 {hasActiveCareRaw && (
                   <span title="Active Enphase Care">
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
@@ -250,7 +262,7 @@ export default ({
                 )}
               </h3>
               <p className="text-sm text-muted-foreground">
-                Case #{caseNumber || "No reference"}
+                Case #<CaseNumberLink caseNumber={caseNumber} fallback="No reference" />
               </p>
             </div>
           </div>
@@ -292,7 +304,7 @@ export default ({
         <div className="mt-4 pt-4 border-t border-border flex items-center justify-between">
           <span className="text-xs text-muted-foreground flex items-center gap-1">
             <Package className="w-3 h-3" />
-            {siteId ? `Site ${siteId}` : "No site ID"}
+            {siteId ? <>Site <SiteIdLink siteId={siteId} /></> : "No site ID"}
           </span>
           {quoteCategory && (
             <span className="text-sm font-bold text-foreground">{quoteCategory}</span>

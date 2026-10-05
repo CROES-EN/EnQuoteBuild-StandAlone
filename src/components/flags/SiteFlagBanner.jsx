@@ -3,6 +3,7 @@ import {Link} from "react-router-dom";
 import {createPageUrl} from "@/utils";
 import {AlertTriangle, ChevronDown, ChevronUp, ExternalLink, ShieldAlert, Siren} from "lucide-react";
 import {cn} from "@/lib/utils";
+import {SiteIdLink} from "@/components/links/ExternalIdLinks";
 
 const FLAG_CONFIG = {
   red: {
@@ -71,7 +72,7 @@ function FlagGroup({ level, flags }) {
               <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-1">
                 <div>
                   <p className="text-xs text-muted-foreground">Site ID</p>
-                  <p className="font-bold text-foreground">{flag.site_id}</p>
+                  <p className="font-bold text-foreground"><SiteIdLink siteId={flag.site_id} className="font-bold" /></p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Trigger</p>

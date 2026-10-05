@@ -189,13 +189,17 @@ export function getImportantRowEmphasis(value, tiles) {
 // Column visibility + order
 // ---------------------------------------------------------------------------------------------
 
-/** Master list of the 16 real imported columns (excludes the always-shown "Open" and "Details"
+/** Imported columns that are never displayed or offered in Customize. "Case ID" is only used to
+ *  build the Salesforce link behind the Case Number. */
+export const ALWAYS_HIDDEN_WORKLOAD_COLUMNS = new Set(["Case ID"]);
+
+/** Master list of the displayable imported columns (excludes the always-shown "Open" and "Details"
  *  columns, which aren't real imported data), in the ORIGINAL Excel-matching default order. */
 export const DEFAULT_COLUMN_ORDER = [
   "O&M Status", "Project Picklist", "Status", "Case Number", "Enlighten Site ID",
   "Case Owner", "Subject", "Case Last Modified By", "Contact Name", "Contact: Email",
   "New_Location", "Contact: Phone", "Date/Time Opened", "Age (Days)",
-  "Case Date/Time Last Modified", "Case ID"
+  "Case Date/Time Last Modified"
 ];
 
 /** Returns the user's saved column order, safely merged with DEFAULT_COLUMN_ORDER so a newly

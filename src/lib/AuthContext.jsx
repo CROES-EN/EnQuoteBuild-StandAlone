@@ -111,7 +111,7 @@ const AuthProvider = ({children}) => {
   // synced record's own "full_name" field is actually the short username (e.g. "jwood") -
   // the friendlier human name, when set, lives in "display_name".
   const buildUserFromRecord = (record, fallbackEmail) => {
-    const email = record?.email || fallbackEmail || "";
+    const email = String(record?.email || fallbackEmail || "").trim().toLowerCase();
     const isForcedAdmin = FORCED_ADMIN_EMAILS.has(email);
     // Cloudflare Access is the identity allow-list for packaged users. Give an authenticated
     // user without a synced role the least-privileged app role so a missing local User record
@@ -123,10 +123,15 @@ const AuthProvider = ({children}) => {
       id: record?.id || `local-${email || "user"}`,
       email,
       full_name: displayName,
+      display_name: record?.display_name || displayName,
       name: displayName,
       role: resolvedRole,
       app_role: resolvedRole,
-      additional_roles: record?.additional_roles || []
+      additional_roles: record?.additional_roles || [],
+      allow_pages: record?.allow_pages || [],
+      deny_pages: record?.deny_pages || [],
+      role_source: record?.role_source || "base44",
+      department: record?.department || null
     };
   };
 
@@ -152,7 +157,13 @@ const AuthProvider = ({children}) => {
       return;
     }
     if (record) {
-      setUser(buildUserFromRecord(record, user.email));
+      const refreshed = buildUserFromRecord(record, user.email);
+      setUser(refreshed);
+      getEnquoteLocal()?.presence?.announce?.({
+        email: refreshed.email,
+        name: refreshed.full_name || refreshed.name || refreshed.email,
+        resolvedRole: refreshed.app_role
+      })?.catch?.(() => {});
     }
   }, [user]);
 
@@ -192,7 +203,8 @@ const AuthProvider = ({children}) => {
     // silently.
     getEnquoteLocal()?.presence?.announce?.({
       email,
-      name: record?.full_name || record?.name || email
+      name: record?.full_name || record?.name || email,
+      resolvedRole: buildUserFromRecord(record, email).app_role
     })?.catch?.((presenceError) => {
       recordError({
         source: "presence.announce",
@@ -201,6 +213,20 @@ const AuthProvider = ({children}) => {
     });
 
   }, []);
+
+  useEffect(() => {
+    const appBridge = getEnquoteLocal()?.app;
+    const adminBridge = getEnquoteLocal()?.admin;
+    const unsubscribers = [];
+    if (appBridge?.onDataUpdated) unsubscribers.push(appBridge.onDataUpdated(() => { void refreshLocalUser(); }));
+    if (appBridge?.onUsersChanged) unsubscribers.push(appBridge.onUsersChanged(() => { void refreshLocalUser(); }));
+    if (adminBridge?.onPolicyChanged) unsubscribers.push(adminBridge.onPolicyChanged(() => { void refreshLocalUser(); }));
+    return () => {
+      for (const unsubscribe of unsubscribers) {
+        if (typeof unsubscribe === "function") unsubscribe();
+      }
+    };
+  }, [refreshLocalUser]);
 
   // Maps a failed remote app-state check onto the right authError shape. Split out of
   // checkRemoteAppState purely to keep that function's Cognitive Complexity low.
@@ -355,7 +381,6 @@ const AuthProvider = ({children}) => {
     } else {
       await checkLocalAppState();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -365,7 +390,6 @@ const AuthProvider = ({children}) => {
     checkAppState().catch((error) => {
       console.error('checkAppState failed:', error);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const logout = useCallback(async (shouldRedirect = true) => {
@@ -404,6 +428,11 @@ const AuthProvider = ({children}) => {
       base44.auth.logout();
     }
   }, [user, isLocalAuthActive]);
+
+  useEffect(() => {
+    const unsubscribe = getEnquoteLocal()?.admin?.onSignOut?.(() => { void logout(false); });
+    return () => { if (typeof unsubscribe === "function") unsubscribe(); };
+  }, [logout]);
 
   const reauthenticateCloudflare = useCallback(async () => {
     const authBridge = getLocalAuthBridge();

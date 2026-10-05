@@ -33,6 +33,7 @@ import {format, isAfter, parseISO, subDays} from "date-fns";
 import {cn} from "@/lib/utils";
 import RoleGuard from "@/components/auth/RoleGuard";
 import SiteQuoteTracker from "@/components/flags/SiteQuoteTracker";
+import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
 
 const FLAG_STYLES = {
   red: { bg: "bg-red-100", text: "text-red-800", border: "border-red-300", icon: Siren, label: "Critical Review" },
@@ -77,7 +78,7 @@ function FlagCard({ flag, onResolve, onDelete }) {
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2 mb-1">
-                <span className="text-lg font-bold text-foreground">{flag.site_id}</span>
+                <SiteIdLink siteId={flag.site_id} className="text-lg font-bold" />
                 <Badge className={cn(cfg.bg, cfg.text, "border-0 text-xs")}>{cfg.label}</Badge>
                 {flag.is_resolved && <Badge className="bg-emerald-100 text-emerald-700 border-0 text-xs">Resolved</Badge>}
               </div>
@@ -669,24 +670,11 @@ function SupportInteractionsLog() {
           <div className="divide-y divide-slate-100">
               {paginated.map((interaction) => {
               const repeatCount = siteRepeatCounts[interaction.site_id] || 1;
-              const sfUrl = interaction.salesforce_case_id ?
-              `https://enphase.lightning.force.com/lightning/r/Case/${interaction.salesforce_case_id}/view` :
-              null;
-              const enlightenUrl = interaction.site_id ?
-              `https://enlighten.enphaseenergy.com/admin/sites/${interaction.site_id}` :
-              null;
-
               return (
                 <div key={interaction.id} className="px-5 py-3 grid grid-cols-2 md:grid-cols-5 gap-x-4 gap-y-1 text-sm">
                     <div>
                       <p className="text-xs text-muted-foreground">Site ID</p>
-                      {enlightenUrl ?
-                    <a href={enlightenUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-indigo-600 hover:text-indigo-800 hover:underline">
-                          {interaction.site_id}
-                        </a> :
-
-                    <p className="font-semibold text-foreground">{interaction.site_id}</p>
-                    }
+                      <SiteIdLink siteId={interaction.site_id} fallback="—" className="font-semibold" />
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Date</p>
@@ -698,13 +686,7 @@ function SupportInteractionsLog() {
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Case #</p>
-                      {sfUrl ?
-                    <a href={sfUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-800 hover:underline">
-                          {interaction.case_number || "—"}
-                        </a> :
-
-                    <p className="text-foreground">{interaction.case_number || "—"}</p>
-                    }
+                      <CaseNumberLink caseNumber={interaction.case_number} caseId={interaction.salesforce_case_id} fallback="—" />
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Repeat Contacts</p>

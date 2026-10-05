@@ -56,6 +56,9 @@ export function isSafeUrl(value) {
 function toDraft(doc) {
   return {
     id: doc?.id,
+    section_id: doc?.section_id || "",
+    order: Number.isFinite(Number(doc?.order)) ? Number(doc.order) : undefined,
+    parent_id: doc?.parent_id || null,
     title: doc?.title || "",
     category: doc?.category || "",
     summary: doc?.summary || "",
@@ -78,6 +81,9 @@ export default function SopEditor({doc, categories, onSaved, onCancel}) {
 
   const buildRecord = () => ({
     ...(draft.id ? {id: draft.id} : {}),
+    ...(draft.section_id ? {section_id: draft.section_id} : {}),
+    ...(Number.isFinite(Number(draft.order)) ? {order: Number(draft.order)} : {}),
+    ...(draft.parent_id ? {parent_id: draft.parent_id} : {}),
     title: draft.title.trim(),
     category: draft.category.trim() || "General",
     summary: draft.summary.trim(),
@@ -185,7 +191,7 @@ export default function SopEditor({doc, categories, onSaved, onCancel}) {
 
       <div className="space-y-1.5">
         <Label>Content</Label>
-        <div className="sop-editor rounded-md bg-white">
+        <div className="sop-editor rounded-md bg-background">
           <ReactQuill theme="snow" value={draft.content_html} onChange={(value) => update({content_html: value})} modules={QUILL_MODULES} />
         </div>
       </div>
@@ -207,14 +213,14 @@ export default function SopEditor({doc, categories, onSaved, onCancel}) {
           />
         </div>
         {draft.files.length === 0 ? (
-          <p className="text-xs text-slate-500">PDF, Word (.docx), images or text files up to 20 MB each.</p>
+          <p className="text-xs text-muted-foreground">PDF, Word (.docx), images or text files up to 20 MB each.</p>
         ) : (
-          <ul className="divide-y divide-slate-100 rounded-md border border-slate-200">
+          <ul className="divide-y divide-border rounded-md border border-border">
             {draft.files.map((file) => (
               <li key={file.fileId} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
                 <span className="truncate">{file.name}</span>
                 <span className="flex items-center gap-2">
-                  <span className="text-xs text-slate-400">{formatBytes(file.size)}</span>
+                  <span className="text-xs text-muted-foreground">{formatBytes(file.size)}</span>
                   <Button
                     type="button"
                     size="icon"
@@ -232,9 +238,9 @@ export default function SopEditor({doc, categories, onSaved, onCancel}) {
         )}
       </div>
 
-      <div className="flex justify-end gap-2 border-t border-slate-200 pt-4">
+      <div className="flex justify-end gap-2 border-t border-border pt-4">
         <Button variant="outline" onClick={onCancel} disabled={saving}>Cancel</Button>
-        <Button onClick={() => save(false)} disabled={saving || uploading > 0} className="bg-orange-600 hover:bg-orange-700">
+        <Button onClick={() => save(false)} disabled={saving || uploading > 0}>
           {saving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}
           Save SOP
         </Button>
@@ -252,7 +258,7 @@ export default function SopEditor({doc, categories, onSaved, onCancel}) {
           <AlertDialogFooter>
             <AlertDialogCancel onClick={reloadLatest}>Load their version</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-rose-600 hover:bg-rose-700"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => { setConflict(null); save(true); }}
             >
               Overwrite with mine

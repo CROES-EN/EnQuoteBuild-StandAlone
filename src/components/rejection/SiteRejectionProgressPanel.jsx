@@ -14,6 +14,7 @@ import {
     TrendingUp,
     Wrench
 } from "lucide-react";
+import {SiteIdLink} from "@/components/links/ExternalIdLinks";
 
 const formatDate = (d) => d ? new Date(d).toLocaleDateString() : "—";
 const formatCurrency = (v) => `$${(v || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -185,7 +186,7 @@ export default function SiteRejectionProgressPanel({ siteId, allReviews = [], on
       {/* Site Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-foreground">Site: {siteId}</h2>
+          <h2 className="text-xl font-bold text-foreground">Site: <SiteIdLink siteId={siteId} className="text-xl font-bold" /></h2>
           <p className="text-sm text-muted-foreground mt-0.5">
             {sorted.length} quote version{sorted.length !== 1 ? "s" : ""} · {rejectionCount} rejection{rejectionCount !== 1 ? "s" : ""}
           </p>

@@ -61,12 +61,12 @@ export default function SopFilePreview({file}) {
   let body;
   if (state.status === "loading") {
     body = (
-      <div className="flex items-center justify-center gap-2 py-10 text-sm text-slate-500">
+      <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" /> Loading file...
       </div>
     );
   } else if (state.status === "error") {
-    body = <p className="px-3 py-6 text-sm text-rose-600">{state.message}</p>;
+    body = <p className="px-3 py-6 text-sm text-destructive">{state.message}</p>;
   } else if (state.type.startsWith("image/")) {
     body = <img src={state.url} alt={file.name} className="mx-auto max-h-[70vh] max-w-full object-contain p-2" />;
   } else if (state.type === "application/pdf") {
@@ -74,18 +74,18 @@ export default function SopFilePreview({file}) {
   } else if (state.html !== null) {
     body = <div className="sop-content max-h-[75vh] overflow-auto px-4 py-3" dangerouslySetInnerHTML={{__html: state.html}} />;
   } else if (state.text !== null) {
-    body = <pre className="max-h-[75vh] overflow-auto whitespace-pre-wrap px-4 py-3 text-sm text-slate-700">{state.text}</pre>;
+    body = <pre className="max-h-[75vh] overflow-auto whitespace-pre-wrap px-4 py-3 text-sm text-foreground">{state.text}</pre>;
   } else {
-    body = <p className="px-3 py-6 text-sm text-slate-500">This file can't be previewed. Use "Save copy" to open it.</p>;
+    body = <p className="px-3 py-6 text-sm text-muted-foreground">This file can't be previewed. Use "Save copy" to open it.</p>;
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-      <div className="flex items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2">
+    <div className="overflow-hidden rounded-lg border border-border bg-background">
+      <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/40 px-3 py-2">
         <div className="flex min-w-0 items-center gap-2 text-sm">
-          <FileText className="h-4 w-4 flex-shrink-0 text-slate-500" />
-          <span className="truncate font-medium text-slate-700">{file.name}</span>
-          <span className="flex-shrink-0 text-xs text-slate-400">{formatBytes(file.size)}</span>
+          <FileText className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+          <span className="truncate font-medium text-foreground">{file.name}</span>
+          <span className="flex-shrink-0 text-xs text-muted-foreground">{formatBytes(file.size)}</span>
         </div>
         {state.status === "ready" && (
           <Button asChild size="sm" variant="ghost">

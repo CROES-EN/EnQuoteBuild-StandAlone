@@ -13,6 +13,7 @@ import {AlertTriangle, Check, ExternalLink, Sparkles} from "lucide-react";
 import {toast} from "sonner";
 import {hasQuoteRequestEvidence, parseQuoteRequestOutput} from "./quoteRequestTextParser";
 import {detectQuoteBlockingIssues, generateQuoteDraft} from "./draftEngine";
+import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
 
 // Quote Draft Agent (Step 2) -- LOCAL, in-app replacement.
 //
@@ -287,8 +288,8 @@ export default function QuoteDraftButton({ quote, products, onApply }) {
               )}
 
               <div className="grid grid-cols-2 gap-2">
-                <div><span className="font-semibold">Site ID:</span> {preview.site_id || MANUAL_INPUT_PLACEHOLDER}</div>
-                <div><span className="font-semibold">Case Number:</span> {preview.case_number || MANUAL_INPUT_PLACEHOLDER}</div>
+                <div><span className="font-semibold">Site ID:</span> <SiteIdLink siteId={preview.site_id} fallback={MANUAL_INPUT_PLACEHOLDER} /></div>
+                <div><span className="font-semibold">Case Number:</span> <CaseNumberLink caseNumber={preview.case_number} fallback={MANUAL_INPUT_PLACEHOLDER} /></div>
                 <div><span className="font-semibold">Picklist:</span> {preview.picklist || "On-Demand"}</div>
                 <div><span className="font-semibold">O&M Status:</span> {preview.om_status || "Quote Requested"}</div>
                 <div><span className="font-semibold">Valid Until:</span> {computeValidUntil()} (today + 30 days)</div>
@@ -399,4 +400,3 @@ export default function QuoteDraftButton({ quote, products, onApply }) {
     </>
   );
 }
-

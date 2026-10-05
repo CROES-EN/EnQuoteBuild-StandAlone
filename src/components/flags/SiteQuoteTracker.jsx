@@ -7,6 +7,7 @@ import {Input} from "@/components/ui/input";
 import {cn} from "@/lib/utils";
 import {CheckCircle2, ChevronDown, ChevronUp, RefreshCw, Search} from "lucide-react";
 import {format} from "date-fns";
+import {SiteIdLink} from "@/components/links/ExternalIdLinks";
 
 const STATUS_LABEL = {
   draft_without_internal: "Draft",
@@ -114,14 +115,22 @@ function SiteRow({ site }) {
 
   return (
     <div className={cn("border-2 rounded-xl overflow-hidden", level.color.includes("red") ? "border-red-200" : level.color.includes("orange") ? "border-orange-200" : "border-yellow-200")}>
-      <button
+      <div
+        role="button"
+        tabIndex={0}
         className="w-full flex items-center justify-between px-4 py-3 bg-card hover:bg-secondary text-left gap-4"
         onClick={() => setExpanded(!expanded)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            setExpanded(!expanded);
+          }
+        }}
       >
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <div className="flex flex-col items-start min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-bold text-foreground">Site {site.site_id}</span>
+              <span className="font-bold text-foreground">Site <SiteIdLink siteId={site.site_id} className="font-bold" /></span>
               {site.submitter && (
                 <span className="text-xs text-indigo-600 font-medium bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">
                   👤 {site.submitter}
@@ -140,7 +149,7 @@ function SiteRow({ site }) {
           <span>Score: <strong className="text-foreground">{score}</strong></span>
           {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
         </div>
-      </button>
+      </div>
 
       {expanded && (
         <div className="border-t border-border bg-secondary px-4 py-3 space-y-2">

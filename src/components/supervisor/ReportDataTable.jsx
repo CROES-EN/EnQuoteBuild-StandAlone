@@ -15,6 +15,8 @@ import {
     resetSummaryFields,
     setSummaryFields
 } from "@/features/supervisorDashboard/summaryFieldPreferences";
+import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
+import {caseIdFromRow, isCaseNumberColumn, isEnlightenSiteIdColumn} from "@/lib/externalLinks";
 
 const NONE_VALUE = "__none__";
 const SUMMARY_SLOT_COUNT = 4;
@@ -50,6 +52,17 @@ function guessSummaryFields(columns) {
   ].filter(Boolean);
 }
 
+function LinkedReportValue({ column, row, className }) {
+  const value = row?.[column];
+  if (isCaseNumberColumn(column)) {
+    return <CaseNumberLink caseNumber={value} caseId={caseIdFromRow(row)} fallback="None" className={className} />;
+  }
+  if (isEnlightenSiteIdColumn(column)) {
+    return <SiteIdLink siteId={value} fallback="None" className={className} />;
+  }
+  return value || "None";
+}
+
 /**
  * Popup showing every column of ONE row as labeled, stacked fields - the full-detail view
  * opened by clicking "View Details" on a compact row. Long values wrap naturally here instead
@@ -69,7 +82,7 @@ function RowDetailsDialog({ open, onOpenChange, columns, row, titleValue }) {
             <div key={col} className="grid grid-cols-3 gap-4 py-2.5 text-sm">
               <dt className="col-span-1 font-medium text-muted-foreground">{col}</dt>
               <dd className="col-span-2 whitespace-pre-wrap break-words text-foreground">
-                {row?.[col] || "None"}
+                <LinkedReportValue column={col} row={row} />
               </dd>
             </div>
           ))}
@@ -353,10 +366,17 @@ export default function ReportDataTable({ reportType, table, defaultSummaryField
 
       <div className="max-h-[32rem] space-y-2 overflow-auto rounded-lg border border-border bg-card p-2">
         {paginatedRows.map((row, i) => (
-          <button
+          <div
             key={page * PAGE_SIZE + i}
-            type="button"
+            role="button"
+            tabIndex={0}
             onClick={() => setDetailsRow(row)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                setDetailsRow(row);
+              }
+            }}
             className="flex w-full items-center justify-between gap-3 rounded-lg border border-border bg-secondary px-3 py-2.5 text-left transition-colors hover:border-indigo-200 hover:bg-indigo-50"
           >
             <div className="min-w-0 flex-1">
@@ -366,7 +386,7 @@ export default function ReportDataTable({ reportType, table, defaultSummaryField
                     <span key={field.column} className="min-w-0 max-w-full truncate text-sm">
                       <span className="text-muted-foreground">{field.label}:</span>{" "}
                       <span className={idx === 0 ? "font-semibold text-foreground" : "text-foreground"}>
-                        {row[field.column] || "None"}
+                        <LinkedReportValue column={field.column} row={row} className={idx === 0 ? "font-semibold" : ""} />
                       </span>
                     </span>
                   ))
@@ -378,7 +398,7 @@ export default function ReportDataTable({ reportType, table, defaultSummaryField
             <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-primary">
               View Details <ChevronRight className="h-3.5 w-3.5" />
             </span>
-          </button>
+          </div>
         ))}
         {filteredRows.length === 0 && (
           <div className="py-8 text-center text-sm text-muted-foreground">
@@ -425,4 +445,3 @@ export default function ReportDataTable({ reportType, table, defaultSummaryField
     </div>
   );
 }
-

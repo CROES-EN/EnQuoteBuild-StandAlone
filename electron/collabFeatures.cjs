@@ -4,6 +4,8 @@ const { createCollabClient } = require("./collabClient.cjs");
 const { createTasksSync } = require("./tasksSync.cjs");
 const { createSopLibrary } = require("./sopLibrary.cjs");
 const { createChatService } = require("./chatService.cjs");
+const { createProfileService } = require("./profileService.cjs");
+const { setupAdminFeatures } = require("./adminFeatures.cjs");
 
 const PREVIEW_LENGTH = 140;
 
@@ -29,6 +31,7 @@ function setupCollabFeatures({
   getOutboundToken,
   getAccessHeaders,
   addBellNotification = async () => {},
+  onUsersUpdated = async () => {},
   logger = console
 }) {
   let userToken = "";
@@ -131,6 +134,13 @@ function setupCollabFeatures({
     }
   });
 
+  const profiles = createProfileService({
+    client,
+    storageDir,
+    logger,
+    onChanged: (update) => sendToRenderer("profiles:changed", update)
+  });
+
   // Every handler returns { ok:false, error, reason } instead of throwing, so the renderer gets
   // a readable message rather than Electron's "Error invoking remote method" wrapper.
   function handle(channel, fn) {
@@ -175,6 +185,24 @@ function setupCollabFeatures({
     return { ok: true };
   });
 
+  handle("profiles:list", () => profiles.list());
+  handle("profiles:setAvatar", (payload) => profiles.setAvatar(payload || {}));
+  handle("profiles:removeAvatar", () => profiles.removeAvatar());
+  handle("profiles:getAvatar", (avatarId) => profiles.getAvatar(String(avatarId || "")));
+  handle("gifs:search", (payload) => client.get("/api/gifs/search", { q: payload?.q || "", offset: payload?.offset || 0 }));
+  handle("gifs:trending", (payload) => client.get("/api/gifs/trending", { offset: payload?.offset || 0 }));
+
+  const admin = setupAdminFeatures({
+    ipcMain,
+    client,
+    storageDir,
+    getEmail,
+    getInboxKey: () => inboxKey,
+    getMainWindow,
+    runUsersSync: onUsersUpdated,
+    logger
+  });
+
   const realtimeHandlers = {
     tasks_updated: (message) => {
       if (inboxKey && message.key === inboxKey) return tasks.sync();
@@ -187,7 +215,9 @@ function setupCollabFeatures({
         return chat.poll();
       }
       return undefined;
-    }
+    },
+    profiles_updated: () => profiles.changed(),
+    ...admin.realtimeHandlers
   };
 
   function applyCredentials(credentials) {
@@ -220,7 +250,7 @@ function setupCollabFeatures({
     chat.stop();
   }
 
-  return { applyCredentials, realtimeHandlers, startOfflineReminders, stop, tasks, sops, chat };
+  return { applyCredentials, realtimeHandlers, startOfflineReminders, stop, tasks, sops, chat, profiles, admin };
 }
 
 module.exports = { setupCollabFeatures };
