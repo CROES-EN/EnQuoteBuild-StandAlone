@@ -4,8 +4,11 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
+const { createPollGate } = require("./syncCadence.cjs");
 
+// New messages are pushed over realtime (inbox_updated); this poll only covers missed pushes.
 const FALLBACK_POLL_MS = 60 * 1000;
+const CONNECTED_POLL_MS = 10 * 60 * 1000;
 const DIRECTORY_TTL_MS = 30 * 60 * 1000;
 const MAX_INDIVIDUAL_ALERTS = 3;
 
@@ -22,6 +25,7 @@ function createChatService({
   let polling = null;
   let repollRequested = false;
   let timer = null;
+  const pollGate = createPollGate({ slowMs: CONNECTED_POLL_MS, now });
   let directoryCache = { at: 0, users: [] };
   let unreadTotal = 0;
 
@@ -117,6 +121,7 @@ function createChatService({
   }
 
   function poll() {
+    pollGate.ran();
     if (polling) {
       repollRequested = true;
       return polling;
@@ -191,7 +196,9 @@ function createChatService({
 
   function start() {
     stop();
-    timer = setInterval(() => { void poll(); }, FALLBACK_POLL_MS);
+    timer = setInterval(() => {
+      if (pollGate.due()) void poll();
+    }, FALLBACK_POLL_MS);
     timer.unref?.();
     void poll();
   }

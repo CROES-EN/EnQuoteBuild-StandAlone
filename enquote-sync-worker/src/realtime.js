@@ -1,6 +1,9 @@
 import { json } from "./util.js";
 
 const ROOM_NAME = "enquote-quotes";
+// Must match the keepalive the desktop app sends (electron/realtimeSync.cjs).
+const PING_MESSAGE = '{"type":"ping"}';
+const PONG_MESSAGE = '{"type":"pong"}';
 
 function hasSnapshotToken(request, env) {
   return Boolean(env.SNAPSHOT_TOKEN) &&
@@ -11,6 +14,10 @@ export class QuoteSyncRoom {
   constructor(state, env) {
     this.state = state;
     this.env = env;
+    // Keepalive pings are answered by the runtime without waking (or billing) this object.
+    if (typeof WebSocketRequestResponsePair === "function" && typeof state.setWebSocketAutoResponse === "function") {
+      state.setWebSocketAutoResponse(new WebSocketRequestResponsePair(PING_MESSAGE, PONG_MESSAGE));
+    }
   }
 
   async fetch(request) {
@@ -51,6 +58,7 @@ export class QuoteSyncRoom {
 
   webSocketMessage(socket, message) {
     if (message === "ping") socket.send("pong");
+    else if (message === PING_MESSAGE) socket.send(PONG_MESSAGE);
   }
 }
 

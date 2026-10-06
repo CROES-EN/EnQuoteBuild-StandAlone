@@ -11,6 +11,7 @@ import {Textarea} from "@/components/ui/textarea";
 import {ALL_PAGES, DEFAULT_ROLE_PAGES, rolesForUser} from "@/lib/rolePageAccess";
 import * as adminApi from "./adminApi";
 import {toast} from "sonner";
+import {ChevronDown, Shield} from "lucide-react";
 
 const PAGE_LABELS = Object.freeze(Object.fromEntries(ALL_PAGES.map((page) => [page, page.replace(/([a-z])([A-Z])/g, "$1 $2")])));
 
@@ -308,7 +309,7 @@ function AuditPanel({entries, onRefresh}) {
   return <div className="space-y-3"><Button variant="outline" onClick={onRefresh}>Refresh audit log</Button><div className="rounded-lg border border-border divide-y divide-border">{entries.length ? entries.map((entry) => <div key={entry.id} className="p-3 text-sm"><div className="flex flex-wrap gap-2 items-center"><Badge variant="outline">#{entry.id}</Badge><span className="font-medium">{entry.action}</span><span className="text-muted-foreground">{entry.actor}</span><span className="text-muted-foreground">{entry.at}</span></div><div className="text-muted-foreground mt-1">Target: {entry.target || "—"}</div>{entry.details ? <pre className="mt-2 overflow-x-auto rounded bg-muted p-2 text-xs">{JSON.stringify(entry.details, null, 2)}</pre> : null}</div>) : <p className="p-4 text-sm text-muted-foreground">No audit entries yet.</p>}</div></div>;
 }
 
-export default function AdminMenu({users: fallbackUsers = []}) {
+function AdminMenuContent({users: fallbackUsers = []}) {
   const [overview, setOverview] = useState(null);
   const [sessions, setSessions] = useState([]);
   const [auditEntries, setAuditEntries] = useState([]);
@@ -337,7 +338,7 @@ export default function AdminMenu({users: fallbackUsers = []}) {
   useEffect(() => { void refresh(); }, []);
 
   return (
-    <Card className="p-6 mb-6 border-indigo-200 bg-indigo-50/40">
+    <div className="border-t border-border p-4 sm:p-5">
       <div className="flex items-start justify-between gap-4 mb-4">
         <div><h2 className="text-xl font-semibold text-foreground">Admin Menu</h2><p className="text-sm text-muted-foreground">Override access, publish announcements, manage live sessions, moderate content, and review audit history.</p></div>
         <Button variant="outline" onClick={refresh} disabled={loading}>{loading ? "Loading..." : "Refresh"}</Button>
@@ -351,6 +352,26 @@ export default function AdminMenu({users: fallbackUsers = []}) {
         <TabsContent value="moderation"><ModerationPanel users={users} /></TabsContent>
         <TabsContent value="audit"><AuditPanel entries={auditEntries} onRefresh={refresh} /></TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+export default function AdminMenu({users}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Card className="mb-6 overflow-hidden">
+      <button
+        type="button"
+        className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+        aria-expanded={open}
+        aria-controls="admin-menu-content"
+        onClick={() => setOpen((value) => !value)}
+      >
+        <Shield className="h-4 w-4 text-muted-foreground" />
+        <span className="flex-1">Admin Menu</span>
+        <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && <div id="admin-menu-content"><AdminMenuContent users={users} /></div>}
     </Card>
   );
 }

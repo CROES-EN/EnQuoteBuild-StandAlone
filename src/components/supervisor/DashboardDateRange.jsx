@@ -29,7 +29,8 @@ function formatRangeLabel(range) {
  * explicit Apply action (per spec, changes never auto-commit while the user is still editing
  * dates), Reset, the resolved period's label, and how many stored snapshots/missing calendar
  * dates fall inside it. This component never fabricates dates - it only resolves which range a
- * preset means and reports on `records` that already exist.
+ * preset means and reports on `records` that already exist. The parent remembers only applied
+ * selections (including Reset), not unapplied date edits, per signed-in user on this device.
  */
 export default function DashboardDateRange({ records = [], value, onChange }) {
   const defaultPreset = resolveDefaultPreset(records);

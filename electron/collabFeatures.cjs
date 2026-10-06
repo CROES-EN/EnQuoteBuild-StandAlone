@@ -6,6 +6,7 @@ const { createSopLibrary } = require("./sopLibrary.cjs");
 const { createChatService } = require("./chatService.cjs");
 const { createProfileService } = require("./profileService.cjs");
 const { setupAdminFeatures } = require("./adminFeatures.cjs");
+const {createOneNoteImport} = require("./oneNoteImport.cjs");
 
 const PREVIEW_LENGTH = 140;
 
@@ -23,6 +24,7 @@ function formatDue(iso) {
 function setupCollabFeatures({
   ipcMain,
   Notification,
+  dialog,
   getMainWindow,
   showMainWindow,
   storageDir,
@@ -106,6 +108,18 @@ function setupCollabFeatures({
     logger,
     onChanged: (list) => sendToRenderer("sops:changed", list)
   });
+  const oneNoteImport = createOneNoteImport({
+    sops,
+    logger,
+    getEmail,
+    chooseFile: async () => {
+      const options = {title: "Import OneNote sections", filters: [{name: "OneNote section", extensions: ["one"]}], properties: ["openFile", "multiSelections"]};
+      const window = getMainWindow();
+      const result = window ? await dialog.showOpenDialog(window, options) : await dialog.showOpenDialog(options);
+      return result.canceled ? [] : result.filePaths;
+    },
+    onProgress: (progress) => sendToRenderer("sops:onenote-progress", progress)
+  });
 
   const chat = createChatService({
     client,
@@ -166,6 +180,9 @@ function setupCollabFeatures({
   handle("sops:versions", (id) => sops.versions(String(id || "")));
   handle("sops:uploadFile", (file) => sops.uploadFile(file || {}));
   handle("sops:getFile", (fileId, meta) => sops.getFile(String(fileId || ""), meta || {}));
+  handle("sops:prepareOneNote", () => oneNoteImport.prepare());
+  handle("sops:importOneNote", (payload) => oneNoteImport.importSection(payload || {}));
+  handle("sops:cancelOneNote", (sessionId) => oneNoteImport.cancel(sessionId));
 
   handle("chat:me", () => ({ ok: true, ...chat.me(), unreadTotal: chat.getUnreadTotal(), ready: client.isReady() }));
   handle("chat:directory", (options) => chat.directory(options || {}));
@@ -186,6 +203,10 @@ function setupCollabFeatures({
   });
 
   handle("profiles:list", () => profiles.list());
+  handle("Base44_DTO:list", (cursor) => client.get("/api/Base44_DTO", {cursor: cursor || ""}));
+  handle("Base44_DTO:get", (email) => client.get("/api/Base44_DTO", {email: String(email || "")}));
+  handle("Base44_DTO:save", (profile) => client.post("/api/Base44_DTO", profile));
+  handle("Base44_DTO:remove", () => client.delete("/api/Base44_DTO"));
   handle("profiles:setAvatar", (payload) => profiles.setAvatar(payload || {}));
   handle("profiles:removeAvatar", () => profiles.removeAvatar());
   handle("profiles:getAvatar", (avatarId) => profiles.getAvatar(String(avatarId || "")));

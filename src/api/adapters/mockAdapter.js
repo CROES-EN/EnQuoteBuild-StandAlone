@@ -99,6 +99,7 @@ export const mockAdapter = {
   updateReview: async (recordId, data) => update("reviews", recordId, data),
 
   getQuoteActivities: async (quoteId) => filter("activities", { quote_id: quoteId }),
+  getAllQuoteActivities: async () => clone(collection("activities")),
   createQuoteActivity: async (data) => create("activities", data),
 
   getFollowUps: async (quoteId) =>

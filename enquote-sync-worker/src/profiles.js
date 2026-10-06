@@ -1,9 +1,7 @@
 import { broadcastMessage } from "./realtime.js";
 import { authenticateUser } from "./user-token.js";
 import { json } from "./util.js";
-
-const AVATAR_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
-const MAX_AVATAR_BYTES = 512 * 1024;
+import {AVATAR_TYPES, MAX_AVATAR_BYTES, gifAvatarError} from "../../shared/avatarRules.js";
 
 async function sha256Hex(bytes) {
   const digest = await crypto.subtle.digest("SHA-256", bytes);
@@ -40,6 +38,10 @@ export async function handleProfileAvatarUpload(request, env) {
   if (!AVATAR_TYPES.has(type)) return json({ ok: false, error: "unsupported_type" }, 415);
   const bytes = await request.arrayBuffer();
   if (bytes.byteLength > MAX_AVATAR_BYTES) return json({ ok: false, error: "file_too_large" }, 413);
+  if (type === "image/gif") {
+    const error = gifAvatarError(new Uint8Array(bytes));
+    if (error) return json({ok: false, error}, 400);
+  }
   const avatarId = await sha256Hex(bytes);
   const key = `profile:avatar:${avatarId}`;
   const existing = await env.CACHE.getWithMetadata(key, "arrayBuffer");

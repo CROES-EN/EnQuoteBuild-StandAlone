@@ -4,8 +4,11 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
+const { createPollGate } = require("./syncCadence.cjs");
 
 const SYNC_INTERVAL_MS = 10 * 60 * 1000;
+// While realtime pushes are flowing, the timer only reaches the Worker on the slow cadence.
+const CONNECTED_SYNC_INTERVAL_MS = 60 * 60 * 1000;
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const FILE_CACHE_LIMIT_BYTES = 300 * 1024 * 1024;
 const SHA_PATTERN = /^[a-f0-9]{64}$/;
@@ -24,6 +27,7 @@ function createSopLibrary({
   let syncing = null;
   let resyncRequested = false;
   let timer = null;
+  const syncGate = createPollGate({ slowMs: CONNECTED_SYNC_INTERVAL_MS });
 
   function load() {
     if (state) return state;
@@ -272,8 +276,13 @@ function createSopLibrary({
 
   function start() {
     stop();
-    timer = setInterval(() => { void sync(); }, SYNC_INTERVAL_MS);
+    timer = setInterval(() => {
+      if (!syncGate.due()) return;
+      syncGate.ran();
+      void sync();
+    }, SYNC_INTERVAL_MS);
     timer.unref?.();
+    syncGate.ran();
     void sync();
   }
 

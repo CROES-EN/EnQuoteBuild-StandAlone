@@ -10,6 +10,14 @@ function createEntityDatabase(records) {
   return {
     offsets,
     prepare(sql) {
+      if (/MAX\(synced_at\)/.test(sql)) {
+        return {
+          async first() {
+            const stamps = records.map((row) => row.synced_at).sort();
+            return { version: stamps.at(-1) ?? null };
+          }
+        };
+      }
       assert.match(sql, /json_group_array\(json_object/);
       assert.match(sql, /json_valid\(record_json\)/);
       let limit;
@@ -50,11 +58,39 @@ function createEntityDatabase(records) {
   };
 }
 
-function makeRequest(authorization = AUTHORIZATION_HEADER) {
+function makeRequest(authorization = AUTHORIZATION_HEADER, ifNoneMatch = null) {
+  const headers = new Headers([["Authorization", authorization]]);
+  if (ifNoneMatch) headers.set("If-None-Match", ifNoneMatch);
   return new Request("https://enquote-sync.example.workers.dev/api/base44/webhook/entity-snapshot", {
-    headers: new Headers([["Authorization", authorization]])
+    headers
   });
 }
+
+test("entity snapshot answers 304 without reading rows when the app already has the version", async () => {
+  const records = [{
+    entity_type: "Product",
+    local_id: "p-1",
+    action: "upsert",
+    record_json: "{}",
+    synced_at: "2026-10-01T00:00:00.000Z"
+  }];
+  const DB = createEntityDatabase(records);
+  const first = await handleEntitySnapshot(makeRequest(), { SNAPSHOT_TOKEN, DB });
+  const etag = first.headers.get("ETag");
+  assert.ok(etag);
+  await first.json();
+
+  const offsetsBefore = DB.offsets.length;
+  const second = await handleEntitySnapshot(makeRequest(AUTHORIZATION_HEADER, etag), { SNAPSHOT_TOKEN, DB });
+  assert.equal(second.status, 304);
+  assert.equal(DB.offsets.length, offsetsBefore);
+
+  records.push({ ...records[0], local_id: "p-2", synced_at: "2026-10-02T00:00:00.000Z" });
+  const third = await handleEntitySnapshot(makeRequest(AUTHORIZATION_HEADER, etag), { SNAPSHOT_TOKEN, DB });
+  assert.equal(third.status, 200);
+  assert.notEqual(third.headers.get("ETag"), etag);
+  assert.equal((await third.json()).entities.length, 2);
+});
 
 test("entity snapshot pages and SQL-encodes rows without changing the response shape", async () => {
   const records = Array.from({ length: 205 }, (_, index) => ({

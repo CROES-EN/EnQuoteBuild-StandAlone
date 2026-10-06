@@ -1,4 +1,4 @@
-import {useMemo, useState} from "react";
+import {cloneElement, useMemo, useState} from "react";
 import {useQuery} from "@tanstack/react-query";
 import {
     AlertCircle,
@@ -27,10 +27,17 @@ import {Button} from "@/components/ui/button";
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import {Checkbox} from "@/components/ui/checkbox";
-import {getQuotes} from "@/api/dataClient";
+import {getAllQuoteActivities, getQuotes} from "@/api/dataClient";
+import {buildQuoteLifecycleReport} from "@/features/quoteDashboard/quoteLifecycle";
+import QuotePeriodActivityTile from "@/components/supervisor/QuotePeriodActivityTile";
+import QuoteContributingRecordsDialog from "@/components/supervisor/QuoteContributingRecordsDialog";
+import NiceCallRecordsTable from "@/components/supervisor/NiceCallRecordsTable";
+import SortableRecordHeaders from "@/components/supervisor/SortableRecordHeaders";
+import {sortRecords} from "@/features/supervisorDashboard/recordSorting";
+import {dailyCountValue, displayCount, displayModeRecords, quoteDisplayMetric} from "@/features/supervisorDashboard/kpiDisplayMode";
+import {niceCallContributingRecords, quoteContributingRecords} from "@/features/supervisorDashboard/contributingRecords";
 import {formatDateLabel, formatNumber, formatRate, formatSecondsAsClock} from "@/features/supervisorDashboard/format";
 import {
-    describeRangeCoverage,
     filterRecordsInRange,
     getPreviousPeriodRange,
     resolveDateRange,
@@ -46,11 +53,6 @@ import {
     resolveClosingBacklog,
     resolveOpeningBacklog
 } from "@/features/supervisorDashboard/periodAggregation";
-import {
-    computeOverallCoverage,
-    computeSourceCoverage,
-    getRecordsForGroup
-} from "@/features/supervisorDashboard/sourceCoverage";
 import {
     computeQuoteOpsMetrics,
     DEFAULT_COMPLETED_STATUSES,
@@ -71,10 +73,9 @@ import {
     computeEodbWidgetTotal,
     getEodbWidgetRecordsFromStoredRows
 } from "@/features/supervisorDashboard/parseEodbWidget";
-import {computeCallVolumeOverridesByDate} from "@/features/supervisorDashboard/callVolumeRawOverrides";
 import DashboardDateRange from "@/components/supervisor/DashboardDateRange";
-import ExecutiveOverviewCharts from "@/components/supervisor/ExecutiveOverviewCharts";
-import RequiresAttentionTable from "@/components/supervisor/RequiresAttentionTable";
+import {useReportingPeriodPreference} from "@/features/supervisorDashboard/useReportingPeriodPreference";
+import QuoteExceptionsPanel from "@/components/supervisor/QuoteExceptionsPanel";
 import DrillDownDrawer from "@/components/supervisor/DrillDownDrawer";
 import HourlyWaitTimeChart from "@/components/supervisor/HourlyWaitTimeChart";
 import TileGrid from "@/components/supervisor/TileGrid";
@@ -87,8 +88,6 @@ import {
     setTileVisibility
 } from "@/features/supervisorDashboard/tilePreferences";
 
-import MetricsTrendCharts from "@/components/supervisor/MetricsTrendCharts";
-import MetricsHistoryTable from "@/components/supervisor/MetricsHistoryTable";
 import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
 
 // Display text used whenever a value is blank, missing, or not applicable - a plain word instead
@@ -666,7 +665,7 @@ function formatImportTimestamp(importedAt, importMethod) {
   return `${methodLabel} ${formatted}`;
 }
 
-function StaffingStatCard({ label, icon: Icon, iconClass, value, sourceLabel, onViewRecords, importedAt, importMethod }) {
+function StaffingStatCard({ label, icon: Icon, iconClass, value, sourceLabel, onViewRecords, importedAt, importMethod, mode, date }) {
   const importTimestampLabel = formatImportTimestamp(importedAt, importMethod);
   return (
     <div className="rounded-xl border border-border bg-secondary p-4">
@@ -681,7 +680,8 @@ function StaffingStatCard({ label, icon: Icon, iconClass, value, sourceLabel, on
       )}
       <p className="mt-1 text-3xl font-bold text-foreground">{value}</p>
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        <Badge variant="outline" className="border-border bg-card text-[10px] text-muted-foreground">Boise O&M</Badge>
+        <Badge variant="outline" className="border-border bg-card text-[10px] text-muted-foreground">{mode ? MODE_LABELS[mode] : "Snapshot"}</Badge>
+        {date && <span className="text-[11px] text-muted-foreground">as of {formatDateLabel(date)}</span>}
       </div>
       <p className="mt-1 text-[11px] text-muted-foreground">{sourceLabel}</p>
       {onViewRecords && (
@@ -739,16 +739,20 @@ function compareStaffingRecords(a, b, sortKey, sortDir, columnType) {
  * Shared drill-down for all 6 EODB Dashboard widget tiles (Total Interactions, Handled,
  * Abandoned, Abandonment Rate, Wait Time Summary, Avg Talk Time) - shows the per-date Grand
  * Total values contributing to whichever tile was clicked, for the active Reporting Period.
- * `records` are already-filtered { date, value, isPercent } objects from
- * parseEodbWidget.js/getEodbWidgetRecordsFromStoredRows - for the "Handled" tile specifically,
- * this intentionally shows Total Call Volume's own per-date records (not a computed per-date
- * Handled figure), since Handled has no dedicated widget of its own.
+ * Report totals remain authoritative; matching NICE raw calls are shown beneath them
+ * with explicit coverage differences. Handled daily values are total minus abandoned.
  */
-function EodbWidgetRecordsDialog({ open, onOpenChange, label, records }) {
-  const sortedRecords = [...records].sort((a, b) => a.date.localeCompare(b.date));
+const eodbRecordColumns = [
+  {key: "date", label: "Date", value: record => record.date},
+  {key: "value", label: "Grand Total", value: record => record.value}
+];
+
+function EodbWidgetRecordsDialog({ open, onOpenChange, label, records, rawCalls }) {
+  const [sort, setSort] = useState({key: "date", direction: "asc"});
+  const sortedRecords = sortRecords(records, eodbRecordColumns, sort);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[80vh] max-w-lg overflow-y-auto">
+      <DialogContent className="max-h-[80vh] max-w-6xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{label} - EODB Dashboard</DialogTitle>
         </DialogHeader>
@@ -759,8 +763,7 @@ function EodbWidgetRecordsDialog({ open, onOpenChange, label, records }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Grand Total</TableHead>
+                <SortableRecordHeaders columns={eodbRecordColumns} sort={sort} onSort={setSort} />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -778,6 +781,7 @@ function EodbWidgetRecordsDialog({ open, onOpenChange, label, records }) {
             </TableBody>
           </Table>
         </div>
+        {rawCalls && <NiceCallRecordsTable {...rawCalls} />}
       </DialogContent>
     </Dialog>
   );
@@ -1027,29 +1031,13 @@ function EmailCaseRecordsDialog({ open, onOpenChange, rows }) {
   );
 }
 
-function SourceCoverageBar({ percent }) {
-  if (percent === null || percent === undefined) {
-    return <span className="text-xs text-muted-foreground">Setup Required</span>;
-  }
-  return (
-    <div className="flex items-center gap-2">
-      <div className="h-2 w-24 overflow-hidden rounded-full bg-slate-200">
-        <div className="h-full rounded-full bg-indigo-500" style={{ width: `${percent}%` }} />
-      </div>
-      <span className="text-xs text-muted-foreground">{percent}%</span>
-    </div>
-  );
-}
 
 export default function DashboardOverview({
   records = [],
-  selectedDate,
   completedStatuses = DEFAULT_COMPLETED_STATUSES,
-  onEditRecord,
-  onChanged
 }) {
   const defaultPreset = useMemo(() => resolveDefaultPreset(records), [records]);
-  const [rangeValue, setRangeValue] = useState(null);
+  const [rangeValue, setRangeValue] = useReportingPeriodPreference("overview");
   const [kpiMode, setKpiMode] = useState(AGGREGATION_MODES.PERIOD_TOTAL);
   const [compareEnabled, setCompareEnabled] = useState(true);
   const [drillDown, setDrillDown] = useState(null);
@@ -1058,6 +1046,7 @@ export default function DashboardOverview({
   const [interactionsDialogRows, setInteractionsDialogRows] = useState(null);
   const [staffingDialogRows, setStaffingDialogRows] = useState(null);
   const [eodbWidgetDialogRows, setEodbWidgetDialogRows] = useState(null);
+  const [quoteActivitySelection, setQuoteActivitySelection] = useState(null);
   const [reportFilter, setReportFilter] = useState("all");
   const [emailDailyDialogRows, setEmailDailyDialogRows] = useState(null);
   const [emailCaseDialogRows, setEmailCaseDialogRows] = useState(null);
@@ -1077,12 +1066,28 @@ export default function DashboardOverview({
     () => (previousRange ? filterRecordsInRange(records, previousRange) : []),
     [records, previousRange]
   );
-  const coverage = useMemo(() => describeRangeCoverage(records, activeRange), [records, activeRange]);
 
-  const { data: allQuotes = [], isLoading: quotesLoading, isError: quotesError } = useQuery({
-    queryKey: ["quotes-all-for-ops-metrics"],
-    queryFn: getQuotes
+  const quotesQuery = useQuery({
+    queryKey: ["quotes", "executive-overview"],
+    queryFn: async () => {
+      const quotes = await getQuotes();
+      if (!Array.isArray(quotes)) throw new Error("Quote service returned an invalid response.");
+      return quotes;
+    }
   });
+  const {data: allQuotes = [], isLoading: quotesLoading, isError: quotesError} = quotesQuery;
+  const activityQuery = useQuery({
+    queryKey: ["quoteActivity", "lifecycle"],
+    queryFn: async () => {
+      const activities = await getAllQuoteActivities();
+      if (!Array.isArray(activities)) throw new Error("Quote activity service returned an invalid response.");
+      return activities;
+    }
+  });
+  const quoteActivityReport = useMemo(() => {
+    if (quotesQuery.isLoading || quotesQuery.isError || activityQuery.isLoading || activityQuery.isError) return null;
+    return buildQuoteLifecycleReport(allQuotes, {range: activeRange, activities: activityQuery.data || []});
+  }, [allQuotes, activeRange, quotesQuery.isLoading, quotesQuery.isError, activityQuery.data, activityQuery.isLoading, activityQuery.isError]);
 
   // Report Data Tables (SFDC-Quotes, Escalations, etc.) - a separate store from the date-ranged
   // daily metrics above. Read-only here; nothing on this page writes to it. Refetches whenever
@@ -1094,6 +1099,21 @@ export default function DashboardOverview({
   });
 
   const sfdcQuotesTable = reportTables?.sfdc_quotes ?? null;
+  const niceCalls = useMemo(() => niceCallContributingRecords(reportTables?.incorta_input?.rows || [], activeRange), [reportTables, activeRange]);
+  function openEodbRecords(label, records, outcome, expected) {
+    const dates = new Set(records.map(record => record.date));
+    const total = computeEodbWidgetTotal(rangedEodbTotalCallVolume.filter(record => dates.has(record.date)));
+    const abandoned = computeEodbWidgetTotal(rangedEodbAbandonedCalls.filter(record => dates.has(record.date)));
+    const reportCount = outcome === "Abandoned" ? abandoned : outcome === "Handled"
+      ? total !== null && abandoned !== null ? total - abandoned : null : total;
+    setEodbWidgetDialogRows({
+      label, records,
+      rawCalls: {
+        records: niceCalls.records.filter(call => dates.has(call.date) && (!outcome || call.outcome === outcome)),
+        expected: reportCount ?? expected, undated: niceCalls.undated, available: Boolean(reportTables?.incorta_input)
+      }
+    });
+  }
   // Incorta - O&M Email Report (Pronto Metrics Dashboard / O&M Email Cases) - two related but distinct
   // data shapes from two separate report exports: "Email Raw Data" (one row per CASE, used
   // for live backlog/aging figures - NOT date-filtered, since an open case from months ago is
@@ -1109,8 +1129,8 @@ export default function DashboardOverview({
     [reportTables]
   );
   const rangedEmailDailyRecords = useMemo(
-    () => filterRecordsInRange(emailDailyRecords, activeRange),
-    [emailDailyRecords, activeRange]
+    () => displayModeRecords(emailDailyRecords, activeRange, kpiMode),
+    [emailDailyRecords, activeRange, kpiMode]
   );
   const emailBacklogTotals = useMemo(
     () => computeEmailBacklogTotals(rangedEmailDailyRecords, emailCaseRecords),
@@ -1131,28 +1151,23 @@ export default function DashboardOverview({
     [reportTables]
   );
   const rangedStaffingRecords = useMemo(
-    () => filterRecordsInRange(staffingRecords, activeRange),
-    [staffingRecords, activeRange]
+    () => displayModeRecords(staffingRecords, activeRange, kpiMode),
+    [staffingRecords, activeRange, kpiMode]
   );
   const staffingTeamTotals = useMemo(
-    () => computeStaffingTeamTotalsV2(rangedStaffingRecords),
-    [rangedStaffingRecords]
+    () => {
+      const totals = computeStaffingTeamTotalsV2(rangedStaffingRecords);
+      if (!totals) return totals;
+      return {...totals,
+        totalAcdContacts: dailyCountValue(totals.totalAcdContacts, rangedStaffingRecords, kpiMode),
+        totalRefusals: dailyCountValue(totals.totalRefusals, rangedStaffingRecords, kpiMode),
+        totalHeldPartyAbandons: dailyCountValue(totals.totalHeldPartyAbandons, rangedStaffingRecords, kpiMode),
+        totalTransferToAgent: dailyCountValue(totals.totalTransferToAgent, rangedStaffingRecords, kpiMode)
+      };
+    },
+    [rangedStaffingRecords, kpiMode]
   );
 
-  // Corrects "calls"/"calls_abandoned"/"calls_offered" per date using the newer, reliable raw
-  // Report Data tables instead of the older CXONE daily-aggregate import - see
-  // callVolumeRawOverrides.js for the full explanation. Only overrides dates that have been
-  // re-imported into "Call Volume - Total"; every other date is untouched.
-  const callVolumeOverridesByDate = useMemo(() => computeCallVolumeOverridesByDate(reportTables), [reportTables]);
-  const allCallVolumeRecords = useMemo(
-    () => Object.entries(callVolumeOverridesByDate).map(([date, values]) => ({ date, ...values })),
-    [callVolumeOverridesByDate]
-  );
-  const rangedCallVolumeRecords = useMemo(() => filterRecordsInRange(allCallVolumeRecords, activeRange), [allCallVolumeRecords, activeRange]);
-  const previousCallVolumeRecords = useMemo(
-    () => (previousRange ? filterRecordsInRange(allCallVolumeRecords, previousRange) : []),
-    [allCallVolumeRecords, previousRange]
-  );
 
 
   const quotesRequestedRows = useMemo(() => {
@@ -1232,12 +1247,12 @@ export default function DashboardOverview({
   // aggregated (summed for plain counts, averaged for the percent-based Abandonment Rate
   // widget - see computeEodbWidgetTotal).
   const rangedEodbTotalCallVolume = useMemo(
-    () => filterRecordsInRange(getEodbWidgetRecordsFromStoredRows(reportTables?.eodb_total_call_volume?.rows || []), activeRange),
-    [reportTables, activeRange]
+    () => displayModeRecords(getEodbWidgetRecordsFromStoredRows(reportTables?.eodb_total_call_volume?.rows || []), activeRange, kpiMode),
+    [reportTables, activeRange, kpiMode]
   );
   const rangedEodbAbandonedCalls = useMemo(
-    () => filterRecordsInRange(getEodbWidgetRecordsFromStoredRows(reportTables?.eodb_abandoned_calls?.rows || []), activeRange),
-    [reportTables, activeRange]
+    () => displayModeRecords(getEodbWidgetRecordsFromStoredRows(reportTables?.eodb_abandoned_calls?.rows || []), activeRange, kpiMode),
+    [reportTables, activeRange, kpiMode]
   );
   const rangedEodbAbandonmentRate = useMemo(
     // FIX (real bug, confirmed live: a multi-day Reporting Period showed 431% instead of
@@ -1249,16 +1264,21 @@ export default function DashboardOverview({
     [reportTables, activeRange]
   );
   const rangedEodbDailyWaitTime = useMemo(
-    () => filterRecordsInRange(getEodbWidgetRecordsFromStoredRows(reportTables?.eodb_daily_wait_time?.rows || []), activeRange),
-    [reportTables, activeRange]
+    () => displayModeRecords(getEodbWidgetRecordsFromStoredRows(reportTables?.eodb_daily_wait_time?.rows || []), activeRange, kpiMode),
+    [reportTables, activeRange, kpiMode]
   );
   const rangedEodbAvgTalkTime = useMemo(
-    () => filterRecordsInRange(getEodbWidgetRecordsFromStoredRows(reportTables?.eodb_avg_talk_time?.rows || []), activeRange),
-    [reportTables, activeRange]
+    () => displayModeRecords(getEodbWidgetRecordsFromStoredRows(reportTables?.eodb_avg_talk_time?.rows || []), activeRange, kpiMode),
+    [reportTables, activeRange, kpiMode]
   );
 
-  const eodbTotalInteractions = useMemo(() => computeEodbWidgetTotal(rangedEodbTotalCallVolume), [rangedEodbTotalCallVolume]);
-  const eodbAbandoned = useMemo(() => computeEodbWidgetTotal(rangedEodbAbandonedCalls), [rangedEodbAbandonedCalls]);
+  const eodbTotalInteractions = useMemo(() => displayCount(rangedEodbTotalCallVolume, kpiMode), [rangedEodbTotalCallVolume, kpiMode]);
+  const eodbAbandoned = useMemo(() => displayCount(rangedEodbAbandonedCalls, kpiMode), [rangedEodbAbandonedCalls, kpiMode]);
+  const eodbHandledRecords = useMemo(() => rangedEodbTotalCallVolume.map(record => {
+    const abandoned = rangedEodbAbandonedCalls.find(item => item.date === record.date);
+    return {...record, value: abandoned ? record.value - abandoned.value : null};
+  }), [rangedEodbTotalCallVolume, rangedEodbAbandonedCalls]);
+  const eodbHandled = useMemo(() => displayCount(eodbHandledRecords, kpiMode), [eodbHandledRecords, kpiMode]);
   // Abandonment Rate is confirmed (via direct inspection of real stored data) to be stored as
   // a raw decimal FRACTION (e.g. 0.18055555555555555 for 9/9), not a string with a "%" sign -
   // multiplying by 100 here converts it into the plain percentage number the tile displays
@@ -1284,10 +1304,12 @@ export default function DashboardOverview({
   // Abandonment Rate widget's own daily percentages.
   const eodbAbandonmentRate = useMemo(
     () => {
-      if (eodbTotalInteractions === null || eodbAbandoned === null || eodbTotalInteractions === 0) return null;
-      return Math.round((eodbAbandoned / eodbTotalInteractions) * 100);
+      const total = computeEodbWidgetTotal(rangedEodbTotalCallVolume);
+      const abandoned = computeEodbWidgetTotal(rangedEodbAbandonedCalls);
+      if (total === null || abandoned === null || total === 0) return null;
+      return Math.round((abandoned / total) * 100);
     },
-    [eodbTotalInteractions, eodbAbandoned]
+    [rangedEodbTotalCallVolume, rangedEodbAbandonedCalls]
   );
   // Daily Wait Time Summary / Average Talk Time(Phone) are confirmed (via direct inspection of
   // real stored data) to be stored as decimal MINUTES (e.g. 5.889502314814814 for 9/9 Wait
@@ -1352,13 +1374,6 @@ export default function DashboardOverview({
     .filter(({ result }) => result.current !== null),
   [rangedRecords, previousRangedRecords, quoteOpsSeries, previousQuoteOpsSeries, kpiMode]);
 
-  const quoteBacklog = useMemo(() => {
-    const opening = resolveOpeningBacklog(quoteOpsSeries.map(q => ({ date: q.date, value: q.backlogStart })));
-    const closing = resolveClosingBacklog(quoteOpsSeries.map(q => ({ date: q.date, value: q.backlogEnd })));
-    const prevOpening = resolveOpeningBacklog(previousQuoteOpsSeries.map(q => ({ date: q.date, value: q.backlogStart })));
-    const prevClosing = resolveClosingBacklog(previousQuoteOpsSeries.map(q => ({ date: q.date, value: q.backlogEnd })));
-    return { opening, closing, net: computeNetBacklogMovement(opening, closing), prevNet: computeNetBacklogMovement(prevOpening, prevClosing) };
-  }, [quoteOpsSeries, previousQuoteOpsSeries]);
 
   const caseBacklog = useMemo(() => {
     const opening = resolveOpeningBacklog(seriesFor(rangedRecords, "case_backlog_start"));
@@ -1368,119 +1383,7 @@ export default function DashboardOverview({
     return { opening, closing, net: computeNetBacklogMovement(opening, closing), prevNet: computeNetBacklogMovement(prevOpening, prevClosing) };
   }, [rangedRecords, previousRangedRecords]);
 
-  const quoteOpsHasDataByDate = useMemo(
-    () => Object.fromEntries(quoteOpsSeries.map(q => [q.date, isFiniteNumber(q.quotesDrafted) || isFiniteNumber(q.quotesCompleted)])),
-    [quoteOpsSeries]
-  );
 
-  const sourceCoverageResults = useMemo(
-    () => computeSourceCoverage(rangedRecords, { quoteOpsHasDataByDate }),
-    [rangedRecords, quoteOpsHasDataByDate]
-  );
-  const overallCoverage = useMemo(() => computeOverallCoverage(sourceCoverageResults), [sourceCoverageResults]);
-
-  const lastStoredOrImportedAt = useMemo(() => {
-    let latest = null;
-    rangedRecords.forEach(record => {
-      const candidates = [record.updated_date, ...Object.values(record.sources || {}).map(s => s?.imported_at)].filter(Boolean);
-      candidates.forEach(candidate => { if (!latest || candidate > latest) latest = candidate; });
-    });
-    return latest;
-  }, [rangedRecords]);
-
-  const attentionRows = useMemo(() => {
-    const rows = [];
-    if (quoteBacklog.net !== null && quoteBacklog.net > 0) {
-      rows.push({
-        key: "quote-backlog-increase",
-        area: "Net Quote Backlog Increase",
-        periodValue: `+${formatNumber(quoteBacklog.net)}`,
-        change: null,
-        coverage: `${formatDateLabel(quoteBacklog.opening.date)} to ${formatDateLabel(quoteBacklog.closing.date)}`,
-        reason: "Review Recommended",
-        source: "Quote Operations (live)",
-        onViewRecords: () => openDrillDown({ title: "Net Quote Backlog Increase", fieldLabel: null, fieldKey: null, source: rangedRecords })
-      });
-    }
-    if (caseBacklog.net !== null && caseBacklog.net > 0) {
-      rows.push({
-        key: "case-backlog-increase",
-        area: "Net Case Backlog Increase",
-        periodValue: `+${formatNumber(caseBacklog.net)}`,
-        change: null,
-        coverage: `${formatDateLabel(caseBacklog.opening.date)} to ${formatDateLabel(caseBacklog.closing.date)}`,
-        reason: "Review Recommended",
-        source: "Case Backlog",
-        onViewRecords: () => openDrillDown({ title: "Net Case Backlog Increase", fieldLabel: "Case Backlog at End", fieldKey: "case_backlog_end", source: rangedRecords })
-      });
-    }
-    if (coverage.missingDateCount > 0) {
-      rows.push({
-        key: "missing-snapshots",
-        area: "Missing Daily Snapshots",
-        periodValue: `${coverage.missingDateCount} missing`,
-        change: null,
-        coverage: `${coverage.snapshotCount} of ${coverage.totalCalendarDays} days stored`,
-        reason: "Data Incomplete",
-        source: "Daily Metrics Store",
-        onViewRecords: () => openDrillDown({ title: "Missing Daily Snapshots", fieldLabel: null, fieldKey: null, source: rangedRecords })
-      });
-    }
-    sourceCoverageResults.forEach(group => {
-      if (group.status === "Full Coverage") return;
-      rows.push({
-        key: `coverage-${group.key}`,
-        area: `${group.label} Coverage`,
-        periodValue: group.coveragePercent !== null ? `${group.coveragePercent}%` : "Setup Required",
-        change: null,
-        coverage: `${group.snapshotsWithData}/${group.snapshotsWithData + group.snapshotsWithoutData} days`,
-        reason: group.status === "Setup Required" ? "Source Missing" : (group.status === "No Data" ? "Source Missing" : "Partial Coverage"),
-        source: group.label,
-        onViewRecords: () => openDrillDown({ title: `${group.label} Records`, fieldLabel: null, fieldKey: null, source: getRecordsForGroup(rangedRecords, group.key, { quoteOpsHasDataByDate }) })
-      });
-    });
-    if (interactionStats.abandoned > 0) {
-      rows.push({
-        key: "calls-abandoned",
-        area: "Calls Abandoned",
-        periodValue: formatNumber(interactionStats.abandoned),
-        change: null,
-        coverage: `${interactionRows.length} interactions in period`,
-        reason: "Current Period",
-        source: "Incorta-O&M-Input",
-        onViewRecords: () => setInteractionsDialogOpen(true)
-      });
-    }
-    const latestEscalations = [...rangedRecords].sort((a, b) => b.date.localeCompare(a.date))
-      .find(r => isFiniteNumber(r.open_critical_escalations));
-    if (latestEscalations && latestEscalations.open_critical_escalations > 0) {
-      rows.push({
-        key: "open-critical-escalations",
-        area: "Open Critical Escalations",
-        periodValue: formatNumber(latestEscalations.open_critical_escalations),
-        change: null,
-        coverage: `As of ${formatDateLabel(latestEscalations.date)}`,
-        reason: "Review Recommended",
-        source: "Escalations",
-        onViewRecords: () => openDrillDown({ title: "Open Critical Escalations", fieldLabel: "Open Critical Escalations", fieldKey: "open_critical_escalations", source: rangedRecords })
-      });
-    }
-    const latestOverdue = [...rangedRecords].sort((a, b) => b.date.localeCompare(a.date))
-      .find(r => isFiniteNumber(r.overdue_follow_ups));
-    if (latestOverdue && latestOverdue.overdue_follow_ups > 0) {
-      rows.push({
-        key: "overdue-follow-ups",
-        area: "Overdue Follow-Ups",
-        periodValue: formatNumber(latestOverdue.overdue_follow_ups),
-        change: null,
-        coverage: `As of ${formatDateLabel(latestOverdue.date)}`,
-        reason: "Review Recommended",
-        source: "Escalations",
-        onViewRecords: () => openDrillDown({ title: "Overdue Follow-Ups", fieldLabel: "Overdue Follow-Ups", fieldKey: "overdue_follow_ups", source: rangedRecords })
-      });
-    }
-    return rows;
-  }, [quoteBacklog, caseBacklog, coverage, sourceCoverageResults, rangedRecords, rangedCallVolumeRecords, quoteOpsHasDataByDate]);
 
   // Unified, customizable tile registry - reorganizes tiles already computed above
   // (primaryResults, secondaryResults, quoteBacklogAlertRows, quotesRequestedRows,
@@ -1504,6 +1407,24 @@ export default function DashboardOverview({
         )
       });
     });
+    for (const [metric, label] of [["created", "Quotes Created"], ["worked", "Quotes Worked"]]) {
+      const display = quoteActivityReport ? quoteDisplayMetric(quoteActivityReport, metric, activeRange, kpiMode) : null;
+      tiles.push({
+        id: `quotes_${metric}_period`,
+        label,
+        category: "Live from EnQuote",
+        render: () => <QuotePeriodActivityTile
+          metric={metric}
+          report={quoteActivityReport}
+          mode={kpiMode}
+          display={display}
+          loading={quotesLoading || activityQuery.isLoading}
+          error={quotesQuery.isError ? quotesQuery.error : activityQuery.isError ? activityQuery.error : null}
+          onRetry={() => { quotesQuery.refetch(); activityQuery.refetch(); }}
+          onViewRecords={() => setQuoteActivitySelection({label: `${label} (${MODE_LABELS[kpiMode]})`, records: quoteContributingRecords({...quoteActivityReport, activity: display.activity}, metric)})}
+        />
+      });
+    }
     tiles.push({
       id: "quote_backlog",
       label: "Quote Backlog",
@@ -1591,14 +1512,14 @@ export default function DashboardOverview({
             iconClass="bg-indigo-50 text-indigo-600"
             value={formatNumber(eodbTotalInteractions)}
             sourceLabel="Total Call Volume (Handled + Abandoned) - EODB Dashboard"
-            onViewRecords={() => setEodbWidgetDialogRows({ label: "Total Interactions", records: rangedEodbTotalCallVolume })}
+            onViewRecords={() => openEodbRecords("Total Interactions", rangedEodbTotalCallVolume, null, eodbTotalInteractions)}
             importedAt={reportTables?.eodb_total_call_volume?.importedAt}
             importMethod={reportTables?.eodb_total_call_volume?.importMethod}
           />
         )
       });
     }
-    if (eodbTotalInteractions !== null && eodbAbandoned !== null) {
+    if (eodbHandled !== null) {
       tiles.push({
         id: "eodb_handled",
         label: "Handled",
@@ -1608,9 +1529,9 @@ export default function DashboardOverview({
             label="Handled"
             icon={Phone}
             iconClass="bg-emerald-50 text-emerald-600"
-            value={formatNumber(eodbTotalInteractions - eodbAbandoned)}
+            value={formatNumber(eodbHandled)}
             sourceLabel="Total Interactions minus Abandoned - EODB Dashboard"
-            onViewRecords={() => setEodbWidgetDialogRows({ label: "Handled (Total - Abandoned)", records: rangedEodbTotalCallVolume })}
+            onViewRecords={() => openEodbRecords("Handled (Total - Abandoned)", eodbHandledRecords, "Handled", computeEodbWidgetTotal(eodbHandledRecords))}
             importedAt={reportTables?.eodb_total_call_volume?.importedAt}
             importMethod={reportTables?.eodb_total_call_volume?.importMethod}
           />
@@ -1629,7 +1550,7 @@ export default function DashboardOverview({
             iconClass="bg-rose-50 text-rose-600"
             value={formatNumber(eodbAbandoned)}
             sourceLabel="# Abandoned Calls - EODB Dashboard"
-            onViewRecords={() => setEodbWidgetDialogRows({ label: "Abandoned", records: rangedEodbAbandonedCalls })}
+            onViewRecords={() => openEodbRecords("Abandoned", rangedEodbAbandonedCalls, "Abandoned", eodbAbandoned)}
             importedAt={reportTables?.eodb_abandoned_calls?.importedAt}
             importMethod={reportTables?.eodb_abandoned_calls?.importMethod}
           />
@@ -1648,7 +1569,7 @@ export default function DashboardOverview({
             iconClass="bg-amber-50 text-amber-600"
             value={`${eodbAbandonmentRate}%`}
             sourceLabel="Abandoned / Total Interactions - EODB Dashboard"
-            onViewRecords={() => setEodbWidgetDialogRows({ label: "Abandonment Rate (Abandoned / Total)", records: rangedEodbAbandonedCalls })}
+            onViewRecords={() => openEodbRecords("Abandonment Rate (Abandoned / Total)", rangedEodbAbandonedCalls, "Abandoned", eodbAbandoned)}
             importedAt={reportTables?.eodb_abandonment_rate?.importedAt}
             importMethod={reportTables?.eodb_abandonment_rate?.importMethod}
           />
@@ -1667,7 +1588,7 @@ export default function DashboardOverview({
             iconClass="bg-sky-50 text-sky-600"
             value={formatSecondsAsClock(eodbAvgWaitSeconds)}
             sourceLabel="Daily Wait Time Summary, avg/day - EODB Dashboard"
-            onViewRecords={() => setEodbWidgetDialogRows({ label: "Wait Time Summary", records: rangedEodbDailyWaitTime })}
+            onViewRecords={() => openEodbRecords("Wait Time Summary", rangedEodbDailyWaitTime, null, eodbTotalInteractions)}
             importedAt={reportTables?.eodb_daily_wait_time?.importedAt}
             importMethod={reportTables?.eodb_daily_wait_time?.importMethod}
           />
@@ -1686,7 +1607,7 @@ export default function DashboardOverview({
             iconClass="bg-violet-50 text-violet-600"
             value={formatSecondsAsClock(eodbAvgTalkSeconds)}
             sourceLabel="Average Talk Time(Phone), avg/day - EODB Dashboard"
-            onViewRecords={() => setEodbWidgetDialogRows({ label: "Avg Talk Time", records: rangedEodbAvgTalkTime })}
+            onViewRecords={() => openEodbRecords("Avg Talk Time", rangedEodbAvgTalkTime, "Handled", eodbTotalInteractions !== null && eodbAbandoned !== null ? eodbTotalInteractions - eodbAbandoned : null)}
             importedAt={reportTables?.eodb_avg_talk_time?.importedAt}
             importMethod={reportTables?.eodb_avg_talk_time?.importMethod}
           />
@@ -1697,7 +1618,7 @@ export default function DashboardOverview({
     // "distinct agents active" across a multi-day range would double-count nothing but also
     // says nothing about any one day's actual coverage. Restricted to single-day periods only,
     // per explicit request - hidden entirely (not shown as 0/blank) for any range selection.
-    const isSingleDayPeriod = Boolean(activeRange?.start && activeRange?.end && activeRange.start === activeRange.end);
+    const isSingleDayPeriod = Boolean(activeRange?.start && activeRange?.end && activeRange.start === activeRange.end) || kpiMode === AGGREGATION_MODES.LATEST_DAY;
     if (staffingTeamTotals) {
       if (isSingleDayPeriod) {
         tiles.push({
@@ -1832,7 +1753,7 @@ export default function DashboardOverview({
             label="Total Emails"
             icon={Mail}
             iconClass="bg-cyan-50 text-cyan-600"
-            value={formatNumber(emailBacklogTotals.totalEmails)}
+            value={formatNumber(dailyCountValue(emailBacklogTotals.totalEmails, rangedEmailDailyRecords, kpiMode))}
             sourceLabel="Sum of # Emails, selected period - Incorta - O&M Email Report"
             onViewRecords={() => setEmailDailyDialogRows(rangedEmailDailyRecords)}
           />
@@ -1886,8 +1807,22 @@ export default function DashboardOverview({
         )
       });
     }
-    return tiles;
-  }, [primaryResults, secondaryResults, compareEnabled, previousRange, rangedRecords, quoteBacklogAlertRows, sfdcQuotesTable, quotesRequestedRows, caseBacklog, interactionStats, staffingTeamTotals, activeRange, rangedEmailDailyRecords, emailBacklogTotals, emailCaseRecords, openEmailCases]);
+    return tiles.map(tile => {
+      const render = tile.render;
+      const source = tile.id.startsWith("staffing_") ? rangedStaffingRecords
+        : tile.id.startsWith("email_") && !["email_open_backlog", "email_oldest_open_case"].includes(tile.id) ? rangedEmailDailyRecords
+          : tile.id === "eodb_wait_time" ? rangedEodbDailyWaitTime
+            : tile.id === "eodb_avg_talk_time" ? rangedEodbAvgTalkTime
+              : tile.id === "eodb_abandoned" ? rangedEodbAbandonedCalls
+                : tile.id.startsWith("eodb_") ? rangedEodbTotalCallVolume : null;
+      if (!source) return tile;
+      const averageOnly = ["staffing_avg_utilization", "staffing_avg_talk_time", "staffing_avg_acw_time", "email_avg_handle_time", "eodb_wait_time", "eodb_avg_talk_time"].includes(tile.id);
+      return {...tile, render: () => cloneElement(render(), {
+        mode: averageOnly && kpiMode === AGGREGATION_MODES.PERIOD_TOTAL ? AGGREGATION_MODES.DAILY_AVERAGE : kpiMode,
+        date: kpiMode === AGGREGATION_MODES.LATEST_DAY ? source[source.length - 1]?.date : null
+      })};
+    });
+  }, [primaryResults, secondaryResults, compareEnabled, previousRange, rangedRecords, quoteBacklogAlertRows, sfdcQuotesTable, quotesRequestedRows, caseBacklog, interactionStats, staffingTeamTotals, activeRange, rangedEmailDailyRecords, emailBacklogTotals, emailCaseRecords, openEmailCases, quoteActivityReport, quotesLoading, quotesQuery.isError, quotesQuery.error, quotesQuery.refetch, activityQuery.isLoading, activityQuery.isError, activityQuery.error, activityQuery.refetch, niceCalls, reportTables, eodbTotalInteractions, eodbAbandoned, rangedEodbTotalCallVolume, rangedEodbAbandonedCalls, rangedEodbDailyWaitTime, rangedEodbAvgTalkTime, eodbAbandonmentRate, eodbAvgWaitSeconds, eodbAvgTalkSeconds, kpiMode, rangedStaffingRecords, eodbHandled, eodbHandledRecords]);
 
   const tileCategories = useMemo(() => Array.from(new Set(allTiles.map((t) => t.category))), [allTiles]);
 
@@ -1911,20 +1846,10 @@ export default function DashboardOverview({
         <CardHeader className="pb-3">
           <CardTitle className="text-base">O&M Executive Overview</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Historical, range-aware summary across imports and manual entry. See the Daily Snapshot Report tab for
-            the full exportable single-day narrative report.
+            Period metrics from imports and live EnQuote activity, followed by actionable quote exceptions.
+            See Quote Dashboard for full quote charts and history.
           </p>
         </CardHeader>
-        <CardContent className="space-y-2">
-          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-            <span>
-              Last stored or imported: {lastStoredOrImportedAt ? new Date(lastStoredOrImportedAt).toLocaleString() : "Never"}
-            </span>
-            <span>
-              Overall source coverage: {overallCoverage !== null ? `${overallCoverage}%` : "N/A - no configured sources in range"}
-            </span>
-          </div>
-        </CardContent>
       </Card>
       <DashboardDateRange records={records} value={activeRange} onChange={setRangeValue} />
       <Card className="border-border">
@@ -1943,6 +1868,7 @@ export default function DashboardOverview({
               Compare to Previous Period{!previousRange && " (not applicable to All Available History)"}
             </Label>
           </div>
+          <p className="text-xs text-muted-foreground">Applies to period-based tiles. Snapshots and the live quote review queue stay unchanged. Rates and average durations are never summed. Quote daily averages include zero-activity calendar days; imported daily averages use available report dates. Latest Day uses each source&apos;s latest available date (quotes use the period end).</p>
         </CardContent>
       </Card>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1977,63 +1903,13 @@ export default function DashboardOverview({
         <h3 className="mb-3 text-lg font-semibold text-foreground">Hourly Wait Time Summary</h3>
         <HourlyWaitTimeChart rows={reportTables?.eodb_hourly_wait_time?.rows} />
       </div>
-      <div>
-        <h2 className="mb-3 text-lg font-semibold text-foreground">Historical Operations Trend</h2>
-        <ExecutiveOverviewCharts records={rangedRecords} quoteOpsSeries={quoteOpsSeries} />
-      </div>
-      <Card className="border-border">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold text-foreground">Source Coverage</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Source Group</TableHead>
-                <TableHead>Coverage</TableHead>
-                <TableHead>Latest Date with Data</TableHead>
-                <TableHead>Latest Import</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Records</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sourceCoverageResults.map(group => (
-                <TableRow key={group.key}>
-                  <TableCell className="font-medium text-foreground">{group.label}</TableCell>
-                  <TableCell><SourceCoverageBar percent={group.coveragePercent} /></TableCell>
-                  <TableCell className="text-muted-foreground">{group.latestDateWithData ? formatDateLabel(group.latestDateWithData) : BLANK_DISPLAY}</TableCell>
-                  <TableCell className="text-muted-foreground">{group.latestImportAt ? new Date(group.latestImportAt).toLocaleDateString() : BLANK_DISPLAY}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={group.status === "Full Coverage" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-border bg-secondary text-muted-foreground"}>
-                      {group.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={group.status === "Setup Required"}
-                      onClick={() => openDrillDown({ title: `${group.label} Records`, fieldLabel: null, fieldKey: null, source: getRecordsForGroup(rangedRecords, group.key, { quoteOpsHasDataByDate }) })}
-                    >
-                      View Records
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-      <RequiresAttentionTable rows={attentionRows} />
-      <div>
-        <h3 className="mb-3 text-sm font-semibold text-muted-foreground">Additional Trends (AHT, Emails, Staffing)</h3>
-        <MetricsTrendCharts records={records} />
-      </div>
-      <div>
-        <h3 className="mb-3 text-sm font-semibold text-muted-foreground">History</h3>
-        <MetricsHistoryTable records={rangedRecords} onEdit={onEditRecord} onChanged={onChanged} />
-      </div>
+      <QuoteExceptionsPanel
+        report={quoteActivityReport}
+        alertRows={quoteBacklogAlertRows}
+        loading={quotesLoading || activityQuery.isLoading}
+        error={quotesQuery.isError ? quotesQuery.error : activityQuery.isError ? activityQuery.error : null}
+        onRetry={() => { quotesQuery.refetch(); activityQuery.refetch(); }}
+      />
       <DrillDownDrawer
         open={Boolean(drillDown)}
         onOpenChange={(open) => { if (!open) setDrillDown(null); }}
@@ -2067,7 +1943,9 @@ export default function DashboardOverview({
         onOpenChange={(open) => { if (!open) setEodbWidgetDialogRows(null); }}
         label={eodbWidgetDialogRows?.label || ""}
         records={eodbWidgetDialogRows?.records || []}
+        rawCalls={eodbWidgetDialogRows?.rawCalls}
       />
+      <QuoteContributingRecordsDialog selection={quoteActivitySelection} onClose={() => setQuoteActivitySelection(null)} />
       <EmailDailyRecordsDialog
         open={emailDailyDialogRows !== null}
         onOpenChange={(open) => { if (!open) setEmailDailyDialogRows(null); }}

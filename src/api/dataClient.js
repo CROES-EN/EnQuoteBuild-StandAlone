@@ -122,6 +122,8 @@ export const updateReview =
 
 export const getQuoteActivities =
   (...args) => call("getQuoteActivities", args);
+export const getAllQuoteActivities =
+  (...args) => call("getAllQuoteActivities", args);
 
 export const createQuoteActivity =
   (...args) => call("createQuoteActivity", args);

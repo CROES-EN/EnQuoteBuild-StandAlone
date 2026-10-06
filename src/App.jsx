@@ -1,4 +1,4 @@
-import {HashRouter, Route, Routes} from "react-router-dom";
+import {HashRouter, Navigate, Route, Routes} from "react-router-dom";
 
 import {Toaster} from "@/components/ui/toaster";
 import {Toaster as SonnerToaster} from "@/components/ui/sonner";
@@ -13,7 +13,6 @@ import PageNotFound from "./lib/PageNotFound";
 
 import SVCancelTrackerPage from "./pages/SVCancelTracker";
 import RejectedQuoteReviewPage from "./pages/RejectedQuoteReview";
-import ManagerDashboardPage from "./pages/ManagerDashboard";
 import SupervisorDashboardPage from "./pages/SupervisorDashboard";
 import BoneyardPage from "./pages/Boneyard";
 import ResourcePlannerPage from "./pages/ResourcePlanner";
@@ -27,6 +26,8 @@ import {AutoDrafter as AutoDrafterPage} from "./pages/AutoDrafter";
 import TasksPage from "./pages/Tasks";
 import SOPLibraryPage from "./pages/SOPLibrary";
 import MessagesPage from "./pages/Messages";
+import Base44_DTO from "@/features/Base44_DTO/Base44_DTO";
+import SecretRetroShortcut from "@/features/Base44_DTO/Shortcut";
 
 import AuthProvider, {useAuth} from "@/lib/AuthContext";
 import UserNotRegisteredError from "@/components/UserNotRegisteredError";
@@ -113,9 +114,10 @@ const AuthenticatedApp = () => {
         </LayoutWrapper>
       } />
       <Route path="/ManagerDashboard" element={
-        <LayoutWrapper currentPageName="ManagerDashboard">
-          <ManagerDashboardPage />
-        </LayoutWrapper>
+        <Navigate to="/SupervisorDashboard?tab=quote-dashboard" replace />
+      } />
+      <Route path="/QuoteDashboard" element={
+        <Navigate to="/SupervisorDashboard?tab=quote-dashboard" replace />
       } />
       <Route path="/SupervisorDashboard" element={
         <LayoutWrapper currentPageName="SupervisorDashboard">
@@ -161,6 +163,7 @@ const AuthenticatedApp = () => {
           <MessagesPage />
         </LayoutWrapper>
       } />
+      <Route path="/Base44_DTO" element={<LayoutWrapper currentPageName="Base44_DTO"><Base44_DTO /></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
@@ -176,6 +179,7 @@ function App() {
         <QueryClientProvider client={queryClientInstance}>
           <HashRouter>
             <NavigationTracker />
+            <SecretRetroShortcut />
             <AuthenticatedApp />
           </HashRouter>
           <Toaster />

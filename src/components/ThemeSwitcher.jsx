@@ -141,6 +141,7 @@ export default function ThemeSwitcher({ iconOnly = false, className }) {
     setFollowSettings(next);
     saveFollowSystemThemeSettings(next);
     if (next.enabled) setThemeId(SYSTEM_THEME_ID);
+    refreshCustomTheme();
   }
 
   function toggleMatchWindows(checked) {
@@ -151,14 +152,7 @@ export default function ThemeSwitcher({ iconOnly = false, className }) {
   }
 
   function applyTheme(theme) {
-    if (matchWindows) {
-      saveFollowSettings({
-        ...followSettings,
-        enabled: true,
-        [theme.isDark ? "darkThemeId" : "lightThemeId"]: theme.id
-      });
-      return;
-    }
+    setFollowSettings((previous) => ({ ...previous, enabled: false }));
     setThemeId(theme.id);
   }
 
@@ -255,7 +249,7 @@ export default function ThemeSwitcher({ iconOnly = false, className }) {
                   {darkThemes.map((theme) => <option key={theme.id} value={theme.id}>{theme.name}</option>)}
                 </select>
               </Field>
-              <p className="text-xs text-muted-foreground sm:col-span-2">Tip: while matching Windows, clicking a card updates the light or dark choice.</p>
+              <p className="text-xs text-muted-foreground sm:col-span-2">Selecting a theme card turns off Windows matching and applies your choice immediately.</p>
             </div>
           )}
         </section>

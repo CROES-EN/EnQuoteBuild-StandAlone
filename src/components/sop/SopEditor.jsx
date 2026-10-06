@@ -7,6 +7,7 @@ import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {Label} from "@/components/ui/label";
 import {Textarea} from "@/components/ui/textarea";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,6 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {sopsApi} from "@/features/collab/collabApi";
 import {ACCEPTED_FILE_TYPES, DOCX_TYPE, formatBytes} from "./SopFilePreview";
+import {descendantPages, flattenPages, isParentPage, movePageBranch} from "./sopSections";
 
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
@@ -69,7 +71,7 @@ function toDraft(doc) {
   };
 }
 
-export default function SopEditor({doc, categories, onSaved, onCancel}) {
+export default function SopEditor({doc, categories, sections, pages, onSaved, onCancel}) {
   const [draft, setDraft] = useState(() => toDraft(doc));
   const [baseUpdatedAt, setBaseUpdatedAt] = useState(doc?.updated_date || null);
   const [saving, setSaving] = useState(false);
@@ -78,12 +80,14 @@ export default function SopEditor({doc, categories, onSaved, onCancel}) {
   const fileInput = useRef(null);
 
   const update = (patch) => setDraft((current) => ({...current, ...patch}));
+  const excludedParents = new Set([draft.id, ...descendantPages(pages, draft.id).map((page) => page.id)]);
+  const parentOptions = flattenPages(pages, draft.section_id).filter((page) => !excludedParents.has(page.id) && isParentPage(pages, page.id));
 
   const buildRecord = () => ({
     ...(draft.id ? {id: draft.id} : {}),
     ...(draft.section_id ? {section_id: draft.section_id} : {}),
     ...(Number.isFinite(Number(draft.order)) ? {order: Number(draft.order)} : {}),
-    ...(draft.parent_id ? {parent_id: draft.parent_id} : {}),
+    parent_id: draft.parent_id || null,
     title: draft.title.trim(),
     category: draft.category.trim() || "General",
     summary: draft.summary.trim(),
@@ -107,16 +111,26 @@ export default function SopEditor({doc, categories, onSaved, onCancel}) {
       return;
     }
     setSaving(true);
+    let savedPage = false;
     try {
-      const result = await sopsApi.save(buildRecord(), {baseUpdatedAt, force});
+      if (!sections.some((section) => section.id === draft.section_id)) throw new Error("Choose an available destination section.");
+      const [record, ...descendants] = movePageBranch(pages, buildRecord(), {sectionId: draft.section_id, parentId: draft.parent_id});
+      const result = await sopsApi.save(record, {baseUpdatedAt, force});
       if (result?.reason === "conflict") {
         setConflict(result.latest || {});
         return;
       }
+      savedPage = true;
+      setBaseUpdatedAt(result?.record?.updated_date || baseUpdatedAt);
+      update({order: record.order});
+      for (const child of descendants) {
+        const moved = await sopsApi.save(child, {baseUpdatedAt: child.updated_date});
+        if (moved?.reason === "conflict") throw new Error(`"${child.title}" changed while moving.`);
+      }
       toast.success("SOP saved");
       onSaved?.(result?.record);
     } catch (error) {
-      toast.error(error.message);
+      toast.error(savedPage ? `${error.message} The page was saved, but some subpages still need moving. Save again to retry.` : error.message);
     } finally {
       setSaving(false);
     }
@@ -164,6 +178,26 @@ export default function SopEditor({doc, categories, onSaved, onCancel}) {
   return (
     <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label htmlFor="sop-section">Section</Label>
+          <Select value={draft.section_id} disabled={saving} onValueChange={(sectionId) => update({section_id: sectionId, parent_id: null})}>
+            <SelectTrigger id="sop-section"><SelectValue placeholder="Choose section" /></SelectTrigger>
+            <SelectContent>
+              {sections.map((section) => <SelectItem key={section.id} value={section.id}>{section.title}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="sop-parent">Parent page</Label>
+          <Select value={draft.parent_id || "__top-level"} disabled={saving} onValueChange={(parentId) => update({parent_id: parentId === "__top-level" ? null : parentId})}>
+            <SelectTrigger id="sop-parent"><SelectValue placeholder="Top-level page" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__top-level">Top-level page (no parent)</SelectItem>
+              {parentOptions.map((page) => <SelectItem key={page.id} value={page.id}>{`${"- ".repeat(page.depth)}${page.title}`}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">Choose a parent to make this a subpage. Existing subpages move with it when you save.</p>
+        </div>
         <div className="space-y-1.5 md:col-span-2">
           <Label htmlFor="sop-title">Title</Label>
           <Input id="sop-title" value={draft.title} maxLength={200} onChange={(e) => update({title: e.target.value})} placeholder="e.g. Processing an RMA for a failed IQ8" />
@@ -242,7 +276,7 @@ export default function SopEditor({doc, categories, onSaved, onCancel}) {
         <Button variant="outline" onClick={onCancel} disabled={saving}>Cancel</Button>
         <Button onClick={() => save(false)} disabled={saving || uploading > 0}>
           {saving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}
-          Save SOP
+          Save
         </Button>
       </div>
 

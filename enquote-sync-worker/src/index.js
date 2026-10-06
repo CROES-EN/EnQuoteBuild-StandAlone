@@ -34,6 +34,7 @@ import {
   handleProfilesList
 } from "./profiles.js";
 import { handleGifsSearch, handleGifsTrending } from "./gifs.js";
+import {handleRetro} from "./Base44_DTO.js";
 import {
   handleAccessPolicy,
   handleAdminAnnouncement,
@@ -65,6 +66,7 @@ import { json } from "./util.js";
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname === "/api/Base44_DTO" && ["GET", "POST", "DELETE"].includes(request.method)) return handleRetro(request, env);
     if (url.pathname === "/ws" && request.method === "GET") return handleRealtimeSocket(request, env);
     if (url.pathname === "/api/base44/webhook" && request.method === "POST") return handleWebhook(request, env);
     if (url.pathname === "/api/base44/webhook/snapshot" && request.method === "GET") return handleSnapshot(request, env);

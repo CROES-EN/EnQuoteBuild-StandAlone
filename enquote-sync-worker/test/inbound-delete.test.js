@@ -40,7 +40,7 @@ function makeRequest(body, authorization = `Bearer ${OUTBOUND_TOKEN}`) {
   });
 }
 
-test("deletes remotely, records a tombstone, refreshes cache, and broadcasts", async () => {
+test("deletes remotely, records a tombstone, and broadcasts without a KV write", async () => {
   const db = makeDatabase();
   const fetchCalls = [];
   const cacheWrites = [];
@@ -98,10 +98,9 @@ test("deletes remotely, records a tombstone, refreshes cache, and broadcasts", a
     assert.ok(db.statements.some(({ sql, values }) =>
       /DELETE FROM quotes/.test(sql) && values[0] === "base44-quote-1"
     ));
-    assert.deepEqual(cacheWrites[0].snapshot, { quotes: [], lastSavedAt: null });
+    assert.equal(cacheWrites.length, 0, "the quote cache revalidates on read, so deletes must not write KV");
     assert.deepEqual(broadcasts, [{
       type: "quotes_updated",
-      quoteCount: 0,
       lastSavedAt: null
     }]);
   } finally {

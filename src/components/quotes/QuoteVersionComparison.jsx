@@ -19,13 +19,13 @@ function FieldComparison({ label, oldValue, newValue, renderValue }) {
     <div className="border-l-2 border-amber-400 pl-4 py-2">
       <p className="text-sm font-medium text-foreground mb-2">{label}</p>
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-rose-50 rounded-lg p-3">
-          <p className="text-xs text-rose-600 font-medium mb-1">Previous</p>
-          <p className="text-sm text-foreground">{render(oldValue)}</p>
+        <div className="bg-card text-card-foreground border border-rose-500/40 rounded-lg p-3">
+          <p className="text-xs font-medium mb-1">Previous</p>
+          <p className="text-sm">{render(oldValue)}</p>
         </div>
-        <div className="bg-emerald-50 rounded-lg p-3">
-          <p className="text-xs text-emerald-600 font-medium mb-1">Updated</p>
-          <p className="text-sm text-foreground">{render(newValue)}</p>
+        <div className="bg-card text-card-foreground border border-emerald-500/40 rounded-lg p-3">
+          <p className="text-xs font-medium mb-1">Updated</p>
+          <p className="text-sm">{render(newValue)}</p>
         </div>
       </div>
     </div>
@@ -42,21 +42,21 @@ function ItemsComparison({ oldItems = [], newItems = [] }) {
     <div className="border-l-2 border-amber-400 pl-4 py-2">
       <p className="text-sm font-medium text-foreground mb-2">Line Items</p>
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-rose-50 rounded-lg p-3">
-          <p className="text-xs text-rose-600 font-medium mb-2">Previous</p>
+        <div className="bg-card text-card-foreground border border-rose-500/40 rounded-lg p-3">
+          <p className="text-xs font-medium mb-2">Previous</p>
           <div className="space-y-1">
             {oldItems.map((item, idx) => (
-              <div key={idx} className="text-xs text-foreground">
+              <div key={idx} className="text-xs">
                 {item.name} - ${item.total?.toFixed(2)}
               </div>
             ))}
           </div>
         </div>
-        <div className="bg-emerald-50 rounded-lg p-3">
-          <p className="text-xs text-emerald-600 font-medium mb-2">Updated</p>
+        <div className="bg-card text-card-foreground border border-emerald-500/40 rounded-lg p-3">
+          <p className="text-xs font-medium mb-2">Updated</p>
           <div className="space-y-1">
             {newItems.map((item, idx) => (
-              <div key={idx} className="text-xs text-foreground">
+              <div key={idx} className="text-xs">
                 {item.name} - ${item.total?.toFixed(2)}
               </div>
             ))}
@@ -106,26 +106,26 @@ export default function QuoteVersionComparison({ quote }) {
         {/* Show rejection reasons from all versions */}
         <div className="space-y-3">
           {versions.filter(v => v.rejection_reason || v.ho_rejection_reason).map((v) => (
-            <div key={v.id} className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+            <div key={v.id} className="bg-card text-card-foreground border border-warning/50 rounded-lg p-3">
               <div className="flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <Badge variant="outline" className="text-xs">
+                    <Badge variant="outline" className="text-xs text-card-foreground border-warning/50">
                       Version {v.version_number}
                     </Badge>
                     {v.rejection_reason && (
-                      <span className="text-xs font-medium text-amber-800">Rejection Feedback</span>
+                      <span className="text-xs font-medium">Rejection Feedback</span>
                     )}
                     {v.ho_rejection_reason && (
-                      <span className="text-xs font-medium text-amber-800">HO Rejection Feedback</span>
+                      <span className="text-xs font-medium">HO Rejection Feedback</span>
                     )}
                   </div>
                   {v.rejection_reason && (
-                    <p className="text-sm text-amber-900">{v.rejection_reason}</p>
+                    <p className="text-sm">{v.rejection_reason}</p>
                   )}
                   {v.ho_rejection_reason && (
-                    <p className="text-sm text-amber-900">{v.ho_rejection_reason}</p>
+                    <p className="text-sm">{v.ho_rejection_reason}</p>
                   )}
                 </div>
               </div>
@@ -179,24 +179,24 @@ export default function QuoteVersionComparison({ quote }) {
                 
                 {/* Show rejection reasons if they exist */}
                 {compareVersion.rejection_reason && (
-                  <div className="bg-rose-50 border border-rose-200 rounded-lg p-4">
+                  <div className="bg-card text-card-foreground border border-destructive/50 rounded-lg p-4">
                     <div className="flex items-start gap-2">
-                      <XCircle className="w-5 h-5 text-rose-600 mt-0.5" />
+                      <XCircle className="w-5 h-5 mt-0.5" />
                       <div>
-                        <p className="font-medium text-rose-800">Rejection Reason (v{compareVersion.version_number})</p>
-                        <p className="text-rose-700 mt-1">{compareVersion.rejection_reason}</p>
+                        <p className="font-medium">Rejection Reason (v{compareVersion.version_number})</p>
+                        <p className="mt-1">{compareVersion.rejection_reason}</p>
                       </div>
                     </div>
                   </div>
                 )}
                 
                 {compareVersion.ho_rejection_reason && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="bg-card text-card-foreground border border-destructive/50 rounded-lg p-4">
                     <div className="flex items-start gap-2">
-                      <XCircle className="w-5 h-5 text-red-600 mt-0.5" />
+                      <XCircle className="w-5 h-5 mt-0.5" />
                       <div>
-                        <p className="font-medium text-red-800">HO Rejection Reason (v{compareVersion.version_number})</p>
-                        <p className="text-red-700 mt-1">{compareVersion.ho_rejection_reason}</p>
+                        <p className="font-medium">HO Rejection Reason (v{compareVersion.version_number})</p>
+                        <p className="mt-1">{compareVersion.ho_rejection_reason}</p>
                       </div>
                     </div>
                   </div>

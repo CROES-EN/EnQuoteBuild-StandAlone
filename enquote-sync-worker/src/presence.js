@@ -1,6 +1,8 @@
 import { json } from "./util.js";
 
-const PRESENCE_TTL_MS = 2 * 60 * 1000;
+const PRESENCE_TTL_MS = 3 * 60 * 1000;
+// A heartbeat only rewrites its row once it is this old (or details changed); comfortably inside the TTL.
+const PRESENCE_REFRESH_MS = 90 * 1000;
 
 function isAuthorized(request, env) {
   return Boolean(env.OUTBOUND_TOKEN) &&
@@ -39,6 +41,7 @@ export async function handlePresenceHeartbeat(request, env) {
   if (!isAllowedEmail(email, env)) return json({ ok: false, error: "email_not_allowed" }, 403);
 
   const now = new Date().toISOString();
+  const refreshBefore = new Date(Date.now() - PRESENCE_REFRESH_MS).toISOString();
   await env.DB.prepare(`
     INSERT INTO presence_sessions (session_id, email, name, signed_in_at, last_seen_at, app_version, ui_version, resolved_role)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -49,7 +52,13 @@ export async function handlePresenceHeartbeat(request, env) {
       app_version = excluded.app_version,
       ui_version = excluded.ui_version,
       resolved_role = excluded.resolved_role
-  `).bind(sessionId, email, name || email, now, now, appVersion, uiVersion, resolvedRole).run();
+    WHERE presence_sessions.last_seen_at < ?
+      OR presence_sessions.email IS NOT excluded.email
+      OR presence_sessions.name IS NOT excluded.name
+      OR presence_sessions.app_version IS NOT excluded.app_version
+      OR presence_sessions.ui_version IS NOT excluded.ui_version
+      OR presence_sessions.resolved_role IS NOT excluded.resolved_role
+  `).bind(sessionId, email, name || email, now, now, appVersion, uiVersion, resolvedRole, refreshBefore).run();
 
   return json({ ok: true, lastSeenAt: now });
 }

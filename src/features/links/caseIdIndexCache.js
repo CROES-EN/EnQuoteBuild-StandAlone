@@ -26,30 +26,48 @@ export function refreshCaseIdIndex({ force = false } = {}) {
       subscribers.forEach((notify) => notify(index));
       return index;
     })
-    .catch(() => cachedIndex)
+    .catch((error) => {
+      console.warn("[case-links] Could not refresh Workload case IDs:", error.message);
+      return cachedIndex;
+    })
     .finally(() => { inFlight = null; });
   return inFlight;
 }
 
-let listening = false;
+let stopListening;
 function ensureListeners() {
-  if (listening || typeof window === "undefined") return;
-  listening = true;
+  if (stopListening || typeof window === "undefined") return;
+  let refreshTimer;
   const refresh = () => { if (document.visibilityState === "visible") refreshCaseIdIndex(); };
   document.addEventListener("visibilitychange", refresh);
   window.addEventListener("focus", refresh);
-  globalThis.window?.enquoteLocal?.app?.onDataUpdated?.(() => refreshCaseIdIndex({ force: true }));
+  const off = globalThis.window?.enquoteLocal?.app?.onDataUpdated?.(() => {
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(() => refreshCaseIdIndex({force: true}), 250);
+  });
+  stopListening = () => {
+    clearTimeout(refreshTimer);
+    document.removeEventListener("visibilitychange", refresh);
+    window.removeEventListener("focus", refresh);
+    if (typeof off === "function") off();
+    stopListening = null;
+  };
 }
+
+if (import.meta.hot) import.meta.hot.dispose(() => stopListening?.());
 
 /** Current Map caseNumberKey -> Case ID (null until the first load finishes). */
 export function useCaseIdIndex() {
   const [index, setIndex] = useState(cachedIndex);
   useEffect(() => {
-    ensureListeners();
     subscribers.add(setIndex);
+    ensureListeners();
     if (cachedIndex) setIndex(cachedIndex);
-    else refreshCaseIdIndex();
-    return () => { subscribers.delete(setIndex); };
+    refreshCaseIdIndex();
+    return () => {
+      subscribers.delete(setIndex);
+      if (!subscribers.size) stopListening?.();
+    };
   }, []);
   return index;
 }

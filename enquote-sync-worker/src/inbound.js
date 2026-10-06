@@ -1,7 +1,6 @@
 import { performPush } from "./pusher.js";
-import { markBase44QuoteDeleted } from "./repository.js";
+import { getSnapshotMeta, markBase44QuoteDeleted } from "./repository.js";
 import { broadcastQuoteUpdate } from "./realtime.js";
-import { refreshSnapshotCache } from "./snapshot-cache.js";
 import { json } from "./util.js";
 
 // Stage 2: Desktop -> Base44 ONLY. This is the counterpart to
@@ -34,13 +33,11 @@ export async function handleInboundBase44(request, env) {
         remoteId: result.remote_id
       });
       try {
-        const snapshot = await refreshSnapshotCache(env);
         await broadcastQuoteUpdate(env, {
-          quoteCount: snapshot.quotes.length,
-          lastSavedAt: snapshot.lastSavedAt
+          lastSavedAt: await getSnapshotMeta(env.DB)
         });
       } catch (error) {
-        console.error("[quote-delete] Could not refresh cached snapshot or notify connected apps:", error.message);
+        console.error("[quote-delete] Could not notify connected apps:", error.message);
       }
     }
     return json({

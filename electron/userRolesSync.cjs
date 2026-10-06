@@ -7,7 +7,11 @@
 // removed (that person lost access). Records that never came from Base44 - for example one added
 // locally with Grant-EnQuoteRole.ps1 - are left alone.
 
+const { createPollGate } = require("./syncCadence.cjs");
+
 const DEFAULT_INTERVAL_MS = 10 * 60 * 1000;
+// While realtime pushes are flowing, the timer only reaches the Worker on the slow cadence.
+const CONNECTED_INTERVAL_MS = 60 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 20 * 1000;
 const SOURCE = "base44-sync";
 
@@ -62,6 +66,7 @@ function createUserRolesSync({
   clearIntervalFn = clearInterval
 }) {
   let timer = null;
+  const pollGate = createPollGate({ slowMs: CONNECTED_INTERVAL_MS });
   let inFlight = null;
 
   async function fetchUsers() {
@@ -101,8 +106,13 @@ function createUserRolesSync({
 
   function start({ immediate = true } = {}) {
     if (timer) return;
+    pollGate.ran();
     if (immediate) void sync();
-    timer = setIntervalFn(() => { void sync(); }, intervalMs);
+    timer = setIntervalFn(() => {
+      if (!pollGate.due()) return;
+      pollGate.ran();
+      void sync();
+    }, intervalMs);
     timer.unref?.();
   }
 

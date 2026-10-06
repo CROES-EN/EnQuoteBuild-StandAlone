@@ -25,6 +25,7 @@ const methodNames = [
   "createReview",
   "updateReview",
   "getQuoteActivities",
+  "getAllQuoteActivities",
   "createQuoteActivity",
   "getFollowUps",
   "createFollowUp",

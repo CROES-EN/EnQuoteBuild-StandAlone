@@ -1,12 +1,25 @@
 import {useEffect, useState} from "react";
+import {createAvatarCache} from "./avatarCache";
 
 const bridge = () => globalThis.window?.enquoteLocal || {};
-const avatarUrls = new Map();
+const avatarCache = createAvatarCache({
+  load: (id) => call("profiles", "getAvatar", id),
+  createUrl: (result) => URL.createObjectURL(new Blob([result.bytes], {type: result.type || "application/octet-stream"})),
+  revokeUrl: (url) => URL.revokeObjectURL(url)
+});
+if (import.meta.hot) import.meta.hot.dispose(() => avatarCache.dispose());
 let profilesCache = null;
 let profilesPromise = null;
 
 function errorFrom(result) {
-  return result?.reason || result?.error || "Something went wrong. Try again.";
+  const code = result?.reason || result?.error;
+  const messages = {
+    file_too_large: "Profile pictures must be 512 KB or smaller.",
+    invalid_gif_avatar: "That file is not a supported GIF image.",
+    gif_dimensions_too_large: "GIF profile pictures must be 1024px or smaller on each side.",
+    unsupported_type: "Choose a PNG, JPEG, WebP, or GIF profile picture."
+  };
+  return messages[code] || code || "Something went wrong. Try again.";
 }
 
 async function call(group, method, ...args) {
@@ -19,7 +32,7 @@ async function call(group, method, ...args) {
 
 async function listProfiles({ refresh = false } = {}) {
   if (!refresh && profilesCache) return profilesCache;
-  if (!refresh && profilesPromise) return profilesPromise;
+  if (profilesPromise) return profilesPromise;
   profilesPromise = call("profiles", "list").then((result) => {
     profilesCache = Array.isArray(result?.profiles) ? result.profiles : [];
     return profilesCache;
@@ -45,14 +58,7 @@ export const profilesApi = {
     clearProfilesCache();
     return result;
   },
-  async getAvatar(avatarId) {
-    if (avatarUrls.has(avatarId)) return avatarUrls.get(avatarId);
-    const result = await call("profiles", "getAvatar", avatarId);
-    const blob = new Blob([result.bytes], { type: result.type || "application/octet-stream" });
-    const url = URL.createObjectURL(blob);
-    avatarUrls.set(avatarId, url);
-    return url;
-  },
+  acquireAvatar: avatarCache.acquire,
   onChanged(callback) {
     const fn = bridge().profiles?.onChanged;
     if (typeof fn !== "function") return () => {};
@@ -78,26 +84,40 @@ export function useAvatar(email) {
   const [state, setState] = useState({ url: "", loading: false });
   useEffect(() => {
     let cancelled = false;
+    let releaseAvatar;
+    let loadVersion = 0;
     const normalized = String(email || "").trim().toLowerCase();
     if (!normalized) {
       setState({ url: "", loading: false });
       return undefined;
     }
     async function load() {
+      const version = ++loadVersion;
       setState((current) => ({ ...current, loading: true }));
       try {
         const profiles = await profilesApi.list();
+        if (cancelled || version !== loadVersion) return;
         const avatarId = profiles.find((profile) => profile.email === normalized)?.avatarId;
-        const url = avatarId ? await profilesApi.getAvatar(avatarId) : "";
-        if (!cancelled) setState({ url, loading: false });
-      } catch {
-        if (!cancelled) setState({ url: "", loading: false });
+        const avatar = avatarId ? await profilesApi.acquireAvatar(avatarId) : null;
+        if (cancelled || version !== loadVersion) {
+          avatar?.release();
+          return;
+        }
+        releaseAvatar?.();
+        releaseAvatar = avatar?.release;
+        setState({ url: avatar?.url || "", loading: false });
+      } catch (error) {
+        if (!cancelled && version === loadVersion) {
+          console.warn("[profiles] Could not load profile picture:", error.message);
+          setState((current) => ({...current, loading: false}));
+        }
       }
     }
     void load();
     const off = profilesApi.onChanged(load);
     return () => {
       cancelled = true;
+      releaseAvatar?.();
       off();
     };
   }, [email]);

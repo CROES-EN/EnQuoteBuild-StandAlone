@@ -28,7 +28,7 @@ export default function TileGrid({ tiles, onReorder }) {
           <div
             ref={provided.innerRef}
             {...provided.droppableProps}
-            className="flex flex-wrap gap-4"
+            className="grid auto-rows-fr grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
           >
             {tiles.map((tile, index) => (
               <Draggable key={tile.id} draggableId={tile.id} index={index}>
@@ -37,7 +37,7 @@ export default function TileGrid({ tiles, onReorder }) {
                     ref={dragProvided.innerRef}
                     {...dragProvided.draggableProps}
                     {...dragProvided.dragHandleProps}
-                    className={`w-full cursor-grab rounded-xl transition-shadow active:cursor-grabbing sm:w-[calc(50%-0.5rem)] lg:w-[calc(25%-0.75rem)] ${dragSnapshot.isDragging ? "shadow-lg ring-2 ring-primary/40" : ""}`}
+                    className={`min-w-0 cursor-grab rounded-xl transition-shadow active:cursor-grabbing [&>div]:h-full ${dragSnapshot.isDragging ? "shadow-lg ring-2 ring-primary/40" : ""}`}
                   >
                     {tile.render()}
                   </div>

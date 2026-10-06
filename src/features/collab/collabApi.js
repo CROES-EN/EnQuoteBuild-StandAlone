@@ -58,7 +58,10 @@ export const sopsApi = {
   delete: (id) => call("sops.delete", id),
   versions: async (id) => list(await call("sops.versions", id), "versions"),
   uploadFile: async (file) => (await call("sops.uploadFile", file))?.file,
-  getFile: (fileId, meta) => call("sops.getFile", fileId, meta)
+  getFile: (fileId, meta) => call("sops.getFile", fileId, meta),
+  prepareOneNote: () => call("sops.prepareOneNote"),
+  importOneNote: (payload) => call("sops.importOneNote", payload),
+  cancelOneNote: (sessionId) => call("sops.cancelOneNote", sessionId)
 };
 
 export const chatApi = {

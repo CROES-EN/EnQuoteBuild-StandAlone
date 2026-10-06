@@ -3,22 +3,21 @@ export const ALL_PAGES = Object.freeze([
   "QuoteOverview", "AutoDrafter", "Products", "MaterialOrders", "PVPanelRMAs", "SLAReporting",
   "Boneyard", "SVCancelTracker", "ResourcePlanner", "SOPLibrary", "SiteFlagManager", "EnphaseCare",
   "InactiveRevenueDashboard", "InactiveCollections", "RevenueAnalytics", "Users", "QuoteDeletionRequests",
-  "EmailNotifications", "FollowUpSettings", "PDFTemplateSettings", "ManagerDashboard", "SupervisorDashboard",
-  "RejectedQuoteReview"
+  "EmailNotifications", "FollowUpSettings", "PDFTemplateSettings", "SupervisorDashboard",
+  "RejectedQuoteReview", "Base44_DTO"
 ]);
 
-// Matches the pre-1.4.0 effective access exactly (old allow-list ∩ each page's RoleGuard), so nothing
-// changes until an admin edits the matrix in the Admin Menu.
+// Defaults preserve legacy access except for viewing pages explicitly available to all roles.
 export const DEFAULT_ROLE_PAGES = Object.freeze({
   submitter: [
     "Dashboard", "Workload", "Tasks", "Messages", "Quotes", "AutoDrafter", "Products", "MaterialOrders",
     "PVPanelRMAs", "SLAReporting", "Boneyard", "SVCancelTracker", "ResourcePlanner", "SOPLibrary",
-    "SiteFlagManager", "EnphaseCare"
+    "SiteFlagManager", "EnphaseCare", "InactiveRevenueDashboard", "InactiveCollections"
   ],
   approver: [
     "Dashboard", "Workload", "Tasks", "Messages", "Quotes", "AutoDrafter", "Products", "MaterialOrders",
     "PVPanelRMAs", "SLAReporting", "Boneyard", "SVCancelTracker", "ResourcePlanner", "SOPLibrary",
-    "SiteFlagManager", "EnphaseCare", "InactiveRevenueDashboard"
+    "SiteFlagManager", "EnphaseCare", "InactiveRevenueDashboard", "InactiveCollections"
   ],
   invoicer: [
     "Dashboard", "Workload", "Tasks", "Messages", "Quotes", "QuoteDetails", "QuoteOverview", "AutoDrafter",
@@ -29,6 +28,7 @@ export const DEFAULT_ROLE_PAGES = Object.freeze({
 });
 
 const ADMIN_ROLES = new Set(["admin", "super_admin"]);
+const ALL_ROLE_VIEW_PAGES = new Set(["Boneyard", "InactiveRevenueDashboard", "InactiveCollections", "Base44_DTO"]);
 
 export function toRoleList(value) {
   if (Array.isArray(value)) return value.map((role) => String(role || "").trim()).filter(Boolean);
@@ -52,6 +52,7 @@ export function canAccessPage(userOrRoles, page, policy = null) {
   if (allowPages.has(pageName)) return true;
   if (roles.some((role) => ADMIN_ROLES.has(role))) return true;
   if (!roles.length) return false;
+  if (ALL_ROLE_VIEW_PAGES.has(pageName)) return true;
   const rolePages = policy?.rolePages || DEFAULT_ROLE_PAGES;
   return roles.some((role) => toRoleList(rolePages?.[role]).includes(pageName));
 }

@@ -3,7 +3,8 @@ const http = require("node:http");
 const https = require("node:https");
 const { Buffer } = require("node:buffer");
 
-const DEFAULT_INTERVAL_MS = 45 * 1000;
+// The Worker keeps sessions for 3 minutes and only rewrites a session row every ~2 beats.
+const DEFAULT_INTERVAL_MS = 60 * 1000;
 
 function createPresenceSync({
   workerUrl,

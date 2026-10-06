@@ -352,14 +352,15 @@ export default function QuoteForm({ quote, products = [], onSave, onSaveDraft, o
 
           {/* Labor Mode Toggle (admin only) */}
           {isAdmin && (
-            <div className="md:col-span-2 flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-              <span className={`text-sm font-medium ${!isFlat ? "text-foreground" : "text-muted-foreground"}`}>Hourly Labor</span>
+            <div className="md:col-span-2 flex flex-wrap items-center gap-3 p-3 bg-secondary text-secondary-foreground border border-warning/50 rounded-lg">
+              <span className={`text-sm ${!isFlat ? "font-semibold" : "font-normal"}`}>Hourly Labor</span>
               <Switch
+                aria-label="Use flat labor fee instead of hourly labor"
                 checked={isFlat}
                 onCheckedChange={(checked) => setFormData({ ...formData, labor_mode: checked ? "flat" : "hourly", flat_labor_fee: "", fst_count: "", labor_hours: "" })}
               />
-              <span className={`text-sm font-medium ${isFlat ? "text-foreground" : "text-muted-foreground"}`}>Flat Labor Fee</span>
-              <span className="text-xs text-amber-700 ml-2">(Admin only)</span>
+              <span className={`text-sm ${isFlat ? "font-semibold" : "font-normal"}`}>Flat Labor Fee</span>
+              <span className="text-xs ml-2">(Admin only)</span>
             </div>
           )}
 

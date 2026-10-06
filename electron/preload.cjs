@@ -179,6 +179,10 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
     versions: (id) => invoke("sops:versions", id),
     uploadFile: (file) => invoke("sops:uploadFile", file),
     getFile: (fileId, meta) => invoke("sops:getFile", fileId, meta),
+    prepareOneNote: () => invoke("sops:prepareOneNote"),
+    importOneNote: (payload) => invoke("sops:importOneNote", payload),
+    cancelOneNote: (sessionId) => invoke("sops:cancelOneNote", sessionId),
+    onOneNoteProgress: (callback) => subscribe("sops:onenote-progress", callback),
     onChanged: (callback) => subscribe("sops:changed", callback)
   },
   chat: {
@@ -221,6 +225,12 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
     audit: (payload) => invoke("admin:audit", payload),
     onPolicyChanged: (callback) => subscribe("admin:policy-changed", callback),
     onSignOut: (callback) => subscribe("admin:sign-out", callback)
+  },
+  Base44_DTO: {
+    list: (cursor) => invoke("Base44_DTO:list", cursor),
+    get: (email) => invoke("Base44_DTO:get", email),
+    save: (profile) => invoke("Base44_DTO:save", profile),
+    remove: () => invoke("Base44_DTO:remove")
   },
   navigation: {
     // Main asks the window to open a page (e.g. after clicking a Windows notification).

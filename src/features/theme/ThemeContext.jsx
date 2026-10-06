@@ -1,4 +1,4 @@
-import {createContext, useContext, useEffect, useMemo, useState} from "react";
+import {createContext, useContext, useEffect, useMemo, useState, useCallback} from "react";
 import {DEFAULT_THEME_ID, SYSTEM_THEME_ID, getTheme, isCustomThemeId, THEMES} from "@/features/theme/themes";
 import {
   getCustomThemeById,
@@ -60,11 +60,11 @@ export function ThemeProvider({ children }) {
     const query = globalThis.window?.matchMedia?.("(prefers-color-scheme: dark)");
     if (!query) return undefined;
     const handleChange = (event) => setPrefersDark(Boolean(event.matches));
-    query.addEventListener?.("change", handleChange);
-    query.addListener?.(handleChange);
+    if (query.addEventListener) query.addEventListener("change", handleChange);
+    else query.addListener?.(handleChange);
     return () => {
-      query.removeEventListener?.("change", handleChange);
-      query.removeListener?.(handleChange);
+      if (query.removeEventListener) query.removeEventListener("change", handleChange);
+      else query.removeListener?.(handleChange);
     };
   }, []);
 
@@ -76,7 +76,8 @@ export function ThemeProvider({ children }) {
     return unsubscribe;
   }, []);
 
-  const value = {
+  const refreshCustomTheme = useCallback(() => setCustomVersion((version) => version + 1), []);
+  const value = useMemo(() => ({
     themeId,
     effectiveThemeId,
     theme: getTheme(effectiveThemeId),
@@ -84,8 +85,8 @@ export function ThemeProvider({ children }) {
     themes: Object.values(THEMES),
     followSystem: themeId === SYSTEM_THEME_ID,
     prefersDark,
-    refreshCustomTheme: () => setCustomVersion((version) => version + 1)
-  };
+    refreshCustomTheme
+  }), [themeId, effectiveThemeId, prefersDark, refreshCustomTheme]);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

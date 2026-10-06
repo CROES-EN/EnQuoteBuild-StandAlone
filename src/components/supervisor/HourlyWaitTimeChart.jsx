@@ -1,10 +1,12 @@
-﻿import {Fragment, useMemo, useState} from "react";
+import {Fragment, useMemo} from "react";
 import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import {Input} from "@/components/ui/input";
 import {Label} from "@/components/ui/label";
 import {CalendarRange, Clock} from "lucide-react";
+import {HOURLY_PRESETS as PRESETS} from "@/features/supervisorDashboard/reportingPeriodPreferences";
+import {useReportingPeriodPreference} from "@/features/supervisorDashboard/useReportingPeriodPreference";
 
 /**
  * Hourly Wait Time Summary grid - replaces the old "Report Data Overview" filter-tiles
@@ -19,12 +21,15 @@ import {CalendarRange, Clock} from "lucide-react";
  * rows are hour-of-day (converted to Mountain Time), and a Total row per date at the
  * bottom. The left-most label column header reads "Hourly Wait Time Summary" per earlier
  * explicit instruction for that column.
+ * Hour rows alternate theme-primary tints over an opaque card background, inherited by
+ * the sticky time labels so horizontal scrolling preserves the row shading.
  *
  * This widget has ITS OWN Reporting Period control (top-right of the header), independent
  * of the page-level Reporting Period above Executive Overview - confirmed via real testing
  * that the page-level range is resolved from DAILY METRICS records (Case Backlog, Contact
  * Center, etc.), which has no relationship to this report type's own imported date
- * coverage.
+ * coverage. Single Day selects one available Mountain Time date, defaulting to the latest.
+ * The preset and date inputs are remembered per signed-in user on this device.
  *
  * ASSUMPTION FLAGGED FOR REVIEW: raw rows have NO agent-identity field, only a per-row
  * "#Unique Agents" COUNT - so when multiple raw rows fall in the same date+hour (e.g.
@@ -37,18 +42,11 @@ import {CalendarRange, Clock} from "lucide-react";
  * @param {Array<Record<string, any>>} [props.rows] - reportTables.eodb_hourly_wait_time.rows
  */
 
-const PRESETS = {
-  LAST_7: "last7",
-  LAST_14: "last14",
-  LAST_30: "last30",
-  ALL: "all",
-  CUSTOM: "custom"
-};
-
 const PRESET_OPTIONS = [
   { value: PRESETS.LAST_7, label: "Last 7 Days" },
   { value: PRESETS.LAST_14, label: "Last 14 Days" },
   { value: PRESETS.LAST_30, label: "Last 30 Days" },
+  { value: PRESETS.SINGLE_DAY, label: "Single Day" },
   { value: PRESETS.ALL, label: "All Available History" },
   { value: PRESETS.CUSTOM, label: "Custom Range" }
 ];
@@ -185,9 +183,12 @@ function buildGrid(rows) {
 }
 
 export default function HourlyWaitTimeChart({ rows = [] }) {
-  const [preset, setPreset] = useState(PRESETS.LAST_7);
-  const [customStart, setCustomStart] = useState("");
-  const [customEnd, setCustomEnd] = useState("");
+  const [period, setPeriod] = useReportingPeriodPreference("hourly");
+  const {preset, customStart, customEnd, selectedDay} = period;
+  const setPreset = preset => setPeriod(previous => ({...previous, preset}));
+  const setCustomStart = customStart => setPeriod(previous => ({...previous, customStart}));
+  const setCustomEnd = customEnd => setPeriod(previous => ({...previous, customEnd}));
+  const setSelectedDay = selectedDay => setPeriod(previous => ({...previous, selectedDay}));
 
   const allDates = useMemo(() => {
     const dates = new Set();
@@ -198,16 +199,19 @@ export default function HourlyWaitTimeChart({ rows = [] }) {
     return Array.from(dates).sort();
   }, [rows]);
 
+  const effectiveDay = allDates.includes(selectedDay) ? selectedDay : (allDates[allDates.length - 1] || "");
+
   const selectedDates = useMemo(() => {
     if (!allDates.length) return [];
     if (preset === PRESETS.ALL) return allDates;
+    if (preset === PRESETS.SINGLE_DAY) return [effectiveDay];
     if (preset === PRESETS.CUSTOM) {
       if (!customStart || !customEnd) return allDates;
       return allDates.filter((d) => d >= customStart && d <= customEnd);
     }
     const n = preset === PRESETS.LAST_7 ? 7 : preset === PRESETS.LAST_14 ? 14 : 30;
     return allDates.slice(Math.max(0, allDates.length - n));
-  }, [allDates, preset, customStart, customEnd]);
+  }, [allDates, preset, customStart, customEnd, effectiveDay]);
 
   const filteredRows = useMemo(() => {
     if (selectedDates.length === allDates.length) return rows;
@@ -244,6 +248,21 @@ export default function HourlyWaitTimeChart({ rows = [] }) {
                 </SelectContent>
               </Select>
             </div>
+            {preset === PRESETS.SINGLE_DAY && (
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="hourly-wait-time-day" className="text-xs text-muted-foreground">Day (Mountain Time)</Label>
+                <Select value={effectiveDay} onValueChange={setSelectedDay} disabled={!allDates.length}>
+                  <SelectTrigger id="hourly-wait-time-day" className="w-44">
+                    <SelectValue placeholder="No dates available" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allDates.slice().reverse().map((date) => (
+                      <SelectItem key={date} value={date}>{date}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             {preset === PRESETS.CUSTOM && (
               <>
                 <div className="flex flex-col gap-1">
@@ -290,8 +309,14 @@ export default function HourlyWaitTimeChart({ rows = [] }) {
               </TableHeader>
               <TableBody>
                 {Array.from({ length: 24 }, (_, hour) => hour).map((hour) => (
-                  <TableRow key={hour}>
-                    <TableCell className="sticky left-0 z-10 bg-card font-medium text-foreground">{formatHourLabel(hour)}</TableCell>
+                  <TableRow
+                    key={hour}
+                    className={`${hour % 2 === 0
+                      ? "bg-[color-mix(in_srgb,hsl(var(--primary))_6%,hsl(var(--card)))]"
+                      : "bg-[color-mix(in_srgb,hsl(var(--primary))_16%,hsl(var(--card)))]"
+                    } hover:bg-[color-mix(in_srgb,hsl(var(--primary))_22%,hsl(var(--card)))]`}
+                  >
+                    <TableCell className="sticky left-0 z-10 bg-inherit font-medium text-foreground">{formatHourLabel(hour)}</TableCell>
                     {grid.dates.map((date) => {
                       const cell = grid.cells.get(`${date}|${hour}`);
                       return (

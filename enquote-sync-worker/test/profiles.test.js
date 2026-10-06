@@ -74,7 +74,7 @@ test("profiles list avatars, upload bytes to KV, download, remove, and broadcast
   assert.equal((await handleProfileAvatarUpload(await authedRequest("/api/profiles/avatar", "alice@example.com", {
     method: "POST",
     body: bytes,
-    headers: { "Content-Type": "image/gif" }
+    headers: { "Content-Type": "image/svg+xml" }
   }), env)).status, 415);
   assert.equal((await handleProfileAvatarUpload(await authedRequest("/api/profiles/avatar", "alice@example.com", {
     method: "POST",
@@ -85,4 +85,28 @@ test("profiles list avatars, upload bytes to KV, download, remove, and broadcast
   assert.deepEqual(await (await handleProfileAvatarRemove(await authedRequest("/api/profiles/avatar/remove", "alice@example.com", { method: "POST" }), env)).json(), { ok: true });
   const empty = await (await handleProfilesList(await authedRequest("/api/profiles", "alice@example.com"), env)).json();
   assert.deepEqual(empty.profiles, []);
+});
+
+test("animated GIF avatars retain their bytes and content type, with size and dimension validation", async () => {
+  const env = makeEnv();
+  const singleFrame = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64");
+  const bytes = Buffer.concat([singleFrame.subarray(0, -1), singleFrame.subarray(19)]);
+  const upload = (body) => authedRequest("/api/profiles/avatar", "alice@example.com", {
+    method: "POST", body, headers: {"Content-Type": "image/gif"}
+  });
+  const response = await handleProfileAvatarUpload(await upload(bytes), env);
+  assert.equal(response.status, 200);
+  const {avatarId} = await response.json();
+  const download = await handleProfileAvatarDownload(await authedRequest(`/api/profiles/avatar/${avatarId}`, "bob@example.com"), env, avatarId);
+  assert.equal(download.headers.get("Content-Type"), "image/gif");
+  assert.deepEqual(Buffer.from(await download.arrayBuffer()), bytes);
+  assert.equal((await handleProfileAvatarUpload(await upload(new ArrayBuffer(512 * 1024 + 1)), env)).status, 413);
+  const bad = await handleProfileAvatarUpload(await upload(new TextEncoder().encode("not a GIF image")), env);
+  assert.equal(bad.status, 400);
+  assert.equal((await bad.json()).error, "invalid_gif_avatar");
+  const large = Buffer.from(bytes);
+  large.writeUInt16LE(1025, 6);
+  const oversized = await handleProfileAvatarUpload(await upload(large), env);
+  assert.equal(oversized.status, 400);
+  assert.equal((await oversized.json()).error, "gif_dimensions_too_large");
 });

@@ -74,7 +74,7 @@ export default function FollowUpHistory({ quoteId }) {
             variant="outline" 
             size="sm"
             onClick={() => setShowManualDialog(true)}
-            className="text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+            className="text-foreground"
           >
             <Send className="w-4 h-4 mr-2" />
             Send Manual Follow-Up

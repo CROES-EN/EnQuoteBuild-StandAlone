@@ -6,8 +6,9 @@ import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
 import {Slider} from "@/components/ui/slider";
 import {cn} from "@/lib/utils";
 import {profilesApi, useAvatar} from "@/features/profiles/profileApi";
+import {MAX_AVATAR_BYTES as MAX_BYTES, MAX_GIF_DIMENSION, gifAvatarError} from "../../../shared/avatarRules.js";
 
-const MAX_BYTES = 512 * 1024;
+const isGif = (file) => file?.type === "image/gif" || /\.gif$/i.test(file?.name || "");
 
 function initialsFor(email, name) {
   const source = String(name || email || "?").trim();
@@ -37,6 +38,14 @@ function canvasToBlob(canvas, type, quality) {
 }
 
 async function cropAvatar(file, zoom) {
+  if (isGif(file)) {
+    if (file.size > MAX_BYTES) throw new Error("GIF profile pictures must be 512 KB or smaller.");
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const error = gifAvatarError(bytes);
+    if (error === "gif_dimensions_too_large") throw new Error(`GIF profile pictures must be ${MAX_GIF_DIMENSION}px or smaller on each side.`);
+    if (error) throw new Error("That file is not a supported GIF image.");
+    return {bytes, type: "image/gif"};
+  }
   const image = await loadImage(file);
   const canvas = document.createElement("canvas");
   canvas.width = 256;
@@ -123,7 +132,7 @@ export function ProfilePicturePicker({email, name, compact = false}) {
       <PopoverContent align="start" className="w-80 space-y-3">
         <div>
           <p className="text-sm font-semibold">Profile picture</p>
-          <p className="text-xs text-muted-foreground">Choose an image. EnQuote crops it square and uploads a 256px avatar.</p>
+          <p className="text-xs text-muted-foreground">Choose an image or animated GIF. Photos are cropped to 256px. GIFs keep their animation (512 KB max, 1024px per side).</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="relative h-24 w-24 overflow-hidden rounded-full bg-muted">
@@ -133,12 +142,12 @@ export function ProfilePicturePicker({email, name, compact = false}) {
             <input
               ref={inputRef}
               type="file"
-              accept="image/png,image/jpeg,image/webp"
+              accept="image/png,image/jpeg,image/webp,image/gif,.gif"
               className="hidden"
               onChange={(event) => setFile(event.target.files?.[0] || null)}
             />
             <Button type="button" variant="outline" size="sm" onClick={() => inputRef.current?.click()}>Choose image</Button>
-            {file && (
+            {file && !isGif(file) && (
               <div className="space-y-1">
                 <p className="text-[11px] text-muted-foreground">Zoom</p>
                 <Slider value={zoom} min={1} max={3} step={0.05} onValueChange={setZoom} />

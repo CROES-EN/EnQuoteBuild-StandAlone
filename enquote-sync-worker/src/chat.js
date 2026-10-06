@@ -317,7 +317,10 @@ export async function handleChatRead(request, env) {
   if (invalidId(body?.conversationId)) return json({ ok: false, error: "invalid_id" }, 400);
   const stampError = validateStamp(body?.at);
   if (stampError) return json({ ok: false, error: stampError }, 400);
-  if (!await activeMember(env, body.conversationId, user.email)) return json({ ok: false, error: "not_found" }, 404);
+  const member = await activeMember(env, body.conversationId, user.email);
+  if (!member) return json({ ok: false, error: "not_found" }, 404);
+  // Re-opening an already-read conversation needs no D1 write.
+  if (member.lastReadAt && member.lastReadAt >= body.at) return json({ ok: true });
   await env.DB.batch([
     env.DB.prepare("UPDATE chat_members SET last_read_at = CASE WHEN last_read_at IS NULL OR last_read_at < ? THEN ? ELSE last_read_at END WHERE conversation_id = ? AND email = ?").bind(body.at, body.at, body.conversationId, user.email)
   ]);

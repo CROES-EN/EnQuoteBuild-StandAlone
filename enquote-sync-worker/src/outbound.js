@@ -1,4 +1,5 @@
 import { upsertBase44EntityState } from "./repository.js";
+import { broadcastMessage } from "./realtime.js";
 import { json } from "./util.js";
 
 // Stage 1 fix (confirmed with Base44, see project chat log): this endpoint is
@@ -27,13 +28,21 @@ export async function handleEnqueue(request, env) {
   if (!localId) return json({ error: "missing_local_id" }, 400);
 
   try {
-    await upsertBase44EntityState(env.DB, {
+    const changed = await upsertBase44EntityState(env.DB, {
       entityType: body.entityType,
       localId,
       action: body.action || "create",
       record: body.record || body.quote || body,
     });
-    return json({ ok: true, stored: true });
+    // Connected apps pull the entity snapshot on this signal instead of polling it constantly.
+    if (changed) {
+      try {
+        await broadcastMessage(env, { type: "entities_updated", entityType: body.entityType });
+      } catch (error) {
+        console.warn("[outbound] Could not notify connected apps:", error.message);
+      }
+    }
+    return json({ ok: true, stored: true, changed });
   } catch (err) {
     return json({ ok: false, error: err.message }, 500);
   }

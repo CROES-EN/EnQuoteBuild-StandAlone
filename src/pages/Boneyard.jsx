@@ -1,5 +1,7 @@
 ﻿import {useState} from "react";
-import {getCurrentUser, getQuotes, updateQuote} from "@/api/dataClient";
+import {getCurrentUser, updateQuote} from "@/api/dataClient";
+import {getBoneyardQuotes} from "@/components/inactive-dashboard/inactiveRevenueService";
+import InactiveDataError from "@/components/inactive-dashboard/InactiveDataError";
 import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
@@ -28,12 +30,13 @@ function BoneyardContent() {
  const [restoreTarget, setRestoreTarget] = useState(null);
  const [restoreNote, setRestoreNote] = useState("");
 
- const { data: onHoldQuotes = [], isLoading } = useQuery({
- queryKey: ["boneyard-quotes"],
- queryFn: async () => {
- const all = await getQuotes();
- return all.filter(q => q.status === "on_hold" && q.is_current_version !== false);
- }
+ const location = useLocation();
+ const params = new URLSearchParams(location.search);
+ const start = params.get("start");
+ const end = params.get("end");
+ const { data: onHoldQuotes = [], isLoading, isError, error, refetch, isFetching } = useQuery({
+ queryKey: ["boneyard-quotes", start, end],
+ queryFn: () => getBoneyardQuotes(start, end)
  });
 
  const updateMutation = useMutation({
@@ -75,11 +78,7 @@ function BoneyardContent() {
  setRestoreNote("");
  };
 
- const location = useLocation();
-
- const params = new URLSearchParams(location.search);
- const start = params.get("start");
- const end = params.get("end");
+ if (isError) return <InactiveDataError error={error} refetch={refetch} isFetching={isFetching} />;
  const dateFiltered = onHoldQuotes.filter((quote) => !start || !end || (quote.hold_date || quote.updated_date || quote.created_date)?.slice(0, 10) >= start && (quote.hold_date || quote.updated_date || quote.created_date)?.slice(0, 10) <= end);
  const filtered = dateFiltered.filter(q =>
  q.site_id?.toLowerCase().includes(search.toLowerCase()) ||

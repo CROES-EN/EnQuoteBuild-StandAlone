@@ -80,6 +80,7 @@ function createCollabClient({
     isReady,
     get: (route, params = {}) => request("GET", `${route}${query(params)}`),
     post: (route, json) => request("POST", route, { json }),
+    delete: (route) => request("DELETE", route),
     async upload(route, { bytes, type, name }) {
       return request("POST", route, {
         body: bytes,

@@ -1,4 +1,5 @@
 ﻿import {base44} from "../base44Client";
+import {loadAllActivityPages} from "../../features/quoteDashboard/loadQuoteActivities.js";
 
 const ENTITY_ALIASES = {
   quotes: "Quote",
@@ -14,8 +15,10 @@ const ENTITY_ALIASES = {
   users: "User",
   siteFlags: "SiteFlag",
   quoteDeletionRequests: "QuoteDeletionRequest",
+  deletionRequests: "QuoteDeletionRequest",
   materialOrders: "MaterialOrder",
   pvPanelRMAs: "PVPanelRMA",
+  rmas: "PVPanelRMA",
   pdfTemplates: "PDFTemplate",
   emailDistributions: "EmailDistribution",
   statusAlertDismissals: "StatusAlertDismissal",
@@ -96,6 +99,7 @@ export const base44Adapter = {
       "-action_at",
       100
     ),
+  getAllQuoteActivities: () => loadAllActivityPages((...args) => base44.entities.QuoteActivity.list(...args)),
 
   createQuoteActivity: (data) =>
     base44.entities.QuoteActivity.create(data),

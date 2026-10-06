@@ -1,5 +1,6 @@
 ﻿import {useEffect, useState} from "react";
 import {useQuery, useQueryClient} from "@tanstack/react-query";
+import {useSearchParams} from "react-router-dom";
 import {Button} from "@/components/ui/button";
 import {Card, CardContent} from "@/components/ui/card";
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
@@ -9,6 +10,7 @@ import DailyMetricsForm from "@/components/supervisor/DailyMetricsForm";
 import DailySnapshotReport from "@/components/supervisor/DailySnapshotReport";
 import DashboardOverview from "@/components/supervisor/DashboardOverview";
 import NiceRawDataPanel from "@/components/supervisor/NiceRawDataPanel";
+import QuoteDashboard from "@/pages/QuoteDashboard";
 
 import EscalationsTabPanel from "@/components/supervisor/EscalationsTabPanel";
 import CareSubscriptionsTabPanel from "@/components/supervisor/CareSubscriptionsTabPanel";
@@ -24,17 +26,30 @@ import {
     openLastImportedFile
 } from "@/features/supervisorDashboard/lastImportedFile";
 import {toast} from "sonner";
-import {BookMarked, FileSpreadsheet, Gauge, Grid3x3, HardDrive, Info, NotebookText, Table2} from "lucide-react";
+import {BookMarked, FileSpreadsheet, Gauge, Grid3x3, HardDrive, Info, LineChart, NotebookText, Table2} from "lucide-react";
 
 const QUERY_KEY = ["supervisor-daily-metrics"];
+const TAB_VALUES = [
+  "dashboard", "quote-dashboard", "nice-raw-data", "report-data", "escalations-tab",
+  "care-subscriptions-tab", "sfdc-quotes-tab", "snapshot-report", "reports"
+];
 function SupervisorDashboardContent() {
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTab = searchParams.get("tab") === "manager-dashboard" ? "quote-dashboard" : searchParams.get("tab");
+  const activeTab = TAB_VALUES.includes(requestedTab) ? requestedTab : "dashboard";
+  function setActiveTab(tab) {
+    setSearchParams(previous => {
+      const next = new URLSearchParams(previous);
+      next.set("tab", tab);
+      return next;
+    }, {replace: true});
+  }
   const [importOpen, setImportOpen] = useState(false);
   const [importInitialSource, setImportInitialSource] = useState(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
-  const [activeTab, setActiveTab] = useState("dashboard");
   const [completedStatuses, setCompletedStatuses] = useState(DEFAULT_COMPLETED_STATUSES);
   const [lastImportedFile, setLastImportedFileState] = useState(() => getLastImportedFile());
   // Keyed by date so the Daily Snapshot Report tab's Executive Summary edits survive Radix Tabs
@@ -85,7 +100,7 @@ function SupervisorDashboardContent() {
       toast.error(result?.error || "Couldn't open that file - it may have moved or been renamed.");
     }
   }
-  if (isLoading) {
+  if (isLoading && activeTab !== "quote-dashboard") {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-4 border-border border-t-indigo-600 rounded-full animate-spin" />
@@ -98,7 +113,7 @@ function SupervisorDashboardContent() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Supervisor Dashboard</h1>
           <p className="text-muted-foreground mt-1">
-            Prior-day O&amp;M operations snapshot - imported from CXONE/Salesforce/Incorta reports via Report Data.
+            Prior-day O&amp;M operations snapshot and quote lifecycle, status history, and turnaround analysis.
           </p>
         </div>
         <div className="flex gap-2">
@@ -115,7 +130,7 @@ function SupervisorDashboardContent() {
           )}
         </div>
       </div>
-      {!isElectronBacked() && (
+      {activeTab !== "quote-dashboard" && !isElectronBacked() && (
         <Card className="border-amber-200 bg-amber-50">
           <CardContent className="p-4 flex items-start gap-3">
             <Info className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
@@ -126,20 +141,21 @@ function SupervisorDashboardContent() {
           </CardContent>
         </Card>
       )}
-      <Card className="border-border bg-secondary">
+      {activeTab !== "quote-dashboard" && <Card className="border-border bg-secondary">
         <CardContent className="p-4 flex items-start gap-3">
           <HardDrive className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
           <p className="text-sm text-muted-foreground">
             This dashboard's daily metrics and imported report tables live in their own local store on this PC.
-            EnQuote quote data (drafted/completed quote counts on the Executive Overview) is read-only here and is
+            EnQuote quote data (created/worked/drafted/completed quote counts on the Executive Overview) is read-only here and is
             never modified by anything on this page.
           </p>
         </CardContent>
-      </Card>
+      </Card>}
       {}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="h-auto flex-wrap justify-start gap-1">
           <TabsTrigger value="dashboard" className="flex items-center gap-1.5"><Gauge className="w-4 h-4" /> Executive Overview</TabsTrigger>
+          <TabsTrigger value="quote-dashboard" className="flex items-center gap-1.5"><LineChart className="w-4 h-4" /> Quote Dashboard</TabsTrigger>
           <TabsTrigger value="nice-raw-data" className="flex items-center gap-1.5"><Grid3x3 className="w-4 h-4" /> NICE Raw Data</TabsTrigger>
 
           <TabsTrigger value="report-data" className="flex items-center gap-1.5"><Table2 className="w-4 h-4" /> Report Data</TabsTrigger>
@@ -157,6 +173,9 @@ function SupervisorDashboardContent() {
             onEditRecord={openEditForm}
             onChanged={refresh}
           />
+        </TabsContent>
+        <TabsContent value="quote-dashboard" className="mt-4">
+          <QuoteDashboard embedded />
         </TabsContent>
         <TabsContent value="nice-raw-data" className="mt-4">
           <NiceRawDataPanel />
@@ -199,4 +218,3 @@ export default function SupervisorDashboard() {
     </RoleGuard>
   );
 }
-

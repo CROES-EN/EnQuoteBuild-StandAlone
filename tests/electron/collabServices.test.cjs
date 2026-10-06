@@ -216,6 +216,26 @@ test("SOP saves are shared, conflicting edits are refused, and deletes are resto
   assert.equal(restored.record.deleted, false);
 });
 
+test("SOP workbooks, sections and subpages survive restart and sync together", async () => {
+  const server = fakeSopServer();
+  const storageDir = tempDir();
+  const alice = createSopLibrary({client: server.client, getEmail: () => "alice@x.com", storageDir, logger: quietLogger});
+  await alice.save({id: "workbook-field", kind: "workbook", title: "Field"});
+  await alice.save({id: "workbook-office", kind: "workbook", title: "Office"});
+  await alice.save({id: "section-maintenance", kind: "section", title: "Maintenance", workbook_id: "workbook-field"});
+  await alice.save({id: "page-root", title: "Checklist", section_id: "section-maintenance"});
+  await alice.save({id: "page-child", title: "Details", section_id: "section-maintenance", parent_id: "page-root"});
+  const restarted = createSopLibrary({client: server.client, getEmail: () => "alice@x.com", storageDir, logger: quietLogger});
+  assert.equal(restarted.list().find((doc) => doc.id === "workbook-field").kind, "workbook");
+  const section = restarted.list().find((doc) => doc.id === "section-maintenance");
+  await restarted.save({...section, workbook_id: "workbook-office"}, {force: true});
+  const bob = createSopLibrary({client: server.client, getEmail: () => "bob@x.com", storageDir: tempDir(), logger: quietLogger});
+  await bob.sync();
+  assert.equal(bob.list().find((doc) => doc.id === section.id).workbook_id, "workbook-office");
+  assert.equal(bob.list().find((doc) => doc.id === "page-child").parent_id, "page-root");
+  assert.equal(bob.list().find((doc) => doc.id === "page-child").section_id, section.id);
+});
+
 test("SOP files are cached on disk and verified against their hash", async () => {
   const server = fakeSopServer();
   const dirA = tempDir();

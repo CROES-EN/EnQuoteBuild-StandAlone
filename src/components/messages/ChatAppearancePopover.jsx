@@ -2,10 +2,21 @@ import {Palette} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
 import {resetChatAppearance, saveChatAppearance} from "@/features/profiles/chatAppearanceStore";
+import {Switch} from "@/components/ui/switch";
+import {hslToHex, parseHslVar} from "@/features/theme/customThemeBuilder";
 
 export default function ChatAppearancePopover({appearance, onChange}) {
   const presets = ["#ffffff", "#fff7ed", "#f8fafc", "#eef2ff", "#ecfdf5"];
-  const update = (patch) => onChange(saveChatAppearance({...appearance, ...patch}));
+  const update = (patch) => onChange(saveChatAppearance({...appearance, mode: "custom", ...patch}));
+  const toggleTheme = (checked) => {
+    if (checked) {
+      update({mode: "theme"});
+      return;
+    }
+    const variables = getComputedStyle(document.documentElement);
+    const color = (name) => hslToHex(parseHslVar(variables.getPropertyValue(name)));
+    update({mine: color("--primary"), theirs: color("--muted"), background: color("--background")});
+  };
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -13,6 +24,13 @@ export default function ChatAppearancePopover({appearance, onChange}) {
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 space-y-3">
         <p className="text-sm font-semibold">Chat appearance</p>
+        <label className="flex items-center justify-between gap-3 text-sm">
+          <span>Match app theme</span>
+          <Switch checked={appearance.mode === "theme"} onCheckedChange={toggleTheme} aria-label="Match app theme for chat" />
+        </label>
+        {appearance.mode === "theme" ? (
+          <p className="text-xs text-muted-foreground">Chat colors follow your theme, including custom themes and Windows light/dark mode.</p>
+        ) : <>
         {[
           ["mine", "My bubble"],
           ["theirs", "Others' bubble"],
@@ -31,7 +49,8 @@ export default function ChatAppearancePopover({appearance, onChange}) {
             ))}
           </div>
         </div>
-        <Button type="button" variant="ghost" size="sm" onClick={() => onChange(resetChatAppearance())}>Reset to default</Button>
+        </>}
+        <Button type="button" variant="ghost" size="sm" onClick={() => onChange(resetChatAppearance())}>Reset to app theme</Button>
       </PopoverContent>
     </Popover>
   );

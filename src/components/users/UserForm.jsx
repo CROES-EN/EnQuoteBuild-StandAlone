@@ -148,6 +148,7 @@ export default function UserForm({ user, onSave, onCancel, isLoading }) {
       <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
         <h4 className="font-medium text-blue-900 mb-2">Role Permissions</h4>
         <ul className="text-sm text-blue-800 space-y-1">
+          <li>• View Inactive Revenue, the Boneyard, and related drill-downs (unless explicitly blocked)</li>
           {formData.app_role === "submitter" && (
             <>
               <li>• Create and edit draft quotes</li>
@@ -165,7 +166,6 @@ export default function UserForm({ user, onSave, onCancel, isLoading }) {
           )}
           {formData.app_role === "invoicer" && (
             <>
-              <li>• View the Inactive Revenue Dashboard</li>
               <li>• Review invoice-related operational queues</li>
             </>
           )}

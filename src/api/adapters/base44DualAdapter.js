@@ -565,6 +565,7 @@ export const base44DualAdapter = {
     base44Adapter.listLocalCollection(
       ...args
     ),
+  getAllQuoteActivities: () => base44Adapter.getAllQuoteActivities(),
 
   createLocalRecord: async (
     name,

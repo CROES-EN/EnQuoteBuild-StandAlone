@@ -12,7 +12,6 @@ import {
   FileText,
   Headset,
   LayoutDashboard,
-  LineChart,
   Mail,
   Menu,
   MessageSquare,
@@ -189,7 +188,6 @@ export default function Layout({ children, currentPageName }) {
     { name: "SOP Library", icon: BookOpen, page: "SOPLibrary", roles: ["submitter", "approver", "admin", "invoicer"] },
     { name: "Site Flags", icon: Siren, page: "SiteFlagManager", roles: ["submitter", "approver", "admin", "invoicer"] },
     { name: "Rejection Reviews", icon: AlertTriangle, page: "RejectedQuoteReview", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "Manager Dashboard", icon: LineChart, page: "ManagerDashboard", roles: ["admin", "submitter", "approver", "invoicer"] },
     { name: "Supervisor Dashboard", icon: Headset, page: "SupervisorDashboard", roles: ["admin", "approver", "submitter", "invoicer"] },
     { name: "Enphase Care", icon: HeartHandshake, page: "EnphaseCare", roles: ["admin", "approver", "invoicer", "submitter"] },
     { name: "Inactive Revenue", icon: Wallet, page: "InactiveRevenueDashboard", roles: ["admin", "approver", "invoicer", "submitter"] }
@@ -852,10 +850,10 @@ export default function Layout({ children, currentPageName }) {
         </div>
       )}
       {/* Main Content */}
-      <main className={cn("transition-[padding] duration-300 ease-in-out", isAuthenticated && (sidebarCollapsed ? "lg:pl-20" : "lg:pl-64"), isAuthenticated && "pt-16 lg:pt-0")}>
+      <main className={cn("transition-[padding] duration-300 ease-in-out", currentPageName === "SOPLibrary" && "flex h-dvh min-h-0 flex-col overflow-hidden", isAuthenticated && (sidebarCollapsed ? "lg:pl-20" : "lg:pl-64"), isAuthenticated && "pt-16 lg:pt-0")}>
         {announcement?.text && (announcement.level === "urgent" || dismissedAnnouncementId !== announcement.id) && (
           <div className={cn(
-            "mx-4 mt-4 rounded-lg border px-4 py-3 text-sm shadow-sm",
+            "mx-4 mt-4 shrink-0 rounded-lg border px-4 py-3 text-sm shadow-sm",
             announcement.level === "urgent" ? "border-red-300 bg-red-50 text-red-900" :
               announcement.level === "warning" ? "border-amber-300 bg-amber-50 text-amber-900" :
                 "border-blue-300 bg-blue-50 text-blue-900"

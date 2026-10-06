@@ -324,6 +324,7 @@ export const salesforceMockAdapter = {
     filterRecords("activities", {
       quote_id: quoteId
     }),
+  getAllQuoteActivities: async () => clone(collection("activities")),
 
   createQuoteActivity: async (record) =>
     createRecord("activities", record, "a20"),

@@ -34,7 +34,7 @@ import {gifsApi} from "@/features/profiles/profileApi";
 import {removeChatMessage as removeChatMessageApi} from "@/features/admin/adminApi";
 import {
   onChatAppearanceChanged,
-  readableTextColor,
+  chatAppearanceStyles,
   readChatAppearance
 } from "@/features/profiles/chatAppearanceStore";
 import {useUserRole} from "@/components/auth/RoleGuard";
@@ -200,6 +200,7 @@ export default function MessagesPage() {
   const [newOpen, setNewOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [appearance, setAppearance] = useState(() => readChatAppearance());
+  const appearanceStyles = useMemo(() => chatAppearanceStyles(appearance), [appearance]);
   const scrollRef = useRef(null);
   const stickToBottom = useRef(true);
   const threadRef = useRef(thread);
@@ -433,7 +434,7 @@ export default function MessagesPage() {
           <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground"><MessageSquare className="h-6 w-6 text-orange-600" />Messages</h1>
           <p className="text-sm text-muted-foreground">Message teammates directly or in groups, and share quotes.</p>
         </div>
-        <Button onClick={() => setNewOpen(true)} disabled={Boolean(listState.error)} className="bg-orange-600 text-white hover:bg-orange-700">
+        <Button onClick={() => setNewOpen(true)} disabled={Boolean(listState.error)}>
           <Plus className="mr-1 h-4 w-4" />New conversation
         </Button>
       </div>
@@ -460,7 +461,7 @@ export default function MessagesPage() {
                       onClick={() => open(conversation.id)}
                       className={cn(
                         "flex w-full items-start gap-2 rounded-md px-3 py-2 text-left transition-colors",
-                        conversation.id === activeId ? "bg-orange-50" : "hover:bg-slate-50"
+                        conversation.id === activeId ? "bg-primary/10" : "hover:bg-muted"
                       )}
                     >
                       {conversation.kind === "group" ? (
@@ -533,7 +534,8 @@ export default function MessagesPage() {
               <div
                 ref={scrollRef}
                 className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3"
-                style={{backgroundColor: appearance.background}}
+                data-testid="chat-background"
+                style={appearanceStyles.background}
                 onScroll={(event) => {
                   const box = event.currentTarget;
                   stickToBottom.current = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
@@ -555,21 +557,23 @@ export default function MessagesPage() {
                       const mine = message.sender === meEmail;
                       const previous = shown[index - 1];
                       const showSender = !mine && active?.kind === "group" && previous?.sender !== message.sender;
-                      const bubbleColor = mine ? appearance.mine : appearance.theirs;
-                      const bubbleText = readableTextColor(bubbleColor);
+                      const bubbleStyle = mine ? appearanceStyles.mine : appearanceStyles.theirs;
                       const removed = message.body === "[removed by admin]" && (message.attachments || []).length === 0;
                       return (
                         <div key={message.id} className={cn("flex gap-2", mine ? "justify-end" : "justify-start")}>
-                          {!mine && <UserAvatar email={message.sender} name={displayName(message.sender, names)} size={28} className={showSender ? "mt-5" : "mt-1 opacity-0"} />}
+                          {!mine && (showSender
+                            ? <UserAvatar email={message.sender} name={displayName(message.sender, names)} size={28} className="mt-5" />
+                            : <span className="h-7 w-7 shrink-0" aria-hidden="true" />)}
                           <div className={cn("flex max-w-[75%] flex-col", mine ? "items-end" : "items-start")}>
                             {showSender && <span className="mb-0.5 px-1 text-xs font-medium text-slate-500">{displayName(message.sender, names)}</span>}
                             <div
                               className={cn(
                                 "space-y-1.5 rounded-2xl px-3 py-2 text-sm",
                                 message.status === "sending" && "opacity-70",
-                                message.status === "failed" && "bg-rose-100 text-rose-900"
+                                message.status === "failed" && "bg-destructive/10 text-destructive"
                               )}
-                              style={message.status === "failed" ? undefined : {backgroundColor: bubbleColor, color: bubbleText}}
+                              data-testid={mine ? "chat-bubble-mine" : "chat-bubble-theirs"}
+                              style={message.status === "failed" ? undefined : bubbleStyle}
                             >
                             {message.body && <p className={cn("whitespace-pre-wrap break-words", removed && "italic opacity-70")}>{message.body}</p>}
                             {(message.attachments || []).length > 0 && (
@@ -681,7 +685,7 @@ export default function MessagesPage() {
                     placeholder="Write a message (Enter to send, Shift+Enter for a new line)"
                     className="min-h-[2.5rem] flex-1 resize-none"
                   />
-                  <Button onClick={send} disabled={!draft.trim() && !attachments.length} className="bg-orange-600 hover:bg-orange-700" aria-label="Send">
+                  <Button onClick={send} disabled={!draft.trim() && !attachments.length} aria-label="Send">
                     <Send className="h-4 w-4" />
                   </Button>
                 </div>

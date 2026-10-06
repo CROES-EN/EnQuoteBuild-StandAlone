@@ -7,7 +7,7 @@ const os = require("node:os");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "..", "..");
-const distIndex = path.join(root, "dist", "index.html");
+const distIndex = path.join(path.resolve(process.env.ENQUOTE_SMOKE_DIST || path.join(root, "dist")), "index.html");
 const PAGE_SETTLE_MS = 2500;
 // Pages that need a record id in the URL to mean anything.
 const SKIP_PAGES = new Set(["QuoteDetails", "EditQuote", "QuoteOverview"]);
@@ -25,7 +25,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function run() {
   if (!fs.existsSync(distIndex)) throw new Error("dist/index.html is missing - run the build first.");
-  app.setPath("userData", fs.mkdtempSync(path.join(os.tmpdir(), "enquote-smoke-")));
+  app.setPath("userData", process.env.ENQUOTE_SMOKE_DATA_DIR || fs.mkdtempSync(path.join(os.tmpdir(), "enquote-smoke-")));
 
   const win = new BrowserWindow({
     show: false,
@@ -45,7 +45,7 @@ async function run() {
   await sleep(PAGE_SETTLE_MS);
 
   const failures = [];
-  const pages = ["Dashboard", ...pageNames().filter((name) => name !== "Dashboard")];
+  const pages = process.argv.includes("--stability-only") || process.argv.includes("--sop-sections-only") || process.argv.includes("--retro-only") ? [] : ["Dashboard", ...pageNames().filter((name) => name !== "Dashboard")];
   for (const page of pages) {
     consoleErrors.length = 0;
     await win.webContents.executeJavaScript(`window.__smokeErrors.length = 0; location.hash = "#/${page}"; true`);
@@ -56,6 +56,7 @@ async function run() {
       return {
         children: root ? root.childElementCount : 0,
         errorScreen: /Something went wrong/i.test(text),
+        signInScreen: /Sign in to EnQuote|Setting up your account/i.test(text),
         notFound: /page not found/i.test(text),
         textLength: text.trim().length,
         pageErrors: window.__smokeErrors.slice()
@@ -65,6 +66,7 @@ async function run() {
     const problems = [];
     if (!state.children || state.textLength === 0) problems.push("blank page");
     if (state.errorScreen) problems.push('shows "Something went wrong"');
+    if (state.signInScreen) problems.push("shows sign-in/setup instead of the requested page");
     if (state.notFound) problems.push("shows page-not-found");
     state.pageErrors.forEach((message) => problems.push(message));
     consoleErrors.forEach((message) => problems.push(`console: ${message}`));
@@ -73,7 +75,17 @@ async function run() {
     if (problems.length) failures.push(page);
   }
 
-  console.log(`\n${pages.length - failures.length}/${pages.length} pages rendered cleanly.`);
+  if (pages.length) console.log(`\n${pages.length - failures.length}/${pages.length} pages rendered cleanly.`);
+  if (!failures.length && process.argv.includes("--sop-sections-only")) {
+    await require("./sop-sections.cjs").runSopSections(win);
+  }
+  if (!failures.length && (process.argv.includes("--stability") || process.argv.includes("--stability-only"))) {
+    await require("./stability.cjs").runStability(win);
+    if (consoleErrors.length) throw new Error(`Stability console errors: ${[...new Set(consoleErrors)].join(" | ")}`);
+  }
+  if (!failures.length && process.argv.includes("--retro-only")) {
+    await require("./Base44_DTO.cjs").runRetro(win);
+  }
   return failures.length === 0 ? 0 : 1;
 }
 
@@ -81,6 +93,6 @@ app.whenReady()
   .then(run)
   .then((code) => app.exit(code))
   .catch((error) => {
-    console.error("Smoke test could not run:", error.message);
+    console.error("Smoke test could not run:", error.stack || error.message);
     app.exit(2);
   });

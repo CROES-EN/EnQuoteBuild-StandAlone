@@ -1,4 +1,5 @@
 export const GENERAL_SECTION_ID = "section-general";
+export const DEFAULT_WORKBOOK_ID = "workbook-sop-library";
 export const SECTION_COLORS = ["#f97316", "#0ea5e9", "#22c55e", "#a855f7", "#eab308", "#ef4444", "#14b8a6", "#ec4899"];
 
 export function slugifySection(value) {
@@ -23,18 +24,36 @@ export function isSectionDoc(doc) {
   return Boolean(doc && doc.kind === "section");
 }
 
+export function isWorkbookDoc(doc) {
+  return Boolean(doc && doc.kind === "workbook");
+}
+
 export function isPageDoc(doc) {
-  return Boolean(doc && !doc.deleted && !isSectionDoc(doc));
+  return Boolean(doc && !doc.deleted && !isSectionDoc(doc) && !isWorkbookDoc(doc));
 }
 
 export function sectionForPage(page) {
   return page?.section_id || legacySectionId(page?.category || "General");
 }
 
-export function createSectionRecord({id, title, color, order = 0, now = new Date().toISOString(), user = ""}) {
+export function createWorkbookRecord({id, title, order = 0, now = new Date().toISOString(), user = ""}) {
+  return {
+    id: id || `workbook-${slugifySection(title)}`,
+    kind: "workbook",
+    title: String(title || "SOP Library").trim() || "SOP Library",
+    order,
+    created_by: user,
+    created_date: now,
+    updated_by: user,
+    updated_date: now
+  };
+}
+
+export function createSectionRecord({id, title, color, workbookId = DEFAULT_WORKBOOK_ID, order = 0, now = new Date().toISOString(), user = ""}) {
   return {
     id: id || legacySectionId(title),
     kind: "section",
+    workbook_id: workbookId,
     title: sectionTitleFromCategory(title),
     color: color || SECTION_COLORS[Math.abs(order) % SECTION_COLORS.length],
     order,
@@ -50,11 +69,21 @@ export function normalizeSopNotebook(docs = []) {
   const liveSections = liveDocs.filter((doc) => !doc.deleted && isSectionDoc(doc));
   const livePages = liveDocs.filter(isPageDoc);
   const sectionsById = new Map();
+  const workbooksById = new Map();
+  liveDocs.filter((doc) => !doc.deleted && isWorkbookDoc(doc)).forEach((workbook, index) => {
+    if (!workbook.id) return;
+    workbooksById.set(workbook.id, {
+      ...workbook,
+      title: String(workbook.title || "SOP Library").trim() || "SOP Library",
+      order: Number.isFinite(Number(workbook.order)) ? Number(workbook.order) : index
+    });
+  });
 
   liveSections.forEach((section, index) => {
     if (!section.id) return;
     sectionsById.set(section.id, {
       ...section,
+      workbook_id: section.workbook_id || DEFAULT_WORKBOOK_ID,
       title: sectionTitleFromCategory(section.title),
       color: section.color || SECTION_COLORS[index % SECTION_COLORS.length],
       order: Number.isFinite(Number(section.order)) ? Number(section.order) : index
@@ -79,6 +108,16 @@ export function normalizeSopNotebook(docs = []) {
   }
 
   const sections = [...sectionsById.values()].sort(compareOrderThenTitle);
+  sections.forEach((section) => {
+    if (!workbooksById.has(section.workbook_id)) {
+      workbooksById.set(section.workbook_id, createWorkbookRecord({
+        id: section.workbook_id,
+        title: section.workbook_id === DEFAULT_WORKBOOK_ID ? "SOP Library" : section.workbook_id.replace(/^workbook-/, ""),
+        order: workbooksById.size
+      }));
+    }
+  });
+  const workbooks = [...workbooksById.values()].sort(compareOrderThenTitle);
   const pages = livePages
     .map((page, index) => ({
       ...page,
@@ -89,7 +128,7 @@ export function normalizeSopNotebook(docs = []) {
     .sort(compareOrderThenTitle);
 
   const sectionNames = Object.fromEntries(sections.map((section) => [section.id, section.title]));
-  return {sections, pages, sectionNames};
+  return {workbooks, sections, pages, sectionNames};
 }
 
 export function compareOrderThenTitle(a, b) {
@@ -107,6 +146,10 @@ export function childrenOf(pages, parentId) {
   return pages.filter((page) => (page.parent_id || null) === (parentId || null)).sort(compareOrderThenTitle);
 }
 
+export function isParentPage(pages, pageId) {
+  return pages.some((page) => !page.deleted && page.parent_id === pageId);
+}
+
 export function flattenPages(pages, sectionId) {
   const scoped = pagesInSection(pages, sectionId);
   const scopedIds = new Set(scoped.map((page) => page.id));
@@ -114,11 +157,66 @@ export function flattenPages(pages, sectionId) {
     .filter((page) => !page.parent_id || !scopedIds.has(page.parent_id))
     .sort(compareOrderThenTitle);
   const flattened = [];
-  roots.forEach((root) => {
-    flattened.push({...root, depth: 0});
-    childrenOf(scoped, root.id).forEach((child) => flattened.push({...child, depth: 1}));
-  });
+  const visited = new Set();
+  const visit = (page, depth) => {
+    if (visited.has(page.id)) return;
+    visited.add(page.id);
+    flattened.push({...page, depth});
+    childrenOf(scoped, page.id).forEach((child) => visit(child, depth + 1));
+  };
+  roots.forEach((root) => visit(root, 0));
+  scoped.forEach((page) => visit(page, 0));
   return flattened;
+}
+
+export function descendantPages(pages, pageId) {
+  if (!pageId) return [];
+  const descendants = [];
+  const visited = new Set([pageId]);
+  const visit = (parentId) => {
+    childrenOf(pages, parentId).forEach((child) => {
+      if (visited.has(child.id)) return;
+      visited.add(child.id);
+      descendants.push(child);
+      visit(child.id);
+    });
+  };
+  visit(pageId);
+  return descendants;
+}
+
+export function pageAncestors(pages, pageId) {
+  const ancestors = [];
+  const visited = new Set([pageId]);
+  let parentId = pages.find((page) => page.id === pageId)?.parent_id;
+  while (parentId && !visited.has(parentId)) {
+    visited.add(parentId);
+    const parent = pages.find((page) => page.id === parentId);
+    if (!parent) break;
+    ancestors.push(parent);
+    parentId = parent.parent_id;
+  }
+  return ancestors;
+}
+
+export function movePageBranch(pages, page, {sectionId, parentId = null}) {
+  if (!sectionId) throw new Error("Choose a destination section.");
+  const descendants = page.id ? descendantPages(pages, page.id) : [];
+  if (parentId) {
+    const parent = pages.find((item) => item.id === parentId);
+    if (!parent || parent.section_id !== sectionId) throw new Error("Choose a parent page in the destination section.");
+    if (parentId === page.id || descendants.some((item) => item.id === parentId)) {
+      throw new Error("A page cannot be moved under itself or one of its subpages.");
+    }
+  }
+  const current = pages.find((item) => item.id === page.id);
+  const unchanged = (current || page).section_id === sectionId && ((current || page).parent_id || null) === parentId;
+  const siblings = pages.filter((item) => item.id !== page.id && item.section_id === sectionId && (item.parent_id || null) === parentId);
+  const order = unchanged ? page.order : Math.max(-1, ...siblings.map((item) => Number(item.order) || 0)) + 1;
+  return [
+    movePageRecord(page, {sectionId, parentId, order}),
+    ...descendants.filter((child) => child.section_id !== sectionId).map((child) => movePageRecord(child, {sectionId, parentId: child.parent_id, order: child.order}))
+  ];
 }
 
 export function reorderWithinSection(pages, pageId, direction) {

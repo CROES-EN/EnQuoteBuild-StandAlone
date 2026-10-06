@@ -39,6 +39,7 @@ try {
 const { createSupervisorSync } = require("./supervisorSync.cjs");
 const { createOutboundSync } = require("./outboundSync.cjs");
 const { startRealtimeSync } = require("./realtimeSync.cjs");
+const { createAdaptivePoller, setRealtimeConnected } = require("./syncCadence.cjs");
 const { openSalesforceReportWindow, closeSalesforceReportWindow } = require("./salesforceImport.cjs");
 const { analyzeAll } = require("./diagnosticReportAnalyzer.cjs");
 const { verifyCloudflareSession, openCloudflareAuthWindow, setVerifiedIdentity, getVerifiedIdentity, clearCloudflareSession, reauthenticate: reauthenticateCloudflare, fetchSyncCredentials } = require("./cloudflareAuth.cjs");
@@ -79,6 +80,12 @@ function loadEnvFile() {
 let quoteRepository;
 let outboundSync;
 let realtimeSync;
+let remoteSyncPoller;
+let entitySnapshotPoller;
+let uiUpdateTimer = null;
+let entitiesUpdatedTimer = null;
+// Fallback cadence for background polls while realtime pushes are flowing.
+const BACKGROUND_POLL_CONNECTED_MS = 10 * 60 * 1000;
 let supervisorSync;
 let userRolesSync;
 let uiUpdater;
@@ -288,9 +295,26 @@ function stopEodbEmailInboxWatcher() {
     eodbEmailInboxWatchedPath = null;
 }
 
+// One save fires several fs.watch events; each file is handled once at a time, and not again
+// while the renderer still has it pending acknowledgement.
+const eodbEmailInboxInFlight = new Set();
+
 async function processEodbEmailInboxFile(root, filename) {
-    const filePath = path.join(root, filename);
     if (!isCandidateReportFile(filename)) return;
+    const filePath = path.join(root, filename);
+    if (eodbEmailInboxInFlight.has(filePath)) return;
+    for (const pending of pendingEodbEmailInboxFiles.values()) {
+        if (pending.filePath === filePath) return;
+    }
+    eodbEmailInboxInFlight.add(filePath);
+    try {
+        await processEodbEmailInboxFileOnce(root, filename, filePath);
+    } finally {
+        eodbEmailInboxInFlight.delete(filePath);
+    }
+}
+
+async function processEodbEmailInboxFileOnce(root, filename, filePath) {
     if (!fs.existsSync(filePath)) return;
 
     const stable = await waitForFileStable(filePath);
@@ -950,7 +974,7 @@ function createWindow() {
         if (details.reason === "clean-exit") return;
         errorReporter?.report({ source: "main:render-process-gone", message: `Renderer process gone: ${details.reason}`, stack: "" });
         setTimeout(() => {
-            if (!mainWindow.isDestroyed()) mainWindow.reload();
+            if (mainWindow && !mainWindow.isDestroyed()) mainWindow.reload();
         }, 500);
     });
 
@@ -1152,7 +1176,7 @@ let then = whenReady().then(async () => {
                 quoteDeletedCount: 0
             };
             if (typeof pollEntitySnapshot === "function") {
-                syncResult = await pollEntitySnapshot();
+                syncResult = await pollEntitySnapshot({ force: true });
                 if (!syncResult?.ok) {
                     throw new Error(syncResult?.error || "Cloudflare data refresh failed.");
                 }
@@ -1832,6 +1856,7 @@ let then = whenReady().then(async () => {
     collabFeatures = setupCollabFeatures({
         ipcMain,
         Notification,
+        dialog,
         getMainWindow: () => mainWindow,
         showMainWindow: () => {
             if (!mainWindow || mainWindow.isDestroyed()) return;
@@ -2025,7 +2050,13 @@ let then = whenReady().then(async () => {
     }
 
     let entitySnapshotPollRunning = false;
-    async function pollEntitySnapshot() {
+    // The Worker answers 304 (no body, no table read) while this ETag is still current, so the
+    // background poll skips both the download and the local import. The ETag is only kept after
+    // a successful import and is re-validated with a full pull at least every 30 minutes.
+    const ENTITY_SNAPSHOT_ETAG_MAX_AGE_MS = 30 * 60 * 1000;
+    let entitySnapshotEtag = null;
+    let entitySnapshotEtagAt = 0;
+    async function pollEntitySnapshot({ force = false } = {}) {
         const snapshotToken = process.env.SNAPSHOT_TOKEN || "";
         if (!snapshotToken) {
             return { ok: false, error: "Cloudflare sync credentials are unavailable." };
@@ -2039,6 +2070,13 @@ let then = whenReady().then(async () => {
         }
         entitySnapshotPollRunning = true;
 
+        let responseEtag = null;
+        const acceptEtag = () => {
+            entitySnapshotEtag = responseEtag;
+            entitySnapshotEtagAt = responseEtag ? Date.now() : 0;
+        };
+        const sendEtag = !force && entitySnapshotEtag && Date.now() - entitySnapshotEtagAt < ENTITY_SNAPSHOT_ETAG_MAX_AGE_MS;
+
         try {
             const response = await new Promise((resolve, reject) => {
                 const https = require("node:https");
@@ -2047,11 +2085,18 @@ let then = whenReady().then(async () => {
                     path: "/api/base44/webhook/entity-snapshot",
                     method: "GET",
                     headers: {
+                        ...(sendEtag ? { "If-None-Match": entitySnapshotEtag } : {}),
                         "Authorization": `Bearer ${snapshotToken}`,
                         "CF-Access-Client-Id": process.env.CF_ACCESS_CLIENT_ID || "",
                         "CF-Access-Client-Secret": process.env.CF_ACCESS_CLIENT_SECRET || "",
                     }
                 }, (res) => {
+                    if (res.statusCode === 304) {
+                        res.resume();
+                        resolve({ notModified: true });
+                        return;
+                    }
+                    responseEtag = typeof res.headers.etag === "string" ? res.headers.etag : null;
                     let raw = "";
                     res.on("data", (chunk) => { raw += chunk; });
                     res.on("end", () => {
@@ -2071,10 +2116,22 @@ let then = whenReady().then(async () => {
                 req.end();
             });
 
+            if (response?.notModified) {
+                return {
+                    ok: true,
+                    notModified: true,
+                    importedRecordCount: 0,
+                    quoteSnapshotCount: 0,
+                    quoteAddedCount: 0,
+                    quoteUpdatedCount: 0,
+                    quoteDeletedCount: 0
+                };
+            }
             if (!response?.ok || !Array.isArray(response.entities)) {
                 throw new Error("Cloudflare returned an invalid entity snapshot.");
             }
             if (response.entities.length === 0) {
+                acceptEtag();
                 return {
                     ok: true,
                     importedRecordCount: 0,
@@ -2087,6 +2144,7 @@ let then = whenReady().then(async () => {
 
             const importSummary = await importEntitySnapshot(quoteRepository, response.entities);
             if (importSummary.importedRecordCount > 0) {
+                acceptEtag();
                 markOwnWrite();
                 console.log(`[entity-sync] Bulk-imported ${importSummary.importedRecordCount} Base44 entity record(s).`);
                 BrowserWindow.getAllWindows().forEach((window) => window.webContents.send("app:data-updated", {
@@ -2259,6 +2317,7 @@ let then = whenReady().then(async () => {
                 markOwnWrite();
                 console.log(`[entity-sync] Synced ${updatedCount} Base44 entity record(s).`);
             }
+            acceptEtag();
             return {
                 ok: true,
                 importedRecordCount: updatedCount,
@@ -2363,15 +2422,22 @@ let then = whenReady().then(async () => {
         }
     }
 
-    const remoteSyncPollTimer = setInterval(pollRemoteSyncSource, REMOTE_SYNC_POLL_INTERVAL_MS);
-    if (remoteSyncPollTimer.unref) remoteSyncPollTimer.unref();
-    // Also run one check immediately on startup, rather than waiting the full 30s for
-    // the first tick - same "flush(); then start the timer" pattern outboundSync.start()
-    // itself already uses.
-    pollRemoteSyncSource();
-    const entitySnapshotPollTimer = setInterval(pollEntitySnapshot, ENTITY_SNAPSHOT_POLL_INTERVAL_MS);
-    if (entitySnapshotPollTimer.unref) entitySnapshotPollTimer.unref();
-    pollEntitySnapshot();
+    // Both polls are fallbacks for missed realtime pushes: every 90s while the live connection
+    // is down, every 10 minutes while it is up. Each runs once immediately on startup.
+    remoteSyncPoller = createAdaptivePoller({
+        name: "remote sync check",
+        run: pollRemoteSyncSource,
+        fastMs: REMOTE_SYNC_POLL_INTERVAL_MS,
+        slowMs: BACKGROUND_POLL_CONNECTED_MS
+    });
+    remoteSyncPoller.start({ immediate: true });
+    entitySnapshotPoller = createAdaptivePoller({
+        name: "entity snapshot poll",
+        run: () => pollEntitySnapshot(),
+        fastMs: ENTITY_SNAPSHOT_POLL_INTERVAL_MS,
+        slowMs: BACKGROUND_POLL_CONNECTED_MS
+    });
+    entitySnapshotPoller.start({ immediate: true });
 
     // Lets the Developer Console's "Clear Cache" button force an immediate,
     // out-of-cycle pull of the full entity-snapshot from Cloudflare (per Cloudflare's
@@ -2381,7 +2447,7 @@ let then = whenReady().then(async () => {
     // pollEntitySnapshot() already used by the normal 90s background timer and by
     // "Refresh App" - no separate, parallel implementation to keep in sync.
     ipcMain.handle("sync:forceEntitySnapshot", async () => {
-        await pollEntitySnapshot();
+        await pollEntitySnapshot({ force: true });
         return { ok: true };
     });
 
@@ -2469,8 +2535,9 @@ let then = whenReady().then(async () => {
             // start on the newest UI; keep checking in the background afterwards.
             if (uiUpdater) {
                 await Promise.race([checkForUiUpdate(), new Promise((resolve) => setTimeout(resolve, 8000))]);
-                const uiTimer = setInterval(() => { void checkForUiUpdate(); }, 15 * 60 * 1000);
-                uiTimer.unref?.();
+                if (uiUpdateTimer) clearInterval(uiUpdateTimer);
+                uiUpdateTimer = setInterval(() => { void checkForUiUpdate(); }, 15 * 60 * 1000);
+                uiUpdateTimer.unref?.();
             }
             // Presence is NOT started here: this runs before the main window exists, so a
             // startup that stalls below would report someone as online with no window open.
@@ -2502,7 +2569,24 @@ let then = whenReady().then(async () => {
                 onQuotesUpdated: () => refreshFromCloudflare(),
                 onOutboundStatus: (data) => outboundSync?.handleRealtimeStatus(data),
                 onSupervisorUpdated: () => supervisorSync?.reconcile(),
-                handlers: collabFeatures?.realtimeHandlers || {}
+                onConnectionChange: setRealtimeConnected,
+                handlers: {
+                    ...(collabFeatures?.realtimeHandlers || {}),
+                    // Base44 edits arrive in bursts; one snapshot pull covers the whole burst.
+                    entities_updated: () => {
+                        const schedulePull = (delay) => {
+                            if (entitiesUpdatedTimer) clearTimeout(entitiesUpdatedTimer);
+                            entitiesUpdatedTimer = setTimeout(async () => {
+                                entitiesUpdatedTimer = null;
+                                const result = await pollEntitySnapshot();
+                                // A poll already in flight may have started before this change.
+                                if (result?.error?.includes("already in progress")) schedulePull(5000);
+                            }, delay);
+                            entitiesUpdatedTimer.unref?.();
+                        };
+                        schedulePull(2000);
+                    }
+                }
             });
         } else {
             console.warn(`[cloudflare-auth] Could not obtain sync credentials (reason: ${credentials.reason}) - sync disabled this session.`);
@@ -2607,6 +2691,10 @@ on("before-quit", () => {
         }, QUIT_FORCE_EXIT_MS).unref?.();
     }
     realtimeSync?.stop();
+    remoteSyncPoller?.stop();
+    entitySnapshotPoller?.stop();
+    if (uiUpdateTimer) clearInterval(uiUpdateTimer);
+    if (entitiesUpdatedTimer) clearTimeout(entitiesUpdatedTimer);
     supervisorSync?.stop();
     userRolesSync?.stop();
     errorReporter?.stop();

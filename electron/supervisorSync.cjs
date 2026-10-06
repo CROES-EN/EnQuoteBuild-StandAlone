@@ -1,7 +1,10 @@
 const fs = require("node:fs");
+const { createPollGate } = require("./syncCadence.cjs");
 
 const COLLECTIONS = ["supervisorDailyMetrics", "supervisorReportTables"];
 const DEFAULT_INTERVAL_MS = 60 * 1000;
+// While realtime pushes are flowing, the timer only reaches the Worker on the slow cadence.
+const CONNECTED_INTERVAL_MS = 10 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 60 * 1000;
 const STAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const EPOCH_STAMP = "1970-01-01T00:00:00.000Z";
@@ -39,6 +42,7 @@ function createSupervisorSync({
   clearIntervalFn = clearInterval
 }) {
   let timer = null;
+  const pollGate = createPollGate({ slowMs: CONNECTED_INTERVAL_MS });
   let running = null;
   let rerunRequested = false;
   const oversizeWarned = new Set();
@@ -249,8 +253,13 @@ function createSupervisorSync({
 
   function start() {
     if (timer) return;
+    pollGate.ran();
     void reconcile();
-    timer = setIntervalFn(() => { void reconcile(); }, intervalMs);
+    timer = setIntervalFn(() => {
+      if (!pollGate.due()) return;
+      pollGate.ran();
+      void reconcile();
+    }, intervalMs);
     timer.unref?.();
   }
 

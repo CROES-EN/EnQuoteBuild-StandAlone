@@ -121,13 +121,18 @@ export const localAdapter = {
   updateProduct: (recordId, data) => resource("products").update(recordId, data),
   deleteProduct: (recordId) => resource("products").delete(recordId),
 
-  getReviews: () => resource("reviews").list(),
-  getReviewsForQuote: (quoteId) => resource("reviews").filter({ quote_id: quoteId }),
-  createReview: (data) => resource("reviews").create(data),
-  updateReview: (recordId, data) => resource("reviews").update(recordId, data),
+  // Reviews are a named collection, not a dedicated preload bridge resource.
+  getReviews: () => resource("collections").list("reviews"),
+  getReviewsForQuote: async (quoteId) => {
+    const reviews = await resource("collections").list("reviews");
+    return reviews.filter(review => review.quote_id === quoteId);
+  },
+  createReview: (data) => resource("collections").create("reviews", data),
+  updateReview: (recordId, data) => resource("collections").update("reviews", recordId, data),
 
   getQuoteActivities: (quoteId) =>
     resource("activities").filter({ quote_id: quoteId }),
+  getAllQuoteActivities: () => resource("collections").list("activities"),
   createQuoteActivity: (data) => resource("activities").create(data),
 
   getFollowUps: (quoteId) =>
@@ -135,7 +140,7 @@ export const localAdapter = {
       ? resource("followUps").filter({ quote_id: quoteId })
       : resource("followUps").list(),
   createFollowUp: (data) => resource("followUps").create(data),
-  // Unlike quotes/products/reviews/etc., "users" has no dedicated bridge object in
+  // Unlike quotes/products, "users" has no dedicated bridge object in
   // preload.cjs - it only ever existed as one of the generic named collections, so route
   // through that bridge instead of the (nonexistent) resource("users").
   getUsers: () => bridge().collections.list("users"),

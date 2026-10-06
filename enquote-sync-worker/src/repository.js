@@ -11,8 +11,10 @@ export async function applyInboundEvent(db, event) {
   if (inserted.meta.changes === 0) return { duplicate: true };
 
   const quotes = event.quotes || (event.quote ? [event.quote] : []);
+  let changed = 0;
   for (const quote of quotes) {
-    await db
+    // Base44 re-sends every quote on each webhook; identical rows are left untouched.
+    const written = await db
       .prepare(
         `INSERT INTO quotes (id, quote_number, local_quote_id, payload, updated_at, created_at)
          VALUES (?, ?, ?, ?, ?, ?)
@@ -20,7 +22,11 @@ export async function applyInboundEvent(db, event) {
            payload = excluded.payload,
            updated_at = excluded.updated_at,
            quote_number = excluded.quote_number,
-           local_quote_id = excluded.local_quote_id`
+           local_quote_id = excluded.local_quote_id
+         WHERE quotes.payload IS NOT excluded.payload
+           OR quotes.updated_at IS NOT excluded.updated_at
+           OR quotes.quote_number IS NOT excluded.quote_number
+           OR quotes.local_quote_id IS NOT excluded.local_quote_id`
       )
       .bind(
         quote.id,
@@ -31,9 +37,10 @@ export async function applyInboundEvent(db, event) {
         receivedAt
       )
       .run();
+    changed += Number(written?.meta?.changes ?? 1) > 0 ? 1 : 0;
   }
 
-  return { duplicate: false };
+  return { duplicate: false, changed };
 }
 
 export async function getSnapshot(db) {
@@ -47,6 +54,22 @@ export async function getSnapshotMeta(db) {
       .prepare("SELECT updated_at FROM quotes ORDER BY updated_at DESC LIMIT 1")
       .first();
   return row ? row.updated_at : null;
+}
+
+// Cheap identity for the quotes table: count catches deletions, MAX(updated_at) catches
+// edits with newer stamps, and the latest webhook catches edits with older stamps.
+export async function getSnapshotVersion(db) {
+  const row = await db
+    .prepare(
+      `SELECT (SELECT COUNT(*) FROM quotes) AS quote_count,
+              (SELECT MAX(updated_at) FROM quotes) AS last_saved_at,
+              (SELECT MAX(received_at) FROM webhook_events) AS last_event_at`
+    )
+    .first();
+  return {
+    version: `${row?.quote_count ?? 0}|${row?.last_saved_at ?? ""}|${row?.last_event_at ?? ""}`,
+    lastSavedAt: row?.last_saved_at ?? null
+  };
 }
 
 
@@ -76,9 +99,11 @@ export async function markOutboundStatus(db, itemId, status, extra = {}) {
 // a new change -> re-triggered the same workflow, endlessly.
 //
 // Upserts by (entity_type, local_id) - a repeated create/update for the same
-// record simply overwrites the stored copy instead of accumulating rows.
+// record simply overwrites the stored copy instead of accumulating rows. An
+// identical re-send writes nothing, so synced_at (the snapshot version) only
+// moves when something really changed. Returns whether a row was written.
 export async function upsertBase44EntityState(db, { entityType, localId, action, record }) {
-  await db
+  const result = await db
     .prepare(
       `INSERT INTO base44_entity_state (entity_type, local_id, action, record_json, origin, synced_at)
        VALUES (?, ?, ?, ?, 'base44', ?)
@@ -86,10 +111,12 @@ export async function upsertBase44EntityState(db, { entityType, localId, action,
          action = excluded.action,
          record_json = excluded.record_json,
          synced_at = excluded.synced_at
-       WHERE base44_entity_state.action != 'delete'`
+       WHERE base44_entity_state.action != 'delete'
+         AND (base44_entity_state.action IS NOT excluded.action OR base44_entity_state.record_json IS NOT excluded.record_json)`
     )
     .bind(entityType, localId, action, JSON.stringify(record ?? {}), new Date().toISOString())
     .run();
+  return Number(result?.meta?.changes ?? 1) > 0;
 }
 
 export async function markBase44QuoteDeleted(db, { localId, remoteId }) {

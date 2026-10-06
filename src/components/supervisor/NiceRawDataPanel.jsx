@@ -25,11 +25,8 @@ const REPORT_LABEL = "NICE Call - RAW DATA";
  * rows x 23 real columns confirmed this session) is too large/wide for the existing
  * compact-row Report Data view to be useful for deep, Excel-like review with sort/filter.
  *
- * This is READ-ONLY with respect to Executive Overview - it uses the exact same
- * supervisorReportTables storage and saveReportTable()/deleteReportTable() functions the
- * existing Report Data tab already uses for this same report type (incorta_input is NOT
- * read by any Executive Overview KPI tile or opsMetricsStore.js calculation), so importing
- * or clearing data here can NEVER affect any tile on Executive Overview.
+ * Uses the same supervisorReportTables storage as Report Data. Executive Overview
+ * reads this table for raw call contributing records; EODB report totals stay separate.
  *
  * This report type remains ALSO available under Report Data's sidebar for now (per explicit
  * request to leave that as-is) - both surfaces read/write the exact same underlying stored

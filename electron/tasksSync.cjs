@@ -4,8 +4,11 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
+const { createPollGate } = require("./syncCadence.cjs");
 
 const SYNC_INTERVAL_MS = 5 * 60 * 1000;
+// While realtime pushes are flowing, the timer only reaches the Worker on the slow cadence.
+const CONNECTED_SYNC_INTERVAL_MS = 30 * 60 * 1000;
 const REMINDER_TICK_MS = 30 * 1000;
 const PUSH_DEBOUNCE_MS = 1500;
 // More reminders than this coming due at once (e.g. the PC was off all weekend) are
@@ -50,6 +53,7 @@ function createTasksSync({
   let resyncRequested = false;
   let pushTimer = null;
   let syncTimer = null;
+  const syncGate = createPollGate({ slowMs: CONNECTED_SYNC_INTERVAL_MS });
   let reminderTimer = null;
 
   function fileFor(email) {
@@ -279,11 +283,16 @@ function createTasksSync({
 
   function start() {
     stop();
-    syncTimer = setInterval(() => { void sync(); }, SYNC_INTERVAL_MS);
+    syncTimer = setInterval(() => {
+      if (!syncGate.due()) return;
+      syncGate.ran();
+      void sync();
+    }, SYNC_INTERVAL_MS);
     syncTimer.unref?.();
     reminderTimer = setInterval(checkReminders, REMINDER_TICK_MS);
     reminderTimer.unref?.();
     checkReminders();
+    syncGate.ran();
     void sync();
   }
 

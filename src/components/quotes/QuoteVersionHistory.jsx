@@ -50,36 +50,36 @@ export default function QuoteVersionHistory({ quote, canRestore = false, onResto
                 to={createPageUrl(`QuoteDetails?id=${version.id}`)}
                 className={`block p-4 rounded-lg border transition-all ${
                   isCurrent 
-                    ? "bg-indigo-50 border-indigo-200" 
-                    : "bg-card border-border hover:bg-secondary"
+                    ? "bg-secondary text-secondary-foreground border-primary/40"
+                    : "bg-card text-card-foreground border-border hover:bg-secondary hover:text-secondary-foreground"
                 } ${canRestore && !isCurrent ? "pr-28" : ""}`}
               >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                    isCurrent ? "bg-indigo-600" : "bg-muted"
+                    isCurrent ? "bg-primary" : "bg-muted"
                   }`}>
-                    <FileText className={`w-5 h-5 ${isCurrent ? "text-white" : "text-muted-foreground"}`} />
+                    <FileText className={`w-5 h-5 ${isCurrent ? "text-primary-foreground" : "text-muted-foreground"}`} />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className={`font-semibold ${isCurrent ? "text-indigo-900" : "text-foreground"}`}>
+                      <p className="font-semibold">
                         Version {version.version_number || 1}
                       </p>
                       {isCurrent && (
-                        <span className="px-2 py-0.5 bg-indigo-600 text-white text-xs font-medium rounded-full">
+                        <span className="px-2 py-0.5 bg-primary text-primary-foreground text-xs font-medium rounded-full">
                           Current
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm">
                       {format(new Date(version.created_date), "MMM d, yyyy 'at' h:mm a")}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <StatusBadge status={version.status} size="sm" />
-                  <p className="text-lg font-semibold text-foreground">
+                  <p className="text-lg font-semibold">
                     ${(version.total || 0).toFixed(2)}
                   </p>
                 </div>
@@ -90,7 +90,7 @@ export default function QuoteVersionHistory({ quote, canRestore = false, onResto
                   size="sm"
                   variant="outline"
                   onClick={() => onRestore(version)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-foreground"
                 >
                   <ArchiveRestore className="w-4 h-4 mr-1.5" />
                   Restore

@@ -1,44 +1,47 @@
 import {useQuery} from "@tanstack/react-query";
-import {getQuotes, getReviews} from "@/api/dataClient";
-import {useUserRole} from "@/components/auth/RoleGuard";
-import {canAccessPage} from "@/lib/rolePageAccess";
-import {useAccessPolicy} from "@/features/admin/adminApi";
+import {getAllQuoteActivities, getQuotes, getReviews} from "@/api/dataClient";
 import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
 import RejectionRateChart from "@/components/manager/RejectionRateChart";
 import CommonRejectionReasons from "@/components/manager/CommonRejectionReasons";
 import FeedbackThemes from "@/components/manager/FeedbackThemes";
 import TurnaroundByTeam from "@/components/manager/TurnaroundByTeam";
 import RejectionReasonBreakdown from "@/components/manager/RejectionReasonBreakdown";
-import {AlertCircle, Lock, MessageSquare, PieChart, Timer, TrendingDown} from "lucide-react";
+import {AlertCircle, MessageSquare, PieChart, Timer, TrendingDown} from "lucide-react";
+import {Button} from "@/components/ui/button";
+import QuoteLifecyclePanel from "@/components/quote-dashboard/QuoteLifecyclePanel";
 
-const ALLOWED_USERS = ["tjm8189", "vseganos"];
-
-export default function ManagerDashboard() {
-  const {user: currentUser, isLoading: accessLoading} = useUserRole();
-  const {policy: accessPolicy} = useAccessPolicy();
-  const emailPrefix = currentUser?.email?.split("@")[0]?.toLowerCase() || "";
-  const isAllowed = canAccessPage(currentUser, "ManagerDashboard", accessPolicy) || ALLOWED_USERS.some(u => emailPrefix.includes(u));
-  const { data: quotes = [], isLoading: loadingQuotes } = useQuery({
-    queryKey: ["manager-quotes"],
+export default function QuoteDashboard({embedded = false}) {
+  const quotesQuery = useQuery({
+    queryKey: ["quotes", "lifecycle"],
     queryFn: async () => {
       const all = await getQuotes();
       return all.filter(q => q.is_current_version !== false);
     },
   });
 
-  const { data: reviews = [], isLoading: loadingReviews } = useQuery({
+  const reviewsQuery = useQuery({
     queryKey: ["manager-reviews"],
     queryFn: getReviews,
   });
+  const activityQuery = useQuery({
+    queryKey: ["quoteActivity", "lifecycle"],
+    queryFn: async () => {
+      const activities = await getAllQuoteActivities();
+      if (!Array.isArray(activities)) throw new Error("Quote activity service returned an invalid response.");
+      return activities;
+    }
+  });
 
-  const loading = loadingQuotes || loadingReviews;
-
-  const totalQuotes = quotes.length;
-  const totalRejected = quotes.filter(q => q.status === "rejected").length;
-  const overallRejectionRate = totalQuotes > 0 ? Math.round((totalRejected / totalQuotes) * 100) : 0;
-  const completedReviews = reviews.filter(r => r.review_status === "completed").length;
-
-  if (accessLoading || loading) {
+  if (quotesQuery.isError || activityQuery.isError) {
+    const failedQuery = quotesQuery.isError ? quotesQuery : activityQuery;
+    return <Card role="alert" className="p-6 space-y-3">
+      <h2 className="font-semibold">Unable to load Quote Dashboard</h2>
+      <p className="text-sm text-muted-foreground">{failedQuery.error?.message || "Quote history or activity data is unavailable."}</p>
+      <p className="text-sm text-muted-foreground">Charts are not shown because source records could not be loaded completely.</p>
+      <Button disabled={failedQuery.isFetching} onClick={() => failedQuery.refetch()}>Try Again</Button>
+    </Card>;
+  }
+  if (quotesQuery.isLoading || activityQuery.isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-4 border-border border-t-orange-500 rounded-full animate-spin" />
@@ -46,56 +49,27 @@ export default function ManagerDashboard() {
     );
   }
 
-  if (!isAllowed) {
-    return (
-      <div className="p-8 flex flex-col items-center justify-center gap-4 text-center">
-        <Lock className="w-12 h-12 text-orange-400" />
-        <h2 className="text-xl font-semibold text-foreground">Access Restricted</h2>
-        <p className="text-muted-foreground max-w-md">
-          The Manager Dashboard is only accessible to authorized managers and admins.
-        </p>
-      </div>
-    );
-  }
-
+  const quotes = quotesQuery.data || [];
+  const reviews = reviewsQuery.data || [];
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
+    <div className={embedded ? "space-y-6" : "p-6 max-w-6xl mx-auto space-y-6"}>
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Manager Dashboard</h1>
+        {embedded
+          ? <h2 className="text-xl font-bold text-foreground">Quote Dashboard</h2>
+          : <h1 className="text-2xl font-bold text-foreground">Quote Dashboard</h1>}
         <p className="text-muted-foreground mt-1">
-          Rejection trends, coaching feedback, and team turnaround analysis to identify training opportunities.
+          Quote creation, status movement, stage turnaround, current aging, and recorded lifetime history.
         </p>
       </div>
 
-      {/* Summary KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <Card className="border-border">
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Quotes</p>
-            <p className="text-3xl font-bold text-foreground mt-1">{totalQuotes}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-red-100">
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Rejected</p>
-            <p className="text-3xl font-bold text-red-600 mt-1">{totalRejected}</p>
-          </CardContent>
-        </Card>
-        <Card className={`border-border ${overallRejectionRate >= 30 ? "bg-red-50" : ""}`}>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide">Overall Rejection Rate</p>
-            <p className={`text-3xl font-bold mt-1 ${overallRejectionRate >= 30 ? "text-red-600" : "text-foreground"}`}>
-              {overallRejectionRate}%
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="border-green-100">
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide">Reviews Completed</p>
-            <p className="text-3xl font-bold text-green-600 mt-1">{completedReviews}</p>
-          </CardContent>
-        </Card>
-      </div>
+      <QuoteLifecyclePanel quotes={quotes} activities={activityQuery.data || []} />
+      <details className="space-y-6">
+        <summary className="cursor-pointer font-semibold">Rejection and coaching analysis (all-time; breakdown uses last 60 days)</summary>
+        <p className="text-sm text-muted-foreground">These existing analyses are separate from the lifecycle activity filters above.</p>
+        {reviewsQuery.isError ? <Card role="alert" className="p-4 space-y-3">
+          <p>Unable to load coaching/review data: {reviewsQuery.error?.message || "Reviews unavailable."}</p>
+          <Button disabled={reviewsQuery.isFetching} onClick={() => reviewsQuery.refetch()}>Retry Reviews</Button>
+        </Card> : reviewsQuery.isLoading ? <p>Loading review analysis...</p> : <>
 
       {/* Row 1: Rejection Rate by Submitter + Common Reasons */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -133,7 +107,7 @@ export default function ManagerDashboard() {
             <PieChart className="w-4 h-4 text-red-500" />
             Rejection Reason Breakdown
           </CardTitle>
-          <p className="text-xs text-muted-foreground">What's driving rejections — last 60 days of reviews &amp; feedback</p>
+          <p className="text-xs text-muted-foreground">What&apos;s driving rejections — last 60 days of reviews &amp; feedback</p>
         </CardHeader>
         <CardContent>
           <RejectionReasonBreakdown reviews={reviews} quotes={quotes} />
@@ -151,7 +125,7 @@ export default function ManagerDashboard() {
             <p className="text-xs text-muted-foreground">Topics most frequently flagged in review feedback</p>
           </CardHeader>
           <CardContent>
-            <FeedbackThemes reviews={reviews} quotes={quotes} canEdit={isAllowed} />
+            <FeedbackThemes reviews={reviews} quotes={quotes} canEdit />
           </CardContent>
         </Card>
 
@@ -168,6 +142,8 @@ export default function ManagerDashboard() {
           </CardContent>
         </Card>
       </div>
+        </>}
+      </details>
     </div>
   );
 }
