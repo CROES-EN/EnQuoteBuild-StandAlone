@@ -261,6 +261,14 @@ require a signed-in identity and record its verified email. Older events that ne
 recorded the editor cannot reliably be attributed retroactively.
 Existing quote notices recover the recorded editor when their quote ID and update
 time still match the current record; a newer edit is never used to label an older event.
+The UI can also read the current quote through the existing desktop bridge.
+When its update timestamp matches the notice and no updater is recorded, the
+last status-history entry supplies a clearly labeled "last status update by"
+attribution. That author is not presented as the editor of unrelated fields.
+Newer quote versions are never used to attribute older notices, and missing,
+invalid or future-dated history is not used. This requires no installer update.
+Notification times are displayed in the viewing user's local timezone, including
+Base44 UTC timestamps that arrive without a timezone suffix.
 Opening the bell marks notifications read;
 Clear and Clear All persist dismissals per signed-in user on this device, including
 across reloads and replayed sync events. New updates remain visible. Storage errors

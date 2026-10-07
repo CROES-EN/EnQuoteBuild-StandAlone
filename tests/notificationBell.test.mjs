@@ -5,6 +5,17 @@ import {createRequire} from "node:module";
 import React from "react";
 import {renderToStaticMarkup} from "react-dom/server";
 import {build} from "esbuild";
+import {parseNotificationTimestamp} from "../src/features/notifications/notificationTimestamp.js";
+
+test("reported Base44 timestamp is 4:20 PM Mountain time, not 10:20 PM", () => {
+  const time = parseNotificationTimestamp("2026-10-07T22:20:21.083334");
+  assert.equal(time, Date.parse("2026-10-07T22:20:21.083Z"));
+  assert.equal(new Date(time).toLocaleTimeString("en-US", {
+    timeZone: "America/Denver", hour: "numeric", minute: "2-digit", hour12: true
+  }), "4:20 PM");
+  assert.equal(parseNotificationTimestamp("2026-10-07T16:20:21.083-06:00"), time);
+  assert.ok(Number.isNaN(parseNotificationTimestamp(null)));
+});
 
 test("bell shows recorded editors and assignment sender, links tasks, and refreshes on task sync", async () => {
   let cursor = 0;
@@ -51,6 +62,16 @@ test("bell shows recorded editors and assignment sender, links tasks, and refres
   assert.match(format({...base, updated_by: "external@example.com"}), /updated by external@example.com/);
   assert.match(format(base), /updater not recorded/);
   assert.match(format({...base, changedBy: "demo@example.invalid"}), /updater not recorded/);
+  assert.match(format({...base, changedBy: "status.author@example.com", attributionSource: "status_history"}),
+    /Q-123 updated \(last status update by status.author@example.com\)/);
+  assert.match(format({...base, changedBy: "demo@example.invalid", updated_by: "real@example.com"}),
+    /updated by real@example.com/);
+  assert.equal(
+    format({...base, occurredAt: "2026-10-07T22:20:21.083334"}),
+    format({...base, occurredAt: "2026-10-07T22:20:21.083Z"}),
+    "Base44's timezone-less UTC timestamp renders like the same explicit UTC instant"
+  );
+  assert.match(format({...base, occurredAt: "invalid"}), /time not recorded/);
   assert.match(format({...base, type: "product_updated", productName: "Panel", changedBy: "editor@example.com"}), /Panel updated by editor@example.com/);
   const html = renderToStaticMarkup(React.createElement(module.exports.default));
   assert.match(html, /Task assigned by sender@example.com: Call homeowner/);

@@ -6,6 +6,8 @@
 
 import {getCurrentUserNamespace, scopedKey} from "@/lib/userScopedStorage";
 import {tasksApi} from "@/features/collab/collabApi";
+import {parseNotificationTimestamp} from "./notificationTimestamp";
+import {notificationActor, withQuoteAttribution} from "./notificationAttribution";
 
 const COLLECTION = "appNotifications";
 const BROWSER_STORAGE_KEY = "enquote_app_notifications_v1";
@@ -13,9 +15,7 @@ const STATE_KEY = "enquote_notification_state_v1";
 
 function eventKey(item) {
   const rawTime = item.occurredAt;
-  const time = typeof rawTime === "string"
-    ? Date.parse(/^\d{4}-\d{2}-\d{2}T[\d:.]+$/.test(rawTime) ? `${rawTime}Z` : rawTime)
-    : NaN;
+  const time = parseNotificationTimestamp(rawTime);
   return JSON.stringify([item.type, item.quoteId || item.productName || item.taskId || item.id,
     Number.isFinite(time) ? time : rawTime]);
 }
@@ -82,7 +82,7 @@ export async function listNotifications() {
   const dismissed = new Set(state.dismissed);
   const read = new Set(state.read);
   const seen = new Set();
-  return [...all].sort((a, b) => (b.seq ?? 0) - (a.seq ?? 0))
+  const visible = [...all].sort((a, b) => (b.seq ?? 0) - (a.seq ?? 0))
     .filter(item => {
       const key = item.eventId || eventKey(item);
       if (dismissed.has(item.id) || dismissed.has(eventKey(item)) || dismissed.has(key) || seen.has(key)) return false;
@@ -90,6 +90,14 @@ export async function listNotifications() {
       return true;
     })
     .map(item => ({...item, read: read.has(item.id) || read.has(eventKey(item)) || read.has(item.eventId)}));
+  const quotesApi = globalThis.window?.enquoteLocal?.quotes;
+  if (!quotesApi?.list || !visible.some(item => item.type === "quote_updated" && !notificationActor(item))) return visible;
+  const quotes = await quotesApi.list();
+  if (owner !== getCurrentUserNamespace()) return [];
+  const byId = new Map(quotes.map(quote => [quote.id, quote]));
+  return visible.map(item => item.type === "quote_updated"
+    ? withQuoteAttribution(item, byId.get(item.quoteId))
+    : item);
 }
 
 /**

@@ -7,6 +7,8 @@ import {clearAllNotifications, clearNotification, listNotifications, markAllRead
 import {onUserSessionChanged} from "@/lib/userScopedStorage";
 import {toast} from "sonner";
 import {subscribe} from "@/features/collab/collabApi";
+import {parseNotificationTimestamp} from "@/features/notifications/notificationTimestamp";
+import {notificationActor} from "@/features/notifications/notificationAttribution";
 
 // Formats a notification's timestamp using the VIEWING user's own browser locale -
 // matches Layout.jsx's existing formatLastUpdated pattern exactly (date part follows
@@ -16,7 +18,8 @@ import {subscribe} from "@/features/collab/collabApi";
 // different machine, possibly hours ago via the background sync) - this way the time
 // shown always reflects whoever is currently looking at it, correctly.
 function formatNotificationDateTime(isoString) {
-  const date = new Date(isoString);
+  const date = new Date(parseNotificationTimestamp(isoString));
+  if (!Number.isFinite(date.getTime())) return "(time not recorded)";
   const datePart = date.toLocaleDateString(undefined, { month: "2-digit", day: "2-digit" });
   const timePart = date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", hour12: true });
   return `${datePart} ${timePart}`;
@@ -31,9 +34,10 @@ function formatNotificationDateTime(isoString) {
 // `message` field, or a generic label, for any such old/malformed record.
 export function formatNotificationMessage(n) {
   const time = formatNotificationDateTime(n.occurredAt);
-  const recordedBy = n.changedBy || n.last_updated_by || n.updated_by;
-  const attribution = recordedBy && !String(recordedBy).toLowerCase().endsWith("@example.invalid")
-    ? `by ${recordedBy}` : "(updater not recorded)";
+  const recordedBy = notificationActor(n);
+  const attribution = recordedBy
+    ? n.attributionSource === "status_history" ? `(last status update by ${recordedBy})` : `by ${recordedBy}`
+    : "(updater not recorded)";
   if (n.type === "task_assigned" && n.taskTitle) {
     return `Task assigned ${attribution}: ${n.taskTitle} - ${time}`;
   }

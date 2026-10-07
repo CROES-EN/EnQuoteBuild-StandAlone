@@ -44,6 +44,46 @@ async function loadNotifications() {
   return module.exports;
 }
 
+test("existing quote bridge supplies latest status attribution without changing dismissal keys", async () => {
+  const storage = new Map([["enquote_local_session_email", "viewer@example.com"]]);
+  const notice = {id: "history-notice", type: "quote_updated", quoteId: "q",
+    occurredAt: "2026-10-07T22:20:21.083334", changedBy: null};
+  let calls = 0;
+  let fail = false;
+  globalThis.window = {
+    localStorage: {getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value)},
+    enquoteLocal: {
+      collections: {list: async () => [notice]},
+      quotes: {list: async () => {
+        calls++;
+        if (fail) throw new Error("Quote read failed");
+        return [{id: "q", updated_date: notice.occurredAt, status_history: [
+          {changed_by: "status.author@example.com", changed_at: "2026-10-07T22:20:20.010Z"}
+        ]}];
+      }}
+    }
+  };
+  try {
+    const api = await loadNotifications();
+    const [item] = await api.listNotifications();
+    assert.equal(item.changedBy, "status.author@example.com");
+    assert.equal(item.attributionSource, "status_history");
+    fail = true;
+    await assert.rejects(api.listNotifications(), /Quote read failed/);
+    fail = false;
+    await api.clearNotification(item.id);
+    const before = calls;
+    assert.deepEqual(await api.listNotifications(), []);
+    assert.equal(calls, before, "dismissed events do not require fetching quotes");
+    storage.set("enquote_local_session_email", "another@example.com");
+    globalThis.window.enquoteLocal.quotes.list = async () => {
+      storage.set("enquote_local_session_email", "switched@example.com");
+      return [];
+    };
+    assert.deepEqual(await api.listNotifications(), [], "account switches cannot leak the prior user's feed");
+  } finally {delete globalThis.window;}
+});
+
 test("142 cleared notifications stay dismissed through reloads, stale database writes and event replays", async () => {
   const storage = new Map([["enquote_local_session_email", "first@example.com"]]);
   let records = Array.from({length: 142}, (_, i) => ({
