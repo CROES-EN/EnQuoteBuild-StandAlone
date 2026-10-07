@@ -1,4 +1,5 @@
 import {useEffect, useState} from "react";
+import {Link} from "react-router-dom";
 import {ClipboardList} from "lucide-react";
 import {toast} from "sonner";
 import {Button} from "@/components/ui/button";
@@ -11,6 +12,9 @@ import {DEFAULT_CASE_WORK_TEAM} from "@/features/supervisorDashboard/caseWorkMet
 import {onUserSessionChanged, scopedKey} from "@/lib/userScopedStorage";
 import {isReadonlyViewing} from "@/features/admin/readonlyViewing";
 import {AGGREGATION_MODE_OPTIONS} from "@/features/supervisorDashboard/periodAggregation";
+import {getStatusLabel} from "@/constants/quoteStatuses";
+import {createPageUrl} from "@/utils";
+import {hasValidQuoteTotal} from "@/features/supervisorDashboard/paidQuoteMetrics";
 
 const TEAM_KEY = "enquote_case_work_team_v1";
 
@@ -53,7 +57,7 @@ export function CaseWorkSettings({team, onChange}) {
   </>;
 }
 
-export default function CaseWorkTile({label, value, subtitle, records = [], loading, error, onRetry, unavailable, mode, payment = false, currency}) {
+export default function CaseWorkTile({label, value, subtitle, records = [], loading, error, onRetry, unavailable, mode, modeLabel, payment = false, quotes = false, currency}) {
   const [open, setOpen] = useState(false);
   const [limit, setLimit] = useState(100);
   const formatted = value === null || value === undefined ? "Unavailable" : currency ?
@@ -68,21 +72,27 @@ export default function CaseWorkTile({label, value, subtitle, records = [], load
     </div> : loading ? <p role="status">Loading report...</p> : unavailable ?
       <p className="mt-2 text-sm text-muted-foreground">{unavailable}</p> :
       <p className="mt-1 text-3xl font-bold text-foreground">{formatted}</p>}
-    <p className="mt-2 text-xs text-muted-foreground">{AGGREGATION_MODE_OPTIONS.find(option => option.value === mode)?.label}</p>
+    <p className="mt-2 text-xs text-muted-foreground">{modeLabel || AGGREGATION_MODE_OPTIONS.find(option => option.value === mode)?.label}</p>
     <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
     {!error && !loading && !unavailable && <Button size="sm" variant="link" className="mt-2 px-0" onClick={() => {setLimit(100); setOpen(true);}}>View contributing records</Button>}
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-h-[85vh] max-w-5xl overflow-auto">
         <DialogHeader><DialogTitle>{label} - contributing records</DialogTitle></DialogHeader>
-        <p className="text-sm text-muted-foreground">{subtitle} {records.length} contributing rows. Distinct-case counts may be smaller than the number of events.</p>
+        <p className="text-sm text-muted-foreground">{subtitle} {records.length} contributing rows. {quotes ? "Each current quote is counted once." : "Distinct-case counts may be smaller than the number of events."}</p>
         <Table>
           <TableHeader><TableRow>
-            {(payment ? ["Invoice", "Paid Date", "Amount Paid", "Currency", "Case", "Site"] :
+            {(quotes ? ["Quote", "Status", "Quote Total (USD)", "Case", "Site"] : payment ? ["Invoice", "Paid Date", "Amount Paid", "Currency", "Case", "Site"] :
               ["Case", "Site", "Edit Date", "Event", "Old Value", "New Value", "Edited By", "Qualification / Review Reason"])
               .map(header => <TableHead key={header}>{header}</TableHead>)}
           </TableRow></TableHeader>
           <TableBody>{records.slice(0, limit).map((event, index) => <TableRow key={`${event.key || event.id || "invalid"}:${index}`}>
-            {payment ? <>
+            {quotes ? <>
+              <TableCell><Link className="text-primary underline" to={createPageUrl(`QuoteDetails?id=${encodeURIComponent(event.id)}`)}>{event.quote_number || event.id}</Link></TableCell>
+              <TableCell>{getStatusLabel(event.status) || event.status}</TableCell>
+              <TableCell>{!hasValidQuoteTotal(event) ? "Missing/invalid total" : new Intl.NumberFormat(undefined, {style: "currency", currency: "USD"}).format(Number(event.total))}</TableCell>
+              <TableCell><CaseNumberLink caseNumber={event.case_number} /></TableCell>
+              <TableCell><SiteIdLink siteId={event.site_id} /></TableCell>
+            </> : payment ? <>
               <TableCell>{event.row["Invoice ID"]}</TableCell>
               <TableCell>{event.row["Paid Date"]}</TableCell>
               <TableCell>{event.row["Amount Paid"]}</TableCell>

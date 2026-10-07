@@ -21,6 +21,15 @@ async function runCaseWork(win) {
       {id: "invoice_payments", reportType: "invoice_payments", columns: ["Invoice ID", "Paid Date", "Amount Paid", "Currency"],
         rows: [{"Invoice ID": "inv-1", "Paid Date": "7/1/2026", "Amount Paid": "1250.25", Currency: "USD"}]}
     ];
+    window.__smokePaidQuotes = [
+      {id: "paid-1", quote_number: "PAID-001", status: "invoice_paid", total: 1250.25, created_date: "2025-01-01"},
+      {id: "paid-2", status: "invoice_paid_materials_required", total: 20},
+      {id: "paid-3", status: "materials_pending_shipment", total: 30},
+      {id: "paid-4", status: "scheduled", total: 40},
+      {id: "unpaid", status: "invoiced", total: 9000},
+      {id: "old-version", status: "invoice_paid", total: 9000, is_current_version: false},
+      {id: "excluded", status: "invoice_paid", total: 9000, exclude_from_reporting: true}
+    ];
     const params = new URLSearchParams({tab: "dashboard"});
     params.set("enquoteReportPeriod", JSON.stringify({
       range: {preset: "custom_range", start: "2026-07-01", end: "2026-07-02"}, mode: "period_total"
@@ -36,8 +45,8 @@ async function runCaseWork(win) {
     ["case_work_transfers", "Cases Transferred Out", "1"],
     ["case_work_events", "Case Work Events", "2"],
     ["case_work_unresolved", "Case Ownership Needs Review", "1"],
-    ["invoice_payments_count", "Invoices Paid", "1"],
-    ["invoice_payments_amount", "Amount Collected", "$1,250.25"]
+    ["invoice_payments_count", "Invoices Paid", "4"],
+    ["invoice_payments_amount", "Paid Quote Total", "$1,340.25"]
   ]) {
     const text = await tileText(id);
     assert.ok(text?.toLowerCase().includes(label.toLowerCase()), `${label} renders in customizable tile registry: ${await evaluate('document.body.innerText.slice(-1800)')}`);
@@ -67,14 +76,23 @@ async function runCaseWork(win) {
   await sleep(600);
   assert.ok((await tileText("case_work_worked")).split("\n").includes("0"));
   assert.equal(await evaluate('document.body.innerText.includes("extends outside the imported event dates")'), true);
+  assert.ok((await tileText("invoice_payments_count")).split("\n").includes("4"), "quote count ignores selected period");
+  assert.ok((await tileText("invoice_payments_amount")).split("\n").includes("$1,340.25"), "quote sum ignores selected period");
+  await evaluate(`document.querySelector('[data-enquote-share-target="supervisor-tile:invoice_payments_amount"] button').click(); true`);
+  await sleep(300);
+  const paidDetail = await evaluate(`document.querySelector('[role="dialog"]').innerText`);
+  assert.ok(paidDetail.includes("PAID-001") && paidDetail.includes("Scheduled") && paidDetail.includes("Materials Pending Shipment"), "live quote drill-down lists qualifying quotes");
+  await evaluate(`document.querySelector('[role="dialog"]').dispatchEvent(new KeyboardEvent("keydown", {key: "Escape", bubbles: true})); true`);
+  await sleep(300);
   await new Promise(resolve => {
     win.webContents.once("did-finish-load", resolve);
     win.webContents.reload();
   });
   await sleep(2000);
   assert.ok((await tileText("case_work_worked")).includes("Import Case Work History"), "missing history shows an import prompt, not a zero total");
-  assert.ok((await tileText("invoice_payments_amount")).includes("Import Paid Invoices"), "missing payments cannot show quote totals as collected revenue");
-  console.log("ok Case Work tiles: strict counts, actual payments, contributing rows, team settings, period coverage and missing sources");
+  assert.ok((await tileText("invoice_payments_count")).split("\n").includes("0"), "empty live quotes show zero count without a payment import");
+  assert.ok(!(await tileText("invoice_payments_amount")).includes("Import Paid Invoices"), "live quote sum needs no payment import");
+  console.log("ok Case Work tiles and live paid-quote snapshot: strict counts, all four statuses, drill-downs, date independence and missing history");
 }
 
 module.exports = {runCaseWork};

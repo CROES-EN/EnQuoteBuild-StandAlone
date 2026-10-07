@@ -229,17 +229,17 @@ simultaneous transfer/closure; repeat timestamps remain separate. A missing Site
 does not remove the case from case counts but is excluded from site counts.
 Drill-downs retain qualifying history rows for audit and load 100 rows at a time.
 
-**Invoices Paid** and **Amount Collected** use **Report Data > Paid Invoices**,
-not quote totals. Required CSV columns are **Invoice ID**, **Paid Date**,
-**Amount Paid**, and **Currency**; optional Case Number and Enlighten Site ID
-provide links. Supply one fully-paid invoice per ID, with its actual net collected
-amount and payment date. Amounts must be numeric, e.g. `1,250.00`, without currency
-symbols; currency uses a three-letter code, e.g. `USD`. Identical invoice records
-count once; conflicting IDs and invalid records are excluded and reported.
-Mixed currencies are never added together. Without a payment report, the tiles
-show an import prompt, not zero collections or an estimate. This is not a payment
-transaction ledger: partial-payment/refund transactions need reconciliation into
-the fully-paid invoice report before import.
+**Invoices Paid** is a quote count; **Paid Quote Total** is the combined quote
+value in USD. Both use live EnQuote quotes currently in exactly these statuses:
+Invoice Paid, Invoice Paid - Materials Required, Materials Pending Shipment,
+or Scheduled. Only current versions not excluded from reporting qualify.
+Both are current snapshots across all dates: the Reporting Period, Latest Day,
+and Daily Average controls do not change them. Each includes contributing quote
+links, current status, case/site identifiers, and quote totals for audit.
+They need no CSV and do not use the optional Paid Invoices import. Paid Quote
+Total is quote value, not reconciled cash receipts. Missing/invalid matching quote
+totals make the dollar amount unavailable with a visible warning rather than
+silently reporting a partial total; the quote count remains available.
 
 ### Supervisor Dashboard: Quote Dashboard tab
 

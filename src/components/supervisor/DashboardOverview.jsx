@@ -85,7 +85,7 @@ import HourlyWaitTimeChart from "@/components/supervisor/HourlyWaitTimeChart";
 import TileGrid from "@/components/supervisor/TileGrid";
 import CaseWorkTile, {CaseWorkSettings, readCaseWorkTeam} from "@/components/supervisor/CaseWorkTiles";
 import {buildCaseWorkReport, caseWorkDisplay, parseHistoryDate} from "@/features/supervisorDashboard/caseWorkMetrics";
-import {buildInvoicePaymentReport} from "@/features/supervisorDashboard/invoicePaymentMetrics";
+import {buildPaidQuoteSnapshot} from "@/features/supervisorDashboard/paidQuoteMetrics";
 import {onUserSessionChanged} from "@/lib/userScopedStorage";
 import {
     applyPartialReorder,
@@ -1051,7 +1051,7 @@ export default function DashboardOverview({
   const {data: reportTables = {}} = reportTablesQuery;
   const rangeRecords = useMemo(() => {
     const dates = new Set(records.map(record => record.date));
-    for (const [table, column] of [["case_history", "Edit Date"], ["invoice_payments", "Paid Date"]]) {
+    for (const [table, column] of [["case_history", "Edit Date"]]) {
       for (const row of reportTables[table]?.rows || []) {
         const parsed = parseHistoryDate(row[column]);
         if (parsed) dates.add(parsed.date);
@@ -1149,8 +1149,7 @@ export default function DashboardOverview({
   // how allQuotes above already relies on remount-triggered refetching.
   const caseWorkReport = useMemo(() => buildCaseWorkReport(reportTables?.case_history?.rows || [], caseWorkTeam),
     [reportTables, caseWorkTeam]);
-  const paymentReport = useMemo(() => buildInvoicePaymentReport(reportTables?.invoice_payments?.rows || [], activeRange, kpiMode),
-    [reportTables, activeRange, kpiMode]);
+  const paymentReport = useMemo(() => buildPaidQuoteSnapshot(allQuotes), [allQuotes]);
 
   const sfdcQuotesTable = reportTables?.sfdc_quotes ?? null;
   const niceCalls = useMemo(() => niceCallContributingRecords(reportTables?.incorta_input?.rows || [], activeRange), [reportTables, activeRange]);
@@ -1463,15 +1462,13 @@ export default function DashboardOverview({
           subtitle={`${rule} Observed export only; filtered/missing history may undercount.${metric === "sites" ? ` ${display.missingSites} contributing events lack a Site ID.` : ""}`} />
       });
     }
-    for (const [metric, label] of [["count", "Invoices Paid"], ["amount", "Amount Collected"]]) {
-      const multipleCurrencies = paymentReport.currencies.length > 1;
+    for (const [metric, label] of [["count", "Invoices Paid"], ["amount", "Paid Quote Total"]]) {
       tiles.push({
-        id: `invoice_payments_${metric}`, label, category: "Paid Invoices",
-        render: () => <CaseWorkTile label={label} value={paymentReport[metric]} records={paymentReport.records} payment mode={kpiMode}
-          currency={metric === "amount" ? paymentReport.currencies[0] : undefined}
-          loading={reportTablesQuery.isLoading} error={reportTablesQuery.error} onRetry={reportTablesQuery.refetch}
-          unavailable={!reportTables.invoice_payments ? "Import Paid Invoices with actual Amount Paid; quote totals are not used." : null}
-          subtitle={`Paid Date within the reporting period. One fully-paid invoice per Invoice ID. ${paymentReport.invalid.length} invalid/conflicting rows excluded.${metric === "amount" && multipleCurrencies ? " Mixed currencies cannot be summed; see contributing records." : ""}`} />
+        id: `invoice_payments_${metric}`, label, category: "Live from EnQuote",
+        render: () => <CaseWorkTile label={label} value={paymentReport[metric]} records={paymentReport.records} quotes
+          modeLabel="Current snapshot - all dates" currency={metric === "amount" ? "USD" : undefined}
+          loading={quotesQuery.isLoading} error={quotesQuery.error} onRetry={quotesQuery.refetch}
+          subtitle={`${metric === "count" ? "Number of current, reportable quotes" : "Combined quote total (USD), not reconciled cash receipts"} in Invoice Paid, Invoice Paid - Materials Required, Materials Pending Shipment, or Scheduled. Ignores reporting period and display mode.${metric === "amount" && paymentReport.invalid.length ? ` Total unavailable: ${paymentReport.invalid.length} matching quotes have missing/invalid totals; see contributing records.` : ""}`} />
       });
     }
     tiles.push({
