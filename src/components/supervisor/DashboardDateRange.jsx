@@ -32,8 +32,8 @@ function formatRangeLabel(range) {
  * preset means and reports on `records` that already exist. The parent remembers only applied
  * selections (including Reset), not unapplied date edits, per signed-in user on this device.
  */
-export default function DashboardDateRange({ records = [], value, onChange, freezePresetDates = false }) {
-  const defaultPreset = resolveDefaultPreset(records);
+export default function DashboardDateRange({ records = [], rangeRecords = records, value, onChange, freezePresetDates = false }) {
+  const defaultPreset = resolveDefaultPreset(rangeRecords);
   const committed = value || { preset: defaultPreset, start: null, end: null };
 
   const [pendingPreset, setPendingPreset] = useState(committed.preset);
@@ -55,7 +55,7 @@ export default function DashboardDateRange({ records = [], value, onChange, free
     preset: pendingPreset,
     startDate: pendingStart || undefined,
     endDate: pendingEnd || undefined,
-    records
+    records: rangeRecords
   });
 
   const isDirty = pendingPreset !== committed.preset || previewRange.start !== committed.start || previewRange.end !== committed.end;
@@ -80,13 +80,13 @@ export default function DashboardDateRange({ records = [], value, onChange, free
       preset: pendingPreset,
       startDate: pendingStart || undefined,
       endDate: pendingEnd || undefined,
-      records
+      records: rangeRecords
     });
     onChange?.({ preset: pendingPreset, start: resolved.start, end: resolved.end });
   }
 
   function handleReset() {
-    const resolved = resolveDateRange({ preset: defaultPreset, records });
+    const resolved = resolveDateRange({preset: defaultPreset, records: rangeRecords});
     setPendingPreset(defaultPreset);
     setPendingStart(resolved.start || "");
     setPendingEnd(resolved.end || "");

@@ -187,6 +187,60 @@ still receive an ordinary readable message. Unknown request types on an older
 Worker fail explicitly; they must not be treated as successfully created tasks.
 The regular personal-task upsert endpoint remains restricted to its caller.
 
+### Supervisor Dashboard: Case work and paid invoices
+
+Executive Overview includes **Cases Worked**, **Cases Closed**, **Cases Transferred
+Out**, **Case Work Events**, **Sites Worked**, and **Case Ownership Needs Review**.
+They support the normal reporting period, display modes, source filter, tile
+visibility/reordering, and contributing-record links.
+
+In **Report Data > Case Work History**, import the Salesforce Case History
+Details Only CSV with Case Number, Field / Event, Old Value, New Value, Edited By,
+and Edit Date. Enlighten Site ID is optional but needed for complete site counts.
+Drop multiple compatible exports together to combine them. Each import replaces
+the stored history table; overlapping event signatures are collapsed by the
+calculations. Windows-1252 and UTF-8 CSVs preserve names and leading-zero identifiers.
+The imported table uses existing Supervisor sync; no desktop/Worker schema change
+is required.
+
+Only owner transfers from the configured team to outside owners/queues and
+non-Closed-to-Closed events with history-supported team ownership qualify.
+Other status changes, creation, notes, subject/contact edits, incoming transfers,
+and internal transfers do not count as work. Current Case Owner, Edited By, and
+Project Picklist never substitute for historical ownership.
+**Case-work team** lets each account review/update its Salesforce owner-name roster
+on this device. The starting roster is the ten names supplied for this report.
+Review the roster before using totals; membership changes recalculate history.
+Viewing mode cannot save this preference.
+
+Closure ownership uses the nearest earlier owner change's new owner and/or the
+nearest later change's old owner, from the entire imported history, not just the
+selected period. Missing/conflicting anchors or simultaneous owner changes go to
+Needs Review, not confirmed totals. The export timestamp is interpreted in its
+report calendar; use the same Salesforce report timezone for overlapping exports.
+Minute-level exports cannot prove the order of changes within a minute.
+Counts describe observed exported history, not guaranteed complete team activity.
+Filtered or missing history may undercount even when a displayed number is zero.
+
+Period totals count each case/site once. Daily Average averages distinct daily
+counts across all calendar days, including zero days. Latest Day uses the selected
+period end. Work Events count one episode per case/timestamp to avoid inflating a
+simultaneous transfer/closure; repeat timestamps remain separate. A missing Site ID
+does not remove the case from case counts but is excluded from site counts.
+Drill-downs retain qualifying history rows for audit and load 100 rows at a time.
+
+**Invoices Paid** and **Amount Collected** use **Report Data > Paid Invoices**,
+not quote totals. Required CSV columns are **Invoice ID**, **Paid Date**,
+**Amount Paid**, and **Currency**; optional Case Number and Enlighten Site ID
+provide links. Supply one fully-paid invoice per ID, with its actual net collected
+amount and payment date. Amounts must be numeric, e.g. `1,250.00`, without currency
+symbols; currency uses a three-letter code, e.g. `USD`. Identical invoice records
+count once; conflicting IDs and invalid records are excluded and reported.
+Mixed currencies are never added together. Without a payment report, the tiles
+show an import prompt, not zero collections or an estimate. This is not a payment
+transaction ledger: partial-payment/refund transactions need reconciliation into
+the fully-paid invoice report before import.
+
 ### Supervisor Dashboard: Quote Dashboard tab
 
 Open **Supervisor Dashboard > Quote Dashboard** for new quotes, status changes,

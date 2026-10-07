@@ -400,7 +400,7 @@ export default function ImportAsTableDialog({ open, onOpenChange, reportType, re
               if (normalized) candidates.push({ ...normalized, sourceName: sectionName });
             }
           } else {
-            const workbook = readWorkbookFromBytes(bytes);
+            const workbook = readWorkbookFromBytes(bytes, file.name);
             for (const sheetName of workbook.sheetNames || []) {
               const normalized = normalizeRows(workbook.getSheetRows(sheetName));
               if (normalized) candidates.push({ ...normalized, sourceName: sheetName });
@@ -578,6 +578,10 @@ export default function ImportAsTableDialog({ open, onOpenChange, reportType, re
           <DialogDescription>
             {reportType === "staffing"
               ? "This imports your OM Staffing Report export (per-agent Login Time, Handle Time, etc.) for any date range - re-importing replaces only the dates included in the new file, keeping every other date's history intact."
+              : reportType === "case_history"
+                ? "Feeds case-work tiles using owner transfers and closures only. Import history across all relevant projects, including outside-team edits. Drop both history exports together to combine them; overlapping event signatures are collapsed by the tiles. Each import replaces this table. Include earlier owner history when possible; current ownership is never substituted."
+              : reportType === "invoice_payments"
+                ? "Feeds paid-invoice and collected-amount tiles. Required columns: Invoice ID, Paid Date, Amount Paid, Currency. Supply one fully-paid invoice per ID with the actual net collected amount, not the quote total. Use numeric amounts (for example 1,250.00) and currency codes (USD). Conflicting invoice rows are excluded; mixed currencies are not summed. Each import replaces this table."
               : "This loads every row as-is for browsing - it does not affect daily metrics on the Executive Overview. Re-importing replaces the current table with the new file's rows."}
 
 

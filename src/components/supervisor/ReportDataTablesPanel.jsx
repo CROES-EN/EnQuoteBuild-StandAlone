@@ -46,6 +46,24 @@ import CareDataHygieneReport from "@/components/supervisor/CareDataHygieneReport
  */
 const REPORT_TYPES = [
   {
+    key: "case_history", label: "Case Work History",
+    defaultSummaryFields: [
+      {column: "Case Number", label: "Case Number"},
+      {column: "Field / Event", label: "Event"},
+      {column: "Old Value", label: "From"},
+      {column: "New Value", label: "To"}
+    ]
+  },
+  {
+    key: "invoice_payments", label: "Paid Invoices",
+    defaultSummaryFields: [
+      {column: "Invoice ID", label: "Invoice"},
+      {column: "Paid Date", label: "Paid Date"},
+      {column: "Amount Paid", label: "Amount Paid"},
+      {column: "Currency", label: "Currency"}
+    ]
+  },
+  {
     key: "escalations", label: "Escalations",
     defaultSummaryFields: [
       { column: "Case Number", label: "Case Number" },

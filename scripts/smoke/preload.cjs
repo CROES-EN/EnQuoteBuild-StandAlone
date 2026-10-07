@@ -72,7 +72,8 @@ function respond(path, args) {
   if (/^on[A-Z]/.test(last)) return () => {};
   if (key === "auth.getVerifiedIdentity") return Promise.resolve(IDENTITY);
   if (key === "auth.hasAccount") return Promise.resolve(true);
-  if (key === "collections.list") return Promise.resolve(args[0] === "users" ? USERS : []);
+  if (key === "collections.list") return Promise.resolve(args[0] === "users" ? USERS :
+    args[0] === "supervisorReportTables" ? window.__smokeWorkTables || [] : []);
   if (key === "largeTables.get" || key === "updater.getState") return Promise.resolve(null);
   if (key === "ui.getInfo") return Promise.resolve({ appVersion: "smoke", uiVersion: null });
   if (key === "remoteSync.checkStatus") return Promise.resolve({ ok: true });

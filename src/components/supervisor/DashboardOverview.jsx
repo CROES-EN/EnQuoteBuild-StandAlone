@@ -83,6 +83,10 @@ import QuoteExceptionsPanel from "@/components/supervisor/QuoteExceptionsPanel";
 import DrillDownDrawer from "@/components/supervisor/DrillDownDrawer";
 import HourlyWaitTimeChart from "@/components/supervisor/HourlyWaitTimeChart";
 import TileGrid from "@/components/supervisor/TileGrid";
+import CaseWorkTile, {CaseWorkSettings, readCaseWorkTeam} from "@/components/supervisor/CaseWorkTiles";
+import {buildCaseWorkReport, caseWorkDisplay, parseHistoryDate} from "@/features/supervisorDashboard/caseWorkMetrics";
+import {buildInvoicePaymentReport} from "@/features/supervisorDashboard/invoicePaymentMetrics";
+import {onUserSessionChanged} from "@/lib/userScopedStorage";
 import {
     applyPartialReorder,
     getHiddenTileIds,
@@ -1040,7 +1044,22 @@ export default function DashboardOverview({
   records = [],
   completedStatuses = DEFAULT_COMPLETED_STATUSES,
 }) {
-  const defaultPreset = useMemo(() => resolveDefaultPreset(records), [records]);
+  const reportTablesQuery = useQuery({
+    queryKey: ["report-tables-for-ops-overview"],
+    queryFn: listReportTables
+  });
+  const {data: reportTables = {}} = reportTablesQuery;
+  const rangeRecords = useMemo(() => {
+    const dates = new Set(records.map(record => record.date));
+    for (const [table, column] of [["case_history", "Edit Date"], ["invoice_payments", "Paid Date"]]) {
+      for (const row of reportTables[table]?.rows || []) {
+        const parsed = parseHistoryDate(row[column]);
+        if (parsed) dates.add(parsed.date);
+      }
+    }
+    return [...dates].sort().map(date => ({date}));
+  }, [records, reportTables]);
+  const defaultPreset = useMemo(() => resolveDefaultPreset(rangeRecords), [rangeRecords]);
   const [rangeValue, setRangeValue] = useReportingPeriodPreference("overview");
   const [searchParams, setSearchParams] = useSearchParams();
   const sharedPeriod = useMemo(() => {
@@ -1084,14 +1103,16 @@ export default function DashboardOverview({
   const [emailCaseDialogRows, setEmailCaseDialogRows] = useState(null);
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [tilePrefsVersion, setTilePrefsVersion] = useState(0);
+  const [caseWorkTeam, setCaseWorkTeam] = useState(readCaseWorkTeam);
+  useEffect(() => onUserSessionChanged(() => setCaseWorkTeam(readCaseWorkTeam)), []);
 
   const activeRange = useMemo(() => {
     if (sharedPeriod.value) return sharedPeriod.value.range;
     if (rangeValue) return rangeValue;
-    const resolved = resolveDateRange({ preset: defaultPreset, records });
+    const resolved = resolveDateRange({preset: defaultPreset, records: rangeRecords});
     return { preset: defaultPreset, start: resolved.start, end: resolved.end };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rangeValue, defaultPreset, records, sharedPeriod.value]);
+  }, [rangeValue, defaultPreset, rangeRecords, sharedPeriod.value]);
 
   const rangedRecords = useMemo(() => filterRecordsInRange(records, activeRange), [records, activeRange]);
   const previousRange = useMemo(() => getPreviousPeriodRange(activeRange), [activeRange]);
@@ -1126,10 +1147,10 @@ export default function DashboardOverview({
   // daily metrics above. Read-only here; nothing on this page writes to it. Refetches whenever
   // this tab remounts (e.g. switching back from Report Data after a new import), consistent with
   // how allQuotes above already relies on remount-triggered refetching.
-  const { data: reportTables = {} } = useQuery({
-    queryKey: ["report-tables-for-ops-overview"],
-    queryFn: listReportTables
-  });
+  const caseWorkReport = useMemo(() => buildCaseWorkReport(reportTables?.case_history?.rows || [], caseWorkTeam),
+    [reportTables, caseWorkTeam]);
+  const paymentReport = useMemo(() => buildInvoicePaymentReport(reportTables?.invoice_payments?.rows || [], activeRange, kpiMode),
+    [reportTables, activeRange, kpiMode]);
 
   const sfdcQuotesTable = reportTables?.sfdc_quotes ?? null;
   const niceCalls = useMemo(() => niceCallContributingRecords(reportTables?.incorta_input?.rows || [], activeRange), [reportTables, activeRange]);
@@ -1425,6 +1446,34 @@ export default function DashboardOverview({
   // so the Report filter dropdown and this registry always agree.
   const allTiles = useMemo(() => {
     const tiles = [];
+    for (const [metric, label, rule] of [
+      ["worked", "Cases Worked", "Distinct cases: team-to-outside transfer or history-supported team closure."],
+      ["closed", "Cases Closed", "Distinct cases: non-Closed to Closed with history-supported team ownership."],
+      ["transfers", "Cases Transferred Out", "Distinct cases transferred from the configured team to outside owners or queues."],
+      ["events", "Case Work Events", "One observed work episode per case/timestamp; repeat timestamps count separately."],
+      ["sites", "Sites Worked", "Distinct known Site IDs on qualifying case-work events."],
+      ["unresolved", "Case Ownership Needs Review", "Distinct cases with candidate events whose historical ownership cannot be established."]
+    ]) {
+      const display = caseWorkDisplay(caseWorkReport, metric, activeRange, kpiMode);
+      tiles.push({
+        id: `case_work_${metric}`, label, category: "Case Work History",
+        render: () => <CaseWorkTile label={label} value={display.value} records={display.rows} mode={kpiMode}
+          loading={reportTablesQuery.isLoading} error={reportTablesQuery.error} onRetry={reportTablesQuery.refetch}
+          unavailable={!reportTables.case_history ? "Import Case Work History on the Report Data tab." : null}
+          subtitle={`${rule} Observed export only; filtered/missing history may undercount.${metric === "sites" ? ` ${display.missingSites} contributing events lack a Site ID.` : ""}`} />
+      });
+    }
+    for (const [metric, label] of [["count", "Invoices Paid"], ["amount", "Amount Collected"]]) {
+      const multipleCurrencies = paymentReport.currencies.length > 1;
+      tiles.push({
+        id: `invoice_payments_${metric}`, label, category: "Paid Invoices",
+        render: () => <CaseWorkTile label={label} value={paymentReport[metric]} records={paymentReport.records} payment mode={kpiMode}
+          currency={metric === "amount" ? paymentReport.currencies[0] : undefined}
+          loading={reportTablesQuery.isLoading} error={reportTablesQuery.error} onRetry={reportTablesQuery.refetch}
+          unavailable={!reportTables.invoice_payments ? "Import Paid Invoices with actual Amount Paid; quote totals are not used." : null}
+          subtitle={`Paid Date within the reporting period. One fully-paid invoice per Invoice ID. ${paymentReport.invalid.length} invalid/conflicting rows excluded.${metric === "amount" && multipleCurrencies ? " Mixed currencies cannot be summed; see contributing records." : ""}`} />
+      });
+    }
     tiles.push({
       id: "improper_quote_requests",
       label: "Improper Quote Requests",
@@ -1861,7 +1910,7 @@ export default function DashboardOverview({
         date: kpiMode === AGGREGATION_MODES.LATEST_DAY ? source[source.length - 1]?.date : null
       })};
     });
-  }, [primaryResults, secondaryResults, compareEnabled, previousRange, rangedRecords, quoteBacklogAlertRows, sfdcQuotesTable, quotesRequestedRows, caseBacklog, interactionStats, staffingTeamTotals, activeRange, rangedEmailDailyRecords, emailBacklogTotals, emailCaseRecords, openEmailCases, quoteActivityReport, quotesLoading, quotesQuery.isError, quotesQuery.error, quotesQuery.refetch, activityQuery.isLoading, activityQuery.isError, activityQuery.error, activityQuery.refetch, niceCalls, reportTables, eodbTotalInteractions, eodbAbandoned, rangedEodbTotalCallVolume, rangedEodbAbandonedCalls, rangedEodbDailyWaitTime, rangedEodbAvgTalkTime, eodbAbandonmentRate, eodbAvgWaitSeconds, eodbAvgTalkSeconds, kpiMode, rangedStaffingRecords, eodbHandled, eodbHandledRecords]);
+  }, [caseWorkReport, paymentReport, reportTablesQuery.isLoading, reportTablesQuery.error, reportTablesQuery.refetch, primaryResults, secondaryResults, compareEnabled, previousRange, rangedRecords, quoteBacklogAlertRows, sfdcQuotesTable, quotesRequestedRows, caseBacklog, interactionStats, staffingTeamTotals, activeRange, rangedEmailDailyRecords, emailBacklogTotals, emailCaseRecords, openEmailCases, quoteActivityReport, quotesLoading, quotesQuery.isError, quotesQuery.error, quotesQuery.refetch, activityQuery.isLoading, activityQuery.isError, activityQuery.error, activityQuery.refetch, niceCalls, reportTables, eodbTotalInteractions, eodbAbandoned, rangedEodbTotalCallVolume, rangedEodbAbandonedCalls, rangedEodbDailyWaitTime, rangedEodbAvgTalkTime, eodbAbandonmentRate, eodbAvgWaitSeconds, eodbAvgTalkSeconds, kpiMode, rangedStaffingRecords, eodbHandled, eodbHandledRecords]);
 
   const tileCategories = useMemo(() => Array.from(new Set(allTiles.map((t) => t.category))), [allTiles]);
 
@@ -1890,7 +1939,7 @@ export default function DashboardOverview({
           </p>
         </CardHeader>
       </Card>
-      <DashboardDateRange records={records} value={activeRange} onChange={changeRange}
+      <DashboardDateRange records={records} rangeRecords={rangeRecords} value={activeRange} onChange={changeRange}
         freezePresetDates={Boolean(sharedPeriod.value)} />
       <Card className="border-border">
         <CardContent className="flex flex-wrap items-center gap-6 p-4">
@@ -1929,6 +1978,20 @@ export default function DashboardOverview({
             Customize Tiles
           </Button>
         </div>
+      </div>
+      <div className="rounded-lg border border-border bg-card p-3 text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="font-medium">Case-work reporting: observed history, not all field edits</p>
+          <CaseWorkSettings team={caseWorkTeam} onChange={setCaseWorkTeam} />
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Team: {caseWorkTeam.join(", ")}. Only transfers out and history-supported closures qualify.
+          Current Case Owner, Edited By and Project Picklist do not establish historical ownership.
+          {caseWorkReport.firstDate ? ` Imported event dates: ${caseWorkReport.firstDate} through ${caseWorkReport.lastDate}.` : " No dated owner/status history imported."}
+          {` ${caseWorkReport.duplicates} repeated event signatures collapsed; ${caseWorkReport.invalid.length} invalid owner/status rows excluded.`}
+        </p>
+        {caseWorkReport.firstDate && (activeRange.start < caseWorkReport.firstDate || activeRange.end > caseWorkReport.lastDate) &&
+          <p role="status" className="mt-1 text-xs text-amber-600">The selected period extends outside the imported event dates. Zero or partial counts do not prove there was no work.</p>}
       </div>
       {visibleOrderedTiles.length === 0 ? (
         <Card className="border-border">

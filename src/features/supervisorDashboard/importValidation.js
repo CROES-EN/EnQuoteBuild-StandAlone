@@ -1,3 +1,6 @@
+import {CASE_HISTORY_COLUMNS} from "./caseWorkMetrics.js";
+import {PAYMENT_COLUMNS} from "./invoicePaymentMetrics.js";
+
 /**
  * Import validation gate - runs BEFORE any imported rows are ever handed to
  * saveReportTable()/saveStaffingSnapshot() (i.e. before they can ever reach disk). Catches
@@ -65,6 +68,10 @@ const FILENAME_OVERRIDE_BY_TYPE = {
 export function validateImport(reportType, columnOptions, dataRows, sourceFileName) {
   const errors = [];
   const columnLabels = (columnOptions || []).map((c) => c.label);
+  const strictColumns = reportType === "case_history" ? CASE_HISTORY_COLUMNS :
+    reportType === "invoice_payments" ? PAYMENT_COLUMNS : [];
+  const missingStrict = strictColumns.filter(column => !columnLabels.includes(column));
+  if (missingStrict.length) errors.push(`Missing required ${reportType} columns: ${missingStrict.join(", ")}.`);
 
   // --- Generic checks, apply to every report type ---
   if (!dataRows || dataRows.length === 0) {

@@ -333,6 +333,18 @@ function wrapWorkbook(workbook) {
   return { sheetNames, getSheetRows };
 }
 
+function reportReadOptions(bytes, filename) {
+  if (!/\.csv$/i.test(filename || "")) return {type: "array", codepage: 65001};
+  let source;
+  try {
+    source = new TextDecoder("utf-8", {fatal: true}).decode(bytes);
+  } catch (error) {
+    if (!(error instanceof TypeError)) throw error;
+    source = new TextDecoder("windows-1252").decode(bytes);
+  }
+  return {source, type: "string"};
+}
+
 /**
  * Reads an uploaded File (.xlsx/.xls/.csv) with all type coercion disabled, so
  * every cell comes back exactly as stored - no locale/timezone-dependent date
@@ -340,7 +352,8 @@ function wrapWorkbook(workbook) {
  */
 export async function readWorkbookRows(file) {
   const buffer = await file.arrayBuffer();
-  return wrapWorkbook(read(buffer, { type: "array", raw: true, codepage: 65001 }));
+  const options = reportReadOptions(buffer, file.name);
+  return wrapWorkbook(read(options.source ?? buffer, {...options, raw: true}));
 }
 
 /**
@@ -349,8 +362,9 @@ export async function readWorkbookRows(file) {
  * file's bytes over Electron IPC (main process reads the file from the watched folder) rather
  * than from a user-driven `<input type="file">` selection.
  */
-export function readWorkbookFromBytes(bytes) {
-  return wrapWorkbook(read(bytes, { type: "array", raw: true, codepage: 65001 }));
+export function readWorkbookFromBytes(bytes, filename) {
+  const options = reportReadOptions(bytes, filename);
+  return wrapWorkbook(read(options.source ?? bytes, {...options, raw: true}));
 }
 
 const HTML_REPORT_EXTENSIONS = new Set([".html", ".htm"]);
@@ -383,8 +397,10 @@ export async function peekReportFile(file) {
   const buffer = await file.arrayBuffer();
   // `bookSheets: true` stops SheetJS after reading just the sheet-name index - it does not
   // touch any sheet's actual cell data, so this stays fast even for a huge multi-tab workbook.
-  const peek = read(buffer, { type: "array", bookSheets: true, codepage: 65001 });
-  return { kind: "spreadsheet", sheetNames: peek.SheetNames || [], _buffer: buffer };
+  const options = reportReadOptions(buffer, file.name);
+  const source = options.source ?? buffer;
+  const peek = read(source, {...options, bookSheets: true});
+  return {kind: "spreadsheet", sheetNames: peek.SheetNames || [], _buffer: source, _readOptions: options};
 }
 
 /**
@@ -408,7 +424,7 @@ export function readPeekedSheets(peeked, sheetNames) {
 
   // `sheets: [...]` limits SheetJS to fully parsing only the requested tabs - every other tab's
   // cells are never converted into memory, which is the whole point of the peek/read split.
-  const workbook = read(peeked._buffer, { type: "array", raw: true, sheets: sheetNames, codepage: 65001 });
+  const workbook = read(peeked._buffer, {...(peeked._readOptions || {type: "array", codepage: 65001}), raw: true, sheets: sheetNames});
   return mergeSheetRowSets(sheetNames.map(name => {
     const sheet = workbook.Sheets[name];
     return sheet ? utils.sheet_to_json(sheet, { header: 1, raw: true, defval: "" }) : [];
@@ -431,7 +447,7 @@ export function readPeekedSheet(peeked, sheetName) {
   if (peeked.kind === "html") {
     return readHtmlSectionRows(peeked._text, sheetName);
   }
-  const workbook = read(peeked._buffer, { type: "array", raw: true, sheets: [sheetName], codepage: 65001 });
+  const workbook = read(peeked._buffer, {...(peeked._readOptions || {type: "array", codepage: 65001}), raw: true, sheets: [sheetName]});
   const sheet = workbook.Sheets[sheetName];
   return sheet ? utils.sheet_to_json(sheet, { header: 1, raw: true, defval: "" }) : [];
 }
