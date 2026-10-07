@@ -22,6 +22,7 @@ async function loadOverview() {
   const state = {range: {start: "2026-09-02", end: "2026-09-04"}, queries: [], retry: 0, tiles: [], tables: {}, updates: []};
   const passthrough = ({children}) => React.createElement("div", null, children);
   const mocks = {
+    "react-router-dom": {useSearchParams: () => [new URLSearchParams(), () => {}]},
     react: {...React, useState: initial => {
       const [value] = React.useState(initial);
       return [initial === "period_total" && state.mode ? state.mode : value, next => state.updates.push(next)];

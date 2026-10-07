@@ -212,7 +212,7 @@ function findTestFiles(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const entryPath = path.join(directory, entry.name);
     if (entry.isDirectory()) return findTestFiles(entryPath);
-    return /\.(test|spec)\.cjs$/.test(entry.name) ? [entryPath] : [];
+    return /\.(test|spec)\.(cjs|mjs|js)$/.test(entry.name) ? [entryPath] : [];
   });
 }
 
