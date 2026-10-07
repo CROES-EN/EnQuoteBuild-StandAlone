@@ -8,6 +8,8 @@ const { KNOWN_ENQUOTE_USERS } = require("./knownEnquoteUsers.cjs");
 const DATA_VERSION = 1;
 const DEFAULT_SYNC_TTL_MS = 5 * 60 * 1000;
 const fileName = "enquote-data-v1.json";
+const {recordedUpdater, parseRecordTimestamp} = require("./quoteAttribution.cjs");
+const {hasNotificationChange, notificationEventId} = require("./notificationEvents.cjs");
 // Gates the verbose [write-timing] diagnostic logging added this week while chasing the
 // concurrency race + the write() self-deadlock, behind an explicit opt-in env var. Now
 // that both of those bugs are fixed AND verified (clean restart, no recurrence), this
@@ -306,7 +308,7 @@ function mergeRecordsById(existingList, incomingList, options = {}) {
 
   const getTimestamp = record => {
     const candidate = record && (record.updated_date || record.updated_at || record.last_saved_at);
-    const time = candidate ? Date.parse(candidate) : NaN;
+    const time = parseRecordTimestamp(candidate);
     return Number.isNaN(time) ? null : time;
   };
 
@@ -363,7 +365,7 @@ function mergeRecordsById(existingList, incomingList, options = {}) {
       const isGenuinelyNewer = (currentTime !== null && incomingTime !== null)
         ? incomingTime > currentTime
         : false;
-      if (isGenuinelyNewer) {
+      if (isGenuinelyNewer && hasNotificationChange(current, winner)) {
         onWinnerIsUpdate(winner, current);
       }
     }
@@ -947,22 +949,20 @@ function repositoryFor(userDataPath) {
           onWinnerIsUpdate: (winner) => {
             if (winner.quote_number) {
               changedQuoteNumbers.push(winner.quote_number);
-              // Attribution comes from status_history's LAST entry (confirmed real field
-              // names via QuoteDetails.jsx: changed_by/changed_at) - null if history is
-              // empty, handled gracefully at render time rather than guessing/crashing.
+              // A previous status transition is not necessarily the author of this edit.
+              // Prefer the recorded updater; history is usable only for the same event.
               // Stores RAW data (quoteId, quoteNumber, changedBy, occurredAt) instead of
               // a pre-baked message string - formatting now happens at RENDER time in
               // NotificationBell.jsx using the VIEWING user's own browser locale, correct
               // regardless of which machine's system clock/locale generated this record.
               // quoteId (winner.id) lets the notification list link straight to the real
               // quote (QuoteDetails.jsx reads ?id=<quoteId> from the URL).
-              const history = Array.isArray(winner.status_history) ? winner.status_history : [];
-              const lastEntry = history[history.length - 1];
               newNotifications.push({
+                eventId: notificationEventId("quote_updated", winner),
                 type: "quote_updated",
                 quoteId: winner.id,
                 quoteNumber: winner.quote_number,
-                changedBy: lastEntry?.changed_by || null,
+                changedBy: recordedUpdater(winner),
                 // Uses the quote's OWN updated_date (when the edit actually happened),
                 // not "now" (when this machine's sync happened to notice) - important
                 // for the automatic 15-minute background sync, where a real gap between
@@ -980,6 +980,7 @@ function repositoryFor(userDataPath) {
             // instead of a pre-baked message - same render-time-formatting reasoning as
             // the quote case above.
             newNotifications.push({
+              eventId: notificationEventId("product_updated", winner),
               type: "product_updated",
               productName: winner.name || winner.id,
               occurredAt: winner.updated_date || new Date().toISOString()
@@ -998,7 +999,6 @@ function repositoryFor(userDataPath) {
         id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         seq: nextNotificationSeq(),
         ...n,
-        occurredAt: new Date().toISOString(),
         read: false
       }));
       merged.appNotifications = [...(merged.appNotifications || []), ...notificationEntries].slice(-200);

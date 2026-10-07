@@ -3,6 +3,13 @@ import {Button} from "@/components/ui/button";
 import {Card} from "@/components/ui/card";
 import {Badge} from "@/components/ui/badge";
 import {Input} from "@/components/ui/input";
+import {Textarea} from "@/components/ui/textarea";
+import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
+import {toast} from "sonner";
+import {useAuth} from "@/lib/AuthContext";
+import {useQuoteRequestReviews} from "@/features/autoDrafter/useQuoteRequestReviews";
+import {activeImproperRequests, createRequestReview, reviewCaseKey} from "@/features/autoDrafter/improperQuoteRequests";
+import ImproperRequestRecords from "@/components/autoDrafter/ImproperRequestRecords";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,6 +37,41 @@ const REPORT_TYPE = "quoteRequestCases";
 const REPORT_LABEL = "Quote Request Cases";
 
 export const AutoDrafter = () => {
+    const {user} = useAuth();
+    const reviews = useQuoteRequestReviews();
+    const improperByCase = activeImproperRequests(reviews.data || []);
+    const [showImproper, setShowImproper] = useState(false);
+    const [markTarget, setMarkTarget] = useState(null);
+    const [markReason, setMarkReason] = useState("");
+    const [savingReview, setSavingReview] = useState(false);
+    const [reviewError, setReviewError] = useState("");
+
+    function openMark(caseNumber, siteId) {
+        setMarkTarget({caseNumber, siteId});
+        setMarkReason("");
+        setReviewError("");
+    }
+
+    async function saveReview(target, action = "mark") {
+        setSavingReview(true);
+        setReviewError("");
+        try {
+            await reviews.save(createRequestReview({
+                ...target, reviewer: user?.email, action,
+                reason: action === "mark" ? markReason : "",
+                markIds: target.activeMarkIds || []
+            }));
+            setMarkTarget(null);
+            setSelectedCaseNumber(null);
+            toast.success(action === "mark" ? "Request marked improper. Shared after desktop sync." : "Mark undone. Request can be drafted again if it still qualifies.");
+        } catch (error) {
+            console.error("Could not save quote request review:", error);
+            setReviewError(error.message);
+            toast.error(error.message);
+        } finally {
+            setSavingReview(false);
+        }
+    }
     const [table, setTable] = useState(null);
     const [loading, setLoading] = useState(true);
     const [reloading, setReloading] = useState(false);
@@ -296,14 +338,15 @@ export const AutoDrafter = () => {
         })
         : dedupedQualifyingRows;
 
+    const awaitingRows = unclaimedQualifyingRows.filter(row => !improperByCase.has(reviewCaseKey(row[caseNumberCol])));
     const term = search.trim().toLowerCase();
     const filteredRows = term
-        ? unclaimedQualifyingRows.filter((row) =>
+        ? awaitingRows.filter((row) =>
             columns.some((col) => String(row[col] ?? "").toLowerCase().includes(term))
         )
-        : unclaimedQualifyingRows;
+        : awaitingRows;
 
-    if (selectedCaseNumber) {
+    if (selectedCaseNumber && !improperByCase.has(reviewCaseKey(selectedCaseNumber)) && !reviews.isLoading && !reviews.isError) {
         const selectedRecord = generatedDraftsByCase[selectedCaseNumber] || null;
         return (
             <AutoDrafterDraftDetails
@@ -371,6 +414,8 @@ export const AutoDrafter = () => {
                 {/* Filters */}
                 <Card className="p-4 mb-6 border-border">
                     <div className="flex flex-col md:flex-row gap-4">
+                        <Button variant={showImproper ? "outline" : "default"} onClick={() => setShowImproper(false)}>Awaiting Draft ({awaitingRows.length})</Button>
+                        <Button variant={showImproper ? "default" : "outline"} onClick={() => setShowImproper(true)}>Improper Requests ({improperByCase.size})</Button>
                         <div className="relative flex-1">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"/>
                             <Input
@@ -383,7 +428,19 @@ export const AutoDrafter = () => {
                     </div>
                 </Card>
 
-                {loading ? (
+                {reviewError && !markTarget && <p role="alert" className="mb-4 text-destructive">{reviewError}</p>}
+                {reviews.isError ? (
+                    <Card role="alert" className="p-6 mb-4">Unable to load improper-request marks: {reviews.error.message}. Drafting is paused until reviews can be loaded.
+                        <Button variant="outline" onClick={() => reviews.refetch()}>Try Again</Button>
+                    </Card>
+                ) : reviews.isLoading ? (
+                    <p role="status" className="py-8 text-center">Loading request reviews...</p>
+                ) : showImproper ? (
+                    <Card className="p-4">
+                        <p className="mb-3 text-sm text-muted-foreground">Marked requests are excluded from drafting. This review log survives imports and clearing drafts. Undo restores eligibility, not a deleted or closed case.</p>
+                        <ImproperRequestRecords records={[...improperByCase.values()]} onUndo={record => saveReview(record, "undo")} busy={savingReview} search={search} />
+                    </Card>
+                ) : loading ? (
                     <p className="py-8 text-center text-sm text-muted-foreground">Loading...</p>
                 ) : !table ? (
                     <Card className="p-12 text-center border-border">
@@ -397,7 +454,7 @@ export const AutoDrafter = () => {
                 ) : (
                     <>
                         <p className="text-xs text-muted-foreground mb-4">
-                            {unclaimedQualifyingRows.length} case{unclaimedQualifyingRows.length === 1 ? "" : "s"} awaiting
+                            {awaitingRows.length} case{awaitingRows.length === 1 ? "" : "s"} awaiting
                             a quote
                             draft -
                             imported {table.importedAt ? new Date(table.importedAt).toLocaleString() : "unknown time"}
@@ -432,6 +489,7 @@ export const AutoDrafter = () => {
                                             savedDraftRecord={caseNumberValue ? generatedDraftsByCase[caseNumberValue] || null : null}
                                             onDraftSaved={() => loadGeneratedDrafts()}
                                             onViewDraft={() => setSelectedCaseNumber(caseNumberValue)}
+                                            onMarkImproper={() => openMark(caseNumberValue, siteIdCol ? row[siteIdCol] : "")}
                                         />
                                     );
                                 })}
@@ -440,6 +498,21 @@ export const AutoDrafter = () => {
                     </>
                 )}
 
+                <Dialog open={Boolean(markTarget)} onOpenChange={open => {if (!open && !savingReview) setMarkTarget(null);}}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Mark case {markTarget?.caseNumber} as an Improper Quote Request?</DialogTitle>
+                            <DialogDescription>This excludes the request from drafting for the team after sync. Saved drafts are retained, and you can undo the mark. Salesforce and real quotes are unchanged.</DialogDescription>
+                        </DialogHeader>
+                        <label htmlFor="improper-request-reason" className="text-sm font-medium">Reason (optional)</label>
+                        <Textarea id="improper-request-reason" maxLength={2000} value={markReason} disabled={savingReview} onChange={event => setMarkReason(event.target.value)} />
+                        {reviewError && <p role="alert" className="text-destructive">{reviewError}</p>}
+                        <div className="flex justify-end gap-2">
+                            <Button variant="outline" disabled={savingReview} onClick={() => setMarkTarget(null)}>Cancel</Button>
+                            <Button disabled={savingReview} onClick={() => saveReview(markTarget)}>{savingReview ? "Saving..." : "Mark Improper"}</Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
                 <ImportAsTableDialog
                     open={importDialogOpen}
                     onOpenChange={setImportDialogOpen}

@@ -19,6 +19,7 @@ import QuoteVersionHistory from "@/components/quotes/QuoteVersionHistory";
 import RoleGuard, {useUserRole} from "@/components/auth/RoleGuard";
 import {toast} from "sonner";
 import {Card} from "@/components/ui/card";
+import {isEditableDraft, saveQuoteEdit} from "@/features/quotes/saveQuoteEdit";
 
 function EditQuoteContent() {
  const { isApprover, isAdmin, roles, user, isLoading: loadingUser } = useUserRole();
@@ -61,39 +62,9 @@ function EditQuoteContent() {
  const user = await getCurrentUser();
  
  // If editing a submitted, approved, or rejected quote, create a new version
- if (quote?.status !== "draft") {
- // Mark current version as not current
- await updateQuote(quoteId, {
- is_current_version: false
- });
- 
- // Get the parent quote ID (either this quote's parent, or this quote itself if it's the original)
- const parentQuoteId = quote.parent_quote_id || quoteId;
- 
- // Get all existing versions to determine the next version number
- const allVersions = (await getQuotes()).filter(q => q.id === parentQuoteId || q.parent_quote_id === parentQuoteId);
- 
- const maxVersion = Math.max(...allVersions.map(v => v.version_number || 1));
- const newVersionNumber = maxVersion + 1;
- 
- // Create new version
- const newQuote = await createQuote({
- ...data,
- parent_quote_id: parentQuoteId,
- version_number: newVersionNumber,
- is_current_version: true,
- status: "submitted",
- submitted_date: new Date().toISOString(),
- rejection_reason: null,
- status_history: [
- {
- status: "submitted",
- changed_by: user.email,
- changed_at: new Date().toISOString(),
- reason: `New version (v${newVersionNumber}) created from v${quote.version_number || 1}`
- }
- ]
- });
+ if (!isEditableDraft(quote)) {
+ const newQuote = await saveQuoteEdit({quote, data, user, getQuotes, createQuote, updateQuote});
+ const newVersionNumber = newQuote.version_number;
  
  if (isLocalDataSource) return newQuote;
 
@@ -143,7 +114,7 @@ function EditQuoteContent() {
  // the local repository can detect a concurrent change (e.g. a Base44 import landing
  // while this form was open) and reject instead of silently overwriting it - see
  // onError below for how that's surfaced. Ignored (harmlessly) by non-local adapters.
- return updateQuote(quoteId, data, quote?._rev);
+ return saveQuoteEdit({quote, data, user, getQuotes, createQuote, updateQuote});
  },
  onSuccess: (newQuote) => {
  queryClient.invalidateQueries({ queryKey: ["quote", quoteId] });
@@ -159,6 +130,12 @@ function EditQuoteContent() {
  // signal is detected via a marker WITHIN the message, not a `.code` property or an
  // exact prefix match, and the original text is recovered by slicing after the marker.
  const message = String(error?.message || "");
+ if (message.startsWith("VERSION_RETIREMENT:")) {
+ setConflictError(message.slice("VERSION_RETIREMENT:".length).trim());
+ queryClient.invalidateQueries({ queryKey: ["quotes"] });
+ queryClient.invalidateQueries({ queryKey: ["quote-versions"] });
+ return;
+ }
  const marker = "CONFLICT:";
  const markerIndex = message.indexOf(marker);
  if (markerIndex !== -1) {

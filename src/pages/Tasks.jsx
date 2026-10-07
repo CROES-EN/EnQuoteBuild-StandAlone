@@ -19,6 +19,8 @@ import {Card, CardContent} from "@/components/ui/card";
 import {Badge} from "@/components/ui/badge";
 import {Checkbox} from "@/components/ui/checkbox";
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
+import QuoteAttentionSection from "@/components/tasks/QuoteAttentionSection";
+import {useAuth} from "@/lib/AuthContext";
 import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
 import {
   AlarmClock,
@@ -40,6 +42,7 @@ import {createPageUrl} from "@/utils";
 import {cn} from "@/lib/utils";
 import {tasksApi, useTasks} from "@/features/collab/collabApi";
 import TaskDialog, {TASK_TYPES} from "@/components/collab/TaskDialog";
+import {CaseNumberLink} from "@/components/links/ExternalIdLinks";
 
 const typeLabel = (type) => TASK_TYPES.find((item) => item.value === type)?.label || "Task";
 
@@ -119,6 +122,9 @@ function TaskRow({ task, now, highlightedId, onEdit }) {
         <div className="flex flex-wrap items-center gap-2">
           <span className={cn("font-medium text-foreground", done && "text-muted-foreground line-through")}>{task.title}</span>
           <Badge variant="outline" className="text-xs">{typeLabel(task.type)}</Badge>
+          {task.case_number && <CaseNumberLink caseNumber={task.case_number} caseId={task.case_id}>
+            Case {task.case_number}
+          </CaseNumberLink>}
           {task.quote_id && (
             <Link to={createPageUrl(`QuoteDetails?id=${task.quote_id}`)} className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium text-foreground hover:bg-accent">
               <FileText className="h-3 w-3" />{task.quote_label || "Quote"}
@@ -143,6 +149,7 @@ function TaskRow({ task, now, highlightedId, onEdit }) {
           )}
           {done && task.completed_at && <span>Done {format(new Date(task.completed_at), "MMM d, h:mm a")}</span>}
         </div>
+        {task.assigned_by && <p className="mt-1 text-xs text-muted-foreground">Tagged by {task.assigned_by}</p>}
         {task.notes && <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{task.notes}</p>}
       </div>
       <div className="flex items-center gap-1">
@@ -193,6 +200,7 @@ function CalendarView({ tasks, now, onEdit, onAdd, highlightedId }) {
   const tasksByDay = useMemo(() => {
     const map = new Map();
     for (const task of tasks) {
+      if (task.status === "done") continue;
       const key = format(new Date(task.due_at), "yyyy-MM-dd");
       if (!map.has(key)) map.set(key, []);
       map.get(key).push(task);
@@ -220,7 +228,6 @@ function CalendarView({ tasks, now, onEdit, onAdd, highlightedId }) {
             ))}
             {days.map((day) => {
               const dayTasks = tasksByDay.get(format(day, "yyyy-MM-dd")) || [];
-              const open = dayTasks.filter((task) => task.status !== "done");
               return (
                 <button
                   key={day.toISOString()}
@@ -235,15 +242,12 @@ function CalendarView({ tasks, now, onEdit, onAdd, highlightedId }) {
                   <div className={cn("mb-1 flex h-5 w-5 items-center justify-center rounded-full text-[11px]", isToday(day) && "bg-orange-600 font-semibold text-white")}>
                     {format(day, "d")}
                   </div>
-                  {open.slice(0, 3).map((task) => (
+                  {dayTasks.slice(0, 3).map((task) => (
                     <div key={task.id} className={cn("mb-0.5 truncate rounded px-1 py-0.5 text-[11px]", new Date(task.due_at) < now ? "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-300" : "bg-orange-100 text-orange-900 dark:bg-orange-950/40 dark:text-orange-200")}>
                       {format(new Date(task.due_at), "h:mma").toLowerCase()} {task.title}
                     </div>
                   ))}
-                  {open.length > 3 && <div className="text-[11px] text-muted-foreground">+{open.length - 3} more</div>}
-                  {dayTasks.length > open.length && open.length < 3 && (
-                    <div className="text-[11px] text-muted-foreground">{dayTasks.length - open.length} done</div>
-                  )}
+                  {dayTasks.length > 3 && <div className="text-[11px] text-muted-foreground">+{dayTasks.length - 3} more</div>}
                 </button>
               );
             })}
@@ -266,6 +270,7 @@ function CalendarView({ tasks, now, onEdit, onAdd, highlightedId }) {
 export default function TasksPage() {
   const { tasks, loading } = useTasks();
   const location = useLocation();
+  const { user } = useAuth();
   const highlightedId = new URLSearchParams(location.search).get("task");
   const [now, setNow] = useState(() => new Date());
   const [dialog, setDialog] = useState({ open: false, task: null, initial: null });
@@ -301,7 +306,7 @@ export default function TasksPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground"><ClipboardList className="h-6 w-6 text-orange-600" />Tasks</h1>
-          <p className="text-sm text-muted-foreground">Your personal call-backs and reminders. Only you can see these.</p>
+          <p className="text-sm text-muted-foreground">Your private call-backs, reminders, and cases tagged by teammates.</p>
         </div>
         <Button onClick={() => openNew(null)} className="bg-orange-600 text-white hover:bg-orange-700"><Plus className="mr-1 h-4 w-4" />New task</Button>
       </div>
@@ -322,6 +327,7 @@ export default function TasksPage() {
           <TabsTrigger value="calendar"><CalendarDays className="mr-1.5 h-4 w-4" />Calendar</TabsTrigger>
         </TabsList>
         <TabsContent value="list" className="mt-4 space-y-6">
+          <QuoteAttentionSection userEmail={user?.email} now={now} />
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading tasks...</p>
           ) : openCount === 0 && !groups.done.length ? (

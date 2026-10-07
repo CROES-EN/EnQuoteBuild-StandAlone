@@ -103,6 +103,21 @@ function validateAttachments(value) {
         width: Number(item.width) || null,
         height: Number(item.height) || null
       });
+    } else if (item.type === "case_task") {
+      if (value.length !== 1 || item.version !== 1 ||
+          typeof item.recipient !== "string" || item.recipient.length > 254 ||
+          typeof item.caseNumber !== "string" || !/^\d{1,30}$/.test(item.caseNumber) ||
+          typeof item.caseId !== "string" || (item.caseId && !/^500[a-zA-Z0-9]{12}(?:[a-zA-Z0-9]{3})?$/.test(item.caseId)) ||
+          typeof item.note !== "string" || item.note.length > 2000 ||
+          typeof item.dueAt !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(item.dueAt) ||
+          !Number.isFinite(Date.parse(item.dueAt)) ||
+          new Date(item.dueAt).toISOString() !== item.dueAt) return "invalid_case_task";
+      out.push({
+        type: "case_task", version: 1,
+        recipient: item.recipient.trim().toLowerCase(),
+        caseNumber: item.caseNumber, caseId: item.caseId,
+        note: item.note.trim(), dueAt: item.dueAt
+      });
     } else {
       return "invalid_attachment_type";
     }
@@ -289,25 +304,81 @@ export async function handleChatMessageSend(request, env) {
   if (!await activeMember(env, conversationId, user.email)) return json({ ok: false, error: "not_found" }, 404);
   const clientId = body?.clientId;
   if (typeof clientId !== "string" || !clientId || clientId.length > 64) return json({ ok: false, error: "invalid_client_id" }, 400);
+  const attachments = validateAttachments(body?.attachments);
+  if (typeof attachments === "string") return json({ ok: false, error: attachments }, 400);
+  const caseTask = attachments.find((item) => item.type === "case_task");
+  const taskId = caseTask ? `case-tag:${clientId}` : null;
+  if (caseTask) {
+    const conversation = await getConversation(env, conversationId, user.email);
+    if (conversation?.kind !== "dm" || caseTask.recipient === user.email ||
+        !allowedEmails(env).includes(caseTask.recipient) ||
+        !conversation.members.some((member) => member.email === caseTask.recipient)) {
+      return json({ ok: false, error: "invalid_case_task_recipient" }, 403);
+    }
+  }
   const existing = (await env.DB.prepare("SELECT id, conversation_id, sender, body, attachments, created_at FROM chat_messages WHERE id = ?").bind(clientId).all()).results?.[0];
   if (existing) {
     // A retry of the caller's own send is idempotent; any other reuse of an id must not reveal that message.
     if (existing.conversation_id !== conversationId || existing.sender !== user.email) return json({ ok: false, error: "duplicate_client_id" }, 409);
-    return json({ ok: true, message: messageShape(existing) });
+    if (caseTask) {
+      const saved = (await env.DB.prepare("SELECT id FROM user_tasks WHERE owner = ? AND id = ?")
+        .bind(caseTask.recipient, taskId).all()).results?.[0];
+      if (!saved) return json({ ok: false, error: "duplicate_client_id" }, 409);
+    }
+    return json({ ok: true, message: { ...messageShape(existing), ...(caseTask ? { caseTaskId: taskId } : {}) } });
   }
-  const attachments = validateAttachments(body?.attachments);
-  if (typeof attachments === "string") return json({ ok: false, error: attachments }, 400);
   const text = typeof body?.body === "string" ? body.body.trim() : "";
   if (text.length > 4000 || (!text && attachments.length === 0)) return json({ ok: false, error: "invalid_body" }, 400);
   const at = nowIso();
+  // Consume the request server-side; older desktop UIs only understand quote/GIF attachments.
+  const storedAttachments = attachments.filter((item) => item.type !== "case_task");
+  // Only the request that inserts the message creates a task, including concurrent retries.
+  // Advance the recipient's sync cursor even if another task was synced in this millisecond.
+  const taskStatements = caseTask ? [
+    env.DB.prepare(`INSERT INTO user_tasks (owner, id, updated_at, synced_at, deleted, data)
+      SELECT ?, ?, ?, CASE WHEN latest >= ? THEN strftime('%Y-%m-%dT%H:%M:%fZ', latest, '+0.001 seconds') ELSE ? END, 0, ?
+      FROM (SELECT MAX(synced_at) AS latest FROM user_tasks WHERE owner = ?)
+      WHERE changes() = 1`).bind(caseTask.recipient, taskId, at, at, at, JSON.stringify({
+      id: taskId, type: "other", title: `Review case ${caseTask.caseNumber}`,
+      notes: caseTask.note, case_number: caseTask.caseNumber, case_id: caseTask.caseId,
+      assigned_by: user.email, source_message_id: clientId,
+      due_at: caseTask.dueAt, remind_at: caseTask.dueAt,
+      status: "open", completed_at: null, snoozed_until: null, notified_at: null,
+      created_date: at, updated_date: at
+    }), caseTask.recipient)
+  ] : [];
   const preview = text ? text.slice(0, 200) : (attachments.some((item) => item.type === "gif") ? "GIF" : "");
   await env.DB.batch([
-    env.DB.prepare("INSERT INTO chat_messages (id, conversation_id, sender, body, attachments, created_at) VALUES (?, ?, ?, ?, ?, ?)").bind(clientId, conversationId, user.email, text, JSON.stringify(attachments), at),
-    env.DB.prepare("UPDATE chat_conversations SET updated_at = ?, last_message_at = ?, last_message_preview = ?, last_sender = ? WHERE id = ?").bind(at, at, preview, user.email, conversationId),
-    env.DB.prepare("UPDATE chat_members SET last_read_at = CASE WHEN last_read_at IS NULL OR last_read_at < ? THEN ? ELSE last_read_at END WHERE conversation_id = ? AND email = ?").bind(at, at, conversationId, user.email)
+    env.DB.prepare(`INSERT INTO chat_messages (id, conversation_id, sender, body, attachments, created_at) VALUES (?, ?, ?, ?, ?, ?)
+      ${caseTask ? "ON CONFLICT(id) DO NOTHING" : ""}`).bind(clientId, conversationId, user.email, text, JSON.stringify(storedAttachments), at),
+    ...taskStatements,
+    env.DB.prepare(`UPDATE chat_conversations SET updated_at = ?, last_message_at = ?, last_message_preview = ?, last_sender = ? WHERE id = ?
+      ${caseTask ? "AND changes() = 1" : ""}`).bind(at, at, preview, user.email, conversationId),
+    env.DB.prepare(`UPDATE chat_members SET last_read_at = CASE WHEN last_read_at IS NULL OR last_read_at < ? THEN ? ELSE last_read_at END WHERE conversation_id = ? AND email = ?
+      ${caseTask ? "AND changes() = 1" : ""}`).bind(at, at, conversationId, user.email)
   ]);
+  let savedMessage = null;
+  if (caseTask) {
+    savedMessage = (await env.DB.prepare("SELECT id, conversation_id, sender, body, attachments, created_at FROM chat_messages WHERE id = ?")
+      .bind(clientId).all()).results?.[0];
+    const savedTask = (await env.DB.prepare("SELECT id FROM user_tasks WHERE owner = ? AND id = ?")
+      .bind(caseTask.recipient, taskId).all()).results?.[0];
+    if (savedMessage?.sender !== user.email || savedMessage?.conversation_id !== conversationId || !savedTask) {
+      return json({ ok: false, error: "duplicate_client_id" }, 409);
+    }
+  }
   await notifyInbox(env, conversationId);
-  return json({ ok: true, message: { id: clientId, conversationId, sender: user.email, body: text, attachments, createdAt: at } });
+  if (caseTask) {
+    try {
+      await broadcastMessage(env, { type: "tasks_updated", key: await inboxKeyForEmail(caseTask.recipient, env.USER_TOKEN_SECRET) });
+    } catch (error) {
+      console.warn("[chat] Case task realtime notification failed:", error.message);
+    }
+  }
+  return json({ ok: true, message: savedMessage ? { ...messageShape(savedMessage), caseTaskId: taskId } : {
+    id: clientId, conversationId, sender: user.email, body: text, attachments: storedAttachments, createdAt: at,
+    ...(caseTask ? { caseTaskId: taskId } : {})
+  } });
 }
 
 export async function handleChatRead(request, env) {

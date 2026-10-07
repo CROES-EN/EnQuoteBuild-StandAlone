@@ -17,12 +17,14 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { repositoryFor } = require("./repository.cjs");
 const { importEntitySnapshot } = require("./entitySnapshotSync.cjs");
-const { applyVerifiedQuoteCreator, applyVerifiedQuoteUpdate, requireVerifiedEmail } = require("./quoteAttribution.cjs");
+const { applyVerifiedQuoteCreator, applyVerifiedQuoteUpdate, requireVerifiedEmail, recordedUpdater, parseRecordTimestamp } = require("./quoteAttribution.cjs");
+const {hasNotificationChange, notificationEventId} = require("./notificationEvents.cjs");
 const { createPresenceSync } = require("./presenceSync.cjs");
 const { createFstRosterSync } = require("./fstRosterSync.cjs");
 const { createLargeTableStore } = require("./largeTableStore.cjs");
 const { createUserRolesSync } = require("./userRolesSync.cjs");
 const { createUiUpdater } = require("./uiUpdate.cjs");
+const { createUpdateState, inspectRuntime, inspectCareTable } = require("./debugDiagnostics.cjs");
 const { createErrorReporter } = require("./errorReporter.cjs");
 const { setupCollabFeatures } = require("./collabFeatures.cjs");
 const { createGeoService } = require("./geoService.cjs");
@@ -89,6 +91,8 @@ const BACKGROUND_POLL_CONNECTED_MS = 10 * 60 * 1000;
 let supervisorSync;
 let userRolesSync;
 let uiUpdater;
+let loadedUiVersion = null;
+const installerUpdateState = createUpdateState();
 let errorReporter;
 let collabFeatures;
 let geoService;
@@ -101,7 +105,7 @@ const presenceSync = createPresenceSync({
         "CF-Access-Client-Id": process.env.CF_ACCESS_CLIENT_ID || "",
         "CF-Access-Client-Secret": process.env.CF_ACCESS_CLIENT_SECRET || ""
     }),
-    getVersions: () => ({ appVersion: getVersion(), uiVersion: uiUpdater?.getInfo().uiVersion || "" })
+    getVersions: () => ({ appVersion: getVersion(), uiVersion: loadedUiVersion || "" })
 });
 
 // --- Zoom (Ctrl+/Ctrl-/Ctrl+0 + in-app buttons) ---
@@ -458,6 +462,7 @@ function moveReportsInboxFile(filePath, destinationDir) {
 // app itself, instead of only going to a console.log that's invisible when launching
 // the installed app normally (not from a terminal).
 function sendStatus(status, data = {}) {
+    installerUpdateState.record(status, data);
     if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send("updater:status", { status, ...data });
     }
@@ -571,14 +576,17 @@ function configureAutoUpdater() {
             startupUpdateCheckActive = false;
         },
         checkForUpdates() {
-            if (updaterCheckInProgress || updateAvailableOrDownloading || downloadedInfo) return;
+            if (downloadedInfo) return Promise.resolve({ ok: true, reason: "restart-required", state: controller.getState() });
+            if (updaterCheckInProgress || updateAvailableOrDownloading) return Promise.resolve({ ok: true, reason: "in-progress", state: controller.getState() });
             updaterCheckInProgress = true;
             lastCheckAt = Date.now();
-            autoUpdater.checkForUpdates().catch((error) => {
+            return autoUpdater.checkForUpdates().then(() => ({ ok: true, state: controller.getState() })).catch((error) => {
                 updaterCheckInProgress = false;
                 consecutiveFailures += 1;
                 console.error("[updater] Background update check failed:", error.message);
+                sendStatus("error", { message: error.message });
                 scheduleRetry();
+                return { ok: false, error: error.message, state: controller.getState() };
             });
         },
         // Coming back to the window after a while is a good moment to look for a new release.
@@ -591,7 +599,8 @@ function configureAutoUpdater() {
             return true;
         },
         getState() {
-            return downloadedInfo ? { status: "ready", ...downloadedInfo } : null;
+            const state = installerUpdateState.get();
+            return downloadedInfo ? { ...state, status: "ready", ...downloadedInfo } : state;
         }
     };
     return controller;
@@ -740,6 +749,7 @@ async function runStartupUpdateCheck() {
             settled = true;
             updateCheckController?.endStartupCheck();
             clearActiveTimeout();
+            cleanupStartupListeners();
             if (typeof handleDownloadProgress === "function") {
                 autoUpdater.removeListener("download-progress", handleDownloadProgress);
             }
@@ -753,7 +763,7 @@ async function runStartupUpdateCheck() {
         // the app - identical behavior to before for this case.
         timeoutId = setTimeout(finish, STARTUP_UPDATE_CHECK_TIMEOUT_MS);
 
-        autoUpdater.once("update-available", () => {
+        const handleAvailable = () => {
             if (settled) return;
             // Phase 2: an update is now CONFIRMED to exist, so the short "haven't heard back
             // yet" timeout no longer applies - cancel it and swap in the much longer safety
@@ -774,16 +784,14 @@ async function runStartupUpdateCheck() {
                 console.error("[updater] Startup download failed:", error.message);
                 finish();
             });
-        });
+        };
 
-        autoUpdater.once("update-not-available", finish);
-        autoUpdater.once("error", finish);
-
-        autoUpdater.once("update-downloaded", () => {
+        const handleDownloaded = () => {
             if (settled) return;
             settled = true;
             updateCheckController?.endStartupCheck();
             clearActiveTimeout();
+            cleanupStartupListeners();
             // Quits the app and relaunches it automatically on the new version. Passes
             // (isSilent=true, isForceRunAfter=true) -- WITHOUT these, the underlying NSIS
             // installer shows its own separate, non-silent wizard (a real "Next/Back/Cancel"
@@ -795,7 +803,19 @@ async function runStartupUpdateCheck() {
             // The silent install leaves nothing on screen for up to a minute, so say so first.
             setStartupSplashStatus("Installing update\u2026 EnQuote will close and reopen on its own in about a minute.");
             setTimeout(() => autoUpdater.quitAndInstall(true, true), 4000);
-        });
+        };
+
+        function cleanupStartupListeners() {
+            autoUpdater.removeListener("update-available", handleAvailable);
+            autoUpdater.removeListener("update-not-available", finish);
+            autoUpdater.removeListener("error", finish);
+            autoUpdater.removeListener("update-downloaded", handleDownloaded);
+            if (handleDownloadProgress) autoUpdater.removeListener("download-progress", handleDownloadProgress);
+        }
+        autoUpdater.once("update-available", handleAvailable);
+        autoUpdater.once("update-not-available", finish);
+        autoUpdater.once("error", finish);
+        autoUpdater.once("update-downloaded", handleDownloaded);
 
         autoUpdater.checkForUpdates().catch(finish);
     });
@@ -829,6 +849,7 @@ let mainWindowHasBeenCreated = false;
 // renders a blank page is marked bad and the bundled UI is loaded instead, so a bad update can
 // never leave the app unusable.
 function loadBundledUi() {
+    loadedUiVersion = null;
     const resourceDist = path.join(process.resourcesPath, "dist", "index.html");
     const packagedDist = path.join(__dirname, "..", "dist", "index.html");
     if (fs.existsSync(resourceDist)) {
@@ -848,6 +869,7 @@ function loadUi() {
     if (!entry) { loadBundledUi(); return; }
 
     console.log(`[ui-update] Loading downloaded UI ${entry.uiVersion}.`);
+    loadedUiVersion = entry.uiVersion;
     const contents = mainWindow.webContents;
     let settled = false;
     const fallBack = (reason) => {
@@ -1303,6 +1325,7 @@ let then = whenReady().then(async () => {
     // Installer updates: the window asks for the current state on load (the "ready" event may have
     // fired before it existed) and can trigger the restart itself.
     ipcMain.handle("updater:get-state", () => updateCheckController?.getState() || null);
+    ipcMain.handle("updater:check", () => updateCheckController?.checkForUpdates() || { ok: false, error: "Installer updates are disabled in development." });
     ipcMain.handle("updater:install-now", () => ({ ok: Boolean(updateCheckController?.installNow()) }));
     on("browser-window-focus", () => updateCheckController?.checkIfStale());
     // Error reports (UI errors forwarded by the window, plus crashes in this process) go to the
@@ -1315,7 +1338,7 @@ let then = whenReady().then(async () => {
             "CF-Access-Client-Id": process.env.CF_ACCESS_CLIENT_ID || "",
             "CF-Access-Client-Secret": process.env.CF_ACCESS_CLIENT_SECRET || ""
         }),
-        getVersions: () => ({ appVersion: getVersion(), uiVersion: uiUpdater?.getInfo().uiVersion || "" })
+        getVersions: () => ({ appVersion: getVersion(), uiVersion: loadedUiVersion || "" })
     });
     ipcMain.on("errors:report", (_event, details) => { errorReporter.report(details); });
     // The monitor variant observes crashes without changing what Electron does with them.
@@ -1331,6 +1354,26 @@ let then = whenReady().then(async () => {
         return { ok: true };
     });
     ipcMain.handle("ui:check", () => checkForUiUpdate());
+    ipcMain.handle("diagnostics:inspect", async (_event, command) => {
+        if (command === "runtime") {
+            const runtime = await inspectRuntime({
+                app,
+                hasIdentity: Boolean(getVerifiedIdentity()?.email),
+                hasSyncCredentials: Boolean(process.env.OUTBOUND_TOKEN),
+                installerState: updateCheckController?.getState() || null,
+                uiInfo: { ...(uiUpdater?.getInfo() || { appVersion: getVersion(), uiVersion: null }), loadedUiVersion }
+            });
+            return { ...runtime, presenceTelemetry: presenceSync.getStatus() };
+        }
+        if (command === "supervisor") {
+            return {
+                sync: supervisorSync.getStatus(),
+                careTable: await inspectCareTable(getPath("userData"))
+            };
+        }
+        throw new Error("Unsupported diagnostic command.");
+    });
+    ipcMain.handle("diagnostics:refresh-supervisor", () => supervisorSync.reconcile());
 
     // Wraps a repository method so any write it performs is flagged as "our own", suppressing
     // the fs.watch-triggered reload that would otherwise fire a moment later and wipe the
@@ -2039,12 +2082,12 @@ let then = whenReady().then(async () => {
     // currently-confirmed data shape.
     function getLatestStatusChangeTime(record) {
         if (record?.updated_date) {
-            const direct = new Date(record.updated_date).getTime();
+            const direct = parseRecordTimestamp(record.updated_date);
             if (!Number.isNaN(direct)) return direct;
         }
         const history = Array.isArray(record?.status_history) ? record.status_history : [];
         const times = history
-            .map((entry) => entry?.changed_at ? new Date(entry.changed_at).getTime() : NaN)
+            .map((entry) => parseRecordTimestamp(entry?.changed_at))
             .filter((t) => !Number.isNaN(t));
         return times.length ? Math.max(...times) : 0;
     }
@@ -2224,17 +2267,16 @@ let then = whenReady().then(async () => {
                             try {
                                 const finalQuote = updated?.id ? updated : { ...match, ...payload };
                                 const quoteNumber = finalQuote.quote_number;
-                                if (quoteNumber) {
-                                    const history = Array.isArray(finalQuote.status_history) ? finalQuote.status_history : [];
-                                    const lastEntry = history[history.length - 1];
+                                if (quoteNumber && hasNotificationChange(match, finalQuote)) {
                                     const existingNotifications = await quoteRepository.listCollection("appNotifications");
                                     const notification = {
+                                        eventId: notificationEventId("quote_updated", finalQuote),
                                         id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
                                         seq: Date.now() * 1000 + (existingNotifications.length % 1000),
                                         type: "quote_updated",
                                         quoteId: finalQuote.id || match.id,
                                         quoteNumber,
-                                        changedBy: lastEntry?.changed_by || null,
+                                        changedBy: recordedUpdater(finalQuote),
                                         occurredAt: finalQuote.updated_date || new Date().toISOString(),
                                         read: false,
                                     };

@@ -160,6 +160,7 @@
             ]
         },
         "mac": {
+            "artifactName": "EnQuote-${version}-mac-${arch}.${ext}",
             "target": [
                 {
                     "target": "dmg",

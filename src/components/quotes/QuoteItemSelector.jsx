@@ -387,7 +387,7 @@ export default function QuoteItemSelector({ products, selectedItems, onItemsChan
               }}
               className="text-xs"
             >
-              ÃƒÂ¢Ã¢â‚¬Â Ã‚Â Back to Categories
+              ← Back to Categories
             </Button>
           )}
         </div>

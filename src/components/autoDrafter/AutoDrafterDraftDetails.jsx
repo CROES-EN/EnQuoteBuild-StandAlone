@@ -9,6 +9,8 @@ import StatusBadge from "@/components/quotes/StatusBadge";
 import {calculateQuoteTotals} from "@/utils/quoteCalculations";
 import {createQuote, getCurrentUser} from "@/api/dataClient";
 import {saveGeneratedDraft} from "@/features/autoDrafter/autoDrafterDraftsStore";
+import {listQuoteRequestReviews} from "@/features/supervisorDashboard/importedTableStore";
+import {assertRequestCanBeDrafted} from "@/features/autoDrafter/improperQuoteRequests";
 import {createPageUrl} from "@/utils";
 import {PRODUCT_CATALOG} from "@/features/quoteDraftAgent/productCatalog";
 import {toast} from "sonner";
@@ -347,6 +349,7 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
   async function handleSendToQuotes() {
     setIsSending(true);
     try {
+      assertRequestCanBeDrafted(await listQuoteRequestReviews(), caseNumber);
       const user = await getCurrentUser();
       const realQuoteNumber = generateRealQuoteNumber();
       const now = new Date().toISOString();
@@ -403,7 +406,7 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
       toast.success(`Sent to Quotes as ${realQuoteNumber}.`);
     } catch (error) {
       console.error("Failed to send draft to Quotes:", error);
-      toast.error("Could not send this draft to Quotes -- see console for details.");
+      toast.error(`Could not send this draft to Quotes: ${error.message}`);
     } finally {
       setIsSending(false);
     }

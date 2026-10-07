@@ -56,7 +56,7 @@ function SupervisorDashboardContent() {
   // unmounting that panel when the user switches to a different tab and back (that field has no
   // Save button of its own, unlike every other form in this feature).
   const [summaryDraftsByDate, setSummaryDraftsByDate] = useState({});
-  const { data: records = [], isLoading } = useQuery({
+  const { data: records = [], isLoading, error: metricsError, refetch: refetchMetrics } = useQuery({
     queryKey: QUERY_KEY,
     queryFn: listDailyMetrics
   });
@@ -71,13 +71,13 @@ function SupervisorDashboardContent() {
     // default) for the entire loading window, so deciding eagerly here would always take the
     // "no data yet" branch on a cold load and never reach "most recent recorded day" below, even
     // when real data exists once the fetch finishes.
-    if (selectedDate || isLoading) return;
+    if (selectedDate || isLoading || metricsError) return;
     if (records.length) {
       setSelectedDate(records[records.length - 1].date);
     } else {
       setSelectedDate(getPriorBusinessDate());
     }
-  }, [records, selectedDate, isLoading]);
+  }, [records, selectedDate, isLoading, metricsError]);
   function refresh() {
     queryClient.invalidateQueries({ queryKey: QUERY_KEY });
     setLastImportedFileState(getLastImportedFile());
@@ -130,6 +130,16 @@ function SupervisorDashboardContent() {
           )}
         </div>
       </div>
+      {metricsError && activeTab !== "quote-dashboard" && (
+        <Card className="border-destructive/50">
+          <CardContent className="p-4 space-y-2" role="alert">
+            <p className="font-medium text-destructive">Could not load Supervisor daily metrics.</p>
+            <p className="text-sm text-muted-foreground">{metricsError.message}</p>
+            <p className="text-sm text-muted-foreground">Open Developer Console (Shift + backtick), then Debugging Console, and run supervisor.</p>
+            <Button variant="outline" onClick={() => refetchMetrics()}>Retry loading metrics</Button>
+          </CardContent>
+        </Card>
+      )}
       {activeTab !== "quote-dashboard" && !isElectronBacked() && (
         <Card className="border-amber-200 bg-amber-50">
           <CardContent className="p-4 flex items-start gap-3">

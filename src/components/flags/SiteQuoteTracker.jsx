@@ -267,7 +267,7 @@ export default function SiteQuoteTracker() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Trouble score = (rejections Ã— 2) + reworks + (HO rejections Ã— 2). Sites with score ≥ 2 shown.
+        Trouble score = (rejections × 2) + reworks + (HO rejections × 2). Sites with score ≥ 2 shown.
         Click any site to expand its full quote history.
       </p>
 

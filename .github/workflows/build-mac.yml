@@ -32,6 +32,9 @@ name: Build macOS
 on:
   workflow_dispatch: {}
 
+permissions:
+  contents: write
+
 jobs:
   build-mac:
     runs-on: macos-latest
@@ -68,4 +71,6 @@ jobs:
           path: |
             release/*.dmg
             release/*.zip
+            release/latest-mac.yml
+            release/*.blockmap
           if-no-files-found: warn

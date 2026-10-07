@@ -45,6 +45,8 @@ function createSupervisorSync({
   const pollGate = createPollGate({ slowMs: CONNECTED_INTERVAL_MS });
   let running = null;
   let rerunRequested = false;
+  let lastResult = null;
+  let lastCompletedAt = null;
   const oversizeWarned = new Set();
 
   function readPendingDeletes() {
@@ -150,6 +152,8 @@ function createSupervisorSync({
 
   async function runReconcile() {
     const pending = await flushPendingDeletes();
+    let failedRecords = Object.keys(pending).length;
+    let localOnlyRecords = 0;
     const { records: remoteRecords } = await request("GET", "/api/supervisor/index");
     const remoteByKey = new Map(remoteRecords.map((entry) => [keyOf(entry.collection, entry.id), entry]));
 
@@ -165,16 +169,19 @@ function createSupervisorSync({
         const localStamp = stampOf(local);
         try {
           if (!remote) {
-            await pushRecord(collection, local);
+            if ((await pushRecord(collection, local)).skipped) localOnlyRecords += 1;
           } else if (remote.deleted) {
-            if (localStamp > remote.updatedAt) await pushRecord(collection, local);
+            if (localStamp > remote.updatedAt) {
+              if ((await pushRecord(collection, local)).skipped) localOnlyRecords += 1;
+            }
             else if (await pull(collection, local.id)) appliedLocally += 1;
           } else if (remote.updatedAt > localStamp) {
             if (await pull(collection, local.id)) appliedLocally += 1;
           } else if (localStamp > remote.updatedAt) {
-            await pushRecord(collection, local);
+            if ((await pushRecord(collection, local)).skipped) localOnlyRecords += 1;
           }
         } catch (error) {
+          failedRecords += 1;
           logger.warn(`[supervisor-sync] Could not sync ${key}:`, error.message);
         }
       }
@@ -185,6 +192,7 @@ function createSupervisorSync({
       try {
         if (await pull(remote.collection, remote.id)) appliedLocally += 1;
       } catch (error) {
+        failedRecords += 1;
         logger.warn(`[supervisor-sync] Could not download ${key}:`, error.message);
       }
     }
@@ -193,7 +201,13 @@ function createSupervisorSync({
       logger.info(`[supervisor-sync] Applied ${appliedLocally} shared change(s) from Cloudflare.`);
       onRemoteApplied({ appliedLocally });
     }
-    return { ok: true, appliedLocally };
+    return {
+      ok: failedRecords === 0,
+      appliedLocally,
+      failedRecords,
+      localOnlyRecords,
+      ...(failedRecords ? { error: `${failedRecords} Supervisor record(s) could not sync; check connectivity and retry.` } : {})
+    };
   }
 
   // Calls arriving while a reconcile is in flight are coalesced into exactly one follow-up
@@ -205,12 +219,15 @@ function createSupervisorSync({
     }
     running = (async () => {
       try {
-        return await runReconcile();
+        lastResult = await runReconcile();
+        return lastResult;
       } catch (error) {
         logger.warn("[supervisor-sync] Reconcile failed:", error.message);
-        return { ok: false, error: error.message };
+        lastResult = { ok: false, error: error.message };
+        return lastResult;
       } finally {
         running = null;
+        lastCompletedAt = new Date().toISOString();
         if (rerunRequested) {
           rerunRequested = false;
           void reconcile();
@@ -268,7 +285,17 @@ function createSupervisorSync({
     timer = null;
   }
 
-  return { start, stop, reconcile, recordSaved, recordDeleted };
+  return {
+    start, stop, reconcile, recordSaved, recordDeleted,
+    getStatus: () => ({
+      enabled: timer !== null,
+      running: running !== null,
+      identityAvailable: Boolean(identityEmail()),
+      credentialsAvailable: Boolean(getOutboundToken()),
+      lastCompletedAt,
+      lastResult: lastResult ? { ...lastResult } : null
+    })
+  };
 }
 
 module.exports = { createSupervisorSync, COLLECTIONS };

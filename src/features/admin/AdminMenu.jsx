@@ -12,6 +12,7 @@ import {ALL_PAGES, DEFAULT_ROLE_PAGES, rolesForUser} from "@/lib/rolePageAccess"
 import * as adminApi from "./adminApi";
 import {toast} from "sonner";
 import {ChevronDown, Shield} from "lucide-react";
+import {sessionTelemetry} from "./sessionTelemetry";
 
 const PAGE_LABELS = Object.freeze(Object.fromEntries(ALL_PAGES.map((page) => [page, page.replace(/([a-z])([A-Z])/g, "$1 $2")])));
 
@@ -277,11 +278,16 @@ function SessionsPanel({sessions, onRefresh}) {
   return (
     <div className="space-y-3">
       <div className="flex gap-2"><Button variant="outline" disabled={busy} onClick={() => run(() => adminApi.clearSessions({}))}>Clear stale ghosts</Button><Button variant="outline" disabled={busy} onClick={onRefresh}>Refresh</Button></div>
+      <p className="text-xs text-muted-foreground">
+        Versions and Resolved role come from the app&apos;s heartbeat; Effective role comes from the server.
+        Not reported means missing telemetry, not proof of an old version. A blank UI version can also mean the bundled UI.
+        On the affected device, run runtime and permissions in Developer Console &gt; Debugging Console.
+      </p>
       <div className="overflow-x-auto rounded-lg border border-border">
         <table className="w-full text-sm"><thead className="bg-muted text-muted-foreground"><tr><th className="px-3 py-2 text-left">User</th><th className="px-3 py-2 text-left">Versions</th><th className="px-3 py-2 text-left">Role</th><th className="px-3 py-2 text-left">Last seen</th><th className="px-3 py-2 text-left">Actions</th></tr></thead>
           <tbody>{sessions.map((session) => {
-            const mismatch = session.resolvedRole && session.effectiveRole && session.resolvedRole !== session.effectiveRole;
-            return <tr key={session.sessionId} className="border-t border-border"><td className="px-3 py-2"><div className="font-medium">{session.name || session.email}</div><div className="text-xs text-muted-foreground">{session.email}</div></td><td className="px-3 py-2">App {session.appVersion || "?"}<br />UI {session.uiVersion || "?"}</td><td className={mismatch ? "px-3 py-2 text-amber-700 font-medium" : "px-3 py-2"}>Resolved {session.resolvedRole || "?"}<br />Effective {session.effectiveRole || "?"}</td><td className="px-3 py-2">{session.lastSeen || "?"}{session.stale ? <Badge className="ml-2" variant="secondary">stale</Badge> : null}</td><td className="px-3 py-2"><div className="flex flex-wrap gap-1"><Button size="sm" variant="outline" onClick={() => run(() => adminApi.command({email: session.email, command: "reload"}))}>Reload</Button><Button size="sm" variant="outline" onClick={() => run(() => adminApi.command({email: session.email, command: "sign_out"}))}>Sign out</Button><Button size="sm" variant="ghost" onClick={() => run(() => adminApi.clearSessions({sessionId: session.sessionId}))}>Clear</Button></div></td></tr>;
+            const telemetry = sessionTelemetry(session);
+            return <tr key={session.sessionId} className="border-t border-border"><td className="px-3 py-2"><div className="font-medium">{session.name || session.email}</div><div className="text-xs text-muted-foreground">{session.email}</div></td><td className="px-3 py-2">App {telemetry.app}<br />UI {telemetry.ui}{telemetry.missing && <p className="text-xs text-muted-foreground">Incomplete app telemetry</p>}</td><td className={telemetry.mismatch ? "px-3 py-2 text-amber-700 font-medium" : "px-3 py-2"}>Resolved {telemetry.resolvedRole}<br />Effective {telemetry.effectiveRole}</td><td className="px-3 py-2">{session.lastSeen || "?"}{session.stale ? <Badge className="ml-2" variant="secondary">stale</Badge> : null}</td><td className="px-3 py-2"><div className="flex flex-wrap gap-1"><Button size="sm" variant="outline" onClick={() => run(() => adminApi.command({email: session.email, command: "reload"}))}>Reload</Button><Button size="sm" variant="outline" onClick={() => run(() => adminApi.command({email: session.email, command: "sign_out"}))}>Sign out</Button><Button size="sm" variant="ghost" onClick={() => run(() => adminApi.clearSessions({sessionId: session.sessionId}))}>Clear</Button></div></td></tr>;
           })}</tbody></table>
       </div>
     </div>

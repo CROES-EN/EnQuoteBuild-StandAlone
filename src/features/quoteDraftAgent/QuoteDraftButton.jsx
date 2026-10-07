@@ -355,14 +355,18 @@ export default function QuoteDraftButton({ quote, products, onApply }) {
                   {preview.dependency_advisories.map((advisory, aIdx) => (
                     <div key={aIdx} className="space-y-1">
                       <p className="text-xs font-medium">For: {advisory.triggerItem}</p>
-                      <ul className="list-disc list-inside space-y-0.5">
-                        {advisory.suggestions.map((suggestion, sIdx) => (
-                          <li key={sIdx} className={suggestion.notInCatalog ? "text-amber-700" : ""}>
-                            {suggestion.name || "IQ Disconnect Tool"}
-                            {suggestion.notInCatalog ? " (not in catalog)" : ""} -- {suggestion.reason}
-                          </li>
-                        ))}
-                      </ul>
+                      {Array.isArray(advisory.suggestions) ? (
+                        <ul className="list-disc list-inside space-y-0.5">
+                          {advisory.suggestions.map((suggestion, sIdx) => (
+                            <li key={sIdx} className={suggestion.notInCatalog ? "text-amber-700" : ""}>
+                              {suggestion.name || "IQ Disconnect Tool"}
+                              {suggestion.notInCatalog ? " (not in catalog)" : ""} -- {suggestion.reason}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-xs">{advisory.reason}</p>
+                      )}
                     </div>
                   ))}
                 </div>

@@ -217,7 +217,7 @@ function RecatRow({ review, canEdit, quote }) {
                       className="text-[10px] text-muted-foreground hover:underline"
                       onClick={() => setUseManual(false)}
                     >
-                      â† use dropdown
+                      ← use dropdown
                     </button>
                   </>
                 )}

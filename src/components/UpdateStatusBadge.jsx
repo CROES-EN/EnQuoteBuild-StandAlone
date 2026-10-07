@@ -14,12 +14,18 @@ export default function UpdateStatusBadge() {
     if (!updater?.onUpdateStatus) return;
     // A "ready" event can fire before this window existed (or before a UI reload).
     updater.getState?.().then((existing) => { if (existing) setState(existing); }).catch(() => {});
-    updater.onUpdateStatus((data) => {
+    let hideTimer;
+    const unsubscribe = updater.onUpdateStatus((data) => {
+      clearTimeout(hideTimer);
       setState(data);
       if (data.status === "ready") setDismissed(false);
       // "up-to-date" is reassuring but not actionable - hide it after a few seconds.
-      if (data.status === "up-to-date") setTimeout(() => setState(null), 4000);
+      if (data.status === "up-to-date") hideTimer = setTimeout(() => setState(null), 4000);
     });
+    return () => {
+      clearTimeout(hideTimer);
+      if (typeof unsubscribe === "function") unsubscribe();
+    };
   }, []);
 
   if (!state) return null;

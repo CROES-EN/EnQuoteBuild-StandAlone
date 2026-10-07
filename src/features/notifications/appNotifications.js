@@ -1,42 +1,54 @@
 /**
- * App notifications (quote updates, product updates, quote-sent-to-Base44 events) -
- * mirrors errorLog.js's EXACT proven structure: same collections-bridge pattern, same
- * browser-storage fallback, same seq-based ordering (Date.now() * 1000 + a per-session
- * counter) to avoid the same-millisecond sort bug already found and fixed in errorLog.js.
- *
- * Notification RECORDS themselves are generated server-side (electron/repository.cjs's
- * importData(), electron/outboundSync.cjs's flush()) - this file only reads/marks-read
- * from the renderer, via the SAME generic collections:list/update bridge already used
- * for every other local collection. No new IPC handlers were needed for this feature.
- *
- * IMPORTANT (same requirement as every other collection this app uses): "appNotifications"
- * must be present in electron/repository.cjs's `collectionNames` array, or the main
- * process rejects every call with "Unsupported local collection: appNotifications".
+ * Notification records come from the local collections bridge. Read/dismissed state is
+ * saved separately per signed-in user, so a background database write cannot restore
+ * cleared notifications. Event keys also suppress replays with regenerated record IDs.
  */
+
+import {getCurrentUserNamespace, scopedKey} from "@/lib/userScopedStorage";
 
 const COLLECTION = "appNotifications";
 const BROWSER_STORAGE_KEY = "enquote_app_notifications_v1";
+const STATE_KEY = "enquote_notification_state_v1";
+
+function eventKey(item) {
+  const rawTime = item.occurredAt;
+  const time = typeof rawTime === "string"
+    ? Date.parse(/^\d{4}-\d{2}-\d{2}T[\d:.]+$/.test(rawTime) ? `${rawTime}Z` : rawTime)
+    : NaN;
+  return JSON.stringify([item.type, item.quoteId || item.productName || item.taskId || item.id,
+    Number.isFinite(time) ? time : rawTime]);
+}
+
+function readState(key = scopedKey(STATE_KEY)) {
+  const raw = globalThis.window?.localStorage?.getItem(key);
+  if (!raw) return {dismissed: [], read: []};
+  const state = JSON.parse(raw);
+  if (!Array.isArray(state.dismissed) || !Array.isArray(state.read)) throw new Error("Saved notification state is invalid.");
+  return state;
+}
+
+function saveState(state, key) {
+  const storage = globalThis.window?.localStorage;
+  if (!storage) throw new Error("Notification storage is unavailable.");
+  storage.setItem(key, JSON.stringify(state));
+}
+
+function remember(items, field, key) {
+  const state = readState(key);
+  state[field] = [...new Set([...state[field], ...items.flatMap(item =>
+    [item.id, eventKey(item), ...(item.eventId ? [item.eventId] : [])])])];
+  saveState(state, key);
+}
 
 function localBridge() {
   return globalThis.window?.enquoteLocal?.collections || null;
 }
 
 function readBrowserStorage() {
-  try {
-    const raw = globalThis.window?.localStorage?.getItem(BROWSER_STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeBrowserStorage(records) {
-  try {
-    globalThis.window?.localStorage?.setItem(BROWSER_STORAGE_KEY, JSON.stringify(records));
-  } catch {
-    // Ignore storage failures (e.g. private-browsing quota) - in-memory state still works this session.
-  }
+  const raw = globalThis.window?.localStorage?.getItem(BROWSER_STORAGE_KEY);
+  const parsed = raw ? JSON.parse(raw) : [];
+  if (!Array.isArray(parsed)) throw new Error("Saved notifications are invalid.");
+  return parsed;
 }
 
 /**
@@ -45,9 +57,21 @@ function writeBrowserStorage(records) {
  * timestamp, which breaks naive timestamp-only sorting).
  */
 export async function listNotifications() {
+  if (getCurrentUserNamespace() === "__anonymous__") return [];
+  const state = readState();
   const bridge = localBridge();
   const all = bridge ? ((await bridge.list(COLLECTION)) || []) : readBrowserStorage();
-  return [...all].sort((a, b) => (b.seq ?? 0) - (a.seq ?? 0));
+  const dismissed = new Set(state.dismissed);
+  const read = new Set(state.read);
+  const seen = new Set();
+  return [...all].sort((a, b) => (b.seq ?? 0) - (a.seq ?? 0))
+    .filter(item => {
+      const key = item.eventId || eventKey(item);
+      if (dismissed.has(item.id) || dismissed.has(eventKey(item)) || dismissed.has(key) || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .map(item => ({...item, read: read.has(item.id) || read.has(eventKey(item)) || read.has(item.eventId)}));
 }
 
 /**
@@ -55,46 +79,18 @@ export async function listNotifications() {
  * opened, per explicit request: "an unread badge that clears once opened."
  */
 export async function markAllRead() {
-  const bridge = localBridge();
-  if (bridge) {
-    const all = (await bridge.list(COLLECTION)) || [];
-    for (const item of all.filter((n) => !n.read)) {
-      await bridge.update(COLLECTION, item.id, { read: true }).catch(() => {});
-    }
-    return;
-  }
-  const all = readBrowserStorage();
-  writeBrowserStorage(all.map((n) => ({ ...n, read: true })));
+  const key = scopedKey(STATE_KEY);
+  remember(await listNotifications(), "read", key);
 }
 
-/**
- * Deletes exactly one notification - used by the bell's per-item "Clear" button. Mirrors
- * markAllRead's exact bridge-vs-browser-storage fallback pattern above.
- */
+/** Persistently dismisses one notification for this user on this device. */
 export async function clearNotification(id) {
-  const bridge = localBridge();
-  if (bridge) {
-    await bridge.delete(COLLECTION, id).catch(() => {});
-    return;
-  }
-  const all = readBrowserStorage();
-  writeBrowserStorage(all.filter((n) => n.id !== id));
+  const key = scopedKey(STATE_KEY);
+  remember((await listNotifications()).filter(item => item.id === id), "dismissed", key);
 }
 
-/**
- * Deletes EVERY notification - used by the bell's "Clear All" button. Mirrors the exact
- * same bridge-vs-browser-storage fallback pattern as clearNotification()/markAllRead()
- * above. Deletes are fired in parallel (not one-by-one sequentially) since there is no
- * ordering dependency between deleting separate notification records - matches the same
- * "fire concurrently, tolerate individual failures" philosophy already used by
- * createLocalRecords() in dataClient.js for bulk operations.
- */
-export async function clearAllNotifications() {
-  const bridge = localBridge();
-  if (bridge) {
-    const all = (await bridge.list(COLLECTION)) || [];
-    await Promise.all(all.map((item) => bridge.delete(COLLECTION, item.id).catch(() => {})));
-    return;
-  }
-  writeBrowserStorage([]);
+/** Dismisses the displayed snapshot, leaving notifications arriving afterward untouched. */
+export async function clearAllNotifications(items) {
+  const key = scopedKey(STATE_KEY);
+  remember(items || await listNotifications(), "dismissed", key);
 }

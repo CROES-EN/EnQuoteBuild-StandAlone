@@ -1,9 +1,11 @@
-import {useCallback, useEffect, useState} from "react";
+import {useCallback, useEffect, useRef, useState} from "react";
 import {Link} from "react-router-dom";
 import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
 import {ArrowUpRight, Bell, X} from "lucide-react";
 import {createPageUrl} from "@/utils";
 import {clearAllNotifications, clearNotification, listNotifications, markAllRead} from "@/features/notifications/appNotifications";
+import {onUserSessionChanged} from "@/lib/userScopedStorage";
+import {toast} from "sonner";
 
 // Formats a notification's timestamp using the VIEWING user's own browser locale -
 // matches Layout.jsx's existing formatLastUpdated pattern exactly (date part follows
@@ -32,7 +34,7 @@ function formatNotificationMessage(n) {
     return `Reminder: ${n.taskTitle}${n.quoteNumber ? ` (${n.quoteNumber})` : ""} - ${time}`;
   }
   if (n.type === "quote_updated" && n.quoteNumber) {
-    return n.changedBy
+    return n.changedBy && !String(n.changedBy).toLowerCase().endsWith("@example.invalid")
       ? `${n.quoteNumber} updated by ${n.changedBy} - ${time}`
       : `${n.quoteNumber} updated - ${time}`;
   }
@@ -50,8 +52,8 @@ function formatNotificationMessage(n) {
  * updates, and quote-sent-to-Base44 events. Clicking it opens a popover listing recent
  * notifications newest-first, and marks everything as read (clearing the badge) - per
  * explicit request: "an unread badge that clears once opened", not a per-item dismiss
- * model for READ state. Each notification has its own "Clear" button (deletes just that
- * one, optimistically removed from view immediately) alongside "View Details" (quote
+ * model for READ state. Each notification has its own "Clear" button (persistently
+ * dismisses that event for this user on this device) alongside "View Details" (quote
  * notifications only - jumps straight to the real quote via QuoteDetails.jsx's real
  * ?id=<quoteId> URL pattern).
  *
@@ -64,10 +66,18 @@ function formatNotificationMessage(n) {
 export default function NotificationBell() {
   const [notifications, setNotifications] = useState([]);
   const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const loadVersion = useRef(0);
 
   const load = useCallback(async () => {
-    const list = await listNotifications();
-    setNotifications(list);
+    const version = ++loadVersion.current;
+    try {
+      const list = await listNotifications();
+      if (version === loadVersion.current) setNotifications(list);
+    } catch (error) {
+      console.error("Unable to load notifications", error);
+      toast.error("Could not load notifications. Please try again.");
+    }
   }, []);
 
   useEffect(() => {
@@ -75,7 +85,12 @@ export default function NotificationBell() {
     // Light polling so the badge stays current even if the app is just sitting open -
     // scoped locally to this component rather than a new global timer.
     const interval = setInterval(load, 30000);
-    return () => clearInterval(interval);
+    const unsubscribe = onUserSessionChanged(() => {
+      setNotifications([]);
+      setOpen(false);
+      void load();
+    });
+    return () => { clearInterval(interval); unsubscribe(); loadVersion.current++; };
   }, [load]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
@@ -83,31 +98,43 @@ export default function NotificationBell() {
 
   async function handleOpenChange(nextOpen) {
     setOpen(nextOpen);
-    if (nextOpen && unreadCount > 0) {
-      await markAllRead();
-      await load();
-    } else if (nextOpen) {
+    if (nextOpen) {
+      try {
+        if (unreadCount > 0) await markAllRead();
+      } catch (error) {
+        console.error("Unable to mark notifications as read", error);
+        toast.error("Could not mark notifications as read.");
+      }
       await load();
     }
   }
 
-  // Optimistic: removes from local state immediately so the item visually disappears
-  // without waiting on a round-trip, then fires the actual delete in the background
-  // (errors swallowed - a failed delete must never re-show an item the user already
-  // dismissed from their own view, and must never block the click itself).
-  function handleClear(id) {
-    setNotifications((prev) => prev.filter((item) => item.id !== id));
-    clearNotification(id).catch(() => {});
+  async function handleClear(id) {
+    setBusy(true);
+    loadVersion.current++;
+    try {
+      await clearNotification(id);
+    } catch (error) {
+      console.error("Unable to clear notification", error);
+      toast.error("Could not clear the notification. Please try again.");
+    } finally {
+      await load();
+      setBusy(false);
+    }
   }
 
-  // Same optimistic-then-background-delete pattern as handleClear above, applied to
-  // every notification at once - empties the visible list immediately so there's no
-  // perceived delay, then fires the actual bulk delete in the background. Errors are
-  // swallowed for the same reason handleClear's are: a failed clear must never
-  // re-populate a list the user already dismissed from their own view.
-  function handleClearAll() {
-    setNotifications([]);
-    clearAllNotifications().catch(() => {});
+  async function handleClearAll() {
+    setBusy(true);
+    loadVersion.current++;
+    try {
+      await clearAllNotifications(notifications);
+    } catch (error) {
+      console.error("Unable to clear notifications", error);
+      toast.error("Could not clear notifications. Please try again.");
+    } finally {
+      await load();
+      setBusy(false);
+    }
   }
 
   return (
@@ -139,6 +166,7 @@ export default function NotificationBell() {
                 <button
                   type="button"
                   onClick={handleClearAll}
+                  disabled={busy}
                   className="inline-flex items-center gap-0.5 text-xs font-medium text-muted-foreground hover:text-foreground"
                 >
                   <X className="w-3 h-3" />
@@ -152,6 +180,7 @@ export default function NotificationBell() {
                     <button
                       type="button"
                       onClick={() => handleClear(n.id)}
+                      disabled={busy}
                       className="inline-flex items-center gap-0.5 text-xs font-medium text-muted-foreground hover:text-foreground"
                     >
                       <X className="w-3 h-3" />

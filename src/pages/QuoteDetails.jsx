@@ -20,6 +20,7 @@ import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 import {Link, useLocation, useNavigate} from "react-router-dom";
 import {createPageUrl} from "@/utils";
 import {calculateQuoteTotals} from "@/utils/quoteCalculations";
+import {labelForEmail, userOptionLabel} from "@/utils/userDisplayName";
 import {format} from "date-fns";
 import {Card} from "@/components/ui/card";
 import {Button} from "@/components/ui/button";
@@ -2229,7 +2230,7 @@ function QuoteDetailsContent() {
  <DialogHeader>
  <DialogTitle>Change Quote Owner</DialogTitle>
  <DialogDescription>
- Select a new owner for this quote. The current owner is <strong>{effectiveOwner}</strong>.
+ Select a new owner for this quote. The current owner is <strong>{labelForEmail(effectiveOwner, allUsers)}</strong>.
  </DialogDescription>
  </DialogHeader>
  <Select value={newOwner} onValueChange={setNewOwner}>
@@ -2237,9 +2238,9 @@ function QuoteDetailsContent() {
  <SelectValue placeholder="Select new owner..." />
  </SelectTrigger>
  <SelectContent>
- {allUsers.map(u => (
+ {[...allUsers].sort((a, b) => userOptionLabel(a).localeCompare(userOptionLabel(b))).map(u => (
  <SelectItem key={u.id} value={u.email}>
- {u.full_name ? `${u.full_name} (${u.email})` : u.email}
+ {userOptionLabel(u)}
  </SelectItem>
  ))}
  </SelectContent>

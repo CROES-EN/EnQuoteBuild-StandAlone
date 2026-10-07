@@ -78,7 +78,9 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
   },
   diagnostics: {
     sendReport: (senderEmail) => invoke("diagnostics:send", senderEmail),
-    listReports: () => invoke("diagnostics:listReports")
+    listReports: () => invoke("diagnostics:listReports"),
+    inspect: (command) => invoke("diagnostics:inspect", command),
+    refreshSupervisor: () => invoke("diagnostics:refresh-supervisor")
   },
     presence: {
     announce: (payload) => invoke("presence:announce", payload),
@@ -244,8 +246,13 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
 try {
   const { contextBridge: __ub_contextBridge, ipcRenderer: __ub_ipcRenderer } = require("electron");
   __ub_contextBridge.exposeInMainWorld("enquoteUpdater", {
-    onUpdateStatus: (callback) => __ub_ipcRenderer.on("updater:status", (_event, data) => callback(data)),
+    onUpdateStatus: (callback) => {
+      const listener = (_event, data) => callback(data);
+      __ub_ipcRenderer.on("updater:status", listener);
+      return () => __ub_ipcRenderer.removeListener("updater:status", listener);
+    },
     getState: () => __ub_ipcRenderer.invoke("updater:get-state"),
+    check: () => __ub_ipcRenderer.invoke("updater:check"),
     installNow: () => __ub_ipcRenderer.invoke("updater:install-now")
   });
 } catch (error) {

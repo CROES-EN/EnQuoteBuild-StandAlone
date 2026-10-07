@@ -25,25 +25,9 @@ function resource(name) {
 // correctly tracking the real signed-in person the entire time in a SEPARATE,
 // disconnected code path.
 //
-// The fix below reads the SAME persisted session key AuthContext.jsx already
-// writes on successful sign-in (LOCAL_SESSION_EMAIL_KEY there /
-// SESSION_EMAIL_KEY here - same literal string, intentionally kept in sync),
-// then looks up that person's real name via the same "users" collection
-// AuthContext.jsx itself uses (getUsers() / bridge().collections.list("users")),
-// building an equivalent user object. Falls back to the original demo user
-// ONLY if no one is actually signed in yet (e.g. this runs before login, or in
-// a context with no Electron bridge at all) - matching AuthContext.jsx's own
-// fallback behavior for that same case, so behavior is unchanged when there is
-// genuinely no session to reflect.
+// Desktop attribution requires the verified identity. Legacy browser sessions may
+// use AuthContext's persisted session key, but missing identity must never become a demo user.
 const SESSION_EMAIL_KEY = "enquote_local_session_email";
-
-const DEMO_USER_FALLBACK = {
-  id: "demo-user",
-  email: "demo.user@example.invalid",
-  full_name: "Demo User",
-  name: "Demo User",
-  role: "admin"
-};
 
 function getPersistedSessionEmail() {
   try {
@@ -75,7 +59,7 @@ async function resolveCurrentUser() {
   if (typeof authBridge?.getVerifiedIdentity === "function") {
     const identity = await authBridge.getVerifiedIdentity();
     sessionEmail = identity?.email?.trim().toLowerCase() || null;
-    if (!sessionEmail) {
+    if (!sessionEmail || sessionEmail.toLowerCase().endsWith("@example.invalid")) {
       throw new Error("Verified Cloudflare identity is unavailable. Sign in again before continuing.");
     }
   } else {
@@ -84,9 +68,7 @@ async function resolveCurrentUser() {
     sessionEmail = getPersistedSessionEmail();
   }
   if (!sessionEmail) {
-    // Nobody has signed in yet via the real local login flow - unchanged prior
-    // behavior for this specific case.
-    return DEMO_USER_FALLBACK;
+    throw new Error("Signed-in identity is unavailable. Sign in again before continuing.");
   }
 
   try {
@@ -95,7 +77,8 @@ async function resolveCurrentUser() {
       (candidate) => candidate.email?.toLowerCase() === sessionEmail.toLowerCase()
     ) || null;
     return buildUserFromRecord(record, sessionEmail);
-  } catch {
+  } catch (error) {
+    console.warn("Unable to load the signed-in user's profile; using the verified session email.", error);
     // Users list temporarily unavailable - still reflect the REAL signed-in
     // email rather than silently reverting to the demo identity.
     return buildUserFromRecord(null, sessionEmail);

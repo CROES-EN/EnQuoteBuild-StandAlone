@@ -26,6 +26,7 @@
  */
 
 import {retryBridgeCall} from "@/features/supervisorDashboard/retryBridgeCall";
+import {validateRequestReview} from "@/features/autoDrafter/improperQuoteRequests";
 
 import {classifyCareSubscriptionRows} from "@/features/supervisorDashboard/careEligibility";
 
@@ -35,6 +36,29 @@ const COLLECTION = "supervisorReportTables";
 // report type - only where the bytes live differs.
 const LARGE_REPORT_TYPES = new Set(["care_subscriptions"]);
 const BROWSER_STORAGE_KEY = "enquote_supervisor_report_tables_v1";
+const REVIEW_PREFIX = "quote-request-review:";
+
+export async function listQuoteRequestReviews() {
+  const bridge = localBridge();
+  const raw = bridge ? await bridge.list(COLLECTION) : globalThis.window?.localStorage?.getItem(BROWSER_STORAGE_KEY);
+  const records = bridge ? raw : raw ? JSON.parse(raw) : [];
+  if (!Array.isArray(records)) throw new Error("Quote request review storage is invalid.");
+  return records.filter(record => String(record.id).startsWith(REVIEW_PREFIX)).map(validateRequestReview);
+}
+
+export async function appendQuoteRequestReview(record) {
+  if (!String(record.id).startsWith(REVIEW_PREFIX)) throw new Error("Invalid quote request review ID.");
+  validateRequestReview(record);
+  const bridge = localBridge();
+  if (bridge) return bridge.create(COLLECTION, record);
+  const storage = globalThis.window?.localStorage;
+  if (!storage) throw new Error("Quote request review storage is unavailable.");
+  const raw = storage.getItem(BROWSER_STORAGE_KEY);
+  const records = raw ? JSON.parse(raw) : [];
+  if (!Array.isArray(records)) throw new Error("Quote request review storage is invalid.");
+  storage.setItem(BROWSER_STORAGE_KEY, JSON.stringify([...records, record]));
+  return record;
+}
 
 function localBridge() {
   return globalThis.window?.enquoteLocal?.collections || null;
@@ -314,7 +338,7 @@ export async function listReportTables() {
       if (table) all.push(table);
     }
   }
-  return Object.fromEntries(all.map((r) => [r.reportType, r]));
+  return Object.fromEntries(all.filter(r => !String(r.id).startsWith(REVIEW_PREFIX)).map((r) => [r.reportType, r]));
 }
 
 export async function deleteReportTable(reportType) {
@@ -340,4 +364,3 @@ export async function deleteReportTable(reportType) {
   const all = readBrowserStorage();
   writeBrowserStorage(all.filter((item) => item.id !== reportType));
 }
-

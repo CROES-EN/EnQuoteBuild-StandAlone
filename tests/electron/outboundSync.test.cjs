@@ -50,6 +50,30 @@ function makeRepository() {
   return repository;
 }
 
+test("outbound retries and restarts notify once per quote version, while real edits still notify", async () => {
+  await withWorker({ok: true, status: "pushed", remote_id: "base44-1"}, async workerUrl => {
+    const repository = makeRepository();
+    const notifications = [];
+    let total = 100;
+    let base44Id;
+    repository.listPendingOutboundQuotes = async () => [{
+      local_id: "local-quote-1", kind: "update", quote_number: "Q-1",
+      quote: {id: "local-quote-1", base44_id: base44Id, quote_number: "Q-1", total, updated_date: "2026-10-07T16:00:00Z"}
+    }];
+    repository.listCollection = async () => notifications;
+    repository.createCollectionRecord = async (_name, record) => notifications.push(record);
+    const makeSync = () => createOutboundSync({repository, config: {workerUrl, outboundToken: "test-token"}});
+    await makeSync().flush();
+    base44Id = "base44-1";
+    await makeSync().flush();
+    assert.equal(notifications.length, 1);
+    assert.equal(notifications[0].occurredAt, "2026-10-07T16:00:00Z");
+    total = 200;
+    await makeSync().flush();
+    assert.equal(notifications.length, 2);
+  });
+});
+
 test("pushes outbound quotes through the Worker's Base44 route", async () => {
   await withWorker({ ok: true, status: "pushed", remote_id: "base44-1" }, async (workerUrl, getRequest) => {
     const repository = makeRepository();
@@ -64,6 +88,9 @@ test("pushes outbound quotes through the Worker's Base44 route", async () => {
     const request = getRequest();
     assert.equal(request.requestPath, "/api/inbound/base44");
     assert.equal(request.requestBody.entityType, "quote");
+    assert.equal(request.requestBody.localId, "local-quote-1");
+    assert.equal(request.requestBody.quote.id, undefined);
+    assert.equal(request.requestBody.quote.local_quote_id, "local-quote-1");
     assert.deepEqual(repository.acknowledgements, [{
       local_id: "local-quote-1",
       remote_id: "base44-1"

@@ -13,7 +13,7 @@ function toRemotePayload(quote) {
     if (value === undefined) continue;
     payload[key] = value;
   }
-  payload.local_quote_id = quote.id;
+  payload.local_quote_id = quote.id || quote.local_quote_id;
   return payload;
 }
 
@@ -127,8 +127,19 @@ async function pushUpdate(env, item) {
   if (!Number.isNaN(remoteUpdatedAt) && !Number.isNaN(localBaseline) && remoteUpdatedAt > localBaseline) {
     return { status: "conflict", conflict_with: remoteCheck.quote.updated_date };
   }
-  const url = `${entityUrl(env, "Quote")}/${encodeURIComponent(String(item.remoteId))}`;
-  const response = await requestJson(url, { method: "PUT", headers: authHeaders(env), body: toRemotePayload(item.quote) });
+  // A Base44 quote belongs to exactly one local quote. Refuse updates from a different local
+  // copy so two quotes can never take turns overwriting the same record.
+  const remoteId = String(item.remoteId);
+  const localId = String(item.quote.id);
+  const remoteOwner = remoteCheck.quote?.local_quote_id ? String(remoteCheck.quote.local_quote_id) : null;
+  const isNativeRecord = localId === remoteId;
+  if (remoteOwner && !isNativeRecord && remoteOwner !== localId && remoteOwner !== remoteId) {
+    throw new Error(`IDENTITY_MISMATCH: Base44 quote ${remoteId} belongs to local quote ${remoteOwner}, not ${localId}. Update refused to avoid overwriting another quote.`);
+  }
+  const payload = toRemotePayload(item.quote);
+  if (isNativeRecord && remoteOwner) payload.local_quote_id = remoteOwner;
+  const url = `${entityUrl(env, "Quote")}/${encodeURIComponent(remoteId)}`;
+  const response = await requestJson(url, { method: "PUT", headers: authHeaders(env), body: payload });
   if (!response.ok) throw new RetryableError(`update failed: ${response.status}`);
   const confirmedId = response.body?.id ? String(response.body.id) : null;
   if (!confirmedId || confirmedId !== String(item.remoteId)) throw new RetryableError(`update not confirmed (expected ${item.remoteId}, got ${confirmedId})`);
@@ -249,6 +260,10 @@ export async function performPush(message, env) {
   const { entityType, action, ...rest } = message;
   if (entityType === "quote") {
     if (action === "delete") return await pushDelete(env, rest);
+    const localId = rest.localId || rest.quote?.id || rest.quote?.local_quote_id;
+    if (typeof localId !== "string" || !localId.trim()) throw new Error("Quote sync requires a local quote id.");
+    if (!rest.quote) throw new Error("quote create/update requires a quote payload");
+    rest.quote = {...rest.quote, id: localId};
     return action === "update" ? await pushUpdate(env, rest) : await pushCreate(env, rest);
   }
   if (entityType === "dismissal") return await pushDismissal(env, rest);

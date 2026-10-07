@@ -5,6 +5,7 @@ const { createPresenceSync } = require("../../electron/presenceSync.cjs");
 
 test("presence sync uses the verified identity for heartbeat, list, and removal", async () => {
   const requests = [];
+  let rejectHeartbeat = false;
   const server = http.createServer((request, response) => {
     let body = "";
     request.on("data", (chunk) => { body += chunk; });
@@ -16,6 +17,11 @@ test("presence sync uses the verified identity for heartbeat, list, and removal"
         accessId: request.headers["cf-access-client-id"],
         body: body ? JSON.parse(body) : null
       });
+      if (rejectHeartbeat) {
+        response.writeHead(503, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ok: false, error: "presence unavailable"}));
+        return;
+      }
       response.writeHead(200, { "Content-Type": "application/json" });
       response.end(JSON.stringify({
         ok: true,
@@ -39,6 +45,10 @@ test("presence sync uses the verified identity for heartbeat, list, and removal"
   try {
     const heartbeat = await sync.heartbeat("Shane", "admin");
     assert.equal(heartbeat.ok, true);
+    assert.equal(sync.getStatus().lastHeartbeatResult.ok, true);
+    assert.equal(sync.getStatus().resolvedRole, "admin");
+    assert.equal(sync.getStatus().versions.appVersion, "1.4.0");
+    assert.ok(sync.getStatus().lastHeartbeatAt);
     assert.equal(requests[0].url, "/api/presence/heartbeat");
     assert.equal(requests[0].authorization, "Bearer outbound-test-token");
     assert.equal(requests[0].accessId, "service-client-id");
@@ -63,6 +73,9 @@ test("presence sync uses the verified identity for heartbeat, list, and removal"
     assert.equal(removed.ok, true);
     assert.equal(requests[3].url, "/api/presence/remove");
     assert.equal(requests[3].body.email, "shane@enphaseenergy.com");
+    rejectHeartbeat = true;
+    assert.equal((await sync.heartbeat()).ok, false);
+    assert.equal(sync.getStatus().lastHeartbeatResult.error, "presence unavailable");
   } finally {
     server.close();
   }

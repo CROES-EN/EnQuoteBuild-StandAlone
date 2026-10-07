@@ -65,6 +65,52 @@ const save = async (machine, collection, record) => {
   return created;
 };
 
+test("UI-only improper reviews sync between PCs and survive imports and clearing generated drafts", async () => {
+  const cluster = await createCluster();
+  try {
+    const a = await cluster.addMachine();
+    const b = await cluster.addMachine();
+    const {activeImproperRequests} = await import("../../src/features/autoDrafter/improperQuoteRequests.js");
+    const review = (id, number) => ({
+      id: `quote-request-review:${id}`, reportType: `quote-request-review:${id}`,
+      kind: "quote_request_review", version: 1, action: "mark", caseNumber: number,
+      siteId: "123", reason: "Incomplete scope", reviewer: email, at: new Date().toISOString(), markIds: []
+    });
+    a.offline = true;
+    b.offline = true;
+    const first = await save(a, "supervisorReportTables", review("a", "00123"));
+    const concurrent = await save(b, "supervisorReportTables", review("b", "00123"));
+    a.offline = false;
+    b.offline = false;
+    await a.sync.reconcile();
+    await b.sync.reconcile();
+    await a.sync.reconcile();
+    let events = await a.repository.listCollection("supervisorReportTables");
+    assert.equal(events.length, 2);
+    assert.equal(activeImproperRequests(events).get("00123").activeMarkIds.length, 2);
+
+    await save(a, "supervisorReportTables", {id: "quoteRequestCases", reportType: "quoteRequestCases", rows: [{case: "00123"}]});
+    await a.repository.deleteCollectionRecord("supervisorReportTables", "quoteRequestCases");
+    await a.sync.recordDeleted("supervisorReportTables", "quoteRequestCases");
+    await a.repository.createCollectionRecord("autoDrafterGeneratedDrafts", {id: "00123", caseNumber: "00123", draft: {}});
+    await a.repository.deleteCollectionRecord("autoDrafterGeneratedDrafts", "00123");
+    await b.sync.reconcile();
+    events = await b.repository.listCollection("supervisorReportTables");
+    assert.equal(events.length, 2);
+    assert.equal(activeImproperRequests(events).size, 1);
+
+    await save(b, "supervisorReportTables", {
+      ...review("undo", "00123"), action: "undo", markIds: [first.id, concurrent.id]
+    });
+    await a.sync.reconcile();
+    events = await a.repository.listCollection("supervisorReportTables");
+    assert.equal(events.length, 3);
+    assert.equal(activeImproperRequests(events).size, 0);
+  } finally {
+    await cluster.cleanup();
+  }
+});
+
 test("an import on one machine appears on another, including large multi-chunk tables", async () => {
   const cluster = await createCluster();
   try {

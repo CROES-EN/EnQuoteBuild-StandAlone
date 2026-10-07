@@ -2,6 +2,7 @@
 
 const https = require("node:https");
 const http = require("node:http");
+const {notificationEventId} = require("./notificationEvents.cjs");
 
 const DEFAULT_INTERVAL_MS = 30 * 1000;
 const REQUEST_TIMEOUT_MS = 20000;
@@ -50,7 +51,6 @@ function toRemotePayload(quote) {
 function createOutboundSync({ repository, config, logger = console, onAfterWrite }) {
   const { workerUrl, outboundToken, intervalMs = DEFAULT_INTERVAL_MS } = config || {};
   let running = false;
-  const recentlyNotifiedQuoteIds = new Map();
   const awaitingRemoteStatus = new Map();
   let timer = null;
   const isConfigured = Boolean(workerUrl && outboundToken);
@@ -139,13 +139,22 @@ function createOutboundSync({ repository, config, logger = console, onAfterWrite
           }
           results.push(result);
           if (!result.error && entry.quote_number && repository?.createCollectionRecord) {
-const now = Date.now();
-const recentTimestamps = (recentlyNotifiedQuoteIds.get(entry.local_id) || []).filter((t) => now - t < 60000);
-if (recentTimestamps.length === 0) {
-recentlyNotifiedQuoteIds.set(entry.local_id, [...recentTimestamps, now]);
-repository.createCollectionRecord("appNotifications", { type: "quote_synced", quoteId: entry.local_id, quoteNumber: entry.quote_number, occurredAt: new Date().toISOString(), read: false }).catch(() => {});
-}
-}
+            const eventId = notificationEventId("quote_synced", {
+              ...entry.quote, id: entry.local_id, base44_id: entry.local_id
+            });
+            try {
+              const existing = await repository.listCollection("appNotifications");
+              if (!existing.some(item => item.eventId === eventId)) {
+                await repository.createCollectionRecord("appNotifications", {
+                  eventId, type: "quote_synced", quoteId: entry.local_id,
+                  quoteNumber: entry.quote_number,
+                  occurredAt: entry.quote.updated_date || new Date().toISOString(), read: false
+                });
+              }
+            } catch (error) {
+              logger.warn(`[outbound-sync] Could not save notification for ${entry.local_id}: ${error.message}`);
+            }
+          }
         } catch (error) { results.push({ local_id: entry.local_id, error: error.message }); }
       }
       if (results.length) await repository.markOutboundSynced(results);

@@ -1,4 +1,4 @@
-# EnQuote — Developer Onboarding & Working Manual
+﻿# EnQuote — Developer Onboarding & Working Manual
 
 This document explains how EnQuote is actually built, tested, and shipped — written from real
 experience fixing this app, not theory. If you're new to this project (hi, Shane), read this
@@ -22,6 +22,147 @@ customization, column order/visibility, "My Cases" name, Workload goal, Salesfor
 session. These are personal display/workflow preferences or credentials — never shared.
 
 ---
+
+### Quote Draft Agent dependency previews
+
+Step 2's preview supports both curated accessory advisories (`suggestions`
+arrays) and generalized dependency advisories (`reason` text with source and
+verification details). Both remain visible for review; generalized advice does
+not add priced items. This renderer-only fix can ship through the signed UI
+update without changing Electron or the installed app version.
+
+### Auto-Drafter: Improper Quote Requests
+
+Use **Mark Improper Request** on a raw case or saved-draft tile, optionally enter
+a reason, and confirm. The request leaves **Awaiting Draft** and cannot be
+generated or sent to Quotes while marked. Existing saved drafts are retained.
+**Improper Requests** provides a searchable, sortable team review list with case
+and site links, marking time, reviewer, reason, and **Undo mark**. Undo restores
+drafting eligibility only if the case still meets the normal intake criteria and
+has no real quote. Marking does not update Salesforce or a real quote's status.
+
+Executive Overview's **Improper Quote Requests** tile counts unique cases marked
+during the selected reporting period, including requests whose marks were later
+undone. Repeated marks count once per case for Period Total. Daily Average counts
+unique cases per local calendar day divided by every day in the period (including
+zero-activity days); Latest Day uses the selected period's end. **View contributing
+records** shows one sortable row per contributing case, first/last marking times
+in the period, latest reviewer/reason, marking-event count, and current state.
+
+Review events are append-only version-1 records with reserved
+`quote-request-review:` IDs in the existing shared `supervisorReportTables`
+collection, excluded from imported-report listings. Each mark has its own ID;
+undo references known active mark IDs rather than rewriting a shared report.
+Concurrent unseen marks remain active until reviewed. Reimports, Clear Data,
+and Clear Generated Drafts do not erase reviews. Reviewer email is attributed
+from the signed-in UI account, not a separately server-verified audit identity.
+
+This uses the released desktop collection bridge and Supervisor sync: no new
+installer, Worker endpoint, or database migration is required. Saving confirms
+local persistence, not delivery to every PC; marks and undo become team-visible
+after desktop sync, including queued offline changes. A PC that has not received
+a remote mark can still draft until sync arrives. Browser development stores
+reviews only in local storage and does not provide team sync. Review-load errors
+pause drafting rather than treating the queue as unmarked.
+
+### Quote edits and outbound identity
+
+Editing a Quote Draft, Quote Missing Details, or legacy draft updates that
+record in place and retains its workflow status. Editing a non-draft creates
+a submitted revision first, then retires the prior version with a revision
+check. Failure to create the replacement must not hide the original quote.
+If retiring fails, the error identifies the saved replacement for review.
+
+The desktop outbound envelope carries `localId` and an already-sanitized quote
+payload (`id` removed, `local_quote_id` included). The Worker reconstructs the
+quote's local identity before retry lookup and create/update serialization.
+Never compare two absent local IDs as evidence that a create retry belongs
+to an existing Base44 quote. The identity correction requires a Worker
+deployment; the draft-edit correction ships through the signed UI update.
+
+Each Base44 quote has one owning local quote (`local_quote_id`). The Worker
+refuses an update from a different local copy (`IDENTITY_MISMATCH`) and
+leaves it queued, so two quotes can never take turns overwriting the same
+record. Updates from a native Base44 id keep the existing owner. Legacy
+records with no owner, or owned by their own Base44 id, still accept updates.
+Symptoms of a pre-guard collision: edits reverting, a quote showing another
+site's data, or every version marked not current and hidden from Quotes.
+Repair by restoring the original owner from its local copy, then recreating
+the other quote as a new Base44 record. Always back up the data file first.
+
+Quote owner pickers show `Real Name (email)`. The label uses the user's
+`display_name`, then `full_name` / `name` when those aren't just the email or
+its prefix. It falls back to the email alone when no real name is known.
+
+### Workload: sorting and personal layout
+
+Sorting Workload by **Open** (or any column) orders every row by that column
+alone. Tile highlighting (colored left border) never pins rows to the top.
+Workload columns and the sidebar tab order are saved per signed-in user on
+each PC (`enquote_sidebar_order_v2::<email>`). The first person to sign in
+after this update keeps the old per-PC sidebar order; others start from the
+default. **Reset tab order** affects only the signed-in user.
+
+### Workload: tagging a teammate into Tasks
+
+The leftmost Workload columns are **View > Tag > Open**. Use **Tag** to assign a
+case task to a teammate. **Age (Days)** displays completed whole
+days (12.9 becomes 12) in the table and details; its checkbox filter groups by
+the same whole-day values. Imported ages and sorting retain their original precision.
+On dark themes, colored O&M Status pills (including customized tile colors),
+Enphase Care eligibility badges, and matching-quote badges use brighter text
+and tinted backgrounds. Their light-theme appearance and status mappings are unchanged.
+Choose a teammate, enter a
+required due date/time (in your local timezone), and optionally add a note.
+**Tag and create task** sends a readable direct message and creates an open
+`Review case ...` task in the recipient's private task list. Tasks shows the case
+link, sender's email, note, and due date. The reminder defaults to the due time;
+the recipient can edit, complete, snooze, or delete it like other personal tasks.
+The sender does not receive a shared completion tracker.
+Completed tasks are hidden from the Tasks calendar, including the selected-day
+list and day counts. They remain available through **Show completed** in List
+view. Reopening a task returns it to the calendar.
+
+### Tasks: quotes needing attention
+
+The Tasks **List** tab starts with **Quotes needing attention**. Click
+**Choose statuses** (or **Statuses**) to pick quote statuses and either
+**My quotes** (owner, or creator when no owner) or **All quotes**. Settings are
+saved per signed-in user (`enquote_tasks_quote_attention_v1::<email>`); nothing
+shows until you choose at least one status. The list updates automatically: only
+current quote versions appear, and a quote drops off when its status changes.
+Rows link to the quote, site and case. They show days in the current status, based
+on the latest matching Status History entry, or the last update if none exists.
+Rows at 7+ days are highlighted. The oldest quotes are listed first. These quotes
+are not tasks, so they aren't counted in the task totals or shown on the calendar.
+
+### Text encoding (mojibake)
+
+Source files must stay UTF-8. If you see garbled sequences in place of dashes, arrows,
+`×` or `°`, UTF-8 was re-read as Windows-1252, usually after an editor or
+PowerShell rewrite. `tests/noMojibake.test.mjs` fails if this appears in
+`src`, `electron`, the Worker source, or this manual. On 2026-10-07, 38 local quotes with
+historical mojibake (item names, scopes, notes, hold and status reasons) were repaired
+and queued to sync. The backup is `Backups\enquote-data-v1.json.pre-mojibake-repair-*`.
+Activity-log history was left unchanged.
+
+Tasks are independent of the imported Workload report, so replacing that report
+does not erase assignments. Delivery requires an online send; the recipient sees
+the task after their app syncs. Existing Windows message notifications still open
+Messages. If sending fails, **Retry tag** reuses the request ID and locks the
+original fields to avoid duplicate tasks. Do not start a new tag to retry an
+uncertain send.
+
+**Rollout without an installer:** deploy the Worker changes first, then publish
+the signed UI update for the compatible installed app version. No new Electron
+or preload APIs and no database migration are required: the existing chat send
+bridge carries a validated version-1 `case_task` request attachment. The Worker
+requires a direct conversation with an allowed recipient, creates the message
+and recipient task in one transaction, and returns `caseTaskId` as confirmation.
+It consumes the request attachment rather than storing it in chat, so older UIs
+still receive an ordinary readable message. Unknown request types on an older
+Worker fail explicitly; they must not be treated as successfully created tasks.
+The regular personal-task upsert endpoint remains restricted to its caller.
 
 ### Supervisor Dashboard: Quote Dashboard tab
 
@@ -87,6 +228,18 @@ dated visits, ignoring older gaps, follow-ups and repeated same-status notes.
 Turnaround remains conservative when history is incomplete. Current age stays Unknown only when no valid, non-future matching
 status entry exists. No history is reconstructed from `updated_date`. Creation counts are
 current-version records, not deduplicated version families.
+
+The notification bell shows the recorded quote updater, not the viewing user or
+an older status-history author. When attribution is unavailable, it shows
+"updated" without guessing an email. Desktop quote edits require a signed-in
+identity and record its verified email. Opening the bell marks notifications read;
+Clear and Clear All persist dismissals per signed-in user on this device, including
+across reloads and replayed sync events. New updates remain visible. Storage errors
+are reported instead of silently claiming notifications were cleared.
+Updates are visible to all signed-in users, but reading or clearing them affects only
+the current user's state on this device. Sync-only timestamp/metadata refreshes do
+not generate quote or product update notifications; repeated copies of an event
+appear once. Signed-out users do not see the notification feed.
 
 Executive Overview includes customizable **Quotes Created** and **Quotes Worked**
 tiles and a live **Quote exceptions** review queue instead of the unused historical
@@ -256,6 +409,118 @@ OneNote desktop installed) `powershell -NoProfile -STA -File tests\electron\oneN
 The native test creates and closes only its own temporary synthetic notebook.
 
 ---
+
+### Debugging Console and macOS troubleshooting
+
+Open **Developer Console** with **Shift + backtick** (the physical Backquote key),
+then select **Debugging Console**. It is available to signed-in users even when a
+page denies access. It never changes roles or bypasses page authorization.
+Commands are fixed names, not arbitrary JavaScript, Terminal, or shell commands.
+
+| Command | Purpose |
+| --- | --- |
+| `help` | Command descriptions and action labels |
+| `diagnose` | All read-only checks, retaining individual failures |
+| `runtime` | Actual installed version, process architecture, translated execution, Mac install location, data-folder access, credential presence |
+| `updates` | Installer state/last error and signed UI version; no network check |
+| `permissions` | Session, local synced account, and service account access to Supervisor Dashboard; identifies offline cached policy |
+| `supervisor` | Local metric counts/date coverage, report row counts, last reconciliation outcome, separate Care table health |
+| `errors` | Last 20 recorded app errors, without stack traces |
+| `check-updates` | Check installer feed; the existing updater may download an available installer |
+| `check-ui` | Check/download a signed compatible UI bundle, without applying/reloading |
+| `refresh-supervisor` | Reconcile shared Supervisor collections, then refetch active queries |
+| `refresh-view` | Refetch active queries without deleting cache/data |
+
+Read-only buttons run immediately; actions must be entered and run explicitly.
+There is no restart, uninstall, data deletion, arbitrary code execution, or automatic
+UI application command. Output is bounded to 20 entries and stays in memory while
+the dialog is open. **Copy transcript** copies locally, not to a server. Common
+credential patterns, emails, and user-home names are redacted; report rows and full
+user records are not included. Review output before sharing; free-text errors may
+contain additional identifying information.
+
+For an affected Mac, run `diagnose`, then `check-updates` and `updates`.
+Keep installer version separate from the downloaded UI version and `runtime.ui.loadedUiVersion`:
+a downloaded UI may be staged but not yet loaded. Signed UI updates require an
+**exact installed desktop version match** and cannot upgrade Electron/main/preload.
+Missing bridges explicitly require a **full desktop update**; older builds can
+still run commands backed by their existing bridges through a compatible UI hotfix.
+
+macOS release review found the global Windows-style artifact name collided between
+Intel (`x64`) and Apple Silicon (`arm64`) builds. Mac artifacts now include platform
+and architecture, with both DMG and ZIP targets retained. Publish both architectures
+and `latest-mac.yml` to the same released GitHub version (not just Actions artifacts);
+the updater needs ZIP assets and matching metadata. The workflow has explicit release
+write permission and includes metadata/blockmaps in its backup artifact.
+The workflow remains **unsigned**. Reliable Mac installer auto-update requires
+proper Apple code signing of the installed and replacement apps; signing/notarization
+must be configured separately before promising automatic upgrades. Do not disable
+signature validation or recommend globally bypassing Gatekeeper.
+
+If updating an older unsigned Mac fails, use the appropriate architecture's DMG for
+a manual upgrade: back up EnQuote's data folder, quit EnQuote completely (closing
+the window is not quitting on macOS), replace EnQuote in Applications, eject the
+DMG, and launch the Applications copy. Preserve the existing data folder/app identity.
+`runtime` flags mounted DMGs, App Translocation and non-Applications locations.
+Validate on real Intel and Apple Silicon Macs; Windows unit/build checks cannot
+verify Gatekeeper, Apple signing, or Squirrel.Mac installation.
+
+For Heather, run `permissions` and `supervisor` on **her signed-in machine**.
+Approvers do **not** have default Supervisor Dashboard access; this is intentional
+and unchanged. An administrator can grant that page explicitly. Explicit deny
+wins over allow; cached offline policy or a stale local role can disagree with the
+current service account. Distinguish Access Denied from a daily-metrics read failure
+(now shown with Retry), missing imports, and an empty selected reporting period.
+Separate large Care table files are local-only: Supervisor reconciliation reads the
+main collections, and records over the Worker's size cap also remain local-only.
+Diagnostics expose those limits; a successful sync is not proof that every local
+report table is shared. Partial record failures now appear in reconciliation results
+instead of being reported as complete success.
+
+This change needs a **new full desktop release** for native diagnostics and installer
+checks. Do not reuse an already-published version number. No release is published
+by editing this code; build/publish and real-device upgrade testing are still required.
+
+#### UI-only hotfix for installed 1.3.0
+
+The Debugging Console, permissions/local-data/error checks, dashboard daily-metrics
+error display, and clearer Admin Menu labels can ship as a **signed UI-only hotfix**.
+They use the existing 1.3.0 preload. `runtime` reports the installed version from
+`ui.getInfo` and exact bridge capabilities; unavailable native fields are explicitly
+listed, never inferred from the renderer's package version or browser user agent.
+`check-ui` and `refresh-view` work without a newer preload.
+`check-updates` and `refresh-supervisor` are labeled unavailable until their native
+methods exist. An available-command label does not mean that a network operation succeeded:
+its actual result is displayed after running it.
+
+Do not publish from the full desktop working tree: `publish-ui.cjs` correctly rejects
+Electron/package changes. Prepare a separate **local release-compatible source
+snapshot**, based on tag `v1.3.0`, with the approved current UI overlaid (including
+pending UI changes when explicitly approved, so existing UI fixes are not rolled back).
+Keep package/dependency manifests, Electron and signing public key identical to
+the release. Run tests/build/smoke in that snapshot, then use its unchanged UI
+publisher, first with `--channel beta`, before promoting to stable.
+The snapshot requires the publisher's normal local credentials/signing key and
+Worker tooling; never commit those files or disable the main-process safety check.
+Preparing/building a snapshot does not publish it. Native fixes remain in the main
+working tree for a later full desktop release.
+
+Andrew's functioning Mac is a useful comparison, not proof that Heather's running
+copy has the same native code or downloaded UI. Run `diagnose` on both devices.
+This hotfix cannot reach a machine whose existing signed UI updater cannot download
+or apply it; that machine still needs a manual compatible installer upgrade.
+
+**Admin Menu > Live sessions:** App/UI/Resolved role are client heartbeat telemetry;
+Effective role is the server's independently resolved account role. Missing App or
+Resolved role is now labeled **Not reported**, not `?` or an assumed old version.
+An empty UI version means **Bundled or not reported**, not necessarily a failed UI
+update. `runtime.presenceTelemetry` shows the versions/role that this desktop sends
+and the last heartbeat outcome. Heartbeats and error reports now identify the
+**loaded** signed UI, not a downloaded update awaiting reload. A version label alone
+does not prove two installers were built from the same code, especially if a version
+was rebuilt or platform releases were produced from different commits. Compare
+native bridge availability and runtime telemetry; ship a higher desktop version for
+native corrections rather than rebuilding 1.3.0 in place.
 
 ## 2. Environment Setup (first time only)
 

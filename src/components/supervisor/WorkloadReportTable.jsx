@@ -48,6 +48,8 @@ import {ALWAYS_HIDDEN_WORKLOAD_COLUMNS} from "@/features/supervisorDashboard/wor
 import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
 import WorkloadSettingsPanel from "@/components/supervisor/WorkloadSettingsPanel";
 import {getCurrentUser} from "@/api/dataClient";
+import CaseTagDialog from "@/components/collab/CaseTagDialog";
+import {formatWorkloadCell} from "@/features/supervisorDashboard/workloadCellFormatting";
 
 // Safety cap for the drag-and-drop column reorder's sliding (FLIP) animation - if a reorder
 // would touch an unreasonably large number of cells (e.g. a future much-larger import), skip
@@ -73,9 +75,9 @@ const WRAP_COLUMNS = new Set(["Subject", "Contact: Email", "New_Location"]);
 
 /** Small colored pill - renders the tile's icon in place of the plain dot when the status is
  *  mapped to a tile. */
-function ColorPill({ classes }) {
+function ColorPill({ classes, brightenInDark = false }) {
   return (
-    <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap", classes.bg,classes.text)}>
+    <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap", brightenInDark && "workload-color-badge", classes.bg,classes.text)}>
       {classes.icon ? (
         <span aria-hidden="true">{classes.icon}</span>
       ) : (
@@ -97,7 +99,7 @@ function CareBadge({ eligibility }) {
   return (
     <span
       title={`Active Enphase Care${eligibility.renewalCount > 0 ? ` (renewed ${eligibility.renewalCount}x)` : ""}`}
-      className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700"
+      className="workload-color-badge inline-flex shrink-0 items-center gap-0.5 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700"
     >
       <ShieldCheck className="h-3 w-3" />
       Care
@@ -128,7 +130,7 @@ function RowDetailsDialog({ open, onOpenChange, columns, row }) {
                   <CaseNumberLink caseNumber={row[col]} caseId={row["Case ID"]} />
                 ) : col === "Enlighten Site ID" && row?.[col] ? (
                   <SiteIdLink siteId={row[col]} />
-                ) : (row?.[col] || "None")}
+                ) : (formatWorkloadCell(col, row?.[col]) || "None")}
               </dd>
             </div>
           ))}
@@ -369,6 +371,7 @@ export default function WorkloadReportTable({ table, onReload, isReloading }) {
   const [sortColumn, setSortColumn] = useState(() => getDefaultSortColumn());
   const [sortDirection, setSortDirection] = useState("asc");
   const [detailsRow, setDetailsRow] = useState(null);
+  const [tagRow, setTagRow] = useState(null);
   const [quoteMatchesForDialog, setQuoteMatchesForDialog] = useState(null);
   const [activeTileFilter, setActiveTileFilter] = useState(null);
   const [reviewMeOnly, setReviewMeOnly] = useState(false);
@@ -623,7 +626,7 @@ export default function WorkloadReportTable({ table, onReload, isReloading }) {
       const values = new Set();
       scopedRows.forEach((row) => {
         const v = row[col];
-        if (v !== null && v !== undefined && v !== "") values.add(String(v));
+        if (v !== null && v !== undefined && v !== "") values.add(formatWorkloadCell(col, v));
       });
       result[col] = Array.from(values).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
     });
@@ -856,7 +859,7 @@ export default function WorkloadReportTable({ table, onReload, isReloading }) {
       entries = entries.filter(({ row }) =>
         Object.entries(columnFilters).every(([col, allowedValues]) => {
           const cellValue = row[col];
-          const cellStr = (cellValue === null || cellValue === undefined || cellValue === "") ? null : String(cellValue);
+          const cellStr = (cellValue === null || cellValue === undefined || cellValue === "") ? null : formatWorkloadCell(col, cellValue);
           // A blank/missing cell only passes if the filter itself doesn't require a specific
           // value to be present - since distinctColumnValues never includes blanks as an
           // option, a blank cell can never be "selected", so it's correctly excluded whenever
@@ -871,9 +874,6 @@ export default function WorkloadReportTable({ table, onReload, isReloading }) {
     }
     const sorted = [...entries].sort((a, b) => {
       if (sortColumn === "__open") {
-        const aImportant = getTileForRow(a.row, tiles) ? 0 : 1;
-        const bImportant = getTileForRow(b.row, tiles) ? 0 : 1;
-        if (aImportant !== bImportant) return aImportant - bImportant;
         const aVal = a.openDays ?? -Infinity;
         const bVal = b.openDays ?? -Infinity;
         const cmp = aVal - bVal;
@@ -1177,6 +1177,12 @@ export default function WorkloadReportTable({ table, onReload, isReloading }) {
         <table className="w-full table-auto border-collapse text-sm">
           <thead>
             <tr>
+              <th scope="col" className={`sticky top-0 z-10 whitespace-nowrap border-b border-border bg-secondary px-3 ${headerPadding}text-left text-xs font-semibold text-foreground`}>
+                View
+              </th>
+              <th scope="col" className={`sticky top-0 z-10 whitespace-nowrap border-b border-border bg-secondary px-3 ${headerPadding}text-left text-xs font-semibold text-foreground`}>
+                Tag
+              </th>
               <SortableHeader column="__open" label="Open" />
               {presentColumns.map((col) => (
                 <SortableHeader
@@ -1186,9 +1192,6 @@ export default function WorkloadReportTable({ table, onReload, isReloading }) {
                   className={WRAP_COLUMNS.has(col) ? "min-w-[14rem]" : undefined}
                 />
               ))}
-              <th scope="col" className={`sticky top-0 z-10 whitespace-nowrap border-b border-border bg-secondary px-3 ${headerPadding}text-left text-xs font-semibold text-foreground`}>
-                Details
-              </th>
             </tr>
           </thead>
           <tbody>
@@ -1205,6 +1208,26 @@ export default function WorkloadReportTable({ table, onReload, isReloading }) {
                     "hover:bg-indigo-500/5"
                   )}
                 >
+                  <td className={`whitespace-nowrap border-b border-border/50 px-3 ${cellPadding} align-top`}>
+                    <button
+                      type="button"
+                      onClick={() => setDetailsRow(row)}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                    >
+                      View <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
+                  </td>
+                  <td className={`whitespace-nowrap border-b border-border/50 px-3 ${cellPadding} align-top`}>
+                    <button
+                      type="button"
+                      disabled={!/^\d{1,30}$/.test(String(row["Case Number"] ?? "").trim())}
+                      onClick={() => setTagRow(row)}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                      aria-label={`Tag someone on case ${row["Case Number"] || "without a case number"}`}
+                    >
+                      <User className="h-3.5 w-3.5" />Tag
+                    </button>
+                  </td>
                   <td className={`whitespace-nowrap border-b border-border/50 px-3 ${cellPadding} align-top font-semibold text-foreground`}>
                     {openDays === null ? "--" : `${openDays}d`}
                   </td>
@@ -1228,7 +1251,7 @@ export default function WorkloadReportTable({ table, onReload, isReloading }) {
                         )}
                       >
                         {col === "O&M Status" ? (
-                          <ColorPill classes={getOMStatusBadgeClasses(row[col], tile)} />
+                          <ColorPill classes={getOMStatusBadgeClasses(row[col], tile)} brightenInDark />
                         ) : col === "Project Picklist" ? (
                           <ColorPill classes={getProjectPicklistBadgeClasses(row[col])} />
                         ) : col === "Enlighten Site ID" ? (
@@ -1252,7 +1275,7 @@ export default function WorkloadReportTable({ table, onReload, isReloading }) {
                               type="button"
                               onClick={(e) => { e.stopPropagation(); setQuoteMatchesForDialog(quoteMatches); }}
                               title={`${quoteMatches.length} matching quote${quoteMatches.length === 1 ? "" : "s"} - click to view`}
-                              className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-indigo-500/10 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 hover:bg-indigo-500/20"
+                              className="workload-color-badge inline-flex shrink-0 items-center gap-0.5 rounded-full bg-indigo-500/10 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 hover:bg-indigo-500/20"
                             >
                               <FileText className="h-3 w-3" />
                               +{quoteMatches.length}
@@ -1261,26 +1284,17 @@ export default function WorkloadReportTable({ table, onReload, isReloading }) {
                         ) : row[col] === "" || row[col] === null || row[col] === undefined ? (
                           <span className="text-muted-foreground">--</span>
                         ) : (
-                          String(row[col])
+                          formatWorkloadCell(col, row[col])
                         )}
                       </td>
                     );
                   })}
-                  <td className={`whitespace-nowrap border-b border-border/50 px-3 ${cellPadding} align-top`}>
-                    <button
-                      type="button"
-                      onClick={() => setDetailsRow(row)}
-                      className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                    >
-                      View <ChevronRight className="h-3.5 w-3.5" />
-                    </button>
-                  </td>
                 </tr>
               );
             })}
             {filteredSorted.length === 0 && (
               <tr>
-                <td colSpan={presentColumns.length + 2} className="py-8 text-center text-sm text-muted-foreground">
+                <td colSpan={presentColumns.length + 3} className="py-8 text-center text-sm text-muted-foreground">
                   {/* Priority order: (1) the import itself is empty, (2) the CURRENT SCOPE
                       (My Cases/All Cases) is entirely empty - true regardless of any
                       search/tile/Review Me/column filter, so this takes priority over a
@@ -1306,6 +1320,7 @@ export default function WorkloadReportTable({ table, onReload, isReloading }) {
         columns={table.columns.filter((col) => !ALWAYS_HIDDEN_WORKLOAD_COLUMNS.has(col))}
         row={detailsRow}
       />
+      {tagRow && <CaseTagDialog row={tagRow} onClose={() => setTagRow(null)} />}
 
       <QuoteMatchesDialog
         matches={quoteMatchesForDialog}

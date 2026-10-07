@@ -19,6 +19,8 @@ function createPresenceSync({
   let timer = null;
   let presenceName = "";
   let presenceResolvedRole = "";
+  let lastHeartbeatAt = null;
+  let lastHeartbeatResult = null;
 
   async function request(action, name = "") {
     const identity = getIdentity();
@@ -98,10 +100,15 @@ function createPresenceSync({
       presenceResolvedRole = resolvedRole.trim().slice(0, 40);
     }
     try {
-      return await request("heartbeat", presenceName);
+      const result = await request("heartbeat", presenceName);
+      lastHeartbeatAt = new Date().toISOString();
+      lastHeartbeatResult = { ok: result.ok === true, ...(result.error ? { error: result.error } : {}) };
+      return result;
     } catch (error) {
       logger.warn("[presence] Heartbeat failed:", error.message);
-      return { ok: false, error: error.message };
+      lastHeartbeatAt = new Date().toISOString();
+      lastHeartbeatResult = { ok: false, error: error.message };
+      return lastHeartbeatResult;
     }
   }
 
@@ -131,7 +138,16 @@ function createPresenceSync({
     }
   }
 
-  return { start, heartbeat, remove, list };
+  return {
+    start, heartbeat, remove, list,
+    getStatus: () => ({
+      enabled: timer !== null,
+      versions: getVersions() || {},
+      resolvedRole: presenceResolvedRole || null,
+      lastHeartbeatAt,
+      lastHeartbeatResult: lastHeartbeatResult ? { ...lastHeartbeatResult } : null
+    })
+  };
 }
 
 module.exports = { createPresenceSync };

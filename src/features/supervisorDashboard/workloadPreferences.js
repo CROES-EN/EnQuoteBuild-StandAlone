@@ -30,9 +30,9 @@
  * Covers everything requested:
  *   - Tiles ("buttons"): each tile has an editable label (text), icon (emoji), color, and a
  *     LIST of O&M Status values that map to it - this is the "change the text and/or the
- *     mapping for the buttons" request. A status counts as "important" (row emphasis, pinned
- *     sort, Review Me filter) if it's mapped to ANY tile - there's no longer a separate
- *     hardcoded "important" list; the tiles themselves ARE the definition.
+ *     mapping for the buttons" request. A status counts as "important" (row emphasis, Review
+ *     Me filter) if it's mapped to ANY tile - there's no longer a separate hardcoded
+ *     "important" list; the tiles themselves ARE the definition. Tiles never affect sorting.
  *   - Column visibility + display order (simple up/down reordering, not full drag-and-drop -
  *     kept intentionally simple to avoid adding a new drag-and-drop dependency for one
  *     feature; can be revisited if that's ever wanted).

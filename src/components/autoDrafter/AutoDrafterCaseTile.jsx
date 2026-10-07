@@ -11,6 +11,8 @@ import {calculateQuoteTotals} from "@/utils/quoteCalculations";
 import {parseQuoteRequestCase} from "@/features/autoDrafter/parseQuoteRequestCase";
 import {generateQuoteDraft} from "@/features/quoteDraftAgent/draftEngine";
 import {saveGeneratedDraft} from "@/features/autoDrafter/autoDrafterDraftsStore";
+import {listQuoteRequestReviews} from "@/features/supervisorDashboard/importedTableStore";
+import {assertRequestCanBeDrafted} from "@/features/autoDrafter/improperQuoteRequests";
 import {useCareEligibilityIndex} from "@/features/supervisorDashboard/careEligibilityCache";
 import {getEligibilityFromIndex} from "@/features/supervisorDashboard/careEligibility";
 import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
@@ -104,7 +106,8 @@ export default ({
                   createdCol,
                   savedDraftRecord = null,
                   onDraftSaved,
-                  onViewDraft
+                  onViewDraft,
+                  onMarkImproper
                 }) => {
   const comment = commentCol ? row[commentCol] || "" : "";
 
@@ -131,6 +134,7 @@ export default ({
   async function handleGenerateDraft() {
     setIsGenerating(true);
     try {
+      assertRequestCanBeDrafted(await listQuoteRequestReviews(), caseNumber);
       const { request, parseWarnings } = parseQuoteRequestCase(comment);
       const draft = generateQuoteDraft(request);
       const record = {
@@ -146,7 +150,7 @@ export default ({
       toast.success("Draft generated and saved for review.");
     } catch (error) {
       console.error("Failed to generate draft from case comment:", error);
-      toast.error("Could not generate a draft from this case -- see console for details.");
+      toast.error(`Could not generate a draft: ${error.message}`);
     } finally {
       setIsGenerating(false);
     }
@@ -235,6 +239,7 @@ export default ({
             </div>
           </Card>
         </div>
+        {onMarkImproper && <Button variant="outline" size="sm" className="mt-2 w-full" disabled={!String(caseNumber ?? "").trim()} onClick={onMarkImproper}>Mark Improper Request</Button>}
       </motion.div>
     );
   }
@@ -326,6 +331,7 @@ export default ({
             )}
             Generate Draft
           </Button>
+          {onMarkImproper && <Button size="sm" variant="outline" className="mt-2 w-full" disabled={isGenerating || !String(caseNumber ?? "").trim()} onClick={onMarkImproper}>Mark Improper Request</Button>}
         </div>
       </Card>
     </motion.div>

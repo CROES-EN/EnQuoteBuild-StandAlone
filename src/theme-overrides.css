@@ -114,6 +114,47 @@ body {
   border-color: var(--theme-accent) !important;
 }
 
+/* Brighter semantic colors for Workload badges on every dark theme. */
+.dark .workload-color-badge[class*="text-red-"] { --workload-badge-rgb: 254 202 202; }
+.dark .workload-color-badge[class*="text-rose-"] { --workload-badge-rgb: 254 205 211; }
+.dark .workload-color-badge[class*="text-yellow-"] { --workload-badge-rgb: 253 224 71; }
+.dark .workload-color-badge[class*="text-amber-"] { --workload-badge-rgb: 252 211 77; }
+.dark .workload-color-badge[class*="text-orange-"] { --workload-badge-rgb: 254 215 170; }
+.dark .workload-color-badge[class*="text-green-"] { --workload-badge-rgb: 134 239 172; }
+.dark .workload-color-badge[class*="text-emerald-"] { --workload-badge-rgb: 110 231 183; }
+.dark .workload-color-badge[class*="text-teal-"] { --workload-badge-rgb: 94 234 212; }
+.dark .workload-color-badge[class*="text-cyan-"] { --workload-badge-rgb: 103 232 249; }
+.dark .workload-color-badge[class*="text-sky-"] { --workload-badge-rgb: 186 230 253; }
+.dark .workload-color-badge[class*="text-blue-"] { --workload-badge-rgb: 191 219 254; }
+.dark .workload-color-badge[class*="text-indigo-"] { --workload-badge-rgb: 199 210 254; }
+.dark .workload-color-badge[class*="text-purple-"] { --workload-badge-rgb: 233 213 255; }
+.dark .workload-color-badge[class*="text-violet-"] { --workload-badge-rgb: 221 214 254; }
+.dark .workload-color-badge[class*="text-fuchsia-"] { --workload-badge-rgb: 245 208 254; }
+
+/* Scoped to colored Workload badges, including custom tile colors; neutral pills stay themed. */
+.dark .workload-color-badge[class*="text-red-"],
+.dark .workload-color-badge[class*="text-rose-"],
+.dark .workload-color-badge[class*="text-yellow-"],
+.dark .workload-color-badge[class*="text-amber-"],
+.dark .workload-color-badge[class*="text-orange-"],
+.dark .workload-color-badge[class*="text-green-"],
+.dark .workload-color-badge[class*="text-emerald-"],
+.dark .workload-color-badge[class*="text-teal-"],
+.dark .workload-color-badge[class*="text-cyan-"],
+.dark .workload-color-badge[class*="text-sky-"],
+.dark .workload-color-badge[class*="text-blue-"],
+.dark .workload-color-badge[class*="text-indigo-"],
+.dark .workload-color-badge[class*="text-purple-"],
+.dark .workload-color-badge[class*="text-violet-"],
+.dark .workload-color-badge[class*="text-fuchsia-"] {
+  color: rgb(var(--workload-badge-rgb)) !important;
+  background-color: rgb(var(--workload-badge-rgb) / 0.16) !important;
+}
+
+.dark button.workload-color-badge:hover {
+  background-color: rgb(var(--workload-badge-rgb) / 0.18) !important;
+}
+
 /* Inputs and form controls */
 input,
 select,
@@ -137,4 +178,3 @@ textarea {
 .bg-slate-50\/50 {
   background-color: var(--theme-bg-secondary) !important;
 }
-

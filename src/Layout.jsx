@@ -70,6 +70,7 @@ import NotificationBell from "@/components/NotificationBell";
 import {recordError} from "@/features/developerConsole/errorLog";
 import {countAttentionTasks, useChatUnread, useTasks} from "@/features/collab/collabApi";
 import {ProfilePicturePicker} from "@/components/profile/UserAvatar";
+import {applySidebarOrder, readSidebarOrder, writeSidebarOrder} from "@/lib/sidebarOrder";
 
 const isDemoMode = ["mock", "local", "salesforce-mock"].includes(import.meta.env.VITE_DATA_SOURCE);
 const appVersion = appPackage?.version || "0.0.0";
@@ -133,35 +134,6 @@ function formatLastUpdated(date) {
   return `${datePart} ${timePart}`;
 }
 
-// Sidebar tab order is a per-computer preference: a list of page ids. Pages missing from the
-// saved list (e.g. added in a later update) keep their default order after the saved ones.
-const SIDEBAR_ORDER_STORAGE_KEY = "enquote_sidebar_order";
-
-function readSidebarOrder() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(SIDEBAR_ORDER_STORAGE_KEY) || "null");
-    return Array.isArray(parsed) ? parsed.filter((id) => typeof id === "string") : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeSidebarOrder(order) {
-  try {
-    if (order) localStorage.setItem(SIDEBAR_ORDER_STORAGE_KEY, JSON.stringify(order));
-    else localStorage.removeItem(SIDEBAR_ORDER_STORAGE_KEY);
-  } catch { /* ignore */ }
-}
-
-function applySidebarOrder(items, order) {
-  if (!order?.length) return items;
-  const rank = new Map(order.map((id, index) => [id, index]));
-  return items
-    .map((item, index) => ({ item, index }))
-    .sort((a, b) => (rank.get(a.item.page) ?? order.length + a.index) - (rank.get(b.item.page) ?? order.length + b.index))
-    .map(({ item }) => item);
-}
-
 export default function Layout({ children, currentPageName }) {
   const { isAdmin, roles, user } = useUserRole();
   const { isAuthenticated, isLocalAuthActive, logout } = useAuth();
@@ -199,6 +171,9 @@ export default function Layout({ children, currentPageName }) {
     try { return localStorage.getItem("enquote_dismissed_announcement_id") || ""; } catch { return ""; }
   });
   const [sidebarOrder, setSidebarOrder] = useState(() => readSidebarOrder());
+  useEffect(() => {
+    setSidebarOrder(readSidebarOrder());
+  }, [user?.email]);
   const orderedNavItems = applySidebarOrder(navItems, sidebarOrder);
   const visibleNavItems = orderedNavItems.filter(item => canAccessPage(user, item.page, accessPolicy));
   const currentPageBlocked = Boolean(currentPageName) && isAuthenticated && !canAccessPage(user, currentPageName, accessPolicy);

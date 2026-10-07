@@ -35,6 +35,117 @@ const SECRET = "01234567890123456789012345678901";
 const OUTBOUND_TOKEN = "outbound-token";
 const ALLOWED_EMAILS_LIST = "alice@example.com,bob@example.com,carol@example.com";
 
+async function caseTagSetup() {
+  const env = makeEnv();
+  const result = await (await handleChatConversationCreate(await authedRequest("/api/chat/conversations", "alice@example.com", {
+    method: "POST", body: { kind: "dm", with: "bob@example.com" }
+  }), env)).json();
+  const attachment = {
+    type: "case_task", version: 1, recipient: "bob@example.com",
+    caseNumber: "00123456", caseId: "500000000000001",
+    note: "Please review the invoice.", dueAt: stamp(86_400_000)
+  };
+  const payload = {
+    conversationId: result.conversation.id, clientId: crypto.randomUUID(),
+    body: "Tagged you to review case 00123456.", attachments: [attachment]
+  };
+  const send = (body = payload, email = "alice@example.com") =>
+    authedRequest("/api/chat/messages", email, { method: "POST", body }).then((req) => handleChatMessageSend(req, env));
+  const tasks = (email = "bob@example.com") =>
+    authedRequest("/api/tasks", email).then((req) => handleTasksList(req, env)).then((response) => response.json());
+  return { env, payload, attachment, send, tasks };
+}
+
+test("case tags atomically create recipient tasks through the released chat API", async () => {
+  const { env, payload, send, tasks } = await caseTagSetup();
+  const result = await (await send()).json();
+  assert.equal(result.message.caseTaskId, `case-tag:${payload.clientId}`);
+  assert.deepEqual(result.message.attachments, [], "old desktop clients never receive unknown attachment types");
+  const bobTasks = await tasks();
+  assert.equal(bobTasks.tasks.length, 1);
+  const task = bobTasks.tasks[0].record;
+  assert.equal(task.case_number, "00123456");
+  assert.equal(task.case_id, "500000000000001");
+  assert.equal(task.assigned_by, "alice@example.com");
+  assert.equal(task.notes, "Please review the invoice.");
+  assert.equal(task.due_at, payload.attachments[0].dueAt);
+  assert.equal(task.remind_at, task.due_at);
+  assert.equal(task.status, "open");
+  assert.equal(task.updated_date, bobTasks.tasks[0].updatedAt);
+  assert.equal((await tasks("alice@example.com")).tasks.length, 0);
+  assert.equal((await tasks("carol@example.com")).tasks.length, 0);
+  assert.ok(env.broadcasts.some((event) => event.type === "tasks_updated"));
+  assert.equal(JSON.stringify(env.broadcasts).includes("bob@example.com"), false);
+  assert.equal((await (await send()).json()).message.caseTaskId, task.id);
+  assert.equal((await tasks()).tasks.length, 1, "retry does not duplicate the task");
+  await handleTasksDelete(await authedRequest("/api/tasks/delete", "bob@example.com", {
+    method: "POST", body: { id: task.id, deletedAt: stamp(1000) }
+  }), env);
+  assert.equal((await send()).status, 200);
+  assert.equal((await tasks()).tasks[0].deleted, true, "retry must not resurrect a removed task");
+});
+
+test("concurrent case-tag retries create one task and one message", async () => {
+  const { env, payload, send, tasks } = await caseTagSetup();
+  const responses = await Promise.all([send(), send()]);
+  for (const response of responses) assert.equal(response.status, 200);
+  assert.equal((await tasks()).tasks.length, 1);
+  const messages = await (await handleChatMessages(await authedRequest(
+    `/api/chat/messages?conversationId=${payload.conversationId}`, "bob@example.com"), env)).json();
+  assert.equal(messages.messages.length, 1);
+});
+
+test("case tags reject invalid requests, unauthorized recipients, groups, and message-id reuse", async () => {
+  const { env, payload, attachment, send, tasks } = await caseTagSetup();
+  for (const patch of [
+    { version: 2 }, { dueAt: "" }, { dueAt: "not-a-date" }, { dueAt: "2026-02-30T09:00:00.000Z" }, { caseNumber: "" },
+    { caseNumber: "<script>" }, { caseId: "https://evil.example" }, { note: "x".repeat(2001) }
+  ]) {
+    assert.equal((await send({ ...payload, attachments: [{ ...attachment, ...patch }] })).status, 400);
+  }
+  for (const recipient of ["alice@example.com", "carol@example.com", "stranger@example.com"]) {
+    assert.equal((await send({ ...payload, attachments: [{ ...attachment, recipient }] })).status, 403);
+  }
+  assert.equal((await send(payload, "carol@example.com")).status, 404);
+  const group = await (await handleChatConversationCreate(await authedRequest("/api/chat/conversations", "alice@example.com", {
+    method: "POST", body: { kind: "group", name: "Team", members: ["bob@example.com"] }
+  }), env)).json();
+  assert.equal((await send({ ...payload, conversationId: group.conversation.id })).status, 403);
+  assert.equal((await tasks()).tasks.length, 0);
+  assert.equal((await send({ ...payload, attachments: [] })).status, 200);
+  assert.equal((await send()).status, 409, "ordinary messages cannot later become task requests");
+  assert.equal((await tasks()).tasks.length, 0);
+});
+
+test("case tag task-write failure rolls back the message and permits a safe retry", async () => {
+  const { env, payload, send, tasks } = await caseTagSetup();
+  const batch = env.DB.batch;
+  env.DB.batch = (statements) => batch([
+    statements[0], env.DB.prepare("INSERT INTO nonexistent_case_tag_table VALUES (1)")
+  ]);
+  await assert.rejects(send(), /nonexistent_case_tag_table/);
+  env.DB.batch = batch;
+  const messages = await (await handleChatMessages(await authedRequest(
+    `/api/chat/messages?conversationId=${payload.conversationId}`, "bob@example.com"), env)).json();
+  assert.equal(messages.messages.length, 0);
+  assert.equal((await tasks()).tasks.length, 0);
+  assert.equal((await send()).status, 200);
+  assert.equal((await tasks()).tasks.length, 1);
+});
+
+test("case tasks advance beyond the recipient's existing incremental sync cursor", async () => {
+  const { env, payload, send } = await caseTagSetup();
+  const cursor = stamp(1000);
+  await env.DB.prepare(`INSERT INTO user_tasks (owner, id, updated_at, synced_at, deleted, data)
+    VALUES (?, ?, ?, ?, 0, ?)`).bind("bob@example.com", "prior-task", stamp(-1000), cursor, "{}").run();
+  assert.equal((await send()).status, 200);
+  const result = await (await handleTasksList(await authedRequest(
+    `/api/tasks?since=${encodeURIComponent(cursor)}`, "bob@example.com"), env)).json();
+  assert.equal(result.tasks.length, 1);
+  assert.equal(result.tasks[0].id, `case-tag:${payload.clientId}`);
+  assert.ok(result.cursor > cursor);
+});
+
 function stamp(offsetMs = 0) {
   return new Date(Date.now() + offsetMs).toISOString();
 }

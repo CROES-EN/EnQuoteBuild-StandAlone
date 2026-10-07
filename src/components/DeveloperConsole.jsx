@@ -7,6 +7,7 @@ import {useQueryClient} from "@tanstack/react-query";
 import {toast} from "sonner";
 import {AdminResetPasswordButton} from "@/features/developerConsole/AdminPasswordReset.jsx";
 import {UserAvatar} from "@/components/profile/UserAvatar";
+import DebuggingConsole from "@/components/DebuggingConsole";
 
 const REPORT_SEVERITY_ORDER = { critical: 0, known_issue: 1, needs_investigation: 2, warning: 3, info: 4 };
 const REPORT_SEVERITY_LABEL = {
@@ -115,6 +116,9 @@ export default function DeveloperConsole({
       setReports(reportsRes?.ok ? (reportsRes.reports || []) : []);
       setUsers(Array.isArray(usersRes) ? usersRes : []);
       await loadPresence();
+    } catch (error) {
+      console.error("Developer Console could not load diagnostics:", error);
+      toast.error(`Could not load console data: ${error?.message || error}. The Debugging Console is still available.`);
     } finally {
       setLoading(false);
     }
@@ -188,12 +192,13 @@ export default function DeveloperConsole({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex items-center gap-2 border-b border-border pb-2">
+        <div className="flex flex-wrap items-center gap-2 border-b border-border pb-2">
                     {[
             { key: "errors", label: `App Errors (${appErrors.length})` },
             { key: "sync", label: `Sync Events (${syncEvents.length})` },
             { key: "reports", label: `Teammate Reports (${flattenedFindings.length})` },
             { key: "presence", label: `Who's Online (${sessions.length})` },
+            { key: "debugging", label: "Debugging Console" },
             // Hidden entirely (not just disabled) for non-admins - matches
             // the "hide, don't just disable" requirement discussed earlier.
             ...(isCurrentUserAdmin ? [{ key: "admin", label: `Manage Users (${users.length})` }] : [])
@@ -225,6 +230,7 @@ export default function DeveloperConsole({
         </div>
 
         <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+          <div hidden={activeTab !== "debugging"}><DebuggingConsole /></div>
           {activeTab === "errors" && (
             appErrors.length === 0 ? (
               <p className="text-sm text-muted-foreground italic p-4 text-center">No app errors recorded. Good sign.</p>

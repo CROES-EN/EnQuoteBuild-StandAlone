@@ -21,7 +21,9 @@ const FRIENDLY_ERRORS = {
   unsupported_type: "That file type isn't supported. Use PDF, Word (.docx), images, or text.",
   unsupported_file_type: "That file type isn't supported. Use PDF, Word (.docx), images, or text.",
   unknown_member: "One of the people you picked isn't on the EnQuote access list.",
-  stamp_in_future: "Your PC clock looks wrong. Check the date and time, then try again."
+  stamp_in_future: "Your PC clock looks wrong. Check the date and time, then try again.",
+  invalid_case_task: "Check the case details and pick a valid due date and time.",
+  invalid_case_task_recipient: "Choose a teammate from the directory for this case task."
 };
 
 export function friendlyError(result) {
@@ -36,7 +38,7 @@ async function call(path, ...args) {
   const result = await fn(...args);
   if (result && typeof result === "object" && result.ok === false && result.reason !== "conflict") {
     const error = new Error(friendlyError(result));
-    error.code = result.reason;
+    error.code = result.reason || result.error;
     throw error;
   }
   return result;

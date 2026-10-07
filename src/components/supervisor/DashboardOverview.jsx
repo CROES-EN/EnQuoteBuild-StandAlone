@@ -30,6 +30,7 @@ import {Checkbox} from "@/components/ui/checkbox";
 import {getAllQuoteActivities, getQuotes} from "@/api/dataClient";
 import {buildQuoteLifecycleReport} from "@/features/quoteDashboard/quoteLifecycle";
 import QuotePeriodActivityTile from "@/components/supervisor/QuotePeriodActivityTile";
+import ImproperQuoteRequestsTile from "@/components/supervisor/ImproperQuoteRequestsTile";
 import QuoteContributingRecordsDialog from "@/components/supervisor/QuoteContributingRecordsDialog";
 import NiceCallRecordsTable from "@/components/supervisor/NiceCallRecordsTable";
 import SortableRecordHeaders from "@/components/supervisor/SortableRecordHeaders";
@@ -1392,6 +1393,12 @@ export default function DashboardOverview({
   // so the Report filter dropdown and this registry always agree.
   const allTiles = useMemo(() => {
     const tiles = [];
+    tiles.push({
+      id: "improper_quote_requests",
+      label: "Improper Quote Requests",
+      category: "Live from EnQuote",
+      render: () => <ImproperQuoteRequestsTile range={activeRange} mode={kpiMode} />
+    });
     primaryResults.forEach(({ def, result }) => {
       tiles.push({
         id: def.key,
