@@ -6,6 +6,7 @@ import {Input} from "@/components/ui/input";
 import {listErrors} from "@/features/developerConsole/errorLog";
 import {availableDebugCommands, formatDebugResult, runDebugCommand} from "@/features/developerConsole/debugCommands";
 import {toast} from "sonner";
+import {isReadonlyViewing} from "@/features/admin/readonlyViewing";
 
 export default function DebuggingConsole() {
   const {user} = useAuth();
@@ -15,7 +16,8 @@ export default function DebuggingConsole() {
   const [running, setRunning] = useState(false);
   const runningRef = useRef(false);
   const sequence = useRef(0);
-  const commands = availableDebugCommands(globalThis.window?.enquoteLocal, globalThis.window?.enquoteUpdater);
+  const viewing = isReadonlyViewing();
+  const commands = availableDebugCommands(globalThis.window?.enquoteLocal, globalThis.window?.enquoteUpdater, viewing);
 
   async function execute(input) {
     if (runningRef.current) return;
@@ -25,7 +27,8 @@ export default function DebuggingConsole() {
       const result = await runDebugCommand(input, {
         bridge: globalThis.window?.enquoteLocal,
         updater: globalThis.window?.enquoteUpdater,
-        user, queryClient, listErrors
+        user, queryClient, listErrors,
+        viewing: viewing ? window.enquotePreview : null
       });
       setEntries(previous => [...previous.slice(-19), {
         id: ++sequence.current,
@@ -53,12 +56,14 @@ export default function DebuggingConsole() {
       <h3 className="text-base font-semibold">Debugging Console</h3>
       <p className="text-xs text-muted-foreground">
         Safe, allowlisted commands only. No shell or JavaScript execution. Diagnostics do not change data.
-        Refresh/update checks are labeled actions; an installer check can start a background download.
+        {viewing
+          ? "Only this window's view refresh and live-permission recheck are allowed. Errors belong to this viewing session, not the selected user's computer."
+          : "Refresh/update checks are labeled actions; an installer check can start a background download."}
         Output omits report rows and credentials and redacts common identifiers. Review before sharing.
       </p>
       <div className="flex flex-wrap gap-2">
         {commands.filter(item => !item.action).map(item => (
-          <Button key={item.name} size="sm" variant="outline" title={item.description} disabled={running} onClick={() => {setCommand(item.name); void execute(item.name);}}>
+          <Button key={item.name} size="sm" variant="outline" title={item.unavailableReason || item.description} disabled={running || !item.available} onClick={() => {setCommand(item.name); void execute(item.name);}}>
             {item.name}
           </Button>
         ))}
@@ -74,7 +79,7 @@ export default function DebuggingConsole() {
       {commands.some(item => !item.available) && (
         <p className="text-xs text-muted-foreground">
           Not available in this installed build: {commands.filter(item => !item.available).map(item => item.name).join(", ")}.
-          The UI-only hotfix still supports permissions, local data, errors, UI checks and view refresh.
+          {viewing ? "Downloads, shared-data reconciliation and private data remain blocked." : "The UI-only hotfix still supports permissions, local data, errors, UI checks and view refresh."}
         </p>
       )}
       <div className="flex gap-2">
@@ -82,7 +87,7 @@ export default function DebuggingConsole() {
         <Button size="sm" variant="ghost" disabled={!entries.length || running} onClick={() => setEntries([])}>Clear output</Button>
       </div>
       <div aria-live="polite" aria-busy={running} className="space-y-2">
-        {!entries.length && <p className="text-xs text-muted-foreground">Run diagnose on the affected Mac, or permissions and supervisor on Heather&apos;s machine.</p>}
+        {!entries.length && <p className="text-xs text-muted-foreground">{viewing ? "Run diagnose for this viewing session. Use the affected user's own app to inspect their Mac or installed code." : "Run diagnose on the affected Mac, or permissions and supervisor on Heather's machine."}</p>}
         {entries.map(entry => (
           <div key={entry.id} className={`rounded-lg border p-3 ${entry.ok ? "border-border" : "border-destructive/50"}`}>
             <p className="text-xs text-muted-foreground">{entry.at}</p>

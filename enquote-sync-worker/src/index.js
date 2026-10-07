@@ -34,6 +34,9 @@ import {
   handleProfilesList
 } from "./profiles.js";
 import { handleGifsSearch, handleGifsTrending } from "./gifs.js";
+import {handleChatImageUpload, handleChatImageDownload} from "./chat-images.js";
+import {handleCustomEmojisList, handleCustomEmojiUpload, handleCustomEmojiDownload, handleCustomEmojiFromGif} from "./custom-emojis.js";
+import {handleChatReactions, handleChatReactionSet} from "./chat.js";
 import {handleRetro} from "./Base44_DTO.js";
 import {
   handleAccessPolicy,
@@ -108,11 +111,19 @@ export default {
       return handleSopFileDownload(request, env, sha);
     }
     if (url.pathname === "/api/chat/directory" && request.method === "GET") return handleChatDirectory(request, env);
+    if (url.pathname === "/api/chat/images" && request.method === "POST") return handleChatImageUpload(request, env);
+    if (url.pathname === "/api/chat/emojis" && request.method === "GET") return handleCustomEmojisList(request, env);
+    if (url.pathname === "/api/chat/emojis" && request.method === "POST") return handleCustomEmojiUpload(request, env);
+    if (url.pathname === "/api/chat/emojis/from-gif" && request.method === "POST") return handleCustomEmojiFromGif(request, env);
+    if (url.pathname === "/api/chat/emojis/image" && request.method === "GET") return handleCustomEmojiDownload(request, env);
+    if (url.pathname === "/api/chat/images" && request.method === "GET") return handleChatImageDownload(request, env);
     if (url.pathname === "/api/chat/conversations" && request.method === "GET") return handleChatConversations(request, env);
     if (url.pathname === "/api/chat/conversations" && request.method === "POST") return handleChatConversationCreate(request, env);
     if (url.pathname === "/api/chat/conversations/update" && request.method === "POST") return handleChatConversationUpdate(request, env);
     if (url.pathname === "/api/chat/messages" && request.method === "GET") return handleChatMessages(request, env);
     if (url.pathname === "/api/chat/messages" && request.method === "POST") return handleChatMessageSend(request, env);
+    if (url.pathname === "/api/chat/reactions" && request.method === "GET") return handleChatReactions(request, env);
+    if (url.pathname === "/api/chat/reactions" && request.method === "POST") return handleChatReactionSet(request, env);
     if (url.pathname === "/api/chat/read" && request.method === "POST") return handleChatRead(request, env);
     if (url.pathname === "/api/chat/inbox" && request.method === "GET") return handleChatInbox(request, env);
     if (url.pathname === "/api/profiles" && request.method === "GET") return handleProfilesList(request, env);

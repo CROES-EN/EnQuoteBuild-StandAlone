@@ -28,7 +28,7 @@ function isDate(value) {
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
-function isValid(scope, value) {
+export function isValidReportingPeriod(scope, value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   if (scope === "overview") {
     return Object.values(RANGE_PRESETS).includes(value.preset)
@@ -51,7 +51,7 @@ export function readReportingPeriod(scope) {
     const raw = globalThis.window?.localStorage?.getItem(key);
     if (!raw) return fallback;
     const value = JSON.parse(raw);
-    if (!isValid(scope, value)) throw new Error("Invalid saved reporting period");
+    if (!isValidReportingPeriod(scope, value)) throw new Error("Invalid saved reporting period");
     return value;
   } catch (error) {
     console.warn("Unable to restore supervisor reporting period", scope, error);
@@ -61,7 +61,7 @@ export function readReportingPeriod(scope) {
 
 export function saveReportingPeriod(scope, value) {
   const key = storageKey(scope);
-  if (!isValid(scope, value)) throw new Error("Invalid reporting period");
+  if (!isValidReportingPeriod(scope, value)) throw new Error("Invalid reporting period");
   try {
     const storage = globalThis.window?.localStorage;
     if (!storage) throw new Error("Local storage is unavailable");

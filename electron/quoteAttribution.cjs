@@ -48,7 +48,7 @@ function recordedUpdater(quote) {
     const email = typeof value === "string" ? value.trim().toLowerCase() : "";
     return email && !email.endsWith("@example.invalid") ? email : null;
   };
-  const updater = usableEmail(quote?.last_updated_by);
+  const updater = usableEmail(quote?.last_updated_by) || usableEmail(quote?.updated_by);
   if (updater) return updater;
   const history = Array.isArray(quote?.status_history) ? quote.status_history : [];
   const last = history[history.length - 1];

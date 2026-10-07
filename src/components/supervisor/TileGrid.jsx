@@ -12,7 +12,7 @@
  * records") still work normally, since the underlying library only treats a
  * press-and-move as a drag, not a plain click.
  */
-export default function TileGrid({ tiles, onReorder }) {
+export default function TileGrid({ tiles, onReorder, sharePath }) {
   function handleDragEnd(result) {
     if (!result.destination || result.destination.index === result.source.index) return;
     const reordered = Array.from(tiles);
@@ -37,6 +37,9 @@ export default function TileGrid({ tiles, onReorder }) {
                     ref={dragProvided.innerRef}
                     {...dragProvided.draggableProps}
                     {...dragProvided.dragHandleProps}
+                    data-enquote-share-target={`supervisor-tile:${tile.id}`}
+                    data-enquote-share-label={tile.label}
+                    data-enquote-share-route={sharePath?.(tile.id)}
                     className={`min-w-0 cursor-grab rounded-xl transition-shadow active:cursor-grabbing [&>div]:h-full ${dragSnapshot.isDragging ? "shadow-lg ring-2 ring-primary/40" : ""}`}
                   >
                     {tile.render()}

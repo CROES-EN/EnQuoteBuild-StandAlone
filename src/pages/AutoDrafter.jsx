@@ -1,4 +1,6 @@
 import {useCallback, useEffect, useRef, useState} from "react";
+import {useSearchParams} from "react-router-dom";
+import {APP_LINK_QUERY} from "../../shared/appLinkRules.js";
 import {Button} from "@/components/ui/button";
 import {Card} from "@/components/ui/card";
 import {Badge} from "@/components/ui/badge";
@@ -37,6 +39,9 @@ const REPORT_TYPE = "quoteRequestCases";
 const REPORT_LABEL = "Quote Request Cases";
 
 export const AutoDrafter = () => {
+    const [searchParams, setSearchParams] = useSearchParams();
+    const shareCase = searchParams.get("shareCase");
+    const draftCase = searchParams.get("draftCase");
     const {user} = useAuth();
     const reviews = useQuoteRequestReviews();
     const improperByCase = activeImproperRequests(reviews.data || []);
@@ -82,8 +87,24 @@ export const AutoDrafter = () => {
     const [clearingDrafts, setClearingDrafts] = useState(false);
     const [search, setSearch] = useState("");
     const [generatedDraftsByCase, setGeneratedDraftsByCase] = useState({});
+    const [draftsLoading, setDraftsLoading] = useState(true);
     const [selectedCaseNumber, setSelectedCaseNumber] = useState(null);
     const [existingQuoteCaseNumbers, setExistingQuoteCaseNumbers] = useState(new Set());
+    useEffect(() => {
+        if (!shareCase && !draftCase) return;
+        setSelectedCaseNumber(draftCase || null);
+        setSearch("");
+        setShowImproper(false);
+    }, [shareCase, draftCase]);
+    function backToTiles() {
+        setSelectedCaseNumber(null);
+        setSearchParams(previous => {
+            const next = new URLSearchParams(previous);
+            next.delete("draftCase");
+            next.delete(APP_LINK_QUERY);
+            return next;
+        }, {replace: true});
+    }
 
     const loadTable = useCallback(async ({showSpinner} = {}) => {
         if (showSpinner) setReloading(true); else setLoading(true);
@@ -109,6 +130,9 @@ export const AutoDrafter = () => {
             setGeneratedDraftsByCase(byCase);
         } catch (error) {
             console.error("Failed to load saved Auto-Drafter drafts:", error);
+            toast.error("Unable to load saved Auto-Drafter quotes.");
+        } finally {
+            setDraftsLoading(false);
         }
     }, []);
 
@@ -348,11 +372,17 @@ export const AutoDrafter = () => {
 
     if (selectedCaseNumber && !improperByCase.has(reviewCaseKey(selectedCaseNumber)) && !reviews.isLoading && !reviews.isError) {
         const selectedRecord = generatedDraftsByCase[selectedCaseNumber] || null;
+        if (!selectedRecord) {
+            return <Card className="m-6 p-6 space-y-3" role={draftsLoading ? "status" : "alert"}>
+                <p>{draftsLoading ? "Loading saved Auto-Drafter quote..." : "This saved Auto-Drafter quote is no longer available."}</p>
+                <Button variant="outline" onClick={backToTiles}>Back to Auto-Drafter</Button>
+            </Card>;
+        }
         return (
             <AutoDrafterDraftDetails
                 record={selectedRecord}
                 caseNumber={selectedCaseNumber}
-                onBack={() => setSelectedCaseNumber(null)}
+                onBack={backToTiles}
                 onRecordUpdated={(updatedRecord) => {
                     setGeneratedDraftsByCase((prev) => ({...prev, [selectedCaseNumber]: updatedRecord}));
                 }}
@@ -361,7 +391,7 @@ export const AutoDrafter = () => {
     }
 
     return (
-        <div className="min-h-screen bg-background">
+        <div className="min-h-screen bg-background" data-enquote-share-scope="tiles">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">

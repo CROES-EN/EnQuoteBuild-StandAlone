@@ -22,10 +22,12 @@
  */
 
 import {retryBridgeCall} from "@/features/supervisorDashboard/retryBridgeCall";
+import {isReadonlyViewing} from "@/features/admin/readonlyViewing";
 
 const COLLECTION = "appErrorLog";
 const BROWSER_STORAGE_KEY = "enquote_app_error_log_v1";
 const MAX_ENTRIES = 500;
+let viewingErrors = [];
 
 // A per-session counter combined with the current timestamp, so `seq` is guaranteed to
 // strictly increase even when multiple errors are recorded within the same millisecond
@@ -70,6 +72,7 @@ function writeBrowserStorage(records) {
  * recent problems at the top without the caller needing to sort.
  */
 export async function listErrors() {
+  if (isReadonlyViewing()) return [...viewingErrors].reverse();
   const bridge = localBridge();
   const all = bridge ? ((await bridge.list(COLLECTION)) || []) : readBrowserStorage();
   // Sorts by `seq`, NOT `occurredAt` alone - see nextSeq()'s comment above for why.
@@ -91,6 +94,14 @@ export async function listErrors() {
  *   ErrorBoundary-caught render errors.
  */
 export async function recordError({ source, message, stack, componentStack }) {
+  if (isReadonlyViewing()) {
+    const entry = {
+      id: `view-error-${nextSeq()}`, source: source || "unknown",
+      message: message || "(no message)", occurredAt: new Date().toISOString()
+    };
+    viewingErrors = [...viewingErrors, entry].slice(-MAX_ENTRIES);
+    return entry;
+  }
   // Forward to the shared error reporter first: it is cheap, rate-limited and de-duplicated in
   // the main process, unlike the local log below which rewrites the data file per error.
   try {
@@ -146,6 +157,10 @@ export async function recordError({ source, message, stack, componentStack }) {
  * Clears every recorded error - used by the Developer Console's "Clear" action.
  */
 export async function clearErrors() {
+  if (isReadonlyViewing()) {
+    viewingErrors = [];
+    return;
+  }
   const bridge = localBridge();
   if (bridge) {
     const all = (await bridge.list(COLLECTION)) || [];

@@ -13,9 +13,17 @@ export const DEBUG_COMMANDS = Object.freeze([
   {name: "refresh-supervisor", description: "Native-only: reconcile shared Supervisor data and refetch active queries.", action: true},
   {name: "refresh-view", description: "Refetch active queries without clearing cache or changing files.", action: true}
 ]);
+const VIEWING_COMMANDS = [
+  ...DEBUG_COMMANDS,
+  {name: "recheck-permissions", description: "Recheck the real operator and viewed account against live service policy; permission changes reload this window.", action: true}
+];
+const VIEWING_BLOCKED = new Set(["updates", "check-updates", "check-ui", "refresh-supervisor"]);
 
-export function availableDebugCommands(bridge, updater) {
-  return DEBUG_COMMANDS.map(command => {
+export function availableDebugCommands(bridge, updater, viewing = false) {
+  return (viewing ? VIEWING_COMMANDS : DEBUG_COMMANDS).map(command => {
+    if (viewing && VIEWING_BLOCKED.has(command.name)) {
+      return {...command, available: false, unavailableReason: "Blocked in viewing mode. Use your own-account console; downloads and shared-data writes are not permitted."};
+    }
     const available = command.name === "check-updates"
       ? typeof updater?.check === "function"
       : command.name === "refresh-supervisor"
@@ -87,15 +95,22 @@ function accessSummary(user, policy) {
 
 export async function runDebugCommand(input, context) {
   const command = String(input || "").trim().toLowerCase();
-  const definition = DEBUG_COMMANDS.find(item => item.name === command);
+  const viewing = Boolean(context.viewing);
+  const definition = (viewing ? VIEWING_COMMANDS : DEBUG_COMMANDS).find(item => item.name === command);
   if (!definition) return {ok: false, command, error: "Unknown command. Type help. Arguments, shell commands and JavaScript are not supported."};
   const {bridge, updater, user, listErrors, queryClient} = context;
   try {
+    if (viewing && VIEWING_BLOCKED.has(command)) throw new Error("Blocked in viewing mode. Use your own-account console; downloads and shared-data writes are not permitted.");
     const data = await bounded(async () => {
       switch (command) {
         case "help":
-          return availableDebugCommands(bridge, updater);
+          return availableDebugCommands(bridge, updater, viewing);
         case "runtime": {
+          if (viewing) return {
+            ui: await requireMethod(bridge?.ui, "getInfo", "Installed version information")(),
+            scope: "This isolated viewing window on the operator's computer, not the selected user's device or installed code.",
+            privateDataBlocked: true, sharedWritesBlocked: true
+          };
           if (typeof bridge?.diagnostics?.inspect === "function") return bridge.diagnostics.inspect("runtime");
           const ui = await requireMethod(bridge?.ui, "getInfo", "Installed version information")();
           return {
@@ -129,6 +144,16 @@ export async function runDebugCommand(input, context) {
           };
         }
         case "permissions": {
+          if (viewing) {
+            const snapshot = requireSuccess(await requireMethod(context.viewing, "context", "Viewing authorization")());
+            return {
+              scope: "Viewed user's service permissions and this window's additional privacy restrictions",
+              operator: accessSummary(snapshot.actor, snapshot),
+              serviceAccount: accessSummary(snapshot.serviceUser, snapshot),
+              viewingWindow: accessSummary(snapshot.user, snapshot),
+              note: "The real operator remains signed in. The target's session and device are not accessed."
+            };
+          }
           const policy = requireSuccess(await requireMethod(bridge?.admin, "policy", "Access policy")());
           const users = arrayResult(await requireMethod(bridge?.collections, "list", "Local user collection")("users"), "Users");
           const storedUser = users.find(candidate => String(candidate?.email || "").toLowerCase() === String(user?.email || "").toLowerCase());
@@ -147,7 +172,9 @@ export async function runDebugCommand(input, context) {
             list("supervisorReportTables").then(value => arrayResult(value, "Report tables"))
           ]);
           const dates = metrics.map(record => record?.date).filter(date => typeof date === "string").sort();
-          const native = bridge?.diagnostics?.inspect
+          const native = viewing
+            ? {scope: "Shared data available on the operator's computer, restricted by both accounts' page permissions."}
+            : bridge?.diagnostics?.inspect
             ? await bridge.diagnostics.inspect("supervisor")
             : {warning: "Native sync/large-table diagnostics need a full desktop update. Local collection counts are still available."};
           return {
@@ -167,7 +194,7 @@ export async function runDebugCommand(input, context) {
             source: error.source, message: error.message, occurredAt: error.occurredAt
           }));
         case "diagnose": {
-          const checks = ["runtime", "updates", "permissions", "supervisor", "errors"];
+          const checks = viewing ? ["runtime", "permissions", "supervisor", "errors"] : ["runtime", "updates", "permissions", "supervisor", "errors"];
           const results = await Promise.all(checks.map(name => runDebugCommand(name, context)));
           return {complete: results.every(result => result.ok), checks: results};
         }
@@ -187,6 +214,16 @@ export async function runDebugCommand(input, context) {
         case "refresh-view":
           await queryClient.invalidateQueries({}, {throwOnError: true});
           return {ok: true, note: "Active queries were refetched. No cache or data was deleted."};
+        case "recheck-permissions":
+          {
+            const snapshot = requireSuccess(await requireMethod(context.viewing, "recheck", "Live viewing authorization")());
+            return {
+              operator: accessSummary(snapshot.actor, snapshot),
+              serviceAccount: accessSummary(snapshot.serviceUser, snapshot),
+              viewingWindow: accessSummary(snapshot.user, snapshot),
+              note: "Live authorization was rechecked. Changed permissions reload this viewing window; loss of authorization closes it."
+            };
+          }
         default:
           throw new Error("Unsupported command.");
       }

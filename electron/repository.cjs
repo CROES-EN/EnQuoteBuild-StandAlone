@@ -974,15 +974,13 @@ function repositoryFor(userDataPath) {
         }),
         products: mergeRecordsById(current.products, normalized.products, {
           onWinnerIsUpdate: (winner) => {
-            // Products have no attribution field at all (confirmed from updateProduct's
-            // real code - just a bare updated_date) and no dedicated details page to
-            // link to, so no quoteId/link is stored for this type. Stores RAW data
-            // instead of a pre-baked message - same render-time-formatting reasoning as
-            // the quote case above.
+            // Product edits use recorded attribution when available; they have no
+            // dedicated details page, so no quoteId/link is stored for this type.
             newNotifications.push({
               eventId: notificationEventId("product_updated", winner),
               type: "product_updated",
               productName: winner.name || winner.id,
+              changedBy: recordedUpdater(winner),
               occurredAt: winner.updated_date || new Date().toISOString()
             });
           }

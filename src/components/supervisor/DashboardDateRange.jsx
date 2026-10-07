@@ -32,7 +32,7 @@ function formatRangeLabel(range) {
  * preset means and reports on `records` that already exist. The parent remembers only applied
  * selections (including Reset), not unapplied date edits, per signed-in user on this device.
  */
-export default function DashboardDateRange({ records = [], value, onChange }) {
+export default function DashboardDateRange({ records = [], value, onChange, freezePresetDates = false }) {
   const defaultPreset = resolveDefaultPreset(records);
   const committed = value || { preset: defaultPreset, start: null, end: null };
 
@@ -49,7 +49,9 @@ export default function DashboardDateRange({ records = [], value, onChange }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [committed.preset, committed.start, committed.end]);
 
-  const previewRange = resolveDateRange({
+  const useCommittedDates = freezePresetDates && pendingPreset === committed.preset &&
+    pendingStart === committed.start && pendingEnd === committed.end;
+  const previewRange = useCommittedDates ? {...committed, isInvalid: false} : resolveDateRange({
     preset: pendingPreset,
     startDate: pendingStart || undefined,
     endDate: pendingEnd || undefined,

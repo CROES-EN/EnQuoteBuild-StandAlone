@@ -67,9 +67,12 @@ import enquoteLogo from "@/assets/enquote-logo.png";
 import SidebarLogoAnimation from "@/components/SidebarLogoAnimation";
 import DeveloperConsole from "@/components/DeveloperConsole";
 import NotificationBell from "@/components/NotificationBell";
+import NewTaskButton from "@/components/collab/NewTaskButton";
 import {recordError} from "@/features/developerConsole/errorLog";
 import {countAttentionTasks, useChatUnread, useTasks} from "@/features/collab/collabApi";
-import {ProfilePicturePicker} from "@/components/profile/UserAvatar";
+import {openChatDock} from "@/features/collab/chatDockState";
+import {ProfilePicturePicker, UserAvatar} from "@/components/profile/UserAvatar";
+import {isReadonlyViewing} from "@/features/admin/readonlyViewing";
 import {applySidebarOrder, readSidebarOrder, writeSidebarOrder} from "@/lib/sidebarOrder";
 
 const isDemoMode = ["mock", "local", "salesforce-mock"].includes(import.meta.env.VITE_DATA_SOURCE);
@@ -175,6 +178,7 @@ export default function Layout({ children, currentPageName }) {
     setSidebarOrder(readSidebarOrder());
   }, [user?.email]);
   const orderedNavItems = applySidebarOrder(navItems, sidebarOrder);
+  const readonlyViewing = isReadonlyViewing();
   const visibleNavItems = orderedNavItems.filter(item => canAccessPage(user, item.page, accessPolicy));
   const currentPageBlocked = Boolean(currentPageName) && isAuthenticated && !canAccessPage(user, currentPageName, accessPolicy);
 
@@ -278,6 +282,7 @@ export default function Layout({ children, currentPageName }) {
   // startEodbEmailAutoImportWatcher/stopEodbEmailAutoImportWatcher functions directly whenever
   // the toggle/folder changes, and this effect only handles the initial state on app launch.
   useEffect(() => {
+    if (readonlyViewing) return undefined;
     let unsubscribe = () => {};
     let cancelled = false;
     async function initialize() {
@@ -296,7 +301,7 @@ export default function Layout({ children, currentPageName }) {
       unsubscribe();
       stopEodbEmailAutoImportWatcher();
     };
-  }, [queryClient, user?.email]);
+  }, [queryClient, user?.email, readonlyViewing]);
 
   // Once a manually-triggered refresh settles (success/error/unreachable), soft-refresh
   // all currently-mounted data and record the timestamp. Deliberately does NOT reset the
@@ -356,16 +361,21 @@ export default function Layout({ children, currentPageName }) {
     const onNavigate = window.enquoteLocal?.navigation?.onNavigate;
     if (typeof onNavigate !== "function") return undefined;
     const off = onNavigate((route) => {
-      if (typeof route === "string" && route.startsWith("/")) navigate(route);
+      if (typeof route !== "string" || !route.startsWith("/")) return;
+      const [path, query] = route.split("?");
+      const conversationId = path === "/Messages" ? new URLSearchParams(query).get("c") : null;
+      if (conversationId && currentPageName !== "Messages" && canAccessPage(user, "Messages", accessPolicy)) openChatDock(conversationId);
+      else navigate(route);
     });
     return typeof off === "function" ? off : undefined;
-  }, [navigate]);
+  }, [navigate, user, accessPolicy, currentPageName]);
 
   // On machines that hold the full Care Subscriptions import, keep the compact shared "active
   // Care" copy (what the Enphase Care page reads) in step with it. A no-op everywhere else.
   useEffect(() => {
+    if (readonlyViewing) return;
     ensureActiveCareTable().catch(() => { /* best effort - the full table is untouched */ });
-  }, []);
+  }, [readonlyViewing]);
   useEffect(() => {
     let cancelled = false;
     async function loadImportantCount() {
@@ -425,13 +435,14 @@ export default function Layout({ children, currentPageName }) {
   const [devConsoleOpen, setDevConsoleOpen] = useState(false);
   useEffect(() => {
     function handleDevConsoleKeydown(event) {
+      if (readonlyViewing) return;
       if (event.code === "Backquote" && event.shiftKey) {
         setDevConsoleOpen((prev) => !prev);
       }
     }
     window.addEventListener("keydown", handleDevConsoleKeydown);
     return () => window.removeEventListener("keydown", handleDevConsoleKeydown);
-  }, []);
+  }, [readonlyViewing]);
 
   // Global error capture - confirmed via a full-codebase search that NOTHING previously
   // caught uncaught JS errors or unhandled promise rejections anywhere in this app (only
@@ -499,6 +510,10 @@ export default function Layout({ children, currentPageName }) {
   // FIX: uses invalidateDataQueries() here too (the "no Electron bridge" fallback path),
   // for the same reason as both effects above.
   function handleRefreshApp() {
+    if (readonlyViewing) {
+      invalidateDataQueries(queryClient);
+      return;
+    }
     if (phase === "running") return;
     if (!hasBridge) {
       // No Electron bridge available (e.g. a plain browser preview) - there's nothing to
@@ -513,6 +528,7 @@ export default function Layout({ children, currentPageName }) {
   }
 
   function handleSwitchAccount() {
+    if (readonlyViewing) return;
     const confirmed = window.confirm("Sign out and let someone else sign in on this PC?");
     if (!confirmed) return;
     logout();
@@ -524,10 +540,10 @@ export default function Layout({ children, currentPageName }) {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background" style={readonlyViewing ? {paddingTop: "6rem"} : undefined}>
       {/* Desktop Sidebar */}
       {isAuthenticated && (
-      <aside className={cn("hidden lg:fixed lg:inset-y-0 lg:flex lg:flex-col transition-[width] duration-300 ease-in-out", sidebarCollapsed ? "lg:w-20" : "lg:w-64")}>
+      <aside style={readonlyViewing ? {top: "6rem"} : undefined} className={cn("hidden lg:fixed lg:inset-y-0 lg:flex lg:flex-col transition-[width] duration-300 ease-in-out", sidebarCollapsed ? "lg:w-20" : "lg:w-64")}>
         <div className="flex flex-col h-full bg-sidebar border-r border-sidebar-border overflow-hidden">
           {/* Logo + Theme Switcher */}
           <div className={cn("h-16 flex items-center border-b border-sidebar-border transition-all duration-300", sidebarCollapsed ? "justify-center gap-0 px-2" :"justify-between gap-2 px-6")}>
@@ -649,14 +665,14 @@ export default function Layout({ children, currentPageName }) {
                 )}
               >
                 {sidebarCollapsed ? (
-                  <ProfilePicturePicker email={user.email} name={user.full_name || user.email} compact />
+                  readonlyViewing ? <UserAvatar email={user.email} name={user.full_name || user.email} /> : <ProfilePicturePicker email={user.email} name={user.full_name || user.email} compact />
                 ) : (
                   <div className="flex items-center gap-3">
-                    <ProfilePicturePicker email={user.email} name={user.full_name || user.email} />
-                    <button type="button" onClick={handleSwitchAccount} className="min-w-0 text-left">
-                      <p className="text-xs text-muted-foreground">Signed in as</p>
+                    {readonlyViewing ? <UserAvatar email={user.email} name={user.full_name || user.email} size={42} /> : <ProfilePicturePicker email={user.email} name={user.full_name || user.email} />}
+                    <button type="button" disabled={readonlyViewing} onClick={handleSwitchAccount} className="min-w-0 text-left">
+                      <p className="text-xs text-muted-foreground">{readonlyViewing ? "Viewing as" : "Signed in as"}</p>
                       <p className="text-sm font-medium text-sidebar-foreground truncate">{user.full_name || user.email}</p>
-                      <p className="text-xs text-primary mt-0.5">Switch account</p>
+                      <p className="text-xs text-primary mt-0.5">{readonlyViewing ? "Read-only viewing mode" : "Switch account"}</p>
                     </button>
                   </div>
                 )}
@@ -869,16 +885,17 @@ export default function Layout({ children, currentPageName }) {
         outboundStatus={outboundStatus}
         fetchOutboundStatus={fetchOutboundStatus}
       />
-            <DeveloperConsole
+      {!readonlyViewing && <DeveloperConsole
         open={devConsoleOpen}
         onOpenChange={setDevConsoleOpen}
         syncEvents={events}
         currentUserEmail={user?.email}
         isCurrentUserAdmin={isAdmin}
-      />
-      <NotificationBell />
-      <UpdateStatusBadge />
-      <UiUpdateBanner />
+      />}
+      {!readonlyViewing && <NotificationBell />}
+      {!readonlyViewing && <NewTaskButton />}
+      {!readonlyViewing && <UpdateStatusBadge />}
+      {!readonlyViewing && <UiUpdateBanner />}
     </div>
   );
 }

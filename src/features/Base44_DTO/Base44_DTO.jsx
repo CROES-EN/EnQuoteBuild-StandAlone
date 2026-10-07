@@ -16,6 +16,7 @@ import {ArrowLeft} from "lucide-react";
 import {TOM_TRIBUTE} from "./tribute";
 import {NavigationQuicklinks, ProfileActions} from "./Quicklinks";
 import {chatApi} from "@/features/collab/collabApi";
+import {openChatDock} from "@/features/collab/chatDockState";
 import {useAccessPolicy} from "@/features/admin/adminApi";
 import {canAccessPage} from "@/lib/rolePageAccess";
 
@@ -167,7 +168,7 @@ export default function Base44_DTO() {
     try {
       const conversation = await chatApi.openDm(viewed.email);
       if (!conversation?.id) throw new Error("Could not open that conversation.");
-      if (version === selectionVersion.current) navigate(`/Messages?c=${encodeURIComponent(conversation.id)}`);
+      if (version === selectionVersion.current) openChatDock(conversation.id);
     } catch (messageError) {
       toast.error(messageError.message);
     } finally {

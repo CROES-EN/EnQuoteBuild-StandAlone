@@ -159,6 +159,77 @@ npx wrangler d1 execute enquote-sync --remote --file=migrations/0005_collab.sql
 
 New authenticated endpoints:
 
+Message reactions additionally require the additive migration below before
+deploying the updated Worker and desktop bridge:
+
+```sh
+npx wrangler d1 execute enquote-sync --remote --file=migrations/0008_chat_reactions.sql
+```
+
+Reactions are stored per message, authenticated user, and emoji. A person may
+select several different reactions. Setting `active: true` adds one idempotently;
+`active: false` removes only that user's selection. Only current conversation
+members may read or change reactions. Reaction updates broadcast
+`chat_reactions_updated` to member inbox keys, without creating messages,
+unread counts, or desktop new-message alerts.
+
+Shared custom emojis require the following additive migration before deploying
+the updated Worker and desktop:
+
+```sh
+npx wrangler d1 execute enquote-sync --remote --file=migrations/0009_custom_emojis.sql
+```
+
+`GET /api/chat/emojis` lists the shared catalog. `POST /api/chat/emojis?name=...`
+uploads raw PNG, JPEG, WebP, or GIF bytes (maximum 512 KiB) with a matching
+Content-Type and image signature. Names are unique, 1-32 lowercase letters,
+numbers, underscores, or hyphens, starting with a letter or number. Image hashes
+are immutable IDs; uploading the same image/name is idempotent. The catalog lives
+in D1 and image bytes in the existing CACHE KV namespace without an expiry.
+`GET /api/chat/emojis/image?id=...` returns an authenticated, private, no-store
+image response. All three endpoints require an allow-listed signed-in user;
+the catalog is shared across conversations, unlike membership-scoped screenshots.
+
+Messages accept `{type: "custom_emoji", emojiId: "<sha256>"}`; the server verifies
+catalog membership and supplies the canonical name. Built-in artwork can be sent
+as `{type: "builtin_emoji", emojiId: "<existing reaction ID>"}`. Reactions accept
+`custom:<sha256>` only for catalog-backed images, with the existing message and
+conversation membership checks. These additions do not change existing reaction
+IDs or alert/unread behavior. No emoji deletion endpoint is provided.
+
+`POST /api/chat/emojis/from-gif` accepts `{name, gifId}`. The server resolves the
+ID through GIPHY using `GIPHY_API_KEY`, restricts it to G/PG results, chooses a
+small GIF rendition, and verifies the bytes and the 512 KiB limit while streaming.
+Only allow-listed HTTPS GIPHY media hosts are fetched, without user/service
+credentials or following media redirects. Animation bytes and source GIF IDs
+are retained for rendering and attribution. GIFs that cannot fit the emoji
+limit fail explicitly; they are never silently converted to static images.
+
+Messages also accept validated `app_link` attachments containing `label`, an
+internal `path`, and a `target` descriptor (`record`, `id`, `testid`, `text`, or
+`page`). External URLs, credential-bearing paths, and arbitrary CSS selectors are
+rejected. The desktop recipient navigates through normal page access checks and
+highlights the matched element for 5 seconds. No additional D1 migration is needed
+for these attachments; deploy the updated Worker before enabling the new UI.
+
+`assigned_task` requests reuse the atomic case-tag message/task transaction.
+The sole attachment supplies `version: 1`, `recipient`, `title` (up to 200 chars),
+`note` (up to 2000 chars), and canonical UTC `dueAt`. The recipient must be another
+active conversation member on the allowed-email list, in a DM or group. The server
+consumes the attachment, creates `chat-task:<clientId>` in the recipient's personal
+Tasks, and returns `assignedTaskId`. Reusing the request ID cannot duplicate or
+resurrect the task. No new migration is required for general assignments.
+
+The global task panel sends `assigned_task` version 2, with up to 4000 characters
+of notes and an additional allowlisted `task` object: `type`, `remind_at`,
+`quote_id`, `quote_label`, `site_id`, `case_number`, `case_id`, `contact_name`, and
+`contact_phone`. Nullable reminder timestamps must be canonical UTC; identifiers
+remain strings, preserving leading zeros. Ownership, completion state, and sender
+identity remain server-controlled. Version 1 retains its original behavior.
+Deploy this Worker update before enabling panel assignments; older Workers reject
+version 2 explicitly rather than silently dropping fields. No new migration is
+needed for this version change.
+
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/api/tasks?since=` | Personal task changes for the signed-in user |
@@ -173,6 +244,8 @@ New authenticated endpoints:
 | GET/POST | `/api/chat/conversations` | List or create DM/group conversations |
 | POST | `/api/chat/conversations/update` | Rename/add members/leave a group |
 | GET/POST | `/api/chat/messages` | Page or send messages |
+| GET | `/api/chat/reactions?conversationId=&messageIds=` | Reaction summaries for up to 99 comma-separated message IDs |
+| POST | `/api/chat/reactions` | Set `{conversationId, messageId, emoji, active}`; supported emoji IDs are `thumbs_up`, `heart`, `laugh`, `surprised`, `sad`, `celebrate` |
 | POST | `/api/chat/read` | Mark a conversation read |
 | GET | `/api/chat/inbox?since=` | Poll new inbox messages and unread total |
 | GET | `/api/chat/directory` | Allow-listed chat directory |

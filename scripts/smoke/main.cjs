@@ -31,7 +31,11 @@ async function run() {
     show: false,
     width: 1400,
     height: 900,
-    webPreferences: { preload: path.join(__dirname, "preload.cjs"), contextIsolation: false, sandbox: false, nodeIntegration: false }
+    webPreferences: {
+      preload: path.join(__dirname, "preload.cjs"), contextIsolation: false, sandbox: false, nodeIntegration: false,
+      backgroundThrottling: !process.argv.includes("--console-only"),
+      additionalArguments: process.argv.includes("--console-only") ? ["--console-only"] : []
+    }
   });
 
   const consoleErrors = [];
@@ -45,7 +49,7 @@ async function run() {
   await sleep(PAGE_SETTLE_MS);
 
   const failures = [];
-  const pages = process.argv.includes("--stability-only") || process.argv.includes("--sop-sections-only") || process.argv.includes("--retro-only") ? [] : ["Dashboard", ...pageNames().filter((name) => name !== "Dashboard")];
+  const pages = process.argv.includes("--stability-only") || process.argv.includes("--sop-sections-only") || process.argv.includes("--retro-only") || process.argv.includes("--console-only") ? [] : ["Dashboard", ...pageNames().filter((name) => name !== "Dashboard")];
   for (const page of pages) {
     consoleErrors.length = 0;
     await win.webContents.executeJavaScript(`window.__smokeErrors.length = 0; location.hash = "#/${page}"; true`);
@@ -85,6 +89,10 @@ async function run() {
   }
   if (!failures.length && process.argv.includes("--retro-only")) {
     await require("./Base44_DTO.cjs").runRetro(win);
+  }
+  if (!failures.length && process.argv.includes("--console-only")) {
+    await require("./developer-console.cjs").runDeveloperConsole(win);
+    if (consoleErrors.length) throw new Error(`Developer Console errors: ${[...new Set(consoleErrors)].join(" | ")}`);
   }
   return failures.length === 0 ? 0 : 1;
 }

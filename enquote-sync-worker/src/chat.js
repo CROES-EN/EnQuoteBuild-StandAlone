@@ -2,6 +2,11 @@ import { broadcastMessage } from "./realtime.js";
 import { allowedEmails, authenticateUser, inboxKeyForEmail } from "./user-token.js";
 import { json } from "./util.js";
 import { parseRecord, validateStamp } from "./tasks.js";
+import {validateChatImage} from "./chat-images.js";
+import {CHAT_REACTIONS} from "../../shared/chatReactionRules.js";
+import {validAppLink} from "../../shared/appLinkRules.js";
+import {validCustomEmojiId, customEmojiIdFromReaction} from "../../shared/customEmojiRules.js";
+import {getCustomEmoji} from "./custom-emojis.js";
 
 function nowIso() { return new Date().toISOString(); }
 function invalidId(id) { return typeof id !== "string" || !id || id.length > 100; }
@@ -103,6 +108,49 @@ function validateAttachments(value) {
         width: Number(item.width) || null,
         height: Number(item.height) || null
       });
+    } else if (item.type === "builtin_emoji") {
+      const reaction = CHAT_REACTIONS.find(choice => choice.id === item.emojiId);
+      if (!reaction) return "invalid_custom_emoji";
+      out.push({type: "builtin_emoji", emojiId: reaction.id, name: reaction.label});
+    } else if (item.type === "custom_emoji") {
+      if (!validCustomEmojiId(item.emojiId)) return "invalid_custom_emoji";
+      out.push({type: "custom_emoji", emojiId: item.emojiId});
+    } else if (item.type === "image") {
+      if (typeof item.fileId !== "string" || !/^[a-f0-9]{64}$/.test(item.fileId) ||
+          typeof item.name !== "string" || item.name.length > 200) return "invalid_attachment";
+      out.push({type: "image", fileId: item.fileId, mimeType: item.mimeType, name: item.name});
+    } else if (item.type === "app_link") {
+      if (!validAppLink(item)) return "invalid_app_link";
+      out.push({type: "app_link", label: item.label, path: item.path, target: {
+        kind: item.target.kind,
+        ...(item.target.kind === "page" ? {} : {value: item.target.value}),
+        ...(item.target.kind === "text" ? {tag: item.target.tag} : {})
+      }});
+    } else if (item.type === "assigned_task") {
+      if (value.length !== 1 || ![1, 2].includes(item.version) ||
+          typeof item.recipient !== "string" || !item.recipient.trim() || item.recipient.length > 254 ||
+          typeof item.title !== "string" || !item.title.trim() || item.title.trim().length > 200 ||
+          typeof item.note !== "string" || item.note.length > (item.version === 2 ? 4000 : 2000) ||
+          typeof item.dueAt !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(item.dueAt) ||
+          !Number.isFinite(Date.parse(item.dueAt)) || new Date(item.dueAt).toISOString() !== item.dueAt) return "invalid_assigned_task";
+      let task;
+      if (item.version === 2) {
+        const fields = item.task;
+        if (!fields || typeof fields !== "object" || Array.isArray(fields) ||
+            !["call", "follow_up", "other"].includes(fields.type) ||
+            !(fields.remind_at === null || (typeof fields.remind_at === "string" &&
+              Number.isFinite(Date.parse(fields.remind_at)) && new Date(fields.remind_at).toISOString() === fields.remind_at))) return "invalid_assigned_task";
+        task = {type: fields.type, remind_at: fields.remind_at};
+        for (const [key, limit] of Object.entries({
+          quote_id: 200, quote_label: 200, site_id: 100, case_number: 100,
+          case_id: 100, contact_name: 120, contact_phone: 40
+        })) {
+          if (fields[key] !== null && (typeof fields[key] !== "string" || fields[key].length > limit)) return "invalid_assigned_task";
+          task[key] = fields[key] === null ? null : fields[key].trim();
+        }
+      }
+      out.push({type: "assigned_task", version: item.version, recipient: item.recipient.trim().toLowerCase(),
+        title: item.title.trim(), note: item.note.trim(), dueAt: item.dueAt, ...(task ? {task} : {})});
     } else if (item.type === "case_task") {
       if (value.length !== 1 || item.version !== 1 ||
           typeof item.recipient !== "string" || item.recipient.length > 254 ||
@@ -146,6 +194,70 @@ function messageShape(row) {
     attachments: parseRecord(row.attachments) || [],
     createdAt: row.created_at ?? row.createdAt
   };
+}
+
+async function reactionsForMessages(env, ids) {
+  const result = Object.fromEntries(ids.map(id => [id, []]));
+  if (!ids.length) return result;
+  const rows = (await env.DB.prepare(`SELECT message_id, email, emoji FROM chat_reactions
+    WHERE message_id IN (${ids.map(() => "?").join(",")}) ORDER BY emoji, email`).bind(...ids).all()).results || [];
+  for (const row of rows) {
+    const reactions = result[row.message_id];
+    let reaction = reactions.find(item => item.emoji === row.emoji);
+    if (!reaction) {
+      reaction = {emoji: row.emoji, users: []};
+      reactions.push(reaction);
+    }
+    reaction.users.push(row.email);
+  }
+  return result;
+}
+
+export async function handleChatReactions(request, env) {
+  const user = await authenticateUser(request, env);
+  if (user.error) return user.error;
+  const url = new URL(request.url);
+  const conversationId = url.searchParams.get("conversationId");
+  const ids = (url.searchParams.get("messageIds") || "").split(",");
+  if (invalidId(conversationId) || ids.length > 99 || ids.some(invalidId)) return json({ok: false, error: "invalid_id"}, 400);
+  if (!await activeMember(env, conversationId, user.email)) return json({ok: false, error: "not_found"}, 404);
+  const rows = (await env.DB.prepare(`SELECT id FROM chat_messages WHERE conversation_id = ?
+    AND id IN (${ids.map(() => "?").join(",")})`).bind(conversationId, ...ids).all()).results || [];
+  return json({ok: true, conversationId, reactions: await reactionsForMessages(env, rows.map(row => row.id))});
+}
+
+export async function handleChatReactionSet(request, env) {
+  const user = await authenticateUser(request, env);
+  if (user.error) return user.error;
+  const body = await readBody(request);
+  if (invalidId(body?.conversationId) || invalidId(body?.messageId) ||
+      typeof body?.active !== "boolean" || (!CHAT_REACTIONS.some(item => item.id === body?.emoji) &&
+        !customEmojiIdFromReaction(body?.emoji))) {
+    return json({ok: false, error: "invalid_reaction"}, 400);
+  }
+  if (!await activeMember(env, body.conversationId, user.email)) return json({ok: false, error: "not_found"}, 404);
+  const customId = customEmojiIdFromReaction(body.emoji);
+  if (customId && !await getCustomEmoji(env, customId)) return json({ok: false, error: "invalid_reaction"}, 400);
+  const message = (await env.DB.prepare("SELECT id, body FROM chat_messages WHERE id = ? AND conversation_id = ?")
+    .bind(body.messageId, body.conversationId).all()).results?.[0];
+  if (!message || message.body === "[removed by admin]") return json({ok: false, error: "not_found"}, 404);
+  if (body.active) {
+    await env.DB.prepare(`INSERT OR IGNORE INTO chat_reactions (message_id, email, emoji)
+      SELECT ?, ?, ? FROM chat_messages WHERE id = ? AND body != ?`)
+      .bind(body.messageId, user.email, body.emoji, body.messageId, "[removed by admin]").run();
+  } else {
+    await env.DB.prepare("DELETE FROM chat_reactions WHERE message_id = ? AND email = ? AND emoji = ?")
+      .bind(body.messageId, user.email, body.emoji).run();
+  }
+  const reactions = await reactionsForMessages(env, [body.messageId]);
+  try {
+    const members = await getMembers(env, body.conversationId);
+    const keys = await Promise.all(members.map(member => inboxKeyForEmail(member.email, env.USER_TOKEN_SECRET)));
+    await broadcastMessage(env, {type: "chat_reactions_updated", keys, conversationId: body.conversationId, messageId: body.messageId});
+  } catch (error) {
+    console.warn("[chat] Reaction realtime notification failed:", error.message);
+  }
+  return json({ok: true, conversationId: body.conversationId, reactions});
 }
 
 export async function handleChatDirectory(request, env) {
@@ -292,7 +404,8 @@ export async function handleChatMessages(request, env) {
   else { if (before) { sql += " AND created_at < ?"; params.push(before); } sql += " ORDER BY created_at DESC LIMIT ?"; params.push(limit); }
   let rows = (await env.DB.prepare(sql).bind(...params).all()).results || [];
   if (newestFirst) rows = rows.reverse();
-  return json({ ok: true, messages: rows.map(messageShape) });
+  const reactions = await reactionsForMessages(env, rows.map(row => row.id));
+  return json({ ok: true, messages: rows.map(row => ({...messageShape(row), reactions: reactions[row.id]})) });
 }
 
 export async function handleChatMessageSend(request, env) {
@@ -306,13 +419,15 @@ export async function handleChatMessageSend(request, env) {
   if (typeof clientId !== "string" || !clientId || clientId.length > 64) return json({ ok: false, error: "invalid_client_id" }, 400);
   const attachments = validateAttachments(body?.attachments);
   if (typeof attachments === "string") return json({ ok: false, error: attachments }, 400);
-  const caseTask = attachments.find((item) => item.type === "case_task");
-  const taskId = caseTask ? `case-tag:${clientId}` : null;
+  const caseTask = attachments.find((item) => item.type === "case_task" || item.type === "assigned_task");
+  const assignedTask = caseTask?.type === "assigned_task";
+  const taskId = caseTask ? `${assignedTask ? "chat-task" : "case-tag"}:${clientId}` : null;
+  const taskResult = caseTask ? {[assignedTask ? "assignedTaskId" : "caseTaskId"]: taskId} : {};
   if (caseTask) {
     const conversation = await getConversation(env, conversationId, user.email);
-    if (conversation?.kind !== "dm" || caseTask.recipient === user.email ||
+    if ((!assignedTask && conversation?.kind !== "dm") || caseTask.recipient === user.email ||
         !allowedEmails(env).includes(caseTask.recipient) ||
-        !conversation.members.some((member) => member.email === caseTask.recipient)) {
+        !conversation?.members.some((member) => member.email === caseTask.recipient)) {
       return json({ ok: false, error: "invalid_case_task_recipient" }, 403);
     }
   }
@@ -325,13 +440,25 @@ export async function handleChatMessageSend(request, env) {
         .bind(caseTask.recipient, taskId).all()).results?.[0];
       if (!saved) return json({ ok: false, error: "duplicate_client_id" }, 409);
     }
-    return json({ ok: true, message: { ...messageShape(existing), ...(caseTask ? { caseTaskId: taskId } : {}) } });
+    return json({ ok: true, message: { ...messageShape(existing), ...taskResult } });
   }
   const text = typeof body?.body === "string" ? body.body.trim() : "";
+  for (let i = 0; i < attachments.length; i++) {
+    if (attachments[i].type === "custom_emoji") {
+      const emoji = await getCustomEmoji(env, attachments[i].emojiId);
+      if (!emoji) return json({ok: false, error: "invalid_custom_emoji"}, 400);
+      attachments[i] = {type: "custom_emoji", emojiId: emoji.id, name: emoji.name,
+        ...(emoji.sourceGifId ? {sourceGifId: emoji.sourceGifId} : {})};
+    }
+    if (attachments[i].type !== "image") continue;
+    const image = await validateChatImage(env, conversationId, attachments[i]);
+    if (!image) return json({ok: false, error: "invalid_image_attachment"}, 400);
+    attachments[i] = image;
+  }
   if (text.length > 4000 || (!text && attachments.length === 0)) return json({ ok: false, error: "invalid_body" }, 400);
   const at = nowIso();
   // Consume the request server-side; older desktop UIs only understand quote/GIF attachments.
-  const storedAttachments = attachments.filter((item) => item.type !== "case_task");
+  const storedAttachments = attachments.filter((item) => !["case_task", "assigned_task"].includes(item.type));
   // Only the request that inserts the message creates a task, including concurrent retries.
   // Advance the recipient's sync cursor even if another task was synced in this millisecond.
   const taskStatements = caseTask ? [
@@ -339,15 +466,18 @@ export async function handleChatMessageSend(request, env) {
       SELECT ?, ?, ?, CASE WHEN latest >= ? THEN strftime('%Y-%m-%dT%H:%M:%fZ', latest, '+0.001 seconds') ELSE ? END, 0, ?
       FROM (SELECT MAX(synced_at) AS latest FROM user_tasks WHERE owner = ?)
       WHERE changes() = 1`).bind(caseTask.recipient, taskId, at, at, at, JSON.stringify({
-      id: taskId, type: "other", title: `Review case ${caseTask.caseNumber}`,
-      notes: caseTask.note, case_number: caseTask.caseNumber, case_id: caseTask.caseId,
+      id: taskId, type: "other", title: assignedTask ? caseTask.title : `Review case ${caseTask.caseNumber}`,
+      notes: caseTask.note,
+      ...(!assignedTask ? {case_number: caseTask.caseNumber, case_id: caseTask.caseId} : {}),
       assigned_by: user.email, source_message_id: clientId,
       due_at: caseTask.dueAt, remind_at: caseTask.dueAt,
+      ...(assignedTask && caseTask.version === 2 ? caseTask.task : {}),
       status: "open", completed_at: null, snoozed_until: null, notified_at: null,
       created_date: at, updated_date: at
     }), caseTask.recipient)
   ] : [];
-  const preview = text ? text.slice(0, 200) : (attachments.some((item) => item.type === "gif") ? "GIF" : "");
+  const emojiAttachment = attachments.find(item => ["custom_emoji", "builtin_emoji"].includes(item.type));
+  const preview = text ? text.slice(0, 200) : (emojiAttachment ? `:${emojiAttachment.name}:` : attachments.some(item => item.type === "image") ? "Screenshot" : attachments.some((item) => item.type === "gif") ? "GIF" : attachments.some(item => item.type === "app_link") ? "EnQuote link" : "");
   await env.DB.batch([
     env.DB.prepare(`INSERT INTO chat_messages (id, conversation_id, sender, body, attachments, created_at) VALUES (?, ?, ?, ?, ?, ?)
       ${caseTask ? "ON CONFLICT(id) DO NOTHING" : ""}`).bind(clientId, conversationId, user.email, text, JSON.stringify(storedAttachments), at),
@@ -375,9 +505,9 @@ export async function handleChatMessageSend(request, env) {
       console.warn("[chat] Case task realtime notification failed:", error.message);
     }
   }
-  return json({ ok: true, message: savedMessage ? { ...messageShape(savedMessage), caseTaskId: taskId } : {
+  return json({ ok: true, message: savedMessage ? { ...messageShape(savedMessage), ...taskResult } : {
     id: clientId, conversationId, sender: user.email, body: text, attachments: storedAttachments, createdAt: at,
-    ...(caseTask ? { caseTaskId: taskId } : {})
+    ...taskResult
   } });
 }
 

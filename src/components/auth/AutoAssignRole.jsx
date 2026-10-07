@@ -2,6 +2,7 @@
 import {base44} from "@/api/base44Client";
 import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 import {useAuth} from "@/lib/AuthContext";
+import {isReadonlyViewing} from "@/features/admin/readonlyViewing";
 import {Card} from "@/components/ui/card";
 import {Button} from "@/components/ui/button";
 import {Loader2, LogIn, ShieldAlert} from "lucide-react";
@@ -49,7 +50,7 @@ export default function AutoAssignRole({ children }) {
  }
  return result;
  },
- enabled: !isLocalDemo,
+ enabled: !isLocalDemo && !isReadonlyViewing(),
  retry: false
  });
 
@@ -94,6 +95,7 @@ export default function AutoAssignRole({ children }) {
  });
 
  useEffect(() => {
+ if (isReadonlyViewing()) return;
  if (user && !userLoading && !invitationLoading) {
  const needsForceAdmin = FORCED_ADMIN_EMAILS.includes(user?.email) && user?.app_role !== "admin";
  if (!user.app_role && invitation) {
@@ -110,6 +112,7 @@ export default function AutoAssignRole({ children }) {
  // eslint-disable-next-line react-hooks/exhaustive-deps
  }, [user, invitation, userLoading, invitationLoading]);
 
+ if (isReadonlyViewing()) return children;
  if (isLocalDemo) {
  if (isLoadingAuth) {
  return (

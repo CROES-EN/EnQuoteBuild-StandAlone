@@ -178,14 +178,76 @@ function createChatService({
     return { ok: true, messages: Array.isArray(result.messages) ? result.messages : [] };
   }
 
+  async function reactions({conversationId, messageIds} = {}) {
+    return client.get("/api/chat/reactions", {conversationId, messageIds: (messageIds || []).join(",")});
+  }
+
+  async function react(payload) {
+    return client.post("/api/chat/reactions", payload);
+  }
+
+  async function emojis() {
+    return client.get("/api/chat/emojis");
+  }
+
+  async function uploadEmoji({name, dataUrl} = {}) {
+    if (!/^[a-z0-9][a-z0-9_-]{0,31}$/.test(name || "")) throw new Error("Use an emoji name of 1-32 lowercase letters, numbers, underscores, or hyphens.");
+    const match = /^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/]+={0,2})$/.exec(dataUrl || "");
+    if (!match) throw new Error("Choose a PNG, JPEG, WebP, or GIF image.");
+    if (match[2].length > Math.ceil(512 * 1024 / 3) * 4) throw new Error("Custom emojis must be 512 KB or smaller.");
+    const bytes = Buffer.from(match[2], "base64");
+    if (!bytes.length || bytes.length > 512 * 1024) throw new Error("Custom emojis must be 512 KB or smaller.");
+    return client.upload(`/api/chat/emojis?name=${encodeURIComponent(name)}`, {bytes, type: match[1], name});
+  }
+
+  async function getEmoji(id) {
+    if (!/^[a-f0-9]{64}$/.test(id || "")) throw new Error("Invalid custom emoji reference.");
+    const image = await client.download(`/api/chat/emojis/image?id=${id}`);
+    if (!["image/png", "image/jpeg", "image/webp", "image/gif"].includes(image.type) ||
+        !image.bytes.length || image.bytes.length > 512 * 1024) throw new Error("The custom emoji response is invalid.");
+    return {ok: true, dataUrl: `data:${image.type};base64,${Buffer.from(image.bytes).toString("base64")}`};
+  }
+
+  async function saveGifEmoji(payload) {
+    return client.post("/api/chat/emojis/from-gif", payload);
+  }
+
   async function send({ conversationId, clientId, body, attachments }) {
+    const outgoing = [];
+    if (Array.isArray(attachments) && attachments.length > 10) throw new Error("Messages can contain up to 10 attachments.");
+    for (const attachment of Array.isArray(attachments) ? attachments : []) {
+      if (attachment.type !== "image" || !attachment.dataUrl) {
+        outgoing.push(attachment);
+        continue;
+      }
+      const match = /^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/]+={0,2})$/.exec(attachment.dataUrl);
+      if (!match) throw new Error("The pasted screenshot is not a supported image.");
+      if (match[2].length > Math.ceil(5 * 1024 * 1024 / 3) * 4) throw new Error("Screenshots must be 5 MB or smaller.");
+      const bytes = Buffer.from(match[2], "base64");
+      if (!bytes.length || bytes.length > 5 * 1024 * 1024) throw new Error("Screenshots must be 5 MB or smaller.");
+      const uploaded = await client.upload(`/api/chat/images?conversationId=${encodeURIComponent(conversationId)}`, {
+        bytes, type: match[1], name: "Screenshot"
+      });
+      if (!uploaded.image?.fileId) throw new Error("The screenshot upload returned no image.");
+      outgoing.push(uploaded.image);
+    }
     const result = await client.post("/api/chat/messages", {
       conversationId,
       clientId: clientId || crypto.randomUUID(),
       body: String(body || ""),
-      attachments: Array.isArray(attachments) ? attachments : []
+      attachments: outgoing
     });
     return { ok: true, message: result.message };
+  }
+
+  async function getImage({conversationId, fileId}) {
+    if (typeof conversationId !== "string" || !conversationId || !/^[a-f0-9]{64}$/.test(fileId || "")) {
+      throw new Error("Invalid screenshot reference.");
+    }
+    const image = await client.download(`/api/chat/images?${new URLSearchParams({conversationId, fileId})}`);
+    if (!["image/png", "image/jpeg", "image/webp", "image/gif"].includes(image.type) ||
+        image.bytes.length > 5 * 1024 * 1024) throw new Error("The screenshot response is invalid.");
+    return {ok: true, dataUrl: `data:${image.type};base64,${Buffer.from(image.bytes).toString("base64")}`};
   }
 
   async function markRead({ conversationId, at }) {
@@ -218,7 +280,14 @@ function createChatService({
     createGroup,
     updateConversation,
     messages,
+    reactions,
+    react,
+    emojis,
+    uploadEmoji,
+    getEmoji,
+    saveGifEmoji,
     send,
+    getImage,
     markRead,
     poll,
     start,

@@ -1202,6 +1202,9 @@ export default function WorkloadReportTable({ table, onReload, isReloading }) {
               return (
                 <tr
                   key={row["Case ID"] || row["Case Number"] || i}
+                  data-enquote-share-target={row["Case ID"] || row["Case Number"]
+                    ? `workload-case:${String(row["Case ID"] || row["Case Number"]).trim()}` : undefined}
+                  data-enquote-share-label={`Workload case ${row["Case Number"] || row["Case ID"] || ""}`}
                   className={cn(
                     tile ? tile.tint : "odd:bg-card even:bg-secondary/40",
                     tile ? tile.border : "border-l-4 border-transparent",

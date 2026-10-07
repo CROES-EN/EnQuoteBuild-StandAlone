@@ -6,6 +6,7 @@ import {createPageUrl} from "@/utils";
 import {clearAllNotifications, clearNotification, listNotifications, markAllRead} from "@/features/notifications/appNotifications";
 import {onUserSessionChanged} from "@/lib/userScopedStorage";
 import {toast} from "sonner";
+import {subscribe} from "@/features/collab/collabApi";
 
 // Formats a notification's timestamp using the VIEWING user's own browser locale -
 // matches Layout.jsx's existing formatLastUpdated pattern exactly (date part follows
@@ -28,18 +29,22 @@ function formatNotificationDateTime(isoString) {
 // by an earlier version of this feature, storing a pre-baked `message` string instead
 // of these raw fields) rendered as "undefined updated". Falls back to the legacy
 // `message` field, or a generic label, for any such old/malformed record.
-function formatNotificationMessage(n) {
+export function formatNotificationMessage(n) {
   const time = formatNotificationDateTime(n.occurredAt);
+  const recordedBy = n.changedBy || n.last_updated_by || n.updated_by;
+  const attribution = recordedBy && !String(recordedBy).toLowerCase().endsWith("@example.invalid")
+    ? `by ${recordedBy}` : "(updater not recorded)";
+  if (n.type === "task_assigned" && n.taskTitle) {
+    return `Task assigned ${attribution}: ${n.taskTitle} - ${time}`;
+  }
   if (n.type === "task_due" && n.taskTitle) {
     return `Reminder: ${n.taskTitle}${n.quoteNumber ? ` (${n.quoteNumber})` : ""} - ${time}`;
   }
   if (n.type === "quote_updated" && n.quoteNumber) {
-    return n.changedBy && !String(n.changedBy).toLowerCase().endsWith("@example.invalid")
-      ? `${n.quoteNumber} updated by ${n.changedBy} - ${time}`
-      : `${n.quoteNumber} updated - ${time}`;
+    return `${n.quoteNumber} updated ${attribution} - ${time}`;
   }
   if (n.type === "product_updated" && n.productName) {
-    return `${n.productName} updated - ${time}`;
+    return `${n.productName} updated ${attribution} - ${time}`;
   }
   if (n.type === "quote_synced" && n.quoteNumber) {
     return `${n.quoteNumber} sent to Base44 - ${time}`;
@@ -85,12 +90,13 @@ export default function NotificationBell() {
     // Light polling so the badge stays current even if the app is just sitting open -
     // scoped locally to this component rather than a new global timer.
     const interval = setInterval(load, 30000);
+    const offTasks = subscribe("tasks", "onChanged", load);
     const unsubscribe = onUserSessionChanged(() => {
       setNotifications([]);
       setOpen(false);
       void load();
     });
-    return () => { clearInterval(interval); unsubscribe(); loadVersion.current++; };
+    return () => { clearInterval(interval); offTasks(); unsubscribe(); loadVersion.current++; };
   }, [load]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
@@ -186,7 +192,7 @@ export default function NotificationBell() {
                       <X className="w-3 h-3" />
                       Clear
                     </button>
-                    {n.type === "task_due" && n.taskId && (
+                    {["task_due", "task_assigned"].includes(n.type) && n.taskId && (
                       <Link
                         to={`/Tasks?task=${encodeURIComponent(n.taskId)}`}
                         onClick={() => setOpen(false)}

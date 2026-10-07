@@ -26,12 +26,17 @@ import {AutoDrafter as AutoDrafterPage} from "./pages/AutoDrafter";
 import TasksPage from "./pages/Tasks";
 import SOPLibraryPage from "./pages/SOPLibrary";
 import MessagesPage from "./pages/Messages";
+import ChatDock from "@/components/messages/ChatDock";
+import AppLinkSharing from "@/components/messages/AppLinkSharing";
 import Base44_DTO from "@/features/Base44_DTO/Base44_DTO";
 import SecretRetroShortcut from "@/features/Base44_DTO/Shortcut";
 
 import AuthProvider, {useAuth} from "@/lib/AuthContext";
 import UserNotRegisteredError from "@/components/UserNotRegisteredError";
 import {ThemeProvider} from "@/features/theme/ThemeContext";
+import {AccessPreviewProvider} from "@/features/admin/AccessPreviewContext";
+import {isReadonlyViewing} from "@/features/admin/readonlyViewing";
+import ViewingBanner from "@/features/admin/ViewingBanner";
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -64,8 +69,11 @@ const AuthenticatedApp = () => {
     }
   }
 
+
   // Render the main app
   return (
+    <>
+    <ViewingBanner />
     <Routes>
       <Route path="/" element={
         <LayoutWrapper currentPageName={mainPageKey}>
@@ -166,6 +174,9 @@ const AuthenticatedApp = () => {
       <Route path="/Base44_DTO" element={<LayoutWrapper currentPageName="Base44_DTO"><Base44_DTO /></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
+    {!isReadonlyViewing() && <ChatDock />}
+    {!isReadonlyViewing() && <AppLinkSharing />}
+    </>
   );
 };
 
@@ -178,9 +189,11 @@ function App() {
       <AuthProvider>
         <QueryClientProvider client={queryClientInstance}>
           <HashRouter>
-            <NavigationTracker />
-            <SecretRetroShortcut />
+            <AccessPreviewProvider>
+            {!isReadonlyViewing() && <NavigationTracker />}
+            {!isReadonlyViewing() && <SecretRetroShortcut />}
             <AuthenticatedApp />
+            </AccessPreviewProvider>
           </HashRouter>
           <Toaster />
           <SonnerToaster position="top-right" richColors />

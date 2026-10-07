@@ -5,6 +5,7 @@
  */
 
 import {getCurrentUserNamespace, scopedKey} from "@/lib/userScopedStorage";
+import {tasksApi} from "@/features/collab/collabApi";
 
 const COLLECTION = "appNotifications";
 const BROWSER_STORAGE_KEY = "enquote_app_notifications_v1";
@@ -57,10 +58,27 @@ function readBrowserStorage() {
  * timestamp, which breaks naive timestamp-only sorting).
  */
 export async function listNotifications() {
-  if (getCurrentUserNamespace() === "__anonymous__") return [];
+  const owner = getCurrentUserNamespace();
+  if (owner === "__anonymous__") return [];
   const state = readState();
   const bridge = localBridge();
-  const all = bridge ? ((await bridge.list(COLLECTION)) || []) : readBrowserStorage();
+  const [stored, tasks] = await Promise.all([
+    bridge ? bridge.list(COLLECTION) : readBrowserStorage(),
+    globalThis.window?.enquoteLocal?.tasks?.list ? tasksApi.list() : []
+  ]);
+  if (owner !== getCurrentUserNamespace()) return [];
+  const assignments = tasks.filter(task => task.assigned_by && task.assigned_by.toLowerCase() !== owner)
+    .map(task => ({
+      id: `task-assigned:${task.id}`,
+      eventId: `task-assigned:${task.id}`,
+      type: "task_assigned",
+      taskId: task.id,
+      taskTitle: task.title,
+      changedBy: task.assigned_by,
+      occurredAt: task.created_date,
+      seq: (Date.parse(task.created_date) || 0) * 1000
+    }));
+  const all = [...(stored || []), ...assignments];
   const dismissed = new Set(state.dismissed);
   const read = new Set(state.read);
   const seen = new Set();

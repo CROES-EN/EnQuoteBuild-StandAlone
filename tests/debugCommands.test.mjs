@@ -30,6 +30,41 @@ test("only exact allowlisted commands run, with no argument or code execution", 
   assert.equal((await runDebugCommand(" HELP ", context())).data.length, DEBUG_COMMANDS.length);
 });
 
+test("viewing diagnostics use selected service permissions and window errors without private or native diagnostic access", async () => {
+  const calls = [];
+  const snapshot = {
+    ok: true, actor: {email: "operator@example.com", app_role: "super_admin"},
+    serviceUser: {email: "heather@example.com", app_role: "admin"},
+    user: {email: "heather@example.com", app_role: "admin", deny_pages: ["Messages", "Tasks"]},
+    users: [{email: "unrelated@example.com"}]
+  };
+  const ctx = context({
+    viewing: {context: async () => snapshot, recheck: async () => {calls.push("recheck"); return snapshot;}},
+    listErrors: async () => [{source: "viewing-test", message: "Local viewing error", occurredAt: "now"}],
+    queryClient: {invalidateQueries: async () => {calls.push("refresh");}}
+  });
+  ctx.bridge.diagnostics.inspect = () => assert.fail("unrestricted native diagnostics invoked");
+  ctx.updater.getState = () => assert.fail("installer state invoked");
+  const result = await runDebugCommand("diagnose", ctx);
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.data.checks.map(check => check.command), ["runtime", "permissions", "supervisor", "errors"]);
+  assert.match(result.data.checks[0].data.scope, /not the selected user's device/);
+  assert.equal(result.data.checks.find(check => check.command === "permissions").data.serviceAccount.canViewSupervisorDashboard, true);
+  assert.equal(result.data.checks.find(check => check.command === "errors").data[0].message, "Local viewing error");
+  for (const command of ["check-updates", "check-ui", "refresh-supervisor", "updates"]) {
+    const blocked = await runDebugCommand(command, ctx);
+    assert.equal(blocked.ok, false);
+    assert.match(blocked.error, /Blocked in viewing mode/);
+    assert.equal(availableDebugCommands(ctx.bridge, ctx.updater, true).find(item => item.name === command).available, false);
+  }
+  assert.equal((await runDebugCommand("refresh-view", ctx)).ok, true);
+  const recheck = await runDebugCommand("recheck-permissions", ctx);
+  assert.equal(recheck.ok, true);
+  assert.equal(recheck.data.users, undefined);
+  assert.deepEqual(calls, ["refresh", "recheck"]);
+  assert.equal((await runDebugCommand("recheck-permissions", context())).ok, false, "own-account console does not expose viewing-only commands");
+});
+
 test("permissions preserve intentional restrictions, overrides, denials and additional roles", async () => {
   for (const [user, expected] of [
     [{app_role: "approver"}, false],

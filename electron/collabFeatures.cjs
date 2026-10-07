@@ -34,6 +34,7 @@ function setupCollabFeatures({
   getAccessHeaders,
   addBellNotification = async () => {},
   onUsersUpdated = async () => {},
+  onAccessPolicyChanged = async () => {},
   logger = console
 }) {
   let userToken = "";
@@ -191,6 +192,13 @@ function setupCollabFeatures({
   handle("chat:createGroup", (payload) => chat.createGroup(payload || {}));
   handle("chat:updateConversation", (payload) => chat.updateConversation(payload));
   handle("chat:messages", (query) => chat.messages(query || {}));
+  handle("chat:reactions", (query) => chat.reactions(query || {}));
+  handle("chat:react", (payload) => chat.react(payload || {}));
+  handle("chat:emojis", () => chat.emojis());
+  handle("chat:uploadEmoji", (payload) => chat.uploadEmoji(payload || {}));
+  handle("chat:getEmoji", (id) => chat.getEmoji(id));
+  handle("chat:saveGifEmoji", (payload) => chat.saveGifEmoji(payload || {}));
+  handle("chat:getImage", (query) => chat.getImage(query || {}));
   handle("chat:send", async (payload) => {
     const result = await chat.send(payload || {});
     void chat.poll();
@@ -221,10 +229,16 @@ function setupCollabFeatures({
     getInboxKey: () => inboxKey,
     getMainWindow,
     runUsersSync: onUsersUpdated,
+    onAccessPolicyChanged,
     logger
   });
 
   const realtimeHandlers = {
+    chat_reactions_updated: (message) => {
+      if (inboxKey && Array.isArray(message.keys) && message.keys.includes(inboxKey)) {
+        sendToRenderer("chat:reactionsChanged", {conversationId: message.conversationId, messageId: message.messageId});
+      }
+    },
     tasks_updated: (message) => {
       if (inboxKey && message.key === inboxKey) return tasks.sync();
       return undefined;

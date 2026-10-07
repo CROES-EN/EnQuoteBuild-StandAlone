@@ -8,6 +8,8 @@ import {toast} from "sonner";
 import {AdminResetPasswordButton} from "@/features/developerConsole/AdminPasswordReset.jsx";
 import {UserAvatar} from "@/components/profile/UserAvatar";
 import DebuggingConsole from "@/components/DebuggingConsole";
+import {useAccessPreview} from "@/features/admin/AccessPreviewContext";
+import UserAccessPreview from "@/features/admin/UserAccessPreview";
 
 const REPORT_SEVERITY_ORDER = { critical: 0, known_issue: 1, needs_investigation: 2, warning: 3, info: 4 };
 const REPORT_SEVERITY_LABEL = {
@@ -79,7 +81,13 @@ export default function DeveloperConsole({
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("errors");
+  const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
   const queryClient = useQueryClient();
+  const {policyState, canPreview} = useAccessPreview();
+
+  useEffect(() => {
+    if (activeTab === "access-preview" && (!open || !canPreview)) setActiveTab("errors");
+  }, [open, canPreview, activeTab]);
 
     const loadPresence = useCallback(async () => {
       const listPresence = globalThis.window?.enquoteLocal?.presence?.list;
@@ -100,6 +108,7 @@ export default function DeveloperConsole({
     }, []);
 
     const loadAll = useCallback(async () => {
+    setPreviewRefreshKey(value => value + 1);
     setLoading(true);
     try {
       const [errors, reportsRes, usersRes] = await Promise.all([
@@ -181,7 +190,7 @@ export default function DeveloperConsole({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-[1400px] max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertOctagon className="w-5 h-5 text-primary" />
@@ -192,13 +201,15 @@ export default function DeveloperConsole({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-wrap items-center gap-2 border-b border-border pb-2">
-                    {[
+        <div className="flex shrink-0 items-center gap-2 border-b border-border pb-2">
+          <nav aria-label="Developer Console tabs" className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
+            {[
             { key: "errors", label: `App Errors (${appErrors.length})` },
             { key: "sync", label: `Sync Events (${syncEvents.length})` },
             { key: "reports", label: `Teammate Reports (${flattenedFindings.length})` },
             { key: "presence", label: `Who's Online (${sessions.length})` },
             { key: "debugging", label: "Debugging Console" },
+            ...(canPreview ? [{ key: "access-preview", label: "View user access" }] : []),
             // Hidden entirely (not just disabled) for non-admins - matches
             // the "hide, don't just disable" requirement discussed earlier.
             ...(isCurrentUserAdmin ? [{ key: "admin", label: `Manage Users (${users.length})` }] : [])
@@ -207,14 +218,15 @@ export default function DeveloperConsole({
               key={tab.key}
               type="button"
               onClick={() => setActiveTab(tab.key)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+              className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-lg text-sm font-medium transition ${
                 activeTab === tab.key ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent"
               }`}
             >
               {tab.label}
             </button>
           ))}
-          <div className="ml-auto flex items-center gap-1">
+          </nav>
+          <div className="flex shrink-0 items-center gap-1">
             <Button variant="ghost" size="icon" onClick={loadAll} disabled={loading} title="Refresh">
               <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
             </Button>
@@ -229,7 +241,10 @@ export default function DeveloperConsole({
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+        <div className="min-h-0 flex-1 overflow-y-auto space-y-2 pr-1">
+          {activeTab === "access-preview" && canPreview && (
+            <UserAccessPreview policyState={policyState} refreshKey={previewRefreshKey} />
+          )}
           <div hidden={activeTab !== "debugging"}><DebuggingConsole /></div>
           {activeTab === "errors" && (
             appErrors.length === 0 ? (

@@ -4,6 +4,7 @@
 // the screens to render. Used only by scripts/smoke/main.cjs.
 const IDENTITY = { email: "smoke.test@enphaseenergy.com" };
 const USERS = [{ id: "smoke-user", email: IDENTITY.email, full_name: "Smoke Test", display_name: "Smoke Test", app_role: "admin", additional_roles: [] }];
+if (process.argv.includes("--console-only")) USERS[0].app_role = "super_admin";
 const SOPS = [
   {id: "smoke-section", kind: "section", title: "General", order: 0},
   {id: "workbook-legacy", kind: "workbook", title: "Legacy workbook", order: 1},
@@ -16,6 +17,14 @@ function respond(path, args) {
   const key = path.join(".");
   window.__smokeCalls[key] = (window.__smokeCalls[key] || 0) + 1;
   const last = path[path.length - 1];
+  if (process.argv.includes("--console-only")) {
+    if (key === "admin.policy") return Promise.resolve({ok: true, me: USERS[0]});
+    if (key === "admin.overview") return Promise.resolve({ok: true, users: USERS});
+    if (key === "viewing.status") {
+      if (window.__smokeViewingReady) return Promise.resolve({ok: true, supported: true, ready: true});
+      return Promise.reject(new Error("No handler registered for 'viewing:status'"));
+    }
+  }
   if (key === "sops.onChanged") {
     sopListeners.add(args[0]);
     return () => sopListeners.delete(args[0]);
@@ -79,7 +88,15 @@ function respond(path, args) {
     return Promise.resolve({ok: true, conversation: {id: "smoke-chat"}});
   }
   if (key === "chat.me") return Promise.resolve({email: IDENTITY.email, unreadTotal: 0});
-  if (key === "chat.directory") return Promise.resolve(USERS.map((user) => ({email: user.email, name: user.full_name})));
+  if (key === "chat.directory") return Promise.resolve([...USERS.map((user) => ({email: user.email, name: user.full_name})),
+    {email: "teammate@example.invalid", name: "Retro Teammate"}]);
+  if (key === "chat.send") {
+    window.__smokeTaskRequests = [...(window.__smokeTaskRequests || []), args[0]];
+    if (window.__smokeTaskSendFail) return Promise.resolve({ok: false, error: "unreachable"});
+    return Promise.resolve({ok: true, message: {id: args[0].clientId, conversationId: args[0].conversationId,
+      assignedTaskId: `chat-task:${args[0].clientId}`, sender: IDENTITY.email,
+      body: args[0].body, attachments: [], createdAt: new Date().toISOString()}});
+  }
   if (key === "chat.conversations") return Promise.resolve([
     {id: "smoke-chat", kind: "dm", members: [{email: IDENTITY.email}, {email: "teammate@example.invalid"}], unread: 0}
   ]);

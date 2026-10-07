@@ -1205,21 +1205,28 @@ function QuoteDetailsContent() {
  }
 
  return (
- <div className="min-h-screen bg-background">
+ <div className="min-h-screen bg-background" data-enquote-share-target={`quote:${quote.id}`} data-enquote-share-scope="groups" data-enquote-share-label={`Quote ${quote.quote_number || quote.site_id}`} data-enquote-share-quote-number={quote.quote_number}>
  <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
  {/* Header */}
- <div className="flex flex-col gap-2 mb-6">
- <div className="flex items-start justify-between">
- <div>
+ <div className="mb-6 space-y-4">
  <Link to={createPageUrl("Quotes")}>
- <Button variant="ghost" className="text-muted-foreground mb-1">
+ <Button variant="ghost" className="-ml-3 text-muted-foreground">
  <ArrowLeft className="w-4 h-4 mr-2" />
  Back to Quotes
  </Button>
  </Link>
- <div className="flex items-center gap-4 flex-wrap">
- <h1 className="text-3xl font-bold text-foreground"><SiteIdLink siteId={quote.site_id} fallback="No Site ID" className="text-3xl font-bold" /></h1>
- <StatusBadge status={quote.status} size="large" />
+ <div className="flex flex-col gap-3">
+ <div className="min-w-0 space-y-2">
+ <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+ <h1 data-enquote-share-target={`quote:${quote.id}:site-heading`} data-enquote-share-label={`Site ID ${quote.site_id || "No Site ID"}`} className="text-3xl font-bold text-foreground"><SiteIdLink siteId={quote.site_id} fallback="No Site ID" className="text-3xl font-bold" /></h1>
+ <div data-enquote-share-target={`quote:${quote.id}:status`} data-enquote-share-label="Quote status"><StatusBadge status={quote.status} size="large" /></div>
+ <span data-enquote-share-target={`quote:${quote.id}:version`} data-enquote-share-label="Quote version" className="rounded-md bg-muted px-2 py-1 text-xs font-semibold text-foreground">
+ v{quote.version_number || 1}
+ </span>
+ </div>
+ <p data-enquote-share-target={`quote:${quote.id}:reference`} data-enquote-share-label={`Quote ${quote.quote_number}`} className="text-sm text-muted-foreground">{quote.quote_number}</p>
+ </div>
+ <div className="flex shrink-0 flex-wrap items-center gap-2" aria-label="Quote downloads">
  <Button 
  onClick={handleDownloadPDF}
  variant="outline"
@@ -1236,19 +1243,14 @@ function QuoteDetailsContent() {
  <Download className="w-4 h-4 mr-2" />
  Download Customer Copy
  </Button>
- <span className="px-3 py-1.5 bg-muted text-foreground text-sm font-semibold rounded-lg">
- v{quote.version_number || 1}
- </span>
- </div>
- <p className="text-muted-foreground mt-1">{quote.quote_number}</p>
  </div>
  </div>
 
  {/* Action Bar */}
- <div className="flex flex-wrap gap-2 justify-center">
+ <div className="flex flex-wrap items-center justify-start gap-2 border-t border-border pt-4" aria-label="Quote actions">
  {(isAdmin || isApprover) && (
  <Select value={quote.status} onValueChange={handleStatusChange} disabled={updateMutation.isPending}>
- <SelectTrigger className="w-[240px] border-slate-300">
+ <SelectTrigger className="h-9 w-full sm:w-[260px] border-border">
  <SelectValue placeholder="Change status..." />
  </SelectTrigger>
  <SelectContent>
@@ -1551,12 +1553,12 @@ function QuoteDetailsContent() {
 
 
  {/* Enphase Care Eligibility Banner */}
- {quote.site_id && <CareEligibilityBanner siteId={quote.site_id} />}
+ {quote.site_id && <div data-enquote-share-target={`quote:${quote.id}:care`} data-enquote-share-label="Enphase Care Eligibility"><CareEligibilityBanner siteId={quote.site_id} /></div>}
 
  {/* On Hold / Boneyard Banner */}
  {quote.status === "on_hold" && (
  <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
- <Card className="p-4 mb-6 bg-amber-50 border-amber-300">
+ <Card data-enquote-share-target={`quote:${quote.id}:boneyard`} data-enquote-share-label="Boneyard details" className="p-4 mb-6 bg-amber-50 border-amber-300">
  <div className="flex items-start gap-3">
  <Archive className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
  <div className="flex-1">
@@ -1585,7 +1587,7 @@ function QuoteDetailsContent() {
  initial={{ opacity: 0, y: -10 }}
  animate={{ opacity: 1, y: 0 }}
  >
- <Card className="p-4 mb-6 bg-rose-50 border-rose-200">
+ <Card data-enquote-share-target={`quote:${quote.id}:rejection`} data-enquote-share-label="Rejection Reason" className="p-4 mb-6 bg-rose-50 border-rose-200">
  <div className="flex items-start gap-3">
  <XCircle className="w-5 h-5 text-rose-600 mt-0.5" />
  <div>
@@ -1603,7 +1605,7 @@ function QuoteDetailsContent() {
  initial={{ opacity: 0, y: -10 }}
  animate={{ opacity: 1, y: 0 }}
  >
- <Card className="p-4 mb-6 bg-red-50 border-red-200">
+ <Card data-enquote-share-target={`quote:${quote.id}:ho-rejection`} data-enquote-share-label="HO Rejection Reason" className="p-4 mb-6 bg-red-50 border-red-200">
  <div className="flex items-start gap-3">
  <XCircle className="w-5 h-5 text-red-600 mt-0.5" />
  <div>
@@ -1621,7 +1623,7 @@ function QuoteDetailsContent() {
  initial={{ opacity: 0, y: -10 }}
  animate={{ opacity: 1, y: 0 }}
  >
- <Card className="p-4 mb-6 bg-amber-50 border-amber-200">
+ <Card data-enquote-share-target={`quote:${quote.id}:deletion-request`} data-enquote-share-label="Deletion Request" className="p-4 mb-6 bg-amber-50 border-amber-200">
  <div className="flex items-start gap-3">
  <Trash2 className="w-5 h-5 text-amber-600 mt-0.5" />
  <div>
@@ -1638,11 +1640,11 @@ function QuoteDetailsContent() {
 
  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
  {/* Quote Info */}
- <Card className="p-6 border-border">
+ <Card data-enquote-share-target={`quote:${quote.id}:info`} data-enquote-share-label="Quote Details" className="p-6 border-border">
  <h3 className="text-lg font-semibold text-foreground mb-4">Quote Details</h3>
- <div className="space-y-4">
+ <div className="quote-detail-fields">
  {quote.site_id && (
- <div className="flex items-center gap-3">
+ <div data-enquote-share-target={`quote:${quote.id}:site-id`} data-enquote-share-label={`Site ID ${quote.site_id}`} className="flex items-center gap-3">
  <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
  <Hash className="w-4 h-4 text-muted-foreground" />
  </div>
@@ -1653,7 +1655,7 @@ function QuoteDetailsContent() {
  </div>
  )}
  {quote.case_number && (
- <div className="flex items-center gap-3">
+ <div data-enquote-share-target={`quote:${quote.id}:case-number`} data-enquote-share-label={`Case Number ${quote.case_number}`} className="flex items-center gap-3">
  <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
  <FileText className="w-4 h-4 text-muted-foreground" />
  </div>
@@ -1664,7 +1666,7 @@ function QuoteDetailsContent() {
  </div>
  )}
  {quote.picklist && (
- <div className="flex items-center gap-3">
+ <div data-enquote-share-target={`quote:${quote.id}:picklist`} data-enquote-share-label={`Project Picklist ${quote.picklist}`} className="flex items-center gap-3">
  <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
  <ClipboardList className="w-4 h-4 text-muted-foreground" />
  </div>
@@ -1675,7 +1677,7 @@ function QuoteDetailsContent() {
  </div>
  )}
  {quote.fst_count > 0 && (
- <div className="flex items-center gap-3">
+ <div data-enquote-share-target={`quote:${quote.id}:fst-count`} data-enquote-share-label="FSTs Needed" className="flex items-center gap-3">
  <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
  <Users className="w-4 h-4 text-muted-foreground" />
  </div>
@@ -1686,7 +1688,7 @@ function QuoteDetailsContent() {
  </div>
  )}
  {quote.miles_traveled > 0 && (
- <div className="flex items-center gap-3">
+ <div data-enquote-share-target={`quote:${quote.id}:miles-traveled`} data-enquote-share-label="Miles Traveled" className="flex items-center gap-3">
  <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
  <Hash className="w-4 h-4 text-muted-foreground" />
  </div>
@@ -1696,7 +1698,7 @@ function QuoteDetailsContent() {
  </div>
  </div>
  )}
- <div className="flex items-center gap-3">
+ <div data-enquote-share-target={`quote:${quote.id}:created`} data-enquote-share-label="Created date" className="flex items-center gap-3">
  <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
  <Calendar className="w-4 h-4 text-muted-foreground" />
  </div>
@@ -1710,7 +1712,7 @@ function QuoteDetailsContent() {
  </div>
  </div>
  {quote.valid_until && (
- <div className="flex items-center gap-3">
+ <div data-enquote-share-target={`quote:${quote.id}:valid-until`} data-enquote-share-label="Valid Until" className="flex items-center gap-3">
  <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
  <Calendar className="w-4 h-4 text-muted-foreground" />
  </div>
@@ -1723,7 +1725,7 @@ function QuoteDetailsContent() {
  </div>
  )}
  {quote.paid_at_date && (
- <div className="flex items-center gap-3">
+ <div data-enquote-share-target={`quote:${quote.id}:paid-at`} data-enquote-share-label="Payment details" className="flex items-center gap-3">
  <div className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center">
  <CheckCircle className="w-4 h-4 text-emerald-600" />
  </div>
@@ -1736,7 +1738,7 @@ function QuoteDetailsContent() {
  </div>
  )}
  {quote.quote_requester && (
- <div className="flex items-center gap-3">
+ <div data-enquote-share-target={`quote:${quote.id}:requester`} data-enquote-share-label="FST Requester" className="flex items-center gap-3">
  <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
  <Users className="w-4 h-4 text-muted-foreground" />
  </div>
@@ -1747,13 +1749,13 @@ function QuoteDetailsContent() {
  </div>
  )}
  {(creatorEmail || quote.owner_email) && (
- <div className="flex items-center gap-3">
+ <div data-enquote-share-target={`quote:${quote.id}:creator`} data-enquote-share-label="Created By and ownership" className="flex items-center gap-3">
  <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
  <Users className="w-4 h-4 text-muted-foreground" />
  </div>
  <div className="min-w-0">
  <p className="text-sm text-muted-foreground">Created By</p>
- <p className="font-medium text-foreground break-all">{creatorEmail || quote.owner_email}</p>
+ <p className="font-medium text-foreground">{creatorEmail || quote.owner_email}</p>
  {quote.owner_email && quote.owner_email !== (creatorEmail || quote.owner_email) && (
  <p className="text-xs text-muted-foreground">Owner: {quote.owner_email}</p>
  )}
@@ -1762,7 +1764,7 @@ function QuoteDetailsContent() {
  </div>
  )}
  {quote.last_follow_up_date && (
- <div className="flex items-center gap-3">
+ <div data-enquote-share-target={`quote:${quote.id}:last-follow-up`} data-enquote-share-label="Last Follow-Up" className="flex items-center gap-3">
  <div className="w-9 h-9 rounded-lg bg-teal-50 flex items-center justify-center">
  <MessageSquarePlus className="w-4 h-4 text-teal-600" />
  </div>
@@ -1775,7 +1777,7 @@ function QuoteDetailsContent() {
  </div>
  )}
  {isAdmin && (
- <div className="flex items-center gap-3 pt-2 border-t border-border">
+ <div data-enquote-share-target={`quote:${quote.id}:reporting`} data-enquote-share-label="Exclude from Reporting" className="flex items-center gap-3 pt-2 border-t border-border">
  <div className="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center">
  <EyeOff className="w-4 h-4 text-amber-600" />
  </div>
@@ -1794,7 +1796,7 @@ function QuoteDetailsContent() {
  )}
 
  {/* Pre-Approval — always visible as a status indicator, editable only by authorized users */}
- <div className={`flex items-center gap-3 pt-2 border-t border-border rounded-lg px-2 py-1 ${quote.pre_approved ? "bg-emerald-50" : "bg-rose-50"}`}>
+ <div data-enquote-share-target={`quote:${quote.id}:pre-approval`} data-enquote-share-label="Pre-Approval" className={`flex items-center gap-3 pt-2 border-t border-border rounded-lg px-2 py-1 ${quote.pre_approved ? "bg-emerald-50" : "bg-rose-50"}`}>
  <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${quote.pre_approved ? "bg-emerald-100" : "bg-rose-100"}`}>
  <CheckCircle className={`w-4 h-4 ${quote.pre_approved ? "text-emerald-600" : "text-rose-400"}`} />
  </div>
@@ -1820,7 +1822,7 @@ function QuoteDetailsContent() {
  </Card>
 
  {/* Line Items */}
- <Card className="p-6 border-border lg:col-span-2">
+ <Card data-enquote-share-target={`quote:${quote.id}:line-items`} data-enquote-share-label="Line Items" className="p-6 border-border lg:col-span-2">
  <div className="flex items-center justify-between mb-4">
  <h3 className="text-lg font-semibold text-foreground">Line Items</h3>
  <Button
@@ -1845,7 +1847,7 @@ function QuoteDetailsContent() {
  </thead>
  <tbody>
  {quote.items?.map((item, index) => (
- <tr key={index} className="border-b border-border">
+ <tr key={index} data-enquote-share-target={`quote:${quote.id}:item:${item.id || item.name}`} data-enquote-share-label={`Line item ${item.name}`} className="border-b border-border">
  <td className="py-3 px-2">
  <p className="font-medium text-foreground">{item.name}</p>
  {item.description && (
@@ -1889,11 +1891,11 @@ function QuoteDetailsContent() {
 
  return (
  <div className="mt-6 pt-4 border-t border-border space-y-2">
- <div className="flex justify-between text-muted-foreground">
+ <div data-enquote-share-target={`quote:${quote.id}:items-subtotal`} data-enquote-share-label="Line Items Subtotal" className="flex justify-between text-muted-foreground">
  <span>Line Items Subtotal</span>
  <span>${itemsSubtotal.toFixed(2)}</span>
  </div>
- <div className="flex justify-between text-muted-foreground">
+ <div data-enquote-share-target={`quote:${quote.id}:labor`} data-enquote-share-label="Labor" className="flex justify-between text-muted-foreground">
  <span>
  {quote.labor_mode === "flat"
  ? `Labor (Flat fee)`
@@ -1901,20 +1903,20 @@ function QuoteDetailsContent() {
  </span>
  <span>${laborCost.toFixed(2)}</span>
  </div>
- <div className="flex justify-between text-muted-foreground">
+ <div data-enquote-share-target={`quote:${quote.id}:travel`} data-enquote-share-label="Travel" className="flex justify-between text-muted-foreground">
  <span>Travel ({quote.travel_hours || 0} hrs @ ${quote.travel_rate || 65}/hr)</span>
  <span>${travelCost.toFixed(2)}</span>
  </div>
- <div className="flex justify-between text-muted-foreground">
+ <div data-enquote-share-target={`quote:${quote.id}:mileage`} data-enquote-share-label="Mileage" className="flex justify-between text-muted-foreground">
  <span>Mileage ({quote.miles_traveled || 0} mi @ ${quote.mileage_rate || 0.73}/mi)</span>
  <span>${mileageCost.toFixed(2)}</span>
  </div>
- <div className="flex justify-between pt-1 border-t border-border text-foreground font-medium">
+ <div data-enquote-share-target={`quote:${quote.id}:subtotal`} data-enquote-share-label="Subtotal" className="flex justify-between pt-1 border-t border-border text-foreground font-medium">
  <span>Subtotal</span>
  <span>${subtotal.toFixed(2)}</span>
  </div>
  {hasDiscount && (
- <div className="flex justify-between text-muted-foreground">
+ <div data-enquote-share-target={`quote:${quote.id}:discount`} data-enquote-share-label="Discount" className="flex justify-between text-muted-foreground">
  <span>
  {quote.discount_type === "flat"
  ? `Discount ($${discountAmount.toFixed(2)} off)`
@@ -1924,18 +1926,18 @@ function QuoteDetailsContent() {
  </div>
  )}
  {hasTax && (
- <div className="flex justify-between text-muted-foreground">
+ <div data-enquote-share-target={`quote:${quote.id}:taxable-subtotal`} data-enquote-share-label="Taxable Subtotal" className="flex justify-between text-muted-foreground">
  <span>Taxable Subtotal <span className="text-xs text-muted-foreground">(taxable items only)</span></span>
  <span>${taxableAfterDiscount.toFixed(2)}</span>
  </div>
  )}
  {hasTax && (
- <div className="flex justify-between text-muted-foreground">
+ <div data-enquote-share-target={`quote:${quote.id}:taxes`} data-enquote-share-label="Taxes" className="flex justify-between text-muted-foreground">
  <span>Taxes ({combinedTaxRate}% combined)</span>
  <span>+${taxAmount.toFixed(2)}</span>
  </div>
  )}
- <div className="flex justify-between pt-2 border-t border-border">
+ <div data-enquote-share-target={`quote:${quote.id}:total`} data-enquote-share-label="Quote Total" className="flex justify-between pt-2 border-t border-border">
  <span className="text-lg font-semibold text-foreground">Total</span>
  <span className="text-2xl font-bold text-indigo-600">
  ${calculatedTotal.toFixed(2)}
@@ -1949,7 +1951,7 @@ function QuoteDetailsContent() {
 
  {/* Scope of Work */}
  {quote.scope_of_work && (
- <Card className="p-6 mt-6 border-border">
+ <Card data-enquote-share-target={`quote:${quote.id}:scope`} data-enquote-share-label="Scope of Work" className="p-6 mt-6 border-border">
  <h3 className="text-lg font-semibold text-foreground mb-2">Scope of Work</h3>
  <p className="text-muted-foreground whitespace-pre-wrap">{quote.scope_of_work}</p>
  </Card>
@@ -1957,7 +1959,7 @@ function QuoteDetailsContent() {
 
  {/* Notes */}
  {quote.notes && (
- <Card className="p-6 mt-6 border-border">
+ <Card data-enquote-share-target={`quote:${quote.id}:notes`} data-enquote-share-label="Notes & Terms" className="p-6 mt-6 border-border">
  <h3 className="text-lg font-semibold text-foreground mb-2">Notes & Terms</h3>
  <p className="text-muted-foreground whitespace-pre-wrap">{quote.notes}</p>
  </Card>
@@ -1966,25 +1968,33 @@ function QuoteDetailsContent() {
  {canViewVersionHistory && (
  <>
  {/* Version Comparison with Rejection History */}
+ <div data-enquote-share-target={`quote:${quote.id}:version-comparison`} data-enquote-share-label="Version Comparison">
  <QuoteVersionComparison quote={quote} />
+ </div>
 
  {/* Version History */}
+ <div data-enquote-share-target={`quote:${quote.id}:version-history`} data-enquote-share-label="Version History">
  <QuoteVersionHistory
  quote={quote}
  canRestore={canRestoreVersion}
  onRestore={handleRestoreVersion}
  />
+ </div>
  </>
  )}
 
  {/* Follow-Up History */}
+ <div data-enquote-share-target={`quote:${quote.id}:follow-up-history`} data-enquote-share-label="Follow-Up History">
  <FollowUpHistory quoteId={quoteId} />
+ </div>
 
+ <div data-enquote-share-target={`quote:${quote.id}:activity`} data-enquote-share-label="Quote Activity">
  <QuoteActivityLog quoteId={quoteId} />
+ </div>
 
  {/* Quote History */}
  {quote.status_history && quote.status_history.length > 0 && (
- <Card className="p-6 mt-6 border-border">
+ <Card data-enquote-share-target={`quote:${quote.id}:status-history`} data-enquote-share-label="Status History" className="p-6 mt-6 border-border">
  <h3 className="text-lg font-semibold text-foreground mb-4">Status History</h3>
  <div className="space-y-4">
  {quote.status_history.map((entry, index) => {

@@ -1,4 +1,6 @@
-import {cloneElement, useMemo, useState} from "react";
+import {cloneElement, useEffect, useMemo, useState} from "react";
+import {useSearchParams} from "react-router-dom";
+import {toast} from "sonner";
 import {useQuery} from "@tanstack/react-query";
 import {
     AlertCircle,
@@ -76,6 +78,7 @@ import {
 } from "@/features/supervisorDashboard/parseEodbWidget";
 import DashboardDateRange from "@/components/supervisor/DashboardDateRange";
 import {useReportingPeriodPreference} from "@/features/supervisorDashboard/useReportingPeriodPreference";
+import {readSharedDashboardPeriod, sharedDashboardTilePath, SHARED_PERIOD_QUERY, SHARED_TILE_QUERY} from "@/features/supervisorDashboard/sharedDashboardPeriod";
 import QuoteExceptionsPanel from "@/components/supervisor/QuoteExceptionsPanel";
 import DrillDownDrawer from "@/components/supervisor/DrillDownDrawer";
 import HourlyWaitTimeChart from "@/components/supervisor/HourlyWaitTimeChart";
@@ -1039,7 +1042,35 @@ export default function DashboardOverview({
 }) {
   const defaultPreset = useMemo(() => resolveDefaultPreset(records), [records]);
   const [rangeValue, setRangeValue] = useReportingPeriodPreference("overview");
-  const [kpiMode, setKpiMode] = useState(AGGREGATION_MODES.PERIOD_TOTAL);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const sharedPeriod = useMemo(() => {
+    try {return {value: readSharedDashboardPeriod(searchParams), error: null};}
+    catch (error) {return {value: null, error: error.message};}
+  }, [searchParams]);
+  useEffect(() => {
+    if (sharedPeriod.error) toast.error(sharedPeriod.error);
+  }, [sharedPeriod.error]);
+  const sharedTileId = searchParams.get(SHARED_TILE_QUERY);
+  const [localKpiMode, setLocalKpiMode] = useState(AGGREGATION_MODES.PERIOD_TOTAL);
+  const kpiMode = sharedPeriod.value?.mode || localKpiMode;
+  function clearSharedPeriod() {
+    setSearchParams(previous => {
+      const next = new URLSearchParams(previous);
+      next.delete(SHARED_PERIOD_QUERY);
+      next.delete(SHARED_TILE_QUERY);
+      return next;
+    }, {replace: true});
+  }
+  function changeRange(value) {
+    setLocalKpiMode(kpiMode);
+    setRangeValue(value);
+    clearSharedPeriod();
+  }
+  function setKpiMode(value) {
+    if (sharedPeriod.value) setRangeValue(sharedPeriod.value.range);
+    setLocalKpiMode(value);
+    clearSharedPeriod();
+  }
   const [compareEnabled, setCompareEnabled] = useState(true);
   const [drillDown, setDrillDown] = useState(null);
   const [quotesRequestedDialogOpen, setQuotesRequestedDialogOpen] = useState(false);
@@ -1055,11 +1086,12 @@ export default function DashboardOverview({
   const [tilePrefsVersion, setTilePrefsVersion] = useState(0);
 
   const activeRange = useMemo(() => {
+    if (sharedPeriod.value) return sharedPeriod.value.range;
     if (rangeValue) return rangeValue;
     const resolved = resolveDateRange({ preset: defaultPreset, records });
     return { preset: defaultPreset, start: resolved.start, end: resolved.end };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rangeValue, defaultPreset, records]);
+  }, [rangeValue, defaultPreset, records, sharedPeriod.value]);
 
   const rangedRecords = useMemo(() => filterRecordsInRange(records, activeRange), [records, activeRange]);
   const previousRange = useMemo(() => getPreviousPeriodRange(activeRange), [activeRange]);
@@ -1835,11 +1867,11 @@ export default function DashboardOverview({
 
   const visibleOrderedTiles = useMemo(() => {
     const hidden = getHiddenTileIds();
-    const filtered = allTiles.filter((t) => !hidden.has(t.id) && (reportFilter === "all" || t.category === reportFilter));
+    const filtered = allTiles.filter((t) => t.id === sharedTileId || (!hidden.has(t.id) && (reportFilter === "all" || t.category === reportFilter)));
     const savedOrder = getTileOrder();
     return orderTiles(filtered, savedOrder);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allTiles, reportFilter, tilePrefsVersion]);
+  }, [allTiles, reportFilter, tilePrefsVersion, sharedTileId]);
 
   function handleReorderTiles(newVisibleOrderIds) {
     const fullOrder = getTileOrder().length ? getTileOrder() : allTiles.map((t) => t.id);
@@ -1858,7 +1890,8 @@ export default function DashboardOverview({
           </p>
         </CardHeader>
       </Card>
-      <DashboardDateRange records={records} value={activeRange} onChange={setRangeValue} />
+      <DashboardDateRange records={records} value={activeRange} onChange={changeRange}
+        freezePresetDates={Boolean(sharedPeriod.value)} />
       <Card className="border-border">
         <CardContent className="flex flex-wrap items-center gap-6 p-4">
           <div className="flex flex-col gap-1">
@@ -1904,7 +1937,8 @@ export default function DashboardOverview({
           </CardContent>
         </Card>
       ) : (
-        <TileGrid tiles={visibleOrderedTiles} onReorder={handleReorderTiles} />
+        <TileGrid tiles={visibleOrderedTiles} onReorder={handleReorderTiles}
+          sharePath={id => sharedDashboardTilePath(id, activeRange, kpiMode)} />
       )}
       <div>
         <h3 className="mb-3 text-lg font-semibold text-foreground">Hourly Wait Time Summary</h3>

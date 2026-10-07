@@ -43,7 +43,7 @@ export function createSupervisorD1(migrations = ["0002_supervisor_records.sql"])
 }
 
 export function createCollabD1() {
-  return createSupervisorD1(["0005_collab.sql"]);
+  return createSupervisorD1(["0005_collab.sql", "0008_chat_reactions.sql", "0009_custom_emojis.sql"]);
 }
 
 // 0006 alters presence_sessions, which lives in schema.sql rather than a migration.
@@ -53,5 +53,5 @@ const PRESENCE_TABLE_SQL = `CREATE TABLE IF NOT EXISTS presence_sessions (
 );`;
 
 export function createAdminD1() {
-  return createSupervisorD1(["0005_collab.sql", { sql: PRESENCE_TABLE_SQL }, "0006_admin_profiles.sql"]);
+  return createSupervisorD1(["0005_collab.sql", { sql: PRESENCE_TABLE_SQL }, "0006_admin_profiles.sql", "0008_chat_reactions.sql"]);
 }

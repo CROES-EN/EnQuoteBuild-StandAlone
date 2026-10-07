@@ -28,12 +28,310 @@ import {
   handleChatInbox,
   handleChatMessageSend,
   handleChatMessages,
+  handleChatReactions,
+  handleChatReactionSet,
   handleChatRead
 } from "../src/chat.js";
+import {handleChatImageUpload, handleChatImageDownload} from "../src/chat-images.js";
+import {handleCustomEmojisList, handleCustomEmojiUpload, handleCustomEmojiDownload, handleCustomEmojiFromGif} from "../src/custom-emojis.js";
 
 const SECRET = "01234567890123456789012345678901";
 const OUTBOUND_TOKEN = "outbound-token";
 const ALLOWED_EMAILS_LIST = "alice@example.com,bob@example.com,carol@example.com";
+
+test("shared emojis enforce auth, format, size, uniqueness and work in messages and reactions", async () => {
+  const env = makeEnv();
+  const bytes = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 1]).buffer;
+  const upload = (name, data = bytes, type = "image/png") => authedRequest(`/api/chat/emojis?name=${name}`, "alice@example.com",
+    {method: "POST", body: data, headers: {"Content-Type": type}}).then(request => handleCustomEmojiUpload(request, env));
+  assert.equal((await handleCustomEmojisList(new Request("https://worker.example/api/chat/emojis"), env)).status, 401);
+  assert.equal((await handleCustomEmojiUpload(new Request("https://worker.example/api/chat/emojis?name=team", {method: "POST", body: bytes}), env)).status, 401);
+  for (const name of ["Bad", "bad%20name", "_bad", "x".repeat(33)]) assert.equal((await upload(name)).status, 400);
+  assert.equal((await upload("team", bytes, "image/svg+xml")).status, 415);
+  assert.equal((await upload("team", new Uint8Array([1, 2, 3]).buffer)).status, 400);
+  assert.equal((await upload("team", new ArrayBuffer(512 * 1024 + 1))).status, 413);
+  const first = await upload("team");
+  assert.equal(first.status, 200);
+  const {emoji} = await first.json();
+  assert.match(emoji.id, /^[a-f0-9]{64}$/);
+  assert.equal((await upload("team")).status, 200);
+  assert.equal((await upload("second")).status, 409, "same image cannot silently change name");
+  assert.equal((await upload("team", Uint8Array.from([...new Uint8Array(bytes), 2]).buffer)).status, 409);
+  const list = await (await handleCustomEmojisList(await authedRequest("/api/chat/emojis", "carol@example.com"), env)).json();
+  assert.deepEqual(list.emojis, [emoji], "catalog is shared outside conversation membership");
+  const download = await handleCustomEmojiDownload(await authedRequest(`/api/chat/emojis/image?id=${emoji.id}`, "bob@example.com"), env);
+  assert.deepEqual(await download.arrayBuffer(), bytes);
+  assert.equal(download.headers.get("X-Content-Type-Options"), "nosniff");
+  assert.equal(download.headers.get("Cache-Control"), "private, no-store");
+  assert.equal((await handleCustomEmojiDownload(new Request(`https://worker.example/api/chat/emojis/image?id=${emoji.id}`), env)).status, 401);
+
+  const conversation = (await (await handleChatConversationCreate(await authedRequest("/api/chat/conversations", "alice@example.com",
+    {method: "POST", body: {kind: "dm", with: "bob@example.com"}}), env)).json()).conversation;
+  const send = (attachments, sender = "alice@example.com") => authedRequest("/api/chat/messages", sender,
+    {method: "POST", body: {conversationId: conversation.id, clientId: crypto.randomUUID(), attachments}})
+    .then(request => handleChatMessageSend(request, env));
+  const response = await send([{type: "custom_emoji", emojiId: emoji.id, name: "forged"}]);
+  assert.equal(response.status, 200);
+  const {message} = await response.json();
+  assert.deepEqual(message.attachments, [{type: "custom_emoji", emojiId: emoji.id, name: "team"}]);
+  assert.equal((await send([{type: "custom_emoji", emojiId: "a".repeat(64)}])).status, 400);
+  assert.equal((await send([{type: "custom_emoji", emojiId: emoji.id}], "carol@example.com")).status, 404);
+  const builtin = await send([{type: "builtin_emoji", emojiId: "heart", name: "forged"}]);
+  assert.equal(builtin.status, 200);
+  assert.deepEqual((await builtin.json()).message.attachments, [{type: "builtin_emoji", emojiId: "heart", name: "Love"}]);
+  assert.equal((await send([{type: "builtin_emoji", emojiId: "bad"}])).status, 400);
+  const react = (email, reaction, active = true) => authedRequest("/api/chat/reactions", email, {method: "POST",
+    body: {conversationId: conversation.id, messageId: message.id, emoji: reaction, active}})
+    .then(request => handleChatReactionSet(request, env));
+  const reaction = `custom:${emoji.id}`;
+  for (let i = 0; i < 2; i++) assert.equal((await react("bob@example.com", reaction)).status, 200);
+  assert.equal((await react("carol@example.com", reaction)).status, 404);
+  assert.equal((await react("bob@example.com", `custom:${"a".repeat(64)}`)).status, 400);
+  assert.equal((await react("bob@example.com", "heart")).status, 200, "old built-in reactions remain supported");
+  const history = await (await handleChatMessages(await authedRequest(`/api/chat/messages?conversationId=${conversation.id}`, "bob@example.com"), env)).json();
+  assert.deepEqual(history.messages.find(item => item.id === message.id).reactions,
+    [{emoji: reaction, users: ["bob@example.com"]}, {emoji: "heart", users: ["bob@example.com"]}]);
+  assert.deepEqual((await (await react("bob@example.com", reaction, false)).json()).reactions[message.id],
+    [{emoji: "heart", users: ["bob@example.com"]}]);
+});
+
+const ANIMATED_GIF = Uint8Array.from(Buffer.from(
+  "47494638396101000100800000000000ffffff21ff0b4e45545343415045322e30030100000021f904000a0000002c000000000100010000020244010021f904000a0000002c00000000010001000002024c01003b", "hex")).buffer;
+
+test("uploaded animated emoji GIFs retain their full animation bytes", async () => {
+  const env = makeEnv();
+  const uploaded = await handleCustomEmojiUpload(await authedRequest("/api/chat/emojis?name=blink", "alice@example.com",
+    {method: "POST", body: ANIMATED_GIF, headers: {"Content-Type": "image/gif"}}), env);
+  assert.equal(uploaded.status, 200);
+  const {emoji} = await uploaded.json();
+  const downloaded = await handleCustomEmojiDownload(await authedRequest(`/api/chat/emojis/image?id=${emoji.id}`, "bob@example.com"), env);
+  assert.equal(downloaded.headers.get("Content-Type"), "image/gif");
+  assert.deepEqual(await downloaded.arrayBuffer(), ANIMATED_GIF);
+});
+
+test("GIPHY emoji imports use a verified small GIF rendition and preserve bytes, size limits and attribution", async () => {
+  const env = {...makeEnv(), GIPHY_API_KEY: "test-giphy-key"};
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  let data = {id: "gif123", rating: "pg", images: {fixed_height_small:
+    {url: "https://media.giphy.com/media/gif123/100.gif", size: String(ANIMATED_GIF.byteLength)}}};
+  let mediaBytes = ANIMATED_GIF;
+  let mediaStatus = 200;
+  globalThis.fetch = async (url, options) => {
+    calls.push({url: String(url), options});
+    return String(url).startsWith("https://api.giphy.com/")
+      ? Response.json({data}) : new Response(mediaBytes, {status: mediaStatus,
+        ...(mediaStatus === 302 ? {headers: {Location: "https://evil.example/redirect.gif"}} : {})});
+  };
+  const save = (body = {name: "saved_gif", gifId: "gif123"}) => authedRequest("/api/chat/emojis/from-gif", "alice@example.com",
+    {method: "POST", body}).then(request => handleCustomEmojiFromGif(request, env));
+  try {
+    const response = await save();
+    assert.equal(response.status, 200);
+    const {emoji} = await response.json();
+    assert.equal(emoji.mimeType, "image/gif");
+    assert.equal(emoji.sourceGifId, "gif123");
+    const downloaded = await handleCustomEmojiDownload(await authedRequest(`/api/chat/emojis/image?id=${emoji.id}`, "bob@example.com"), env);
+    assert.deepEqual(await downloaded.arrayBuffer(), ANIMATED_GIF);
+    assert.equal(calls.length, 2);
+    assert.equal(calls[1].options.redirect, "manual", "use the Workers-supported mode without following redirects");
+    assert.equal(calls[1].options.headers, undefined, "user and service credentials never go to GIPHY media");
+    assert.equal((await save({name: "bad", gifId: "https://evil.example"})).status, 400);
+    assert.equal(calls.length, 2);
+    data = {...data, images: {fixed_height_small: {url: "https://evil.example/animation.gif", size: "100"}}};
+    assert.equal((await save()).status, 413);
+    assert.equal(calls.length, 3, "untrusted media is never fetched");
+    data = {...data, images: {fixed_height_small: {url: "https://media.giphy.com/animation.gif", size: "100"}}};
+    mediaStatus = 302;
+    assert.equal((await save()).status, 502, "redirect responses fail explicitly without following the destination");
+    mediaStatus = 200;
+    mediaBytes = new ArrayBuffer(512 * 1024 + 1);
+    assert.equal((await save()).status, 413, "actual streamed bytes enforce the size limit, not GIPHY metadata");
+    mediaBytes = new Uint8Array([1, 2, 3]).buffer;
+    assert.equal((await save()).status, 400, "non-GIF media cannot be saved as an animated emoji");
+    data = {...data, rating: "r"};
+    assert.equal((await save()).status, 400);
+    assert.equal((await handleCustomEmojiFromGif(new Request("https://worker.example/api/chat/emojis/from-gif", {method: "POST"}), env)).status, 401);
+  } finally {globalThis.fetch = originalFetch;}
+});
+
+test("panel assignments preserve task metadata privately and reject invalid fields", async () => {
+  const {payload, send, tasks} = await caseTagSetup();
+  const task = {type: "call", remind_at: null, quote_id: "quote-001", quote_label: "Q-001",
+    site_id: "00123", case_number: "000456", case_id: null, contact_name: "Homeowner", contact_phone: "555-0100"};
+  const attachment = {type: "assigned_task", version: 2, recipient: "bob@example.com",
+    title: "Call homeowner", note: "n".repeat(4000), dueAt: stamp(86400000), task};
+  const request = {...payload, body: "Assigned task: Call homeowner", attachments: [attachment]};
+  for (const response of await Promise.all([send(request), send(request)])) {
+    assert.equal(response.status, 200);
+    const result = await response.json();
+    assert.equal(result.message.assignedTaskId, `chat-task:${payload.clientId}`);
+    assert.deepEqual(result.message.attachments, []);
+  }
+  const recipientTasks = await tasks();
+  assert.equal(recipientTasks.tasks.length, 1);
+  const record = recipientTasks.tasks[0].record;
+  for (const [field, value] of Object.entries(task)) assert.equal(record[field], value);
+  assert.equal(record.notes.length, 4000);
+  assert.equal(record.assigned_by, "alice@example.com");
+  assert.equal((await tasks("alice@example.com")).tasks.length, 0);
+  assert.equal((await tasks("carol@example.com")).tasks.length, 0);
+  for (const patch of [{type: "admin"}, {remind_at: "bad"}, {site_id: 123}, {contact_phone: "x".repeat(41)}, {quote_id: {id: "q"}}]) {
+    assert.equal((await send({...request, clientId: crypto.randomUUID(),
+      attachments: [{...attachment, task: {...task, ...patch}}]})).status, 400);
+  }
+  const reminder = stamp(3600000);
+  assert.equal((await send({...request, clientId: crypto.randomUUID(),
+    attachments: [{...attachment, task: {...task, type: "follow_up", remind_at: reminder, owner: "carol@example.com"}}]})).status, 200);
+  const second = (await tasks()).tasks.find(item => item.record.remind_at === reminder);
+  assert.equal(second.record.type, "follow_up");
+  assert.equal(second.record.owner, undefined, "unapproved fields cannot override task ownership");
+});
+
+test("general chat assignments create one private task in DMs or groups and retries never resurrect it", async () => {
+  const {env, payload, send, tasks} = await caseTagSetup();
+  const attachment = {type: "assigned_task", version: 1, recipient: "bob@example.com",
+    title: "Check the invoice", note: "Please verify the total.", dueAt: stamp(86400000)};
+  const request = {...payload, body: "Assigned task: Check the invoice", attachments: [attachment]};
+  const responses = await Promise.all([send(request), send(request)]);
+  for (const response of responses) {
+    assert.equal(response.status, 200);
+    const result = await response.json();
+    assert.equal(result.message.assignedTaskId, `chat-task:${payload.clientId}`);
+    assert.deepEqual(result.message.attachments, []);
+  }
+  const recipientTasks = await tasks();
+  assert.equal(recipientTasks.tasks.length, 1);
+  assert.equal(recipientTasks.tasks[0].record.title, attachment.title);
+  assert.equal(recipientTasks.tasks[0].record.notes, attachment.note);
+  assert.equal(recipientTasks.tasks[0].record.assigned_by, "alice@example.com");
+  assert.equal(recipientTasks.tasks[0].record.source_message_id, payload.clientId);
+  assert.equal((await tasks("alice@example.com")).tasks.length, 0);
+  assert.equal((await tasks("carol@example.com")).tasks.length, 0);
+  for (const patch of [{title: ""}, {title: "x".repeat(201)}, {note: "x".repeat(2001)}, {dueAt: "invalid"}, {version: 2}]) {
+    assert.equal((await send({...request, clientId: crypto.randomUUID(), attachments: [{...attachment, ...patch}]})).status, 400);
+  }
+  assert.equal((await send({...request, clientId: crypto.randomUUID(), attachments: [{...attachment, recipient: "carol@example.com"}]})).status, 403);
+  const group = await (await handleChatConversationCreate(await authedRequest("/api/chat/conversations", "alice@example.com", {
+    method: "POST", body: {kind: "group", name: "Team", members: ["bob@example.com", "carol@example.com"]}
+  }), env)).json();
+  assert.equal((await send({...request, conversationId: group.conversation.id, clientId: crypto.randomUUID(),
+    attachments: [{...attachment, recipient: "carol@example.com"}]})).status, 200);
+  assert.equal((await tasks("carol@example.com")).tasks.length, 1);
+  await handleTasksDelete(await authedRequest("/api/tasks/delete", "bob@example.com", {
+    method: "POST", body: {id: `chat-task:${payload.clientId}`, deletedAt: stamp(1000)}
+  }), env);
+  assert.equal((await send(request)).status, 200);
+  assert.equal((await tasks()).tasks[0].deleted, true);
+});
+
+test("internal app links survive send and history without permitting external redirects or arbitrary selectors", async () => {
+  const {env, payload, send} = await caseTagSetup();
+  const link = {type: "app_link", label: "Quote Q-123", path: "/QuoteDetails?id=123", target: {kind: "record", value: "quote:123"}};
+  const sent = await (await send({...payload, body: "", attachments: [link]})).json();
+  assert.deepEqual(sent.message.attachments, [link]);
+  const history = await (await handleChatMessages(await authedRequest(`/api/chat/messages?conversationId=${payload.conversationId}`, "bob@example.com"), env)).json();
+  assert.deepEqual(history.messages[0].attachments, [link]);
+  for (const invalid of [
+    {...link, path: "//evil.example"},
+    {...link, path: "javascript:alert(1)"},
+    {...link, path: "/Quotes?token=sensitive"},
+    {...link, target: {kind: "selector", value: "body"}},
+    {...link, label: "x".repeat(161)}
+  ]) {
+    assert.equal((await send({...payload, clientId: crypto.randomUUID(), body: "", attachments: [invalid]})).status, 400);
+  }
+});
+
+test("message reactions are member-scoped, persistent, multi-emoji, idempotent, and do not create unread messages", async () => {
+  const {env, payload, send} = await caseTagSetup();
+  await send({...payload, attachments: []});
+  const react = (emoji, active = true, email = "alice@example.com", patch = {}) =>
+    authedRequest("/api/chat/reactions", email, {method: "POST", body: {
+      conversationId: payload.conversationId, messageId: payload.clientId, emoji, active, ...patch
+    }}).then(request => handleChatReactionSet(request, env));
+  const read = (email = "bob@example.com", messageId = payload.clientId) =>
+    authedRequest(`/api/chat/reactions?conversationId=${payload.conversationId}&messageIds=${messageId}`, email)
+      .then(request => handleChatReactions(request, env)).then(response => response.json());
+  const before = await (await handleChatConversations(await authedRequest("/api/chat/conversations", "bob@example.com"), env)).json();
+  await react("thumbs_up");
+  await react("thumbs_up");
+  await react("heart");
+  await react("thumbs_up", true, "bob@example.com");
+  const current = (await read()).reactions[payload.clientId];
+  assert.deepEqual(current, [
+    {emoji: "heart", users: ["alice@example.com"]},
+    {emoji: "thumbs_up", users: ["alice@example.com", "bob@example.com"]}
+  ]);
+  const history = await (await handleChatMessages(await authedRequest(`/api/chat/messages?conversationId=${payload.conversationId}`, "bob@example.com"), env)).json();
+  assert.deepEqual(history.messages[0].reactions, current);
+  await react("thumbs_up", false);
+  await react("thumbs_up", false);
+  assert.deepEqual((await read()).reactions[payload.clientId], [
+    {emoji: "heart", users: ["alice@example.com"]}, {emoji: "thumbs_up", users: ["bob@example.com"]}
+  ]);
+  assert.equal((await react("heart", true, "carol@example.com")).status, 404);
+  assert.equal((await react("unsupported")).status, 400);
+  assert.equal((await react("heart", "yes")).status, 400);
+  assert.equal((await react("heart", true, "alice@example.com", {messageId: "missing"})).status, 404);
+  assert.equal((await read("carol@example.com")).ok, false);
+  assert.deepEqual((await read("bob@example.com", "missing")).reactions, {});
+  const after = await (await handleChatConversations(await authedRequest("/api/chat/conversations", "bob@example.com"), env)).json();
+  assert.deepEqual(after, before);
+  const changes = env.broadcasts.filter(event => event.type === "chat_reactions_updated");
+  assert.ok(changes.length > 0);
+  assert.equal(JSON.stringify(changes).includes("alice@example.com"), false);
+  await env.DB.prepare("UPDATE chat_members SET left_at = ? WHERE conversation_id = ? AND email = ?")
+    .bind(stamp(), payload.conversationId, "bob@example.com").run();
+  assert.equal((await react("heart", true, "bob@example.com")).status, 404);
+  assert.equal((await read()).ok, false);
+  await env.DB.prepare("UPDATE chat_messages SET body = ?, attachments = ? WHERE id = ?")
+    .bind("[removed by admin]", "[]", payload.clientId).run();
+  assert.equal((await react("heart")).status, 404);
+});
+
+test("screenshots upload, send, and download only within their authorized conversation", async () => {
+  const env = makeEnv();
+  const conversation = await (await handleChatConversationCreate(await authedRequest("/api/chat/conversations", "alice@example.com", {
+    method: "POST", body: {kind: "dm", with: "bob@example.com"}
+  }), env)).json();
+  const conversationId = conversation.conversation.id;
+  const bytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0]).buffer;
+  const upload = (email = "alice@example.com", type = "image/png", body = bytes) =>
+    authedRequest(`/api/chat/images?conversationId=${conversationId}`, email, {
+      method: "POST", body, headers: {"Content-Type": type}
+    }).then(req => handleChatImageUpload(req, env));
+  const result = await (await upload()).json();
+  assert.equal(result.ok, true);
+  assert.equal(result.image.size, bytes.byteLength);
+  assert.equal((await upload()).status, 200);
+  const url = `/api/chat/images?conversationId=${conversationId}&fileId=${result.image.fileId}`;
+  const downloaded = await handleChatImageDownload(await authedRequest(url, "bob@example.com"), env);
+  assert.equal(downloaded.status, 200);
+  assert.deepEqual(await downloaded.arrayBuffer(), bytes);
+  assert.equal((await handleChatImageDownload(await authedRequest(url, "carol@example.com"), env)).status, 404);
+  assert.equal((await upload("carol@example.com")).status, 404);
+  assert.equal((await upload("alice@example.com", "image/svg+xml")).status, 415);
+  assert.equal((await upload("alice@example.com", "image/png", new Uint8Array([1, 2, 3]).buffer)).status, 400);
+  assert.equal((await upload("alice@example.com", "image/png", new ArrayBuffer(5 * 1024 * 1024 + 1))).status, 413);
+  const sent = await (await handleChatMessageSend(await authedRequest("/api/chat/messages", "alice@example.com", {
+    method: "POST", body: {conversationId, clientId: crypto.randomUUID(), body: "", attachments: [result.image]}
+  }), env)).json();
+  assert.equal(sent.message.attachments[0].fileId, result.image.fileId);
+  const received = await (await handleChatMessages(await authedRequest(
+    `/api/chat/messages?conversationId=${conversationId}`, "bob@example.com"), env)).json();
+  assert.deepEqual(received.messages[0].attachments, [result.image]);
+  const other = await (await handleChatConversationCreate(await authedRequest("/api/chat/conversations", "alice@example.com", {
+    method: "POST", body: {kind: "dm", with: "carol@example.com"}
+  }), env)).json();
+  const crossThread = await handleChatMessageSend(await authedRequest("/api/chat/messages", "alice@example.com", {
+    method: "POST", body: {conversationId: other.conversation.id, clientId: crypto.randomUUID(), body: "", attachments: [result.image]}
+  }), env);
+  assert.equal(crossThread.status, 400);
+  await env.DB.prepare("UPDATE chat_members SET left_at = ? WHERE conversation_id = ? AND email = ?")
+    .bind(stamp(), conversationId, "bob@example.com").run();
+  assert.equal((await handleChatImageDownload(await authedRequest(url, "bob@example.com"), env)).status, 404);
+});
 
 async function caseTagSetup() {
   const env = makeEnv();
@@ -213,6 +511,27 @@ test("user tokens sign, verify, expire, tamper, and authenticate with bearer tok
   assert.equal((await authenticateUser(await authedRequest("/api/tasks", "alice@example.com"), noSecret)).error.status, 503);
   const stranger = await authedRequest("/api/tasks", "stranger@example.com");
   assert.equal((await authenticateUser(stranger, env)).error.status, 403);
+});
+
+test("claimed Super Admin or viewed-user identity cannot bypass private chat membership", async () => {
+  const env = makeEnv();
+  const conversation = await (await handleChatConversationCreate(await authedRequest("/api/chat/conversations", "alice@example.com", {
+    method: "POST", body: {kind: "dm", with: "bob@example.com"}
+  }), env)).json();
+  const conversationId = conversation.conversation.id;
+  await handleChatMessageSend(await authedRequest("/api/chat/messages", "alice@example.com", {
+    method: "POST", body: {conversationId, clientId: crypto.randomUUID(), body: "Private to Alice and Bob"}
+  }), env);
+  const headers = {"X-EnQuote-Role": "super_admin", "X-EnQuote-Act-As": "alice@example.com"};
+  const denied = await handleChatMessages(await authedRequest(
+    `/api/chat/messages?conversationId=${conversationId}&email=alice@example.com`,
+    "carol@example.com", {headers}
+  ), env);
+  assert.equal(denied.status, 404);
+  const list = await (await handleChatConversations(await authedRequest(
+    "/api/chat/conversations?email=alice@example.com", "carol@example.com", {headers}
+  ), env)).json();
+  assert.deepEqual(list.conversations, []);
 });
 
 test("sync credentials include userToken and inboxKey only when configured", async () => {

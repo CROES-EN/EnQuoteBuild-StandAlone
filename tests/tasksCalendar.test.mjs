@@ -9,22 +9,25 @@ import {build} from "esbuild";
 const require = createRequire(import.meta.url);
 const passthrough = ({children}) => React.createElement("div", null, children);
 let tasks = [];
+let activeTab = "calendar";
 const mocks = {
   "@/utils": {createPageUrl: page => `/${page}`},
   "@/lib/utils": {cn: (...values) => values.filter(value => typeof value === "string").join(" ")},
   sonner: {toast: {}},
   "@/features/collab/collabApi": {useTasks: () => ({tasks, loading: false}), tasksApi: {}},
+  "@/lib/AuthContext": {useAuth: () => ({user: {email: "tasks@example.com"}})},
+  "@/components/tasks/QuoteAttentionSection": () => React.createElement("section", {"data-testid": "quote-attention"}, "Quote attention content"),
   "react-router-dom": {useLocation: () => ({search: ""}), Link: passthrough},
   "lucide-react": new Proxy({}, {get: () => () => null}),
   "@/components/collab/TaskDialog": Object.assign(() => null, {TASK_TYPES: []}),
-  "@/components/links/ExternalIdLinks": {CaseNumberLink: passthrough},
+  "@/components/links/ExternalIdLinks": {CaseNumberLink: passthrough, SiteIdLink: ({siteId}) => siteId},
   "@/components/ui/button": {Button: passthrough},
   "@/components/ui/card": {Card: passthrough, CardContent: passthrough},
   "@/components/ui/badge": {Badge: passthrough},
   "@/components/ui/checkbox": {Checkbox: () => null},
   "@/components/ui/tabs": {
     Tabs: passthrough, TabsList: passthrough, TabsTrigger: passthrough,
-    TabsContent: ({value, children}) => value === "calendar" ? children : null
+    TabsContent: ({value, children}) => value === activeTab ? children : null
   },
   "@/components/ui/dropdown-menu": Object.fromEntries(
     ["DropdownMenu", "DropdownMenuContent", "DropdownMenuItem", "DropdownMenuTrigger"].map(name => [name, passthrough])
@@ -48,6 +51,7 @@ const due = new Date();
 due.setHours(9, 0, 0, 0);
 
 test("completed tasks are absent from calendar cells, overflow counts, and selected-day rows", () => {
+  activeTab = "calendar";
   tasks = [
     {id: "open", title: "OPEN-TASK", due_at: due.toISOString(), status: "open"},
     ...Array.from({length: 5}, (_, index) => ({
@@ -61,4 +65,23 @@ test("completed tasks are absent from calendar cells, overflow counts, and selec
   assert.match(render(), /Nothing due this day/);
   tasks[0] = {...tasks[0], status: "open"};
   assert.equal((render().match(/COMPLETED-TASK-0/g) || []).length, 2, "reopening restores both calendar surfaces");
+});
+
+test("quote attention has its own tab rather than appearing in List or Calendar", () => {
+  tasks = [];
+  for (const tab of ["list", "calendar", "quote-attention"]) {
+    activeTab = tab;
+    const html = render();
+    assert.match(html, /Quotes needing attention/);
+    assert.equal(html.includes('data-testid="quote-attention"'), tab === "quote-attention");
+    assert.equal(html.includes("No tasks yet"), tab === "list");
+  }
+});
+
+test("saved task identifiers appear in task rows and preserve leading zeros", () => {
+  activeTab = "list";
+  tasks = [{id: "identifiers", title: "Call homeowner", status: "open", due_at: due.toISOString(), site_id: "123456", case_number: "00123456"}];
+  const html = render();
+  assert.match(html, /Site .*123456/);
+  assert.match(html, /Case .*00123456/);
 });

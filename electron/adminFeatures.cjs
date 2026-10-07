@@ -9,6 +9,7 @@ function setupAdminFeatures({
   getInboxKey,
   getMainWindow,
   runUsersSync = async () => {},
+  onAccessPolicyChanged = async () => {},
   logger = console
 }) {
   const cachePath = path.join(storageDir, "enquote-access-policy.json");
@@ -62,7 +63,8 @@ function setupAdminFeatures({
   }
 
   handle("admin:policy", policy);
-  handle("admin:overview", () => client.get("/api/admin/overview"));
+  const overview = () => request("overview", () => client.get("/api/admin/overview"));
+  handle("admin:overview", overview);
   handle("admin:setUserOverride", (payload) => client.post("/api/admin/user-override", payload || {}));
   handle("admin:setRolePages", (payload) => client.post("/api/admin/role-pages", payload || {}));
   handle("admin:setAnnouncement", (payload) => client.post("/api/admin/announcement", payload || {}));
@@ -82,6 +84,7 @@ function setupAdminFeatures({
     policy_updated: async () => {
       const result = await policy();
       send("admin:policy-changed", result);
+      await onAccessPolicyChanged();
     },
     admin_command: (message) => {
       if (!getInboxKey() || message.key !== getInboxKey()) return;
@@ -93,7 +96,7 @@ function setupAdminFeatures({
     }
   };
 
-  return { policy, realtimeHandlers };
+  return { policy, overview, realtimeHandlers };
 }
 
 module.exports = { setupAdminFeatures };

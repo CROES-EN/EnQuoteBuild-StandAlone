@@ -25,6 +25,7 @@ test("notification attribution uses the updater, not an unrelated historic statu
   };
   assert.equal(recordedUpdater(quote), null);
   assert.equal(recordedUpdater({...quote, last_updated_by: " REAL@Example.com "}), "real@example.com");
+  assert.equal(recordedUpdater({...quote, updated_by: " External.Editor@Example.com "}), "external.editor@example.com");
   assert.equal(recordedUpdater({...quote, last_updated_by: "demo.user@example.invalid"}), null);
   assert.equal(recordedUpdater({
     ...quote,

@@ -415,7 +415,12 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
   const isSent = Boolean(record.sentToQuotes);
 
   return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto">
+    <div className="p-4 md:p-6 max-w-5xl mx-auto"
+      data-enquote-share-scope="groups"
+      data-enquote-share-target={`auto-drafter-case:${caseNumber}`}
+      data-enquote-share-label={`Auto-Drafter quote ${record.quoteNumber || caseNumber}`}
+      data-enquote-share-quote-number={isSent ? record.realQuoteNumber : record.quoteNumber}
+      data-enquote-share-route={`/AutoDrafter?draftCase=${encodeURIComponent(caseNumber)}`}>
       <Button variant="ghost" className="text-muted-foreground mb-4" onClick={onBack}>
         <ArrowLeft className="w-4 h-4 mr-2" />
         Back to Auto-Drafter
@@ -499,10 +504,10 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Draft Info */}
-        <Card className="p-6 border-border">
+        <Card data-enquote-share-target={`auto-drafter-case:${caseNumber}:info`} data-enquote-share-label="Auto-Drafter Quote Details" className="p-6 border-border">
           <h3 className="text-lg font-semibold text-foreground mb-4">Quote Details</h3>
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
+          <div className="quote-detail-fields">
+            <div data-enquote-share-target={`auto-drafter-case:${caseNumber}:site-id`} data-enquote-share-label={`Site ID ${record.siteId || draft.site_id}`} className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
                 <Hash className="w-4 h-4 text-muted-foreground" />
               </div>
@@ -511,7 +516,7 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
                 <p className="font-medium text-foreground"><SiteIdLink siteId={record.siteId || draft.site_id} fallback="—" className="font-medium" /></p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div data-enquote-share-target={`auto-drafter-case:${caseNumber}:case-number`} data-enquote-share-label={`Case Number ${draft.case_number || caseNumber}`} className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
                 <FileText className="w-4 h-4 text-muted-foreground" />
               </div>
@@ -520,7 +525,7 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
                 <p className="font-medium text-foreground"><CaseNumberLink caseNumber={draft.case_number || caseNumber} fallback="—" className="font-medium" /></p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div data-enquote-share-target={`auto-drafter-case:${caseNumber}:customer`} data-enquote-share-label="Customer" className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
                 <User className="w-4 h-4 text-muted-foreground" />
               </div>
@@ -537,7 +542,7 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
                 )}
               </div>
             </div>
-            <div className="flex items-start gap-3">
+            <div data-enquote-share-target={`auto-drafter-case:${caseNumber}:address`} data-enquote-share-label="Site Address" className="flex items-start gap-3">
               <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
                 <MapPin className="w-4 h-4 text-muted-foreground" />
               </div>
@@ -554,7 +559,7 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div data-enquote-share-target={`auto-drafter-case:${caseNumber}:fst-count`} data-enquote-share-label="FSTs Needed" className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
                 <Users className="w-4 h-4 text-muted-foreground" />
               </div>
@@ -573,7 +578,7 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div data-enquote-share-target={`auto-drafter-case:${caseNumber}:labor-hours`} data-enquote-share-label="Labor Hours" className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
                 <Hash className="w-4 h-4 text-muted-foreground" />
               </div>
@@ -593,7 +598,7 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div data-enquote-share-target={`auto-drafter-case:${caseNumber}:miles-traveled`} data-enquote-share-label="Miles Traveled" className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
                 <Hash className="w-4 h-4 text-muted-foreground" />
               </div>
@@ -612,7 +617,7 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div data-enquote-share-target={`auto-drafter-case:${caseNumber}:generated`} data-enquote-share-label="Generated date" className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
                 <Calendar className="w-4 h-4 text-muted-foreground" />
               </div>
@@ -625,9 +630,9 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
         </Card>
 
         {/* Line Items */}
-        <Card className="p-6 border-border lg:col-span-2">
+        <Card data-enquote-share-target={`auto-drafter-case:${caseNumber}:line-items`} data-enquote-share-label="Line Items" className="p-6 border-border lg:col-span-2">
           {draft.service_type && (
-            <p className="text-sm text-muted-foreground mb-4">
+            <p data-enquote-share-target={`auto-drafter-case:${caseNumber}:service-type`} data-enquote-share-label="Service Type" className="text-sm text-muted-foreground mb-4">
               <span className="font-medium text-foreground">Service Type:</span> {draft.service_type}
             </p>
           )}
@@ -654,7 +659,7 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
               </thead>
               <tbody>
                 {(draft.items || []).map((item, index) => (
-                  <tr key={index} className="border-b border-border">
+                  <tr key={index} data-enquote-share-target={`auto-drafter-case:${caseNumber}:item:${item.id || item.name}`} data-enquote-share-label={`Line item ${item.name}`} className="border-b border-border">
                     <td className="py-3 px-2">
                       {isEditing ? (
                         <Input
@@ -737,45 +742,45 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
           </div>
 
           <div className="mt-6 pt-4 border-t border-border space-y-2">
-            <div className="flex justify-between text-muted-foreground">
+            <div data-enquote-share-target={`auto-drafter-case:${caseNumber}:items-subtotal`} data-enquote-share-label="Line Items Subtotal" className="flex justify-between text-muted-foreground">
               <span>Line Items Subtotal</span>
               <span>${itemsSubtotal.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between text-muted-foreground">
+            <div data-enquote-share-target={`auto-drafter-case:${caseNumber}:labor`} data-enquote-share-label="Labor" className="flex justify-between text-muted-foreground">
               <span>Labor ({draft.fst_count || 0} FST{(draft.fst_count || 0) > 1 ? "s" : ""} — {draft.labor_hours || 0} hrs @ ${draft.labor_rate || 125}/hr)</span>
               <span>${laborCost.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between text-muted-foreground">
+            <div data-enquote-share-target={`auto-drafter-case:${caseNumber}:travel`} data-enquote-share-label="Travel" className="flex justify-between text-muted-foreground">
               <span>Travel ({draft.travel_hours || 0} hrs @ ${draft.travel_rate || 65}/hr)</span>
               <span>${travelCost.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between text-muted-foreground">
+            <div data-enquote-share-target={`auto-drafter-case:${caseNumber}:mileage`} data-enquote-share-label="Mileage" className="flex justify-between text-muted-foreground">
               <span>Mileage ({draft.miles_traveled || 0} mi @ ${draft.mileage_rate || 0.73}/mi)</span>
               <span>${mileageCost.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between pt-1 border-t border-border text-foreground font-medium">
+            <div data-enquote-share-target={`auto-drafter-case:${caseNumber}:subtotal`} data-enquote-share-label="Subtotal" className="flex justify-between pt-1 border-t border-border text-foreground font-medium">
               <span>Subtotal</span>
               <span>${subtotal.toFixed(2)}</span>
             </div>
             {hasDiscount && (
-              <div className="flex justify-between text-muted-foreground">
+              <div data-enquote-share-target={`auto-drafter-case:${caseNumber}:discount`} data-enquote-share-label="Discount" className="flex justify-between text-muted-foreground">
                 <span>Discount</span>
                 <span>-${discountAmount.toFixed(2)}</span>
               </div>
             )}
             {hasTax && (
-              <div className="flex justify-between text-muted-foreground">
+              <div data-enquote-share-target={`auto-drafter-case:${caseNumber}:taxable-subtotal`} data-enquote-share-label="Taxable Subtotal" className="flex justify-between text-muted-foreground">
                 <span>Taxable Subtotal <span className="text-xs text-muted-foreground">(taxable items only)</span></span>
                 <span>${taxableAfterDiscount.toFixed(2)}</span>
               </div>
             )}
             {hasTax && (
-              <div className="flex justify-between text-muted-foreground">
+              <div data-enquote-share-target={`auto-drafter-case:${caseNumber}:taxes`} data-enquote-share-label="Taxes" className="flex justify-between text-muted-foreground">
                 <span>Taxes ({combinedTaxRate}% combined)</span>
                 <span>+${taxAmount.toFixed(2)}</span>
               </div>
             )}
-            <div className="flex justify-between pt-2 border-t border-border">
+            <div data-enquote-share-target={`auto-drafter-case:${caseNumber}:total`} data-enquote-share-label="Quote Total" className="flex justify-between pt-2 border-t border-border">
               <span className="text-lg font-semibold text-foreground">Total</span>
               <span className="text-2xl font-bold text-indigo-600">${calculatedTotal.toFixed(2)}</span>
             </div>
@@ -790,7 +795,7 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
       />
 
       {/* Scope of Work */}
-      <Card className="p-6 mt-6 border-border">
+      <Card data-enquote-share-target={`auto-drafter-case:${caseNumber}:scope`} data-enquote-share-label="Scope of Work" className="p-6 mt-6 border-border">
         <h3 className="text-lg font-semibold text-foreground mb-2">Scope of Work</h3>
         {isEditing ? (
           <Textarea
@@ -805,7 +810,7 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
 
       {/* Compatibility & Dependency Flags */}
       {allFlags.length > 0 && (
-        <Card className="p-6 mt-6 border-border">
+        <Card data-enquote-share-target={`auto-drafter-case:${caseNumber}:compatibility`} data-enquote-share-label="Compatibility & Dependency Flags" className="p-6 mt-6 border-border">
           <h3 className="text-lg font-semibold text-foreground mb-4">Compatibility & Dependency Flags</h3>
           <div className="space-y-2">
             {allFlags.map((flag, idx) => (
@@ -816,7 +821,7 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
       )}
 
       {/* Notes */}
-      <Card className="p-6 mt-6 border-border">
+      <Card data-enquote-share-target={`auto-drafter-case:${caseNumber}:notes`} data-enquote-share-label="Notes & Terms" className="p-6 mt-6 border-border">
         <h3 className="text-lg font-semibold text-foreground mb-2">Notes & Terms</h3>
         {isEditing ? (
           <Textarea

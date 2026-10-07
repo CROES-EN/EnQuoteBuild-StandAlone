@@ -1,13 +1,31 @@
 const { contextBridge, ipcRenderer } = require("electron");
+const readonlyViewing = process.argv.includes("--enquote-readonly-preview");
+if (readonlyViewing) {
+  contextBridge.exposeInMainWorld("enquotePreview", {
+    active: true,
+    context: () => ipcRenderer.invoke("viewing:context"),
+    recheck: () => ipcRenderer.invoke("viewing:recheck"),
+    selectUser: (email) => ipcRenderer.invoke("viewing:select-user", email),
+    exit: () => ipcRenderer.invoke("viewing:exit")
+  });
+}
 
 const invoke = (channel, ...args) => ipcRenderer.invoke(channel, ...args);
+const listen = (channel, listener) => {
+  if (!readonlyViewing) ipcRenderer.on(channel, listener);
+};
 const subscribe = (channel, callback) => {
   const listener = (_event, payload) => callback(payload);
-  ipcRenderer.on(channel, listener);
+  listen(channel, listener);
   return () => ipcRenderer.removeListener(channel, listener);
 };
 
 contextBridge.exposeInMainWorld("enquoteLocal", {
+  viewing: {
+    status: () => invoke("viewing:status"),
+    start: (email) => invoke("viewing:start", email),
+    onEnded: (callback) => subscribe("viewing:ended", callback)
+  },
   app: {
     // Returns a promise resolving with the definitive check result ({ ok, reason,
     // storedQuoteCount, storedProductCount, ... } or { ok: false, unreachable, error }) -
@@ -16,7 +34,7 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
     refresh: () => invoke("app:refresh"),
     onRefreshProgress: (callback) => {
       const listener = (_event, progress) => callback(progress);
-      ipcRenderer.on("app:refresh-progress", listener);
+      listen("app:refresh-progress", listener);
       return () => ipcRenderer.removeListener("app:refresh-progress", listener);
     },
     getRefreshStatus: () => invoke("app:refresh-status"),
@@ -27,7 +45,7 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
     // React Query cache invalidation). Returns an unsubscribe function.
     onDataUpdated: (callback) => {
       const listener = (_event, payload) => callback(payload);
-      ipcRenderer.on("app:data-updated", listener);
+      listen("app:data-updated", listener);
       return () => ipcRenderer.removeListener("app:data-updated", listener);
     },
     onUsersChanged: (callback) => subscribe("app:users-changed", callback)
@@ -98,7 +116,7 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
     apply: () => invoke("ui:apply"),
     onUpdateReady: (callback) => {
       const listener = (_event, data) => callback(data);
-      ipcRenderer.on("ui:update-ready", listener);
+      listen("ui:update-ready", listener);
       return () => ipcRenderer.removeListener("ui:update-ready", listener);
     }
   },
@@ -139,7 +157,7 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
     close: () => invoke("salesforce:close"),
     onFileDownloaded: (callback) => {
       const listener = (_event, payload) => callback(payload);
-      ipcRenderer.on("salesforce:file-downloaded", listener);
+      listen("salesforce:file-downloaded", listener);
       return () => ipcRenderer.removeListener("salesforce:file-downloaded", listener);
     }
   },
@@ -156,7 +174,7 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
     scanNow: () => invoke("eodb-email-inbox:scan-now"),
     onNewFile: (callback) => {
       const listener = (_event, payload) => callback(payload);
-      ipcRenderer.on("eodb-email-inbox:new-file", listener);
+      listen("eodb-email-inbox:new-file", listener);
       return () => ipcRenderer.removeListener("eodb-email-inbox:new-file", listener);
     },
     reportOutcome: (token, outcome) => ipcRenderer.send("eodb-email-inbox:report-outcome", { token, ...outcome })
@@ -195,6 +213,14 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
     createGroup: (payload) => invoke("chat:createGroup", payload),
     updateConversation: (payload) => invoke("chat:updateConversation", payload),
     messages: (query) => invoke("chat:messages", query),
+    reactions: (query) => invoke("chat:reactions", query),
+    react: (payload) => invoke("chat:react", payload),
+    emojis: () => invoke("chat:emojis"),
+    uploadEmoji: (payload) => invoke("chat:uploadEmoji", payload),
+    getEmoji: (id) => invoke("chat:getEmoji", id),
+    saveGifEmoji: (payload) => invoke("chat:saveGifEmoji", payload),
+    onReactionsChanged: (callback) => subscribe("chat:reactionsChanged", callback),
+    getImage: (query) => invoke("chat:getImage", query),
     send: (payload) => invoke("chat:send", payload),
     markRead: (payload) => invoke("chat:markRead", payload),
     setActiveConversation: (id) => invoke("chat:setActiveConversation", id),
@@ -248,7 +274,7 @@ try {
   __ub_contextBridge.exposeInMainWorld("enquoteUpdater", {
     onUpdateStatus: (callback) => {
       const listener = (_event, data) => callback(data);
-      __ub_ipcRenderer.on("updater:status", listener);
+      listen("updater:status", listener);
       return () => __ub_ipcRenderer.removeListener("updater:status", listener);
     },
     getState: () => __ub_ipcRenderer.invoke("updater:get-state"),

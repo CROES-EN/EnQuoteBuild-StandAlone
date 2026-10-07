@@ -32,19 +32,19 @@ function PeopleList({people, names, selected, onToggle, single = false, onPick})
         {visible.map((person) => (
           <li key={person.email}>
             {single ? (
-              <button type="button" onClick={() => onPick(person.email)} className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-slate-50">
+              <button type="button" onClick={() => onPick(person.email)} className="flex w-full items-center gap-3 px-3 py-2 text-left text-foreground hover:bg-muted">
                 <UserAvatar email={person.email} name={displayName(person.email, names)} size={32} />
                 <span className="flex min-w-0 flex-col">
-                  <span className="truncate text-sm font-medium text-slate-800">{displayName(person.email, names)}</span>
+                  <span className="truncate text-sm font-medium text-foreground">{displayName(person.email, names)}</span>
                   <span className="truncate text-xs text-slate-500">{person.email}</span>
                 </span>
               </button>
             ) : (
-              <label className="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-slate-50">
+              <label className="flex cursor-pointer items-center gap-3 px-3 py-2 text-foreground hover:bg-muted">
                 <Checkbox checked={selected.has(person.email)} onCheckedChange={(checked) => onToggle(person.email, checked === true)} />
                 <UserAvatar email={person.email} name={displayName(person.email, names)} size={32} />
                 <span className="flex min-w-0 flex-col">
-                  <span className="truncate text-sm font-medium text-slate-800">{displayName(person.email, names)}</span>
+                  <span className="truncate text-sm font-medium text-foreground">{displayName(person.email, names)}</span>
                   <span className="truncate text-xs text-slate-500">{person.email}</span>
                 </span>
               </label>
@@ -67,7 +67,7 @@ function useToggleSet(open) {
   return [items, toggle];
 }
 
-export function NewConversationDialog({open, onOpenChange, directory, names, meEmail, onCreated}) {
+export function NewConversationDialog({open, onOpenChange, directory, names, meEmail, onCreated, embedded = false}) {
   const [tab, setTab] = useState("dm");
   const [groupName, setGroupName] = useState("");
   const [members, toggle] = useToggleSet(open);
@@ -84,6 +84,7 @@ export function NewConversationDialog({open, onOpenChange, directory, names, meE
     setBusy(true);
     try {
       const conversation = await action();
+      if (!conversation?.id) throw new Error("Could not open conversation. Please try again.");
       if (conversation?.id) {
         onCreated(conversation);
         onOpenChange(false);
@@ -95,13 +96,14 @@ export function NewConversationDialog({open, onOpenChange, directory, names, meE
     }
   };
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>New conversation</DialogTitle>
-          <DialogDescription>Message one person directly, or start a group.</DialogDescription>
-        </DialogHeader>
+  const content = (
+    <>
+        {embedded ? <p className="text-sm text-muted-foreground">Message one person directly, or start a group.</p> : (
+          <DialogHeader>
+            <DialogTitle>New conversation</DialogTitle>
+            <DialogDescription>Message one person directly, or start a group.</DialogDescription>
+          </DialogHeader>
+        )}
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="dm">Direct message</TabsTrigger>
@@ -129,9 +131,10 @@ export function NewConversationDialog({open, onOpenChange, directory, names, meE
             </DialogFooter>
           </TabsContent>
         </Tabs>
-      </DialogContent>
-    </Dialog>
+    </>
   );
+  if (embedded) return open ? <div className="space-y-4 p-3">{content}</div> : null;
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-w-lg">{content}</DialogContent></Dialog>;
 }
 
 export function GroupSettingsDialog({open, onOpenChange, conversation, directory, names, onUpdated, onLeft}) {

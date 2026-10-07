@@ -1,6 +1,7 @@
 import {base44} from "@/api/base44Client";
 import {useQuery} from "@tanstack/react-query";
 import {useAuth} from "@/lib/AuthContext";
+import {isReadonlyViewing} from "@/features/admin/readonlyViewing";
 import {canAccessPage, pageFromPathname, toRoleList} from "@/lib/rolePageAccess";
 import {useAccessPolicy} from "@/features/admin/adminApi";
 import {useLocation} from "react-router-dom";
@@ -44,6 +45,7 @@ function AppVersionBadge() {
 }
 
 function useCurrentUserQuery() {
+ const localIdentity = isLocalDemo || isReadonlyViewing();
  const { isAuthenticated, user: authUser, navigateToLogin, refreshLocalUser } = useAuth();
  const hasLoadedOnceRef = useRef(false);
 
@@ -59,11 +61,11 @@ function useCurrentUserQuery() {
  }
  return result;
  },
- enabled: !isLocalDemo,
+ enabled: !localIdentity,
  retry: false
  });
 
- const user = isLocalDemo ? authUser : queriedUser;
+ const user = localIdentity ? authUser : queriedUser;
 
  // isLoading here means "no data has ever been fetched yet" - React Query's own `isLoading`
  // (as opposed to `isFetching`) already has almost this meaning, but is computed BEFORE the
@@ -74,16 +76,16 @@ function useCurrentUserQuery() {
  if (user && !hasLoadedOnceRef.current) {
  hasLoadedOnceRef.current = true;
  }
- const isFirstLoad = !hasLoadedOnceRef.current && (isLocalDemo ? !authUser : queryLoading);
- const isBackgroundRefetch = hasLoadedOnceRef.current && (isLocalDemo ? false : isFetching);
+ const isFirstLoad = !hasLoadedOnceRef.current && (localIdentity ? !authUser : queryLoading);
+ const isBackgroundRefetch = hasLoadedOnceRef.current && (localIdentity ? false : isFetching);
 
- const needsLogin = !isLocalDemo && !isFirstLoad && (isError || !user);
+ const needsLogin = !localIdentity && !isFirstLoad && (isError || !user);
   // FIX (confirmed real bug): refetchUser (React Query's refetch) is a SILENT NO-OP in
   // local mode, since this query is `enabled: !isLocalDemo` - calling it never actually
   // re-fetches anything, which is why the auto-retry below used to hang forever instead
   // of ever reaching "Role Not Assigned". In local mode, use the REAL local refresh
   // (refreshLocalUser) instead; in remote/Base44 mode, keep using the original refetchUser.
-  const realRefetch = isLocalDemo ? refreshLocalUser : refetchUser;
+  const realRefetch = localIdentity ? refreshLocalUser : refetchUser;
   return { user, isLoading: isFirstLoad, isBackgroundRefetch, needsLogin, navigateToLogin, refetchUser: realRefetch };
 }
 

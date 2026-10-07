@@ -183,7 +183,7 @@ function MaterialOrdersContent() {
  </div>
  <Button
  onClick={() => { setEditingOrder(null); setShowForm(true); }}
- className="bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-200"
+ className="bg-primary text-primary-foreground hover:bg-primary/90"
  >
  <Plus className="w-4 h-4 mr-2" />
  New Request

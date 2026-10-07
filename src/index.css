@@ -108,6 +108,55 @@
 ::highlight(find-all) { background-color: #fde047; color: #000; }
 ::highlight(find-current) { background-color: #fb923c; color: #000; }
 
+.enquote-shared-target {
+  outline: 3px solid hsl(var(--primary));
+  outline-offset: 4px;
+  box-shadow: 0 0 20px 6px hsl(var(--primary) / 0.4);
+}
+
+.quote-detail-fields {
+  display: flex;
+  flex-direction: column;
+}
+
+.quote-detail-fields > div {
+  align-items: flex-start;
+  min-width: 0;
+  padding-top: 0.25rem;
+  padding-bottom: 1.5rem;
+}
+
+.quote-detail-fields > div:last-child {
+  padding-bottom: 0.25rem;
+}
+
+.quote-detail-fields > div.border-t {
+  padding-top: 1rem;
+}
+
+.quote-detail-fields > div > div:first-child,
+.quote-detail-fields > div > button {
+  flex-shrink: 0;
+}
+
+.quote-detail-fields > div > div:last-of-type {
+  min-width: 0;
+  flex: 1;
+}
+
+.quote-detail-fields p {
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
+
+.quote-detail-fields p + p {
+  margin-top: 0.25rem;
+}
+
+.quote-detail-fields > div > button {
+  align-self: center;
+}
+
 /* SOP Library rich text (Tailwind's preflight strips list/heading styling). */
 .sop-content { font-size: 0.875rem; line-height: 1.6; color: hsl(var(--foreground)); overflow-wrap: anywhere; }
 .sop-content h1 { font-size: 1.5rem; font-weight: 700; margin: 1rem 0 0.5rem; }

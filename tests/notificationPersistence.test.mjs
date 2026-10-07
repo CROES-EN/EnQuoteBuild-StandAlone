@@ -7,6 +7,32 @@ import {localAdapter} from "../src/api/adapters/localAdapter.js";
 
 const require = createRequire(import.meta.url);
 
+test("assigned-task bell notices identify the sender, stay private, and remain cleared after sync", async () => {
+  const storage = new Map([["enquote_local_session_email", "recipient@example.com"]]);
+  let tasks = [{id: "assigned", title: "Call homeowner", assigned_by: "sender@example.com", created_date: "2026-10-07T20:00:00Z"}];
+  globalThis.window = {
+    localStorage: {getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value)},
+    enquoteLocal: {collections: {list: async () => []}, tasks: {list: async () => tasks}}
+  };
+  try {
+    const api = await loadNotifications();
+    const [notice] = await api.listNotifications();
+    assert.equal(notice.type, "task_assigned");
+    assert.equal(notice.changedBy, "sender@example.com");
+    assert.equal(notice.taskId, "assigned");
+    await api.markAllRead();
+    assert.equal((await api.listNotifications())[0].read, true);
+    await api.clearNotification(notice.id);
+    tasks = [{...tasks[0], updated_date: "2026-10-08T20:00:00Z", status: "done"}];
+    assert.deepEqual(await (await loadNotifications()).listNotifications(), []);
+    storage.set("enquote_local_session_email", "sender@example.com");
+    assert.deepEqual(await api.listNotifications(), [], "sender never gets their own assignment notice");
+    tasks = [];
+    storage.set("enquote_local_session_email", "unrelated@example.com");
+    assert.deepEqual(await api.listNotifications(), []);
+  } finally {delete globalThis.window;}
+});
+
 async function loadNotifications() {
   const result = await build({
     entryPoints: [path.join("src", "features", "notifications", "appNotifications.js")],

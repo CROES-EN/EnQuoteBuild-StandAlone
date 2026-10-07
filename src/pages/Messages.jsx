@@ -1,19 +1,19 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {Link, useLocation, useNavigate} from "react-router-dom";
-import {format, isToday, isYesterday} from "date-fns";
+import {format, isToday} from "date-fns";
 import {
   AlertCircle,
   FileText,
   Image,
   Loader2,
   MessageSquare,
-  MoreVertical,
+  MousePointer2,
+  Smile,
   Paperclip,
   Plus,
   RotateCcw,
   Send,
   Settings,
-  Users,
   X
 } from "lucide-react";
 import {toast} from "sonner";
@@ -22,15 +22,27 @@ import {Textarea} from "@/components/ui/textarea";
 import {Card, CardContent} from "@/components/ui/card";
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
-import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
 import {cn} from "@/lib/utils";
 import {createPageUrl} from "@/utils";
-import {chatApi, hasCollabBridge, subscribe} from "@/features/collab/collabApi";
+import {chatApi, hasCollabBridge, registerActiveChatView, subscribe} from "@/features/collab/collabApi";
 import QuotePicker, {quoteAttachment} from "@/components/collab/QuotePicker";
 import ChatAppearancePopover from "@/components/messages/ChatAppearancePopover";
+import ScreenshotAttachment from "@/components/messages/ScreenshotAttachment";
+import ConversationListItem, {conversationTitle} from "@/components/messages/ConversationListItem";
+import MessageReactions from "@/components/messages/MessageReactions";
+import MessageSenderAvatar, {startsMessageSenderGroup} from "@/components/messages/MessageSenderAvatar";
+import EmojiGifPicker from "@/components/messages/EmojiGifPicker";
+import EmojiAttachment from "@/components/messages/EmojiAttachment";
+import AppLinkAttachment from "@/components/messages/AppLinkAttachment";
+import {startAppLinkSelection} from "@/features/collab/appLinkSelection";
+import {mergeReactions, onChatReactionsChanged} from "@/features/collab/chatReactions";
+import {getCurrentUserNamespace} from "@/lib/userScopedStorage";
+import {clipboardImageFiles, screenshotAttachments} from "@/features/collab/clipboardImages";
+import {openChatDock} from "@/features/collab/chatDockState";
+import {mergeMessages, onChatMessageSent} from "@/features/collab/chatMessages";
 import {displayName, GroupSettingsDialog, NewConversationDialog} from "@/components/messages/ConversationDialogs";
 import {UserAvatar} from "@/components/profile/UserAvatar";
-import {gifsApi} from "@/features/profiles/profileApi";
+import MessageBubble, {GifAttachment, isGifOnlyMessage} from "@/components/messages/MessageBubble";
 import {removeChatMessage as removeChatMessageApi} from "@/features/admin/adminApi";
 import {
   onChatAppearanceChanged,
@@ -44,31 +56,10 @@ const PAGE_SIZE = 50;
 const MAX_BODY = 4000;
 const MAX_ATTACHMENTS = 10;
 
-function formatListTime(value) {
-  const time = Date.parse(value || "");
-  if (!Number.isFinite(time)) return "";
-  if (isToday(time)) return format(time, "h:mm a");
-  if (isYesterday(time)) return "Yesterday";
-  return format(time, "MMM d");
-}
-
 function formatMessageTime(value) {
   const time = Date.parse(value || "");
   if (!Number.isFinite(time)) return "";
   return isToday(time) ? format(time, "h:mm a") : format(time, "MMM d, h:mm a");
-}
-
-function mergeMessages(current, incoming) {
-  const byId = new Map(current.map((message) => [message.id, message]));
-  for (const message of incoming) if (message?.id) byId.set(message.id, message);
-  return [...byId.values()].sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
-}
-
-function conversationTitle(conversation, meEmail, names) {
-  if (!conversation) return "";
-  if (conversation.kind === "group") return conversation.name || "Group";
-  const other = (conversation.members || []).find((member) => member.email !== meEmail);
-  return displayName(other?.email || meEmail, names);
 }
 
 function AttachmentChip({attachment, onRemove}) {
@@ -113,80 +104,11 @@ function AttachmentChip({attachment, onRemove}) {
   );
 }
 
-function GifAttachment({attachment}) {
-  const ratio = attachment.width && attachment.height ? attachment.height / attachment.width : 0.75;
-  return (
-    <a href={attachment.url} target="_blank" rel="noreferrer" className="block max-w-[260px] overflow-hidden rounded-xl border border-white/20 bg-black/5">
-      <img
-        src={attachment.url}
-        alt={attachment.title || "GIF"}
-        loading="lazy"
-        className="block w-full object-cover"
-        style={{aspectRatio: ratio ? `${attachment.width || 1} / ${attachment.height || Math.round((attachment.width || 1) * ratio)}` : undefined}}
-      />
-    </a>
-  );
-}
-
-function GiphyPicker({onPick}) {
-  const [query, setQuery] = useState("");
-  const [items, setItems] = useState([]);
-  const [nextOffset, setNextOffset] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  const load = useCallback(async ({q = query, offset = 0, append = false} = {}) => {
-    setLoading(true);
-    setError("");
-    try {
-      const result = q.trim() ? await gifsApi.search({q: q.trim(), offset}) : await gifsApi.trending({offset});
-      setItems((current) => (append ? [...current, ...result.gifs] : result.gifs));
-      setNextOffset(result.nextOffset);
-    } catch (loadError) {
-      setError(loadError.message || "Could not load GIFs.");
-    } finally {
-      setLoading(false);
-    }
-  }, [query]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => { void load({q: query, offset: 0, append: false}); }, query ? 300 : 0);
-    return () => clearTimeout(timer);
-  }, [query, load]);
-
-  return (
-    <div className="space-y-3">
-      <input
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        placeholder="Search GIPHY"
-        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-orange-500"
-      />
-      {error && <p className="text-xs text-rose-600">{error}</p>}
-      <div className="grid max-h-80 grid-cols-3 gap-2 overflow-y-auto">
-        {items.map((gif) => (
-          <button key={`${gif.id}-${gif.url}`} type="button" className="overflow-hidden rounded-md bg-muted" onClick={() => onPick(gif)} title={gif.title}>
-            <img src={gif.previewUrl || gif.url} alt={gif.title || "GIF"} loading="lazy" className="h-24 w-full object-cover" />
-          </button>
-        ))}
-      </div>
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Powered by GIPHY</span>
-        {nextOffset != null && (
-          <Button type="button" variant="outline" size="sm" onClick={() => load({offset: nextOffset, append: true})} disabled={loading}>
-            {loading && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}Load more
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-export default function MessagesPage() {
+export default function MessagesPage({conversationId, compact = false, visible = true}) {
   const location = useLocation();
   const navigate = useNavigate();
   const {isAdmin, user} = useUserRole();
-  const activeId = new URLSearchParams(location.search).get("c");
+  const activeId = conversationId || new URLSearchParams(location.search).get("c");
   const [meEmail, setMeEmail] = useState("");
   const [directory, setDirectory] = useState([]);
   const [conversations, setConversations] = useState([]);
@@ -195,16 +117,111 @@ export default function MessagesPage() {
   const [pending, setPending] = useState([]);
   const [draft, setDraft] = useState("");
   const [attachments, setAttachments] = useState([]);
+  const [pasting, setPasting] = useState(false);
+  const pasteInFlight = useRef(false);
+  const activeConversationRef = useRef(activeId);
+  activeConversationRef.current = activeId;
+  const cancelElementSelection = useRef(null);
+  useEffect(() => () => {
+    cancelElementSelection.current?.();
+    cancelElementSelection.current = null;
+  }, [activeId]);
+  const sharePageItem = () => {
+    const owner = getCurrentUserNamespace();
+    const conversation = activeId;
+    cancelElementSelection.current?.();
+    cancelElementSelection.current = startAppLinkSelection(attachment => {
+      if (owner !== getCurrentUserNamespace() || activeConversationRef.current !== conversation) return;
+      setAttachments(list => {
+        if (list.length >= MAX_ATTACHMENTS) {
+          toast.error("Messages can contain up to 10 attachments. Remove one before sharing an item.");
+          return list;
+        }
+        return [...list, attachment];
+      });
+    });
+  };
+  useEffect(() => {
+    setAttachments(list => list.filter(item => item.type !== "image"));
+  }, [activeId]);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [gifOpen, setGifOpen] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  useEffect(() => {
+    if (!visible) {
+      setPickerOpen(false);
+      setGifOpen(false);
+      setSettingsOpen(false);
+    }
+  }, [visible]);
   const [appearance, setAppearance] = useState(() => readChatAppearance());
   const appearanceStyles = useMemo(() => chatAppearanceStyles(appearance), [appearance]);
   const scrollRef = useRef(null);
+  const composerRef = useRef(null);
+  useEffect(() => {
+    const composer = composerRef.current;
+    if (!composer) return;
+    composer.style.height = "auto";
+    composer.style.height = `${Math.min(120, composer.scrollHeight)}px`;
+  }, [draft, visible, activeId]);
+  useEffect(() => {
+    if (compact && visible) composerRef.current?.focus({preventScroll: true});
+  }, [compact, visible]);
   const stickToBottom = useRef(true);
   const threadRef = useRef(thread);
   threadRef.current = thread;
+  const reactionRevision = useRef(0);
+  const refreshReactions = useCallback(async () => {
+    const current = threadRef.current;
+    if (!current.id || current.loading || !current.messages.length) return;
+    const revision = ++reactionRevision.current;
+    const owner = getCurrentUserNamespace();
+    try {
+      const ids = current.messages.map(message => message.id);
+      const reactions = {};
+      for (let offset = 0; offset < ids.length; offset += 99) {
+        const result = await chatApi.reactions({conversationId: current.id, messageIds: ids.slice(offset, offset + 99)});
+        if (owner !== getCurrentUserNamespace()) return;
+        Object.assign(reactions, result.reactions);
+      }
+      if (revision !== reactionRevision.current || threadRef.current.id !== current.id) return;
+      setThread(state => state.id === current.id ? {...state, messages: mergeReactions(state.messages, reactions)} : state);
+    } catch (error) {
+      if (owner !== getCurrentUserNamespace()) return;
+      console.error("Could not refresh message reactions", error);
+      toast.error(error.message);
+    }
+  }, []);
+  useEffect(() => onChatReactionsChanged(update => {
+    reactionRevision.current++;
+    setThread(state => state.id === update.conversationId
+      ? {...state, messages: mergeReactions(state.messages, update.reactions)} : state);
+  }), []);
+  useEffect(() => {
+    const off = subscribe("chat", "onReactionsChanged", update => {
+      if (update.conversationId === threadRef.current.id) void refreshReactions();
+    });
+    return off;
+  }, [refreshReactions]);
+  useEffect(() => {
+    if (!visible) return undefined;
+    void refreshReactions();
+    const timer = setInterval(() => { void refreshReactions(); }, 60000);
+    return () => clearInterval(timer);
+  }, [visible, refreshReactions]);
+  const reactToMessage = async (message, emoji, active) => {
+    const owner = getCurrentUserNamespace();
+    try {
+      reactionRevision.current++;
+      await chatApi.react({conversationId: message.conversationId, messageId: message.id, emoji, active});
+      if (owner !== getCurrentUserNamespace()) return;
+    } catch (error) {
+      if (owner !== getCurrentUserNamespace()) return;
+      console.error("Could not update message reaction", error);
+      toast.error(error.message);
+    }
+  };
 
   const names = useMemo(() => new Map(directory.map((person) => [person.email, person.name || ""]).filter(([, name]) => name)), [directory]);
   const active = conversations.find((conversation) => conversation.id === activeId) || null;
@@ -234,8 +251,9 @@ export default function MessagesPage() {
         if (batch.length < 100) break;
         after = batch[batch.length - 1].createdAt;
       }
-    } catch {
-      // The next change event or poll retries.
+    } catch (error) {
+      console.error("Could not refresh conversation messages", error);
+      toast.error("Could not refresh this conversation. Close and reopen it to try again.");
     }
   }, []);
 
@@ -261,6 +279,16 @@ export default function MessagesPage() {
     };
   }, [refreshConversations, loadNewer]);
 
+  useEffect(() => onChatMessageSent(message => {
+    setThread(state => state.id === message.conversationId
+      ? {...state, messages: mergeMessages(state.messages, [message])} : state);
+    void refreshConversations();
+  }), [refreshConversations]);
+
+  useEffect(() => {
+    if (visible) void loadNewer();
+  }, [visible, loadNewer]);
+
   // Opening a conversation loads its newest page; older pages load on demand.
   useEffect(() => {
     if (!activeId) {
@@ -272,20 +300,29 @@ export default function MessagesPage() {
     setThread({id: activeId, messages: [], hasOlder: false, loading: true, loadingOlder: false});
     chatApi.messages({conversationId: activeId, limit: PAGE_SIZE})
       .then((messages) => {
-        if (!cancelled) setThread({id: activeId, messages, hasOlder: messages.length === PAGE_SIZE, loading: false, loadingOlder: false});
+        if (!cancelled) setThread(state => ({
+          id: activeId,
+          messages: mergeMessages(state.id === activeId ? state.messages : [], messages),
+          hasOlder: messages.length === PAGE_SIZE, loading: false, loadingOlder: false
+        }));
       })
       .catch((error) => {
         if (cancelled) return;
         toast.error(error.message);
         setThread((state) => ({...state, loading: false}));
       });
-    void chatApi.setActiveConversation(activeId);
     return () => {
       cancelled = true;
     };
   }, [activeId]);
 
-  useEffect(() => () => { void chatApi.setActiveConversation(null); }, []);
+  useEffect(() => {
+    if (!visible || !activeId) return undefined;
+    return registerActiveChatView(activeId, compact ? 1 : 0);
+  }, [activeId, visible, compact]);
+  useEffect(() => {
+    if (!compact && activeId) openChatDock(activeId, {minimized: true});
+  }, [activeId, compact]);
   useEffect(() => onChatAppearanceChanged(setAppearance), []);
 
   const loadOlder = async () => {
@@ -319,11 +356,11 @@ export default function MessagesPage() {
   useEffect(() => {
     const box = scrollRef.current;
     if (box && stickToBottom.current) box.scrollTop = box.scrollHeight;
-  }, [shown.length, activeId, thread.loading]);
+  }, [shown.length, activeId, thread.loading, visible]);
 
   // Mark the conversation read while it is on screen and the window has focus.
   useEffect(() => {
-    if (!activeId || !lastMessage?.createdAt) return undefined;
+    if (!visible || !activeId || !lastMessage?.createdAt) return undefined;
     const markRead = () => {
       if (!document.hasFocus()) return;
       void chatApi.markRead({conversationId: activeId, at: lastMessage.createdAt});
@@ -332,9 +369,15 @@ export default function MessagesPage() {
     markRead();
     window.addEventListener("focus", markRead);
     return () => window.removeEventListener("focus", markRead);
-  }, [activeId, lastMessage?.createdAt]);
+  }, [activeId, lastMessage?.createdAt, visible]);
 
-  const open = (id) => navigate(id ? `/Messages?c=${encodeURIComponent(id)}` : "/Messages", {replace: Boolean(activeId)});
+  const open = (id) => {
+    if (compact) {
+      if (id) openChatDock(id);
+    } else {
+      navigate(id ? `/Messages?c=${encodeURIComponent(id)}` : "/Messages", {replace: Boolean(activeId)});
+    }
+  };
 
   const deliver = async (message) => {
     setPending((list) => list.map((item) => (item.id === message.id ? {...item, status: "sending"} : item)));
@@ -356,6 +399,7 @@ export default function MessagesPage() {
   };
 
   const send = () => {
+    if (pasteInFlight.current) return;
     const body = draft.trim();
     if (!activeId || (!body && !attachments.length)) return;
     if (body.length > MAX_BODY) {
@@ -379,12 +423,14 @@ export default function MessagesPage() {
   };
 
   const addAttachment = (quote) => {
+    if (pasteInFlight.current) return;
     const attachment = quoteAttachment(quote);
     setAttachments((list) => (list.some((item) => item.quoteId === attachment.quoteId) || list.length >= MAX_ATTACHMENTS ? list : [...list, attachment]));
     setPickerOpen(false);
   };
 
   const addGif = (gif) => {
+    if (pasteInFlight.current) return;
     const attachment = {
       type: "gif",
       id: gif.id,
@@ -396,6 +442,40 @@ export default function MessagesPage() {
     };
     setAttachments((list) => (list.length >= MAX_ATTACHMENTS ? list : [...list, attachment]));
     setGifOpen(false);
+  };
+
+  const addEmoji = (emoji, type) => {
+    if (pasteInFlight.current) return;
+    const attachment = {type, emojiId: emoji.id, name: emoji.name || emoji.label,
+      ...(emoji.sourceGifId ? {sourceGifId: emoji.sourceGifId} : {})};
+    setAttachments(list => list.length >= MAX_ATTACHMENTS ? list : [...list, attachment]);
+    setGifOpen(false);
+  };
+
+  const pasteScreenshots = async (event) => {
+    const files = clipboardImageFiles(event.clipboardData);
+    if (!files.length) return;
+    event.preventDefault();
+    if (pasteInFlight.current) {
+      toast.error("Wait for the current screenshot to finish loading.");
+      return;
+    }
+    pasteInFlight.current = true;
+    setPasting(true);
+    const conversationId = activeId;
+    try {
+      const images = await screenshotAttachments(files, MAX_ATTACHMENTS - attachments.length);
+      if (activeConversationRef.current !== conversationId) {
+        toast.error("The conversation changed. Paste the screenshot again in the intended conversation.");
+        return;
+      }
+      setAttachments(list => [...list, ...images]);
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      pasteInFlight.current = false;
+      setPasting(false);
+    }
   };
 
   const removeMessageAsAdmin = async (messageId) => {
@@ -428,8 +508,8 @@ export default function MessagesPage() {
   }
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-4rem)] max-w-7xl flex-col gap-4 p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className={compact ? "flex h-full min-h-0 flex-col" : "mx-auto flex h-[calc(100vh-4rem)] max-w-7xl flex-col gap-4 p-6"}>
+      {!compact && <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground"><MessageSquare className="h-6 w-6 text-orange-600" />Messages</h1>
           <p className="text-sm text-muted-foreground">Message teammates directly or in groups, and share quotes.</p>
@@ -437,10 +517,10 @@ export default function MessagesPage() {
         <Button onClick={() => setNewOpen(true)} disabled={Boolean(listState.error)}>
           <Plus className="mr-1 h-4 w-4" />New conversation
         </Button>
-      </div>
+      </div>}
 
-      <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-[300px_1fr]">
-        <Card className="min-h-0 overflow-hidden">
+      <div className={compact ? "flex min-h-0 flex-1 flex-col" : "grid min-h-0 flex-1 gap-4 md:grid-cols-[300px_1fr]"}>
+        {!compact && <Card className="min-h-0 overflow-hidden">
           <CardContent className="h-full overflow-y-auto p-2">
             {listState.loading ? (
               <div className="flex items-center justify-center gap-2 py-8 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading...</div>
@@ -456,53 +536,16 @@ export default function MessagesPage() {
               <ul className="space-y-1">
                 {conversations.map((conversation) => (
                   <li key={conversation.id}>
-                    <button
-                      type="button"
-                      onClick={() => open(conversation.id)}
-                      className={cn(
-                        "flex w-full items-start gap-2 rounded-md px-3 py-2 text-left transition-colors",
-                        conversation.id === activeId ? "bg-primary/10" : "hover:bg-muted"
-                      )}
-                    >
-                      {conversation.kind === "group" ? (
-                        <span className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500"><Users className="h-4 w-4" /></span>
-                      ) : (
-                        <UserAvatar
-                          email={(conversation.members || []).find((member) => member.email !== meEmail)?.email || meEmail}
-                          name={conversationTitle(conversation, meEmail, names)}
-                          size={32}
-                          className="mt-0.5"
-                        />
-                      )}
-                      <span className="min-w-0 flex-1">
-                        <span className="flex items-center justify-between gap-2">
-                          <span className={cn("truncate text-sm", conversation.unread > 0 ? "font-semibold text-slate-900" : "font-medium text-slate-700")}>
-                            {conversationTitle(conversation, meEmail, names)}
-                          </span>
-                          <span className="flex-shrink-0 text-[11px] text-slate-400">{formatListTime(conversation.lastMessageAt || conversation.createdAt)}</span>
-                        </span>
-                        <span className="flex items-center justify-between gap-2">
-                          <span className="truncate text-xs text-slate-500">
-                            {conversation.lastMessagePreview
-                              ? `${conversation.lastSender === meEmail ? "You" : displayName(conversation.lastSender, names)}: ${conversation.lastMessagePreview}`
-                              : "No messages yet"}
-                          </span>
-                          {conversation.unread > 0 && (
-                            <span className="inline-flex h-5 min-w-[1.25rem] flex-shrink-0 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-semibold text-white">
-                              {conversation.unread > 99 ? "99+" : conversation.unread}
-                            </span>
-                          )}
-                        </span>
-                      </span>
-                    </button>
+                    <ConversationListItem conversation={conversation} meEmail={meEmail} names={names}
+                      active={conversation.id === activeId} onClick={() => open(conversation.id)} />
                   </li>
                 ))}
               </ul>
             )}
           </CardContent>
-        </Card>
+        </Card>}
 
-        <Card className="flex min-h-0 flex-col overflow-hidden">
+        <Card className={cn("flex min-h-0 flex-col overflow-hidden", compact && "flex-1 rounded-none border-0 shadow-none")}>
           {!activeId ? (
             <div className="flex flex-1 flex-col items-center justify-center p-10 text-center text-slate-500">
               <MessageSquare className="mb-3 h-10 w-10 text-slate-300" />
@@ -510,7 +553,7 @@ export default function MessagesPage() {
             </div>
           ) : (
             <>
-              <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-4 py-3">
+              {!compact && <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-4 py-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     {active?.kind !== "group" && <UserAvatar email={(active?.members || []).find((member) => member.email !== meEmail)?.email || meEmail} name={conversationTitle(active, meEmail, names)} size={32} />}
@@ -529,11 +572,11 @@ export default function MessagesPage() {
                     <Button size="sm" variant="ghost" onClick={() => setSettingsOpen(true)}><Settings className="mr-1 h-4 w-4" /> Group</Button>
                   )}
                 </div>
-              </div>
+              </div>}
 
               <div
                 ref={scrollRef}
-                className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3"
+                className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 pb-3 pt-12"
                 data-testid="chat-background"
                 style={appearanceStyles.background}
                 onScroll={(event) => {
@@ -556,49 +599,40 @@ export default function MessagesPage() {
                     {shown.map((message, index) => {
                       const mine = message.sender === meEmail;
                       const previous = shown[index - 1];
-                      const showSender = !mine && active?.kind === "group" && previous?.sender !== message.sender;
+                      const showAvatar = startsMessageSenderGroup(message, previous);
+                      const showSender = !mine && showAvatar;
                       const bubbleStyle = mine ? appearanceStyles.mine : appearanceStyles.theirs;
                       const removed = message.body === "[removed by admin]" && (message.attachments || []).length === 0;
+                      const gifOnly = isGifOnlyMessage(message);
                       return (
-                        <div key={message.id} className={cn("flex gap-2", mine ? "justify-end" : "justify-start")}>
-                          {!mine && (showSender
-                            ? <UserAvatar email={message.sender} name={displayName(message.sender, names)} size={28} className="mt-5" />
-                            : <span className="h-7 w-7 shrink-0" aria-hidden="true" />)}
+                        <div key={message.id} className={cn("group/message relative flex gap-2", mine ? "justify-end" : "justify-start")}>
+                          {!mine && <MessageSenderAvatar email={message.sender} name={displayName(message.sender, names)}
+                            show={showAvatar} hasSenderLabel={showSender} />}
                           <div className={cn("flex max-w-[75%] flex-col", mine ? "items-end" : "items-start")}>
-                            {showSender && <span className="mb-0.5 px-1 text-xs font-medium text-slate-500">{displayName(message.sender, names)}</span>}
-                            <div
-                              className={cn(
-                                "space-y-1.5 rounded-2xl px-3 py-2 text-sm",
-                                message.status === "sending" && "opacity-70",
-                                message.status === "failed" && "bg-destructive/10 text-destructive"
-                              )}
-                              data-testid={mine ? "chat-bubble-mine" : "chat-bubble-theirs"}
-                              style={message.status === "failed" ? undefined : bubbleStyle}
-                            >
-                            {message.body && <p className={cn("whitespace-pre-wrap break-words", removed && "italic opacity-70")}>{message.body}</p>}
+                            {showSender && <span className="mb-0.5 px-1 text-xs font-medium text-foreground">{displayName(message.sender, names)}</span>}
+                            <MessageBubble message={message} mine={mine} bubbleStyle={bubbleStyle}>
+                            {message.body && !gifOnly && <p className={cn("whitespace-pre-wrap break-words", removed && "italic opacity-70")}>{message.body}</p>}
                             {(message.attachments || []).length > 0 && (
-                              <div className="flex flex-col gap-1">
+                              <div className={cn("flex flex-col", !gifOnly && "gap-1")}>
                                 {message.attachments.map((attachment, attachmentIndex) => (
                                   attachment.type === "gif"
-                                    ? <GifAttachment key={`${attachment.id}-${attachmentIndex}`} attachment={attachment} />
+                                    ? <GifAttachment key={`${attachment.id}-${attachmentIndex}`} attachment={attachment} edgeToEdge={gifOnly} />
+                                    : ["custom_emoji", "builtin_emoji"].includes(attachment.type)
+                                      ? <EmojiAttachment key={`emoji-${attachmentIndex}`} attachment={attachment} />
+                                    : attachment.type === "image"
+                                      ? <ScreenshotAttachment key={`${attachment.fileId || attachment.id}-${attachmentIndex}`} attachment={attachment} conversationId={message.conversationId} />
+                                    : attachment.type === "app_link"
+                                      ? <AppLinkAttachment key={`app-link-${attachmentIndex}`} attachment={attachment} />
                                     : <AttachmentChip key={attachment.quoteId} attachment={attachment} />
                                 ))}
                               </div>
                             )}
-                            </div>
-                            {isChatAdmin && !message.status && !removed && (
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <button type="button" className="mt-0.5 rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="Message options">
-                                    <MoreVertical className="h-3.5 w-3.5" />
-                                  </button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align={mine ? "end" : "start"}>
-                                  <DropdownMenuItem className="text-rose-600" onClick={() => removeMessageAsAdmin(message.id)}>Remove message (admin)</DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            )}
-                          <span className="mt-0.5 flex items-center gap-2 px-1 text-[11px] text-slate-400">
+                            </MessageBubble>
+                          <div className="mt-1 flex max-w-full flex-col">
+                            {!message.status && !removed && <MessageReactions message={message} meEmail={meEmail} names={names} mine={mine}
+                              isChatAdmin={isChatAdmin} onReact={(emoji, active) => reactToMessage(message, emoji, active)}
+                              onRemove={() => removeMessageAsAdmin(message.id)} />}
+                          <span className="flex flex-wrap items-center gap-2 px-1 text-[11px] leading-4 text-muted-foreground">
                             {message.status === "sending" && "Sending..."}
                             {message.status === "failed" && (
                               <>
@@ -614,6 +648,8 @@ export default function MessagesPage() {
                             {!message.status && formatMessageTime(message.createdAt)}
                           </span>
                           </div>
+                          </div>
+                          {mine && <MessageSenderAvatar email={message.sender} name={displayName(message.sender, names)} show={showAvatar} />}
                         </div>
                       );
                     })}
@@ -632,6 +668,19 @@ export default function MessagesPage() {
                             <X className="h-3.5 w-3.5" />
                           </button>
                         </span>
+                      ) : ["custom_emoji", "builtin_emoji"].includes(attachment.type) ? (
+                        <EmojiAttachment key={`emoji-${index}`} attachment={attachment}
+                          onRemove={() => setAttachments(list => list.filter((_, position) => position !== index))} />
+                      ) : attachment.type === "image" ? (
+                        <div key={attachment.id} className="relative w-48 max-w-full rounded-lg border border-border bg-card p-2 text-card-foreground">
+                          <img src={attachment.dataUrl} alt="Screenshot preview" className="max-h-28 w-full rounded object-contain" />
+                          <button type="button" aria-label="Remove screenshot" onClick={() => setAttachments(list => list.filter(item => item.id !== attachment.id))} className="absolute right-1 top-1 rounded bg-card p-1 text-card-foreground">
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : attachment.type === "app_link" ? (
+                        <AppLinkAttachment key={`app-link-${index}`} attachment={attachment}
+                          onRemove={() => setAttachments(list => list.filter((_, position) => position !== index))} />
                       ) : (
                         <AttachmentChip
                           key={attachment.quoteId}
@@ -642,15 +691,40 @@ export default function MessagesPage() {
                     ))}
                   </div>
                 )}
-                <div className="flex items-end gap-2">
+                <div className="rounded-md border border-input bg-background focus-within:ring-1 focus-within:ring-ring">
+                  <Textarea
+                    ref={composerRef}
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onPaste={pasteScreenshots}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                        e.preventDefault();
+                        send();
+                      }
+                    }}
+                    rows={1}
+                    maxLength={MAX_BODY}
+                    aria-label="Message text"
+                    title="Enter to send, Shift+Enter for a new line. Paste screenshots with Ctrl+V."
+                    placeholder="Type a message"
+                    className="min-h-10 w-full resize-none border-0 bg-transparent shadow-none focus-visible:ring-0"
+                  />
+                  <div className="flex items-center justify-end gap-1 px-1 pb-1" aria-label="Message composer actions">
+                  <Button type="button" size="icon" variant="ghost" className="h-7 w-7" aria-label="Share something in EnQuote"
+                    title="Pick something on this page to share" onClick={sharePageItem}
+                    disabled={pasting || attachments.length >= MAX_ATTACHMENTS}>
+                    <MousePointer2 className="h-4 w-4" />
+                  </Button>
                   <Button
                     type="button"
                     size="icon"
-                    variant="outline"
+                    variant="ghost"
+                    className="h-7 w-7"
                     aria-label="Attach a quote"
                     title="Attach a quote"
                     onClick={() => setPickerOpen(true)}
-                    disabled={attachments.length >= MAX_ATTACHMENTS}
+                    disabled={pasting || attachments.length >= MAX_ATTACHMENTS}
                   >
                     <Paperclip className="h-4 w-4" />
                   </Button>
@@ -659,36 +733,27 @@ export default function MessagesPage() {
                       <Button
                         type="button"
                         size="icon"
-                        variant="outline"
-                        aria-label="Add a GIF"
-                        title="Add a GIF"
-                        disabled={attachments.length >= MAX_ATTACHMENTS}
+                        variant="ghost"
+                        className="h-7 w-7"
+                        aria-label="Add emoji or GIF"
+                        title="Emoji and GIFs"
+                        disabled={pasting || attachments.length >= MAX_ATTACHMENTS}
                       >
-                        <Image className="h-4 w-4" />
+                        <Smile className="h-4 w-4" />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent align="start" className="w-96">
-                      <GiphyPicker onPick={addGif} />
+                    <PopoverContent align="end" className="w-96 max-w-[calc(100vw-1rem)]">
+                      <EmojiGifPicker onCustom={emoji => addEmoji(emoji, "custom_emoji")}
+                        onBuiltin={emoji => addEmoji(emoji, "builtin_emoji")} onGif={addGif} />
                     </PopoverContent>
                   </Popover>
-                  <Textarea
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                        e.preventDefault();
-                        send();
-                      }
-                    }}
-                    rows={2}
-                    maxLength={MAX_BODY}
-                    placeholder="Write a message (Enter to send, Shift+Enter for a new line)"
-                    className="min-h-[2.5rem] flex-1 resize-none"
-                  />
-                  <Button onClick={send} disabled={!draft.trim() && !attachments.length} aria-label="Send">
+                  <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-primary" title="Send message"
+                    onClick={send} disabled={pasting || (!draft.trim() && !attachments.length)} aria-label="Send">
                     <Send className="h-4 w-4" />
                   </Button>
+                  </div>
                 </div>
+                {pasting && <p className="text-xs text-muted-foreground" role="status">Preparing screenshot...</p>}
               </div>
             </>
           )}

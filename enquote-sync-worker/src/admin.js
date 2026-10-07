@@ -250,7 +250,10 @@ export async function handleAdminChatRemoveMessage(request, env) {
   if (!messageId) return json({ ok: false, error: "invalid_message_id" }, 400);
   const row = (await env.DB.prepare("SELECT conversation_id AS conversationId FROM chat_messages WHERE id = ?").bind(messageId).all()).results?.[0];
   if (!row) return json({ ok: false, error: "not_found" }, 404);
-  await env.DB.prepare("UPDATE chat_messages SET body = ?, attachments = ? WHERE id = ?").bind("[removed by admin]", "[]", messageId).run();
+  await env.DB.batch([
+    env.DB.prepare("UPDATE chat_messages SET body = ?, attachments = ? WHERE id = ?").bind("[removed by admin]", "[]", messageId),
+    env.DB.prepare("DELETE FROM chat_reactions WHERE message_id = ?").bind(messageId)
+  ]);
   const members = (await env.DB.prepare("SELECT email FROM chat_members WHERE conversation_id = ? AND left_at IS NULL").bind(row.conversationId).all()).results || [];
   const keys = [];
   for (const member of members) keys.push(await inboxKeyForEmail(member.email, env.USER_TOKEN_SECRET));

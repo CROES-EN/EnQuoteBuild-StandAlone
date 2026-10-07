@@ -1,4 +1,14 @@
-const { app, BrowserWindow, ipcMain, shell, dialog, Notification, net } = require("electron");
+const { app, BrowserWindow, ipcMain, shell, dialog, Notification, net, session, protocol } = require("electron");
+const {createReadonlyPreview, installPreviewIpcGuard} = require("./readonlyPreview.cjs");
+let readonlyPreview = null;
+installPreviewIpcGuard(ipcMain, () => readonlyPreview);
+ipcMain.handle("viewing:status", () => ({
+    ok: true, supported: true, ready: Boolean(readonlyPreview)
+}));
+protocol.registerSchemesAsPrivileged([{scheme: "enquote-preview", privileges: {standard: true, secure: true, supportFetchAPI: true}}]);
+function appWindows() {
+    return BrowserWindow.getAllWindows().filter(window => !readonlyPreview?.isPreview(window.webContents.id));
+}
 // FIX: destructuring these directly off app (e.g. "const { on } = app") strips their
 // "this" binding back to the real app instance, which crashes as soon as they're
 // called (app extends EventEmitter internally, and needs "this" to be app itself).
@@ -18,7 +28,7 @@ const path = require("node:path");
 const { repositoryFor } = require("./repository.cjs");
 const { importEntitySnapshot } = require("./entitySnapshotSync.cjs");
 const { applyVerifiedQuoteCreator, applyVerifiedQuoteUpdate, requireVerifiedEmail, recordedUpdater, parseRecordTimestamp } = require("./quoteAttribution.cjs");
-const {hasNotificationChange, notificationEventId} = require("./notificationEvents.cjs");
+const {hasNotificationChange, notificationEventId, restoreNotificationAttribution} = require("./notificationEvents.cjs");
 const { createPresenceSync } = require("./presenceSync.cjs");
 const { createFstRosterSync } = require("./fstRosterSync.cjs");
 const { createLargeTableStore } = require("./largeTableStore.cjs");
@@ -223,7 +233,7 @@ function notifyWindowsDataUpdated() {
     }
     lastDataRefreshAt = now;
 
-    const windows = BrowserWindow.getAllWindows();
+    const windows = appWindows();
     console.log('[sync] Notifying', windows.length, 'window(s) of new imported data (soft refresh, no reload)');
     windows.forEach((window) => window.webContents.send("app:data-updated", {
         at: new Date().toISOString(),
@@ -332,7 +342,7 @@ async function processEodbEmailInboxFileOnce(root, filename, filePath) {
         return;
     }
 
-    const windows = BrowserWindow.getAllWindows();
+    const windows = appWindows();
     if (windows.length === 0) return; // renderer not ready yet - left in place, no dead end (see scanNow below)
 
     const token = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -1005,6 +1015,7 @@ function createWindow() {
     // Closing the main window ends EnQuote entirely, even if a Salesforce or sign-in window is
     // still open - otherwise those keep the process (and its background sync/presence) alive.
     mainWindow.on("closed", () => {
+        readonlyPreview?.closeAll();
         if (process.platform !== "darwin") quit();
     });
 }
@@ -1275,7 +1286,7 @@ let then = whenReady().then(async () => {
         onRemoteApplied: () => {
             markOwnWrite();
             // Same soft-refresh event the Base44 import uses: the renderer re-queries in place.
-            BrowserWindow.getAllWindows().forEach((window) => window.webContents.send("app:data-updated", {
+            appWindows().forEach((window) => window.webContents.send("app:data-updated", {
                 at: new Date().toISOString(),
                 changedQuoteNumbers: []
             }));
@@ -1295,7 +1306,7 @@ let then = whenReady().then(async () => {
         }),
         onChanged: () => {
             markOwnWrite();
-            BrowserWindow.getAllWindows().forEach((window) => window.webContents.send("app:data-updated", {
+            appWindows().forEach((window) => window.webContents.send("app:data-updated", {
                 at: new Date().toISOString(),
                 changedQuoteNumbers: []
             }));
@@ -1432,9 +1443,21 @@ let then = whenReady().then(async () => {
     ipcMain.handle("quotes:import", (_event, data) => ownWrite(quoteRepository.importData)(data));
     ipcMain.handle("products:list", () => quoteRepository.listProducts());
     ipcMain.handle("products:create", (_event, record) => ownWrite(quoteRepository.createProduct)(record));
-    ipcMain.handle("products:update", (_event, id, changes) => ownWrite(quoteRepository.updateProduct)(id, changes));
+    ipcMain.handle("products:update", (_event, id, changes) => ownWrite(quoteRepository.updateProduct)(
+        id, {...changes, last_updated_by: requireVerifiedEmail(getVerifiedIdentity())}
+    ));
     ipcMain.handle("products:delete", (_event, id) => ownWrite(quoteRepository.deleteProduct)(id));
-    ipcMain.handle("collections:list", (_event, name) => quoteRepository.listCollection(name));
+    ipcMain.handle("collections:list", async (_event, name) => {
+        const records = await quoteRepository.listCollection(name);
+        if (name !== "appNotifications") return records;
+        const quotes = await quoteRepository.list();
+        return records.map(notification => {
+            const record = notification.type === "quote_updated"
+                ? quotes.find(quote => quote.id === notification.quoteId)
+                : null;
+            return restoreNotificationAttribution(notification, record);
+        });
+    });
     // DIAGNOSTIC WRAPPER (temporary): "collections:create" was intermittently failing with
     // Electron's generic "reply was never sent" error for 2 specific report types, with no
     // visible underlying cause in the renderer's DevTools console. This wraps the handler in an
@@ -1916,13 +1939,34 @@ let then = whenReady().then(async () => {
             "CF-Access-Client-Secret": process.env.CF_ACCESS_CLIENT_SECRET || ""
         }),
         addBellNotification: (record) => quoteRepository.createCollectionRecord("appNotifications", record),
+        onAccessPolicyChanged: () => readonlyPreview?.revalidateAll(),
         onUsersUpdated: async () => {
             const result = await userRolesSync?.sync();
-            BrowserWindow.getAllWindows().forEach((window) => window.webContents.send("app:users-changed", {
+            appWindows().forEach((window) => window.webContents.send("app:users-changed", {
                 at: new Date().toISOString()
             }));
+            await readonlyPreview?.revalidateAll();
             return result;
         }
+    });
+    const pageAccess = await import("./pageAccess.mjs");
+    readonlyPreview = createReadonlyPreview({
+        BrowserWindow, session, net, ipcMain,
+        getMainWindow: () => mainWindow,
+        getIdentity: getVerifiedIdentity,
+        getPolicy: () => collabFeatures.admin.policy(),
+        getOverview: () => collabFeatures.admin.overview(),
+        getRepository: () => quoteRepository,
+        getUserDataPath: () => getPath("userData"),
+        getEntry: () => {
+            const {fileURLToPath} = require("node:url");
+            const current = mainWindow?.webContents.getURL() || "";
+            return current.startsWith("file:") ? fileURLToPath(current.split("#")[0]) : null;
+        },
+        devUrl: !isPackaged ? "http://localhost:5173" : "",
+        canAccessPage: pageAccess.canAccessPage,
+        rolesForUser: pageAccess.rolesForUser,
+        allPages: pageAccess.ALL_PAGES
     });
     geoService = createGeoService({
         fetchImpl: (url, init) => net.fetch(url, init),
@@ -1966,7 +2010,7 @@ let then = whenReady().then(async () => {
             return { ok: false, error: "No Salesforce report URL was provided." };
         }
         openSalesforceReportWindow(reportUrl, (result) => {
-            BrowserWindow.getAllWindows().forEach((win) => win.webContents.send("salesforce:file-downloaded", result));
+            appWindows().forEach((win) => win.webContents.send("salesforce:file-downloaded", result));
         }, userEmail);
         return { ok: true };
     });
@@ -2190,7 +2234,7 @@ let then = whenReady().then(async () => {
                 acceptEtag();
                 markOwnWrite();
                 console.log(`[entity-sync] Bulk-imported ${importSummary.importedRecordCount} Base44 entity record(s).`);
-                BrowserWindow.getAllWindows().forEach((window) => window.webContents.send("app:data-updated", {
+                appWindows().forEach((window) => window.webContents.send("app:data-updated", {
                     at: new Date().toISOString(),
                     changedQuoteNumbers: []
                 }));
@@ -2547,7 +2591,7 @@ let then = whenReady().then(async () => {
         if (!uiUpdater) return { updated: false, reason: "not-packaged" };
         const result = await uiUpdater.check();
         if (result.updated) {
-            BrowserWindow.getAllWindows().forEach((window) => window.webContents.send("ui:update-ready", {
+            appWindows().forEach((window) => window.webContents.send("ui:update-ready", {
                 uiVersion: result.uiVersion,
                 notes: result.notes || ""
             }));

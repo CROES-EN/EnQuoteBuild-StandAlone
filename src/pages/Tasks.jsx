@@ -42,7 +42,7 @@ import {createPageUrl} from "@/utils";
 import {cn} from "@/lib/utils";
 import {tasksApi, useTasks} from "@/features/collab/collabApi";
 import TaskDialog, {TASK_TYPES} from "@/components/collab/TaskDialog";
-import {CaseNumberLink} from "@/components/links/ExternalIdLinks";
+import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
 
 const typeLabel = (type) => TASK_TYPES.find((item) => item.value === type)?.label || "Task";
 
@@ -122,6 +122,7 @@ function TaskRow({ task, now, highlightedId, onEdit }) {
         <div className="flex flex-wrap items-center gap-2">
           <span className={cn("font-medium text-foreground", done && "text-muted-foreground line-through")}>{task.title}</span>
           <Badge variant="outline" className="text-xs">{typeLabel(task.type)}</Badge>
+          {task.site_id && <span>Site <SiteIdLink siteId={task.site_id} /></span>}
           {task.case_number && <CaseNumberLink caseNumber={task.case_number} caseId={task.case_id}>
             Case {task.case_number}
           </CaseNumberLink>}
@@ -308,7 +309,6 @@ export default function TasksPage() {
           <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground"><ClipboardList className="h-6 w-6 text-orange-600" />Tasks</h1>
           <p className="text-sm text-muted-foreground">Your private call-backs, reminders, and cases tagged by teammates.</p>
         </div>
-        <Button onClick={() => openNew(null)} className="bg-orange-600 text-white hover:bg-orange-700"><Plus className="mr-1 h-4 w-4" />New task</Button>
       </div>
 
       <div className="grid grid-cols-3 gap-3">
@@ -322,12 +322,12 @@ export default function TasksPage() {
       </div>
 
       <Tabs defaultValue="list">
-        <TabsList>
+        <TabsList className="h-auto flex-wrap justify-start">
           <TabsTrigger value="list"><ListTodo className="mr-1.5 h-4 w-4" />List</TabsTrigger>
           <TabsTrigger value="calendar"><CalendarDays className="mr-1.5 h-4 w-4" />Calendar</TabsTrigger>
+          <TabsTrigger value="quote-attention"><FileText className="mr-1.5 h-4 w-4" />Quotes needing attention</TabsTrigger>
         </TabsList>
         <TabsContent value="list" className="mt-4 space-y-6">
-          <QuoteAttentionSection userEmail={user?.email} now={now} />
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading tasks...</p>
           ) : openCount === 0 && !groups.done.length ? (
@@ -355,6 +355,9 @@ export default function TasksPage() {
         </TabsContent>
         <TabsContent value="calendar" className="mt-4">
           <CalendarView tasks={tasks} now={now} onEdit={openEdit} onAdd={openNew} highlightedId={highlightedId} />
+        </TabsContent>
+        <TabsContent value="quote-attention" className="mt-4">
+          <QuoteAttentionSection userEmail={user?.email} now={now} />
         </TabsContent>
       </Tabs>
 

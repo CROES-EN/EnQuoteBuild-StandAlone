@@ -9,11 +9,12 @@ function safeInt(value) {
   return Math.max(0, Number.parseInt(value || "0", 10) || 0);
 }
 
-function safeMediaUrl(value) {
+export function safeGiphyMediaUrl(value) {
   if (typeof value !== "string" || value.length > 500) return "";
   try {
     const url = new URL(value);
-    if (url.protocol !== "https:" || !ALLOWED_GIPHY_HOST.test(url.hostname)) return "";
+    if (url.protocol !== "https:" || url.username || url.password ||
+        (url.port && url.port !== "443") || !ALLOWED_GIPHY_HOST.test(url.hostname)) return "";
     return url.href;
   } catch {
     return "";
@@ -23,8 +24,8 @@ function safeMediaUrl(value) {
 function mapGif(item) {
   const fixedHeight = item?.images?.fixed_height || {};
   const preview = item?.images?.fixed_width_small || item?.images?.fixed_height_small || fixedHeight;
-  const url = safeMediaUrl(fixedHeight.url);
-  const previewUrl = safeMediaUrl(preview.webp || preview.url || fixedHeight.url);
+  const url = safeGiphyMediaUrl(fixedHeight.url);
+  const previewUrl = safeGiphyMediaUrl(preview.webp || preview.url || fixedHeight.url);
   if (!url) return null;
   return {
     id: String(item.id || "").slice(0, 100),

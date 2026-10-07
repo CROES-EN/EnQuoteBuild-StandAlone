@@ -36,6 +36,9 @@ export default function QuoteCard({ quote, index = 0, selectable = false, isSele
     >
       <div
         role="link"
+        data-enquote-share-target={`quote:${quote.id}`}
+        data-enquote-share-route={createPageUrl(`QuoteDetails?id=${encodeURIComponent(quote.id)}`)}
+        aria-label={`Quote ${quote.quote_number || quote.site_id || quote.id}`}
         tabIndex={0}
         onClick={() => navigate(createPageUrl(`QuoteDetails?id=${quote.id}`))}
         onKeyDown={(event) => {

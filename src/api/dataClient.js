@@ -8,10 +8,10 @@ import {localAdapter} from "./adapters/localAdapter";
 import {salesforceAdapter} from "./adapters/salesforceAdapter";
 
 import {salesforceMockAdapter} from "./adapters/salesforceMockAdapter";
+import {isReadonlyViewing} from "@/features/admin/readonlyViewing";
 
 const DATA_SOURCE =
-  import.meta.env.VITE_DATA_SOURCE ||
-  "local";
+  isReadonlyViewing() ? "local" : (import.meta.env.VITE_DATA_SOURCE || "local");
 
 const adapters = {
   base44: base44Adapter,

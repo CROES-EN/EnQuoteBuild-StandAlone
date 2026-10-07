@@ -1,6 +1,15 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {hasNotificationChange, notificationEventId} = require("../../electron/notificationEvents.cjs");
+const {hasNotificationChange, notificationEventId, restoreNotificationAttribution} = require("../../electron/notificationEvents.cjs");
+
+test("old notices recover recorded attribution only from the matching update event", () => {
+  const notice = {type: "quote_updated", occurredAt: "2026-10-07T17:00:00.000Z", changedBy: null};
+  const record = {updated_date: "2026-10-07T17:00:00.000000", last_updated_by: "editor@example.com"};
+  assert.equal(restoreNotificationAttribution(notice, record).changedBy, "editor@example.com");
+  assert.equal(restoreNotificationAttribution(notice, {...record, updated_date: "2026-10-07T18:00:00Z"}).changedBy, null);
+  assert.equal(restoreNotificationAttribution({...notice, changedBy: "original@example.com"}, record).changedBy, "original@example.com");
+  assert.equal(restoreNotificationAttribution(notice, null).changedBy, null);
+});
 
 test("content comparison ignores transport metadata and object ordering, not real edits", () => {
   const original = {id: "local", total: 100, items: [{name: "panel", count: 1}]};

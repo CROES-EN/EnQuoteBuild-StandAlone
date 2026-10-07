@@ -188,7 +188,10 @@ export default ({
             }
           }}
         >
-          <Card className="p-5 hover:shadow-lg transition-all duration-300 border-border hover:border-indigo-200 group cursor-pointer h-full flex flex-col">
+          <Card data-enquote-share-target={caseNumber ? `auto-drafter-case:${caseNumber}` : undefined}
+            data-enquote-share-label={`Auto-Drafter quote ${displayReference || caseNumber}`}
+            data-enquote-share-route={`/AutoDrafter?shareCase=${encodeURIComponent(caseNumber || "")}`}
+            className="p-5 hover:shadow-lg transition-all duration-300 border-border hover:border-indigo-200 group cursor-pointer h-full flex flex-col">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center group-hover:bg-indigo-100 transition-colors shrink-0">
@@ -251,7 +254,10 @@ export default ({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.03 }}
     >
-      <Card className="p-5 hover:shadow-lg transition-all duration-300 border-border hover:border-violet-200 group h-full flex flex-col">
+      <Card data-enquote-share-target={caseNumber ? `auto-drafter-case:${caseNumber}` : undefined}
+        data-enquote-share-label={`Auto-Drafter case ${caseNumber}`}
+        data-enquote-share-route={`/AutoDrafter?shareCase=${encodeURIComponent(caseNumber || "")}`}
+        className="p-5 hover:shadow-lg transition-all duration-300 border-border hover:border-violet-200 group h-full flex flex-col">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-violet-50 flex items-center justify-center group-hover:bg-violet-100 transition-colors shrink-0">

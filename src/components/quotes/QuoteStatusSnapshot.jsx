@@ -38,15 +38,15 @@ export default function QuoteStatusSnapshot({ quotes, activeStatus, onSelectStat
               key={card.status}
               onClick={() => onSelectStatus?.(isActive ? "all" : card.status)}
               className={cn(
-                "border rounded-lg p-3 bg-card text-left transition-all hover:shadow-md hover:-translate-y-0.5",
-                isActive ? "border-indigo-500 ring-2 ring-indigo-100" : "border-border"
+                "border rounded-lg p-3 bg-card text-card-foreground text-left transition-colors hover:border-primary",
+                isActive ? "border-primary ring-1 ring-primary" : "border-border"
               )}
             >
               <div className="flex items-center gap-2 mb-1">
                 <span className={`w-2.5 h-2.5 rounded-full ${card.color}`} />
-                <span className="text-xs text-muted-foreground">{card.label}</span>
+                <span className="text-xs text-card-foreground">{card.label}</span>
               </div>
-              <p className="text-2xl font-bold text-foreground">{card.count}</p>
+              <p className="text-2xl font-bold text-card-foreground">{card.count}</p>
             </button>
           );
         })}
