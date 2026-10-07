@@ -81,7 +81,7 @@ function AttachmentChip({attachment, onRemove}) {
       {linkedSublabel}
     </>
   );
-  const className = "inline-flex max-w-full items-center gap-1.5 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-xs text-indigo-700";
+  const className = "inline-flex min-w-0 max-w-full flex-wrap items-center gap-1.5 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-xs text-indigo-700";
   if (onRemove) {
     return (
       <span className={className}>
@@ -576,7 +576,7 @@ export default function MessagesPage({conversationId, compact = false, visible =
 
               <div
                 ref={scrollRef}
-                className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 pb-3 pt-12"
+                className="min-h-0 min-w-0 flex-1 space-y-3 overflow-y-auto px-4 pb-3 pt-12"
                 data-testid="chat-background"
                 style={appearanceStyles.background}
                 onScroll={(event) => {
@@ -608,7 +608,7 @@ export default function MessagesPage({conversationId, compact = false, visible =
                         <div key={message.id} className={cn("group/message relative flex gap-2", mine ? "justify-end" : "justify-start")}>
                           {!mine && <MessageSenderAvatar email={message.sender} name={displayName(message.sender, names)}
                             show={showAvatar} hasSenderLabel={showSender} />}
-                          <div className={cn("flex max-w-[75%] flex-col", mine ? "items-end" : "items-start")}>
+                          <div className={cn("flex min-w-0 max-w-[75%] flex-col", mine ? "items-end" : "items-start")}>
                             {showSender && <span className="mb-0.5 px-1 text-xs font-medium text-foreground">{displayName(message.sender, names)}</span>}
                             <MessageBubble message={message} mine={mine} bubbleStyle={bubbleStyle}>
                             {message.body && !gifOnly && <p className={cn("whitespace-pre-wrap break-words", removed && "italic opacity-70")}>{message.body}</p>}

@@ -1,4 +1,4 @@
-﻿# EnQuote — Developer Onboarding & Working Manual
+# EnQuote — Developer Onboarding & Working Manual
 
 This document explains how EnQuote is actually built, tested, and shipped — written from real
 experience fixing this app, not theory. If you're new to this project (hi, Shane), read this
@@ -392,6 +392,13 @@ that chat. The shared size clears when you switch signed-in accounts.
 GIF-only messages fill the rounded bubble without themed padding or a colored
 frame. Messages with a text caption or other attachment types retain their normal
 chat colors and padding. Sending/failed status and reactions remain below the GIF.
+Long message text and shared EnQuote link labels wrap inside the chat, including
+narrow resized windows. Minimized conversation name buttons fill the tile's
+height; click anywhere in the name area to reopen it. The separate X closes it.
+Reaction badges use larger 28px artwork so custom animated emojis are easier to
+recognize. Opening a shared Workload case row switches to **All Cases** and clears
+search, tile, Review Me, and column filters so the row can be revealed. This does
+not change saved customization preferences or grant access to unavailable data.
 Hover reaction shortcuts and the message-options menu appear at the upper-right
 of the message row with larger click targets. The space between the message and
 toolbar remains hoverable so the controls do not disappear while moving to an

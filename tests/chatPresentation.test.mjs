@@ -56,6 +56,23 @@ test("GIF-only messages fill the bubble without theme color, padding, or an inne
     }, "Content"));
     assert.match(html, /px-3 py-2/);
     assert.match(html, /background-color:#ffff00/);
+    assert.match(html, /min-w-0 max-w-full \[overflow-wrap:anywhere\]/);
+  }
+});
+
+test("shared app links wrap the entire label within a shrinkable chip", async () => {
+  const {default: Attachment} = await load("src\\components\\messages\\AppLinkAttachment.jsx", {
+    "lucide-react": {MousePointer2: () => null, X: () => null},
+    "react-router-dom": {Link: ({to, children, ...props}) => React.createElement("a", {...props, href: to}, children)}
+  });
+  const attachment = {type: "app_link", label: "SiteIdCaseNumberCustomerStatusViewDetails".repeat(4).slice(0, 160),
+    path: "/Quotes", target: {kind: "page"}};
+  for (const onRemove of [undefined, () => {}]) {
+    const html = renderToStaticMarkup(React.createElement(Attachment, {attachment, onRemove}));
+    assert.match(html, /inline-flex min-w-0 max-w-full/);
+    assert.match(html, /whitespace-normal \[overflow-wrap:anywhere\]/);
+    assert.ok(html.includes(attachment.label));
+    assert.doesNotMatch(html, /\btruncate\b/);
   }
 });
 

@@ -1,5 +1,6 @@
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from "react";
-import {Link} from "react-router-dom";
+import {Link, useLocation} from "react-router-dom";
+import {sharedWorkloadCase} from "@/features/supervisorDashboard/sharedWorkloadCase";
 import {createPageUrl} from "@/utils";
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
@@ -367,6 +368,8 @@ function ColumnFilterPopover({ column, distinctValues, selectedValues, onApply, 
  * report; can be revisited if this ever grows to NICE-Raw-Data-like row counts.
  */
 export default function WorkloadReportTable({ table, onReload, isReloading }) {
+  const location = useLocation();
+  const sharedCase = sharedWorkloadCase(location.search);
   const [search, setSearch] = useState("");
   const [sortColumn, setSortColumn] = useState(() => getDefaultSortColumn());
   const [sortDirection, setSortDirection] = useState("asc");
@@ -396,6 +399,15 @@ export default function WorkloadReportTable({ table, onReload, isReloading }) {
   // "is this map non-empty".
   const [columnFilters, setColumnFilters] = useState({});
   const [openFilterColumn, setOpenFilterColumn] = useState(null);
+  useEffect(() => {
+    if (!sharedCase) return;
+    setAllCasesMode(true);
+    setSearch("");
+    setActiveTileFilter(null);
+    setReviewMeOnly(false);
+    setColumnFilters({});
+    setOpenFilterColumn(null);
+  }, [sharedCase, location.key]);
   const filterAnchorRefs = useRef({});
 
   function getFilterAnchorRef(column) {

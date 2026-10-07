@@ -150,6 +150,8 @@ test("the dock is hidden and its composer inactive in Messages, retaining drafts
     const minimized = render();
     assert.match(minimized, /aria-label="Message someone"/);
     assert.match(minimized, /aria-label="Open chat with Conversation"/);
+    assert.match(minimized, /aria-label="Open chat with Conversation"[^>]*class="[^"]*self-stretch/);
+    assert.match(minimized, /aria-label="Close chat with Conversation"[^>]*class="[^"]*self-stretch/);
     assert.equal(views.at(-1).visible, false);
     assert.match(minimized, /display:none/);
     assert.doesNotMatch(minimized, /display:flex/);

@@ -21,7 +21,7 @@ export function isGifOnlyMessage(message) {
 export default function MessageBubble({message, mine, bubbleStyle, children}) {
   const gifOnly = isGifOnlyMessage(message);
   return (
-    <div className={cn("rounded-2xl text-sm group-hover/message:ring-2 group-hover/message:ring-primary/50 group-focus-within/message:ring-2 group-focus-within/message:ring-primary/50",
+    <div className={cn("min-w-0 max-w-full [overflow-wrap:anywhere] rounded-2xl text-sm group-hover/message:ring-2 group-hover/message:ring-primary/50 group-focus-within/message:ring-2 group-focus-within/message:ring-primary/50",
       gifOnly ? "w-fit max-w-full overflow-hidden bg-transparent" : "space-y-1.5 px-3 py-2",
       message.status === "sending" && "opacity-70",
       message.status === "failed" && !gifOnly && "bg-destructive/10 text-destructive")}

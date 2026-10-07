@@ -70,9 +70,9 @@ export default function MessageReactions({message, meEmail, names, mine, isChatA
             aria-label={`${item.label}: ${reaction.users.length} reactions`}
             title={reaction.users.map(email => displayName(email, names)).join(", ")}
             onClick={() => void react(item.id)}
-            className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs", selected(item.id)
+            className={cn("inline-flex min-h-9 items-center gap-1.5 rounded-full border px-2 py-1 text-xs", selected(item.id)
               ? "border-primary bg-primary/10 text-foreground" : "border-border bg-card text-card-foreground")}>
-            {customId ? <CustomEmojiImage id={customId} name={item.label} size={16} /> : <ReactionIcon reaction={item.id} size={16} />}
+            {customId ? <CustomEmojiImage id={customId} name={item.label} size={28} /> : <ReactionIcon reaction={item.id} size={28} />}
             {reaction.users.length}</button>;
         })}
       </div>}

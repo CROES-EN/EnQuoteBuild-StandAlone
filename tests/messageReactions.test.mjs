@@ -61,7 +61,7 @@ test("reaction actions reveal on hover or focus, show selected counts and names,
   }
   assert.match(html, /width="24" height="24"/);
   assert.match(html, /width="20" height="20"/);
-  assert.match(html, /width="16" height="16"/);
+  assert.match(html, /width="28" height="28"/);
   assert.doesNotMatch(html, /👍|❤️|😆|😮|😢|🎉/u);
   const custom = renderToStaticMarkup(React.createElement(module.exports.default, {...props, message: {reactions: [
     {emoji: `custom:${"a".repeat(64)}`, users: ["alice@example.com", "bob@example.com"]}
@@ -69,5 +69,5 @@ test("reaction actions reveal on hover or focus, show selected counts and names,
   assert.match(custom, /aria-label="More emoji reactions"/);
   assert.match(custom, /aria-label="team: 2 reactions"/);
   assert.match(custom, /aria-pressed="true"/);
-  assert.match(custom, /alt=":team:" width="16" height="16"/);
+  assert.match(custom, /alt=":team:" width="28" height="28"/);
 });

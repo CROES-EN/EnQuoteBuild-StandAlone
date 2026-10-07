@@ -244,11 +244,11 @@ export default function ChatDock() {
           return (
             <div key={tab.id} className="flex w-44 shrink-0 items-center rounded-md border border-border bg-card text-card-foreground">
               <button type="button" aria-expanded={false} aria-label={`Open chat with ${title}`}
-                onClick={() => dispatch({type: "open", id: tab.id})} className="flex min-w-0 flex-1 items-center gap-2 p-2 text-sm">
+                onClick={() => dispatch({type: "open", id: tab.id})} className="flex min-w-0 flex-1 self-stretch items-center gap-2 rounded-l-md p-2 text-left text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
                 <MessageSquare className="h-4 w-4 shrink-0" /><span className="truncate">{title}</span>
                 {unread > 0 && <span aria-label={`${unread} unread messages`} className="rounded-full bg-primary px-1.5 text-xs text-primary-foreground">{unread > 99 ? "99+" : unread}</span>}
               </button>
-              <button type="button" aria-label={`Close chat with ${title}`} onClick={() => dispatch({type: "close", id: tab.id})} className="shrink-0 rounded p-1 hover:bg-muted"><X className="h-3.5 w-3.5" /></button>
+              <button type="button" aria-label={`Close chat with ${title}`} onClick={() => dispatch({type: "close", id: tab.id})} className="flex w-7 shrink-0 self-stretch items-center justify-center rounded-r-md hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"><X className="h-3.5 w-3.5" /></button>
             </div>
           );
         })}
