@@ -151,6 +151,12 @@ body {
   background-color: rgb(var(--workload-badge-rgb) / 0.16) !important;
 }
 
+/* Workload status and picklist pills use their color as text and a light outline, not a fill. */
+.dark .workload-color-badge.workload-status-pill[class*="text-"] {
+  background-color: transparent !important;
+  border-color: rgb(var(--workload-badge-rgb) / 0.45) !important;
+}
+
 .dark button.workload-color-badge:hover {
   background-color: rgb(var(--workload-badge-rgb) / 0.18) !important;
 }

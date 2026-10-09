@@ -78,7 +78,7 @@ const WRAP_COLUMNS = new Set(["Subject", "Contact: Email", "New_Location"]);
  *  mapped to a tile. */
 function ColorPill({ classes, brightenInDark = false }) {
   return (
-    <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap", brightenInDark && "workload-color-badge", classes.bg,classes.text)}>
+    <span className={cn("inline-flex items-center gap-1.5 rounded-full border border-transparent px-2.5 py-1 text-xs font-medium whitespace-nowrap", brightenInDark && "workload-color-badge workload-status-pill", classes.bg,classes.text)}>
       {classes.icon ? (
         <span aria-hidden="true">{classes.icon}</span>
       ) : (
@@ -1268,7 +1268,7 @@ export default function WorkloadReportTable({ table, onReload, isReloading }) {
                         {col === "O&M Status" ? (
                           <ColorPill classes={getOMStatusBadgeClasses(row[col], tile)} brightenInDark />
                         ) : col === "Project Picklist" ? (
-                          <ColorPill classes={getProjectPicklistBadgeClasses(row[col])} />
+                          <ColorPill classes={getProjectPicklistBadgeClasses(row[col])} brightenInDark />
                         ) : col === "Enlighten Site ID" ? (
                           <div className="flex items-center gap-1.5">
                             <SiteIdLink siteId={row[col]} fallback={<span>--</span>} />
