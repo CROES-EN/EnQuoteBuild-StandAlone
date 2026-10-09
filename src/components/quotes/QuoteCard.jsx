@@ -1,3 +1,4 @@
+import React from "react";
 import {Card} from "@/components/ui/card";
 import {format} from "date-fns";
 import {Calendar, FileText, ShieldCheck, User} from "lucide-react";
@@ -20,6 +21,18 @@ export default function QuoteCard({ quote, index = 0, selectable = false, isSele
   const careIndex = useCareEligibilityIndex();
   const careEligibility = careIndex ? getEligibilityFromIndex(quote.site_id, careIndex) : null;
   const hasActiveCare = careEligibility?.status === "ACTIVE_CARE";
+  const isNestedInteractiveTarget = (event) => {
+    const interactive = event.target?.closest?.("a, button, [role='checkbox']");
+    return Boolean(interactive && interactive !== event.currentTarget);
+  };
+  const handleCardClick = (event) => {
+    if (isNestedInteractiveTarget(event)) return;
+    if (selectable) {
+      onToggleSelect?.(quote.id);
+      return;
+    }
+    navigate(createPageUrl(`QuoteDetails?id=${quote.id}`));
+  };
   const stripeClass = effectiveLevel === "red"
     ? "border-l-4 border-l-red-500"
     : effectiveLevel === "orange"
@@ -35,16 +48,19 @@ export default function QuoteCard({ quote, index = 0, selectable = false, isSele
       transition={{ delay: index * 0.05 }}
     >
       <div
-        role="link"
+        role={selectable ? "checkbox" : "link"}
         data-enquote-share-target={`quote:${quote.id}`}
         data-enquote-share-route={createPageUrl(`QuoteDetails?id=${encodeURIComponent(quote.id)}`)}
         aria-label={`Quote ${quote.quote_number || quote.site_id || quote.id}`}
+        aria-checked={selectable ? isSelected : undefined}
         tabIndex={0}
-        onClick={() => navigate(createPageUrl(`QuoteDetails?id=${quote.id}`))}
+        onClick={handleCardClick}
         onKeyDown={(event) => {
+          if (isNestedInteractiveTarget(event)) return;
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
-            navigate(createPageUrl(`QuoteDetails?id=${quote.id}`));
+            if (selectable) onToggleSelect?.(quote.id);
+            else navigate(createPageUrl(`QuoteDetails?id=${quote.id}`));
           }
         }}
       >
@@ -55,7 +71,10 @@ export default function QuoteCard({ quote, index = 0, selectable = false, isSele
                 <Checkbox
                   checked={isSelected}
                   onCheckedChange={() => onToggleSelect?.(quote.id)}
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  onClick={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => event.stopPropagation()}
+                  aria-hidden="true"
+                  tabIndex={-1}
                   className="shrink-0"
                 />
               )}

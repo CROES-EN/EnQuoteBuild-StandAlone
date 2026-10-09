@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useRef, useState} from "react";
+import React, {useEffect, useMemo, useRef, useState} from "react";
 import {useAuth} from "@/lib/AuthContext";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
@@ -15,10 +15,7 @@ import {useLocation, useNavigate} from "react-router-dom";
 import {ArrowLeft} from "lucide-react";
 import {TOM_TRIBUTE} from "./tribute";
 import {NavigationQuicklinks, ProfileActions} from "./Quicklinks";
-import {chatApi} from "@/features/collab/collabApi";
-import {openChatDock} from "@/features/collab/chatDockState";
-import {useAccessPolicy} from "@/features/admin/adminApi";
-import {canAccessPage} from "@/lib/rolePageAccess";
+import MailCenter from "./MailCenter";
 
 const DRAFT_KEY = "enquote_retro_draft_v1";
 const MAX_FRIEND_TILES = 8;
@@ -37,10 +34,15 @@ const RETRO_THEME = {
   "--theme-border": "#8ca9c3",
 };
 
+function draftStorageKeyForUser(user) {
+  const email = String(user?.email || "").trim().toLowerCase();
+  return email ? `${DRAFT_KEY}::${email}` : scopedKey(DRAFT_KEY);
+}
+
 function initialDraft(user) {
   const fallback = {name: user?.name || user?.full_name || "My space", mood: "Feeling nostalgic", html: "", css: "", layout: "classic", picture: "", appearance: "classic", tagline: "My corner of the web.", location: "", about: "Welcome to my space!", meet: "", interests: "", music: "", movies: "", television: "", books: "", heroes: "", notes: ""};
   try {
-    const draft = JSON.parse(localStorage.getItem(scopedKey(DRAFT_KEY)) || "null");
+    const draft = JSON.parse(localStorage.getItem(draftStorageKeyForUser(user)) || "null");
     return draft && ["name", "mood", "html", "css"].every((key) => typeof draft[key] === "string")
       ? {...fallback, ...draft, layout: draft.layout || (draft.html.trim() && draft.html !== STARTER_HTML ? "custom" : "classic"),
         appearance: draft.appearance || (draft.css.trim() ? "imported" : "classic")} : fallback;
@@ -50,15 +52,29 @@ function initialDraft(user) {
   }
 }
 
+function persistLocalDraft(storageKey, draft) {
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(draft));
+    return null;
+  } catch (error) {
+    return error;
+  }
+}
+
 export default function Base44_DTO() {
   const {user, isAuthenticated} = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const {policy} = useAccessPolicy();
-  const canMail = canAccessPage(user, "Messages", policy);
+  const query = new URLSearchParams(location.search);
+  const mailMode = query.get("mail") === "1";
+  const mailRecipient = query.get("to") || "";
   const [profiles, setProfiles] = useState([]);
   const [cursor, setCursor] = useState(null);
   const [draft, setDraft] = useState(() => initialDraft(user));
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  const draftOwnerEmail = useRef(String(user?.email || "").trim().toLowerCase());
+  const draftStorageKey = useMemo(() => draftStorageKeyForUser(user), [user?.email]);
   const [viewed, setViewed] = useState(null);
   const [editing, setEditing] = useState(false);
   const [preview, setPreview] = useState(null);
@@ -67,7 +83,6 @@ export default function Base44_DTO() {
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
-  const [sending, setSending] = useState(false);
   const directoryRef = useRef(null);
   const searchRef = useRef(null);
   const selectionVersion = useRef(0);
@@ -88,6 +103,16 @@ export default function Base44_DTO() {
       return buildRetroPreview("<p>Could not render this profile. Check the image URLs in Edit my space.</p>", "", false, !editing);
     }
   }, [preview, avatar, friends, animate, editing, ownerEmail]);
+  const mailThemeSource = useMemo(() => {
+    if (!mailMode) return "";
+    try {
+      const profile = materializeProfile(draft, avatar, friends);
+      return buildRetroBackground(profile.html, profile.css);
+    } catch (themeError) {
+      console.warn("[retro-mail] Could not render the selected theme backdrop:", themeError.message);
+      return buildRetroBackground(draft.html, draft.css);
+    }
+  }, [mailMode, draft, avatar, friends]);
   const profileFrameRef = useRef(null);
   const openFriendRef = useRef(null);
   openFriendRef.current = (index) => {
@@ -139,7 +164,7 @@ export default function Base44_DTO() {
   }, [draft, editing]);
   const backgroundSource = useMemo(() => preview ? buildRetroBackground(preview.html, preview.css) : "", [preview]);
   const visibleProfiles = profiles.filter((profile) => `${profile.name} ${profile.email} ${profile.mood}`.toLowerCase().includes(search.trim().toLowerCase()));
-  const canMessage = canMail && Boolean(viewed?.email) && viewed.email !== user?.email && !editing;
+  const canMessage = Boolean(viewed?.email) && viewed.email !== user?.email && !editing;
   const isOwnProfileView = !editing && Boolean(preview) && viewed?.email === user?.email;
   function editOwnProfile() {
     if (viewed.layout === "classic") {
@@ -153,6 +178,19 @@ export default function Base44_DTO() {
     directoryRef.current.scrollIntoView({block: "nearest"});
     if (focusSearch) searchRef.current?.focus();
   }
+  function navigateFromMail(destination) {
+    if (!mailMode) {
+      if (destination === "home") home();
+      else browse(destination === "search");
+      return;
+    }
+    if (destination === "home") {
+      home();
+      navigate("/Base44_DTO");
+      return;
+    }
+    navigate(`/Base44_DTO?browse=1${destination === "search" ? "&search=1" : ""}`);
+  }
   function home() {
     selectionVersion.current++;
     setEditing(false);
@@ -161,19 +199,17 @@ export default function Base44_DTO() {
     setLoadingProfile(false);
     setSearch("");
   }
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (mailMode || params.get("browse") !== "1" || !directoryRef.current) return;
+    directoryRef.current.open = true;
+    directoryRef.current.scrollIntoView({block: "nearest"});
+    if (params.get("search") === "1") searchRef.current?.focus();
+    navigate("/Base44_DTO", {replace: true, state: location.state});
+  }, [location.search, location.state, mailMode, navigate]);
   async function messageProfile() {
-    if (!canMessage || sending) return;
-    const version = selectionVersion.current;
-    setSending(true);
-    try {
-      const conversation = await chatApi.openDm(viewed.email);
-      if (!conversation?.id) throw new Error("Could not open that conversation.");
-      if (version === selectionVersion.current) openChatDock(conversation.id);
-    } catch (messageError) {
-      toast.error(messageError.message);
-    } finally {
-      setSending(false);
-    }
+    if (!canMessage) return;
+    navigate(`/Base44_DTO?mail=1&to=${encodeURIComponent(viewed.email)}`);
   }
   function closeSpace() {
     selectionVersion.current++;
@@ -205,16 +241,36 @@ export default function Base44_DTO() {
     }
   }
   useEffect(() => {
-    if (isAuthenticated) void loadDirectory();
+    if (isAuthenticated && !mailMode) void loadDirectory();
     return () => { selectionVersion.current++; };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, mailMode]);
+  useEffect(() => {
+    const email = String(user?.email || "").trim().toLowerCase();
+    if (!email || email === draftOwnerEmail.current) return;
+    draftOwnerEmail.current = email;
+    setDraft(initialDraft(user));
+  }, [user, user?.email]);
+  useEffect(() => {
+    let flushed = false;
+    function flushDraft() {
+      if (flushed) return;
+      flushed = true;
+      const saveError = persistLocalDraft(draftStorageKey, draftRef.current);
+      if (saveError) console.error("[retro] Could not flush the local draft:", saveError.message);
+    }
+    window.addEventListener("pagehide", flushDraft);
+    return () => {
+      window.removeEventListener("pagehide", flushDraft);
+      flushDraft();
+    };
+  }, [draftStorageKey]);
   useEffect(() => {
     const timer = setTimeout(() => {
-      try { localStorage.setItem(scopedKey(DRAFT_KEY), JSON.stringify(draft)); }
-      catch (saveError) { toast.error(`Could not save your local draft: ${saveError.message}`); }
+      const saveError = persistLocalDraft(draftStorageKey, draft);
+      if (saveError) toast.error(`Could not save your local draft: ${saveError.message}`);
     }, 750);
     return () => clearTimeout(timer);
-  }, [draft]);
+  }, [draft, draftStorageKey]);
 
   async function visit(email) {
     const version = ++selectionVersion.current;
@@ -277,7 +333,7 @@ export default function Base44_DTO() {
   }
   if (!isAuthenticated) return <p className="p-6">Sign in to visit retro profiles.</p>;
   return (
-    <div style={RETRO_THEME} className={`relative isolate min-h-screen px-2 py-3 text-[#16345d] sm:px-4 [&_input]:bg-[#ffffff] [&_textarea]:bg-[#ffffff] ${preview && !editing ? "bg-transparent" : "bg-[#e5efff]"}`}>
+    <div style={RETRO_THEME} className={`relative isolate min-h-screen px-2 py-3 text-[#16345d] sm:px-4 [&_input]:bg-[#ffffff] [&_textarea]:bg-[#ffffff] ${preview && !editing || mailMode ? "bg-transparent" : "bg-[#e5efff]"}`}>
       <div className={`relative z-10 mx-auto w-full ${preview && !editing ? "max-w-[1100px]" : "max-w-[1000px]"}`}>
       <header className="w-full border border-[#76a4de] bg-[#022e90] px-3 py-2 text-white">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -286,7 +342,7 @@ export default function Base44_DTO() {
           </h1>
           <div className="flex flex-wrap items-center gap-2">
             {isOwnProfileView && <Button size="sm" variant="secondary" onClick={editOwnProfile}>Edit my profile</Button>}
-            {!editing && preview && viewed?.email && viewed.email !== user.email && <ProfileActions name={viewed.name} onMessage={messageProfile} canMessage={canMessage} sending={sending} />}
+            {!editing && preview && viewed?.email && viewed.email !== user.email && <ProfileActions name={viewed.name} onMessage={messageProfile} canMessage={canMessage} />}
             <Button size="sm" variant="secondary" onClick={closeSpace}><ArrowLeft className="mr-2 h-4 w-4" />Back to EnQuote</Button>
           </div>
         </div>
@@ -296,16 +352,18 @@ export default function Base44_DTO() {
           <Button size="sm" variant="secondary" onClick={editDraft}>Edit my space</Button>
           <Button size="sm" variant="secondary" disabled={loadingProfile} onClick={() => visit(user.email)}>View my page</Button>
           <Button size="sm" variant="secondary" disabled={busy} onClick={() => loadDirectory()}>Refresh friends</Button>
-          <Button size="sm" variant="secondary" asChild><a href="https://layouts.spacehey.com/" target="_blank" rel="noopener noreferrer">Browse coded themes</a></Button>
+          <Button size="sm" variant="secondary" asChild><a href="https://layouts.spacehey.com/" target="_blank" rel="noopener noreferrer">SpaceHey themes</a></Button>
+          <Button size="sm" variant="secondary" asChild><a href="https://www.pimp-my-profile.com/myspace-layouts/" target="_blank" rel="noopener noreferrer">Pimp My Profile themes</a></Button>
           {profiles.some((profile) => profile.email === user.email) && <Button size="sm" variant="secondary" disabled={busy} onClick={remove}>Remove my shared page</Button>}
         </div>
         {preview && !editing && <div className="mt-2 flex gap-2"><Button size="sm" variant="secondary" onClick={() => setAnimate((value) => !value)}>{animate ? "Pause CSS animations" : "Enable CSS animations"}</Button><Button size="sm" variant="secondary" onClick={() => setPreview(null)}>Stop preview</Button></div>}
         </details>
-        <NavigationQuicklinks onHome={home} onBrowse={() => browse()} onSearch={() => browse(true)}
-          onMail={() => navigate("/Messages")} canMail={canMail} />
+        <NavigationQuicklinks onHome={() => navigateFromMail("home")}
+          onBrowse={() => navigateFromMail("browse")} onSearch={() => navigateFromMail("search")}
+          onMail={() => navigate("/Base44_DTO?mail=1")} />
       </header>
-      {error && <div role="alert" className="mb-4 rounded border border-red-400 bg-white p-3 text-red-800">{error}</div>}
-      <div className={preview && !editing ? "" : "space-y-3"}>
+      {error && !mailMode && <div role="alert" className="mb-4 rounded border border-red-400 bg-white p-3 text-red-800">{error}</div>}
+      {mailMode ? <MailCenter initialRecipient={mailRecipient} appearance={draft.appearance} themeCode={draft.css} /> : <div className={preview && !editing ? "" : "space-y-3"}>
         <details aria-label="Profile directory" ref={directoryRef} key={preview ? "viewing" : "browsing"} open={preview ? undefined : true} className={`border border-[#76a4de] bg-white ${preview && !editing ? "hidden [&[open]]:block" : ""}`}>
           <summary className="cursor-pointer bg-[#ffdbb6] px-3 py-2 text-sm font-bold">Your friends&apos; spaces</summary>
           <div className="p-3">
@@ -339,9 +397,9 @@ export default function Base44_DTO() {
                   onClick={() => setDraft({...draft, appearance: value === "theme" ? (draft.appearance === "imported-raw" ? "imported-raw" : "imported") : value})}>{label}</Button>)}
               </div>
               <div className="space-y-2 rounded border border-dashed border-[#76a4de] bg-white p-3 text-sm">
-                <p className="font-bold">Use a theme from SpaceHey</p>
+                <p className="font-bold">Use a theme from SpaceHey or Pimp My Profile</p>
                 <ol className="list-decimal space-y-0.5 pl-5 text-xs">
-                  <li><a href="https://layouts.spacehey.com/" target="_blank" rel="noopener noreferrer" className="font-bold underline">Browse layouts</a> and open one you like.</li>
+                  <li>Browse <a href="https://layouts.spacehey.com/" target="_blank" rel="noopener noreferrer" className="font-bold underline">SpaceHey</a> or <a href="https://www.pimp-my-profile.com/myspace-layouts/" target="_blank" rel="noopener noreferrer" className="font-bold underline">Pimp My Profile</a>, then open a layout you like.</li>
                   <li>Copy all of the code in its code box.</li>
                   <li>Click <strong>Paste theme</strong> (or paste into the box below).</li>
                 </ol>
@@ -395,9 +453,9 @@ export default function Base44_DTO() {
             <iframe ref={profileFrameRef} key={pictureKey} title="Isolated retro profile preview" sandbox={ownerEmail ? "allow-scripts" : ""} referrerPolicy="no-referrer" srcDoc={source} className={`block w-full border-0 ${editing ? "bg-white h-[600px]" : "bg-transparent h-[calc(100vh-180px)] min-h-[400px]"}`} />
           </div> : !loadingProfile && !preview && <div className="border-2 border-[#76a4de] bg-white p-10 text-center"><h2 className="text-xl font-bold">You&apos;ve found the secret space.</h2><p>Visit a friend or customize your own profile.</p></div>}
         </section>
+      </div>}
       </div>
-      </div>
-      {preview && !editing && <iframe title="Profile theme background" aria-hidden="true" tabIndex={-1} sandbox="" referrerPolicy="no-referrer" srcDoc={backgroundSource} className="pointer-events-none fixed inset-0 z-0 h-screen w-screen border-0" />}
+      {(preview && !editing || mailMode) && <iframe title="Profile theme background" aria-hidden="true" tabIndex={-1} sandbox="" referrerPolicy="no-referrer" srcDoc={mailMode ? mailThemeSource : backgroundSource} className="pointer-events-none fixed inset-0 z-0 h-screen w-screen border-0" />}
     </div>
   );
 }

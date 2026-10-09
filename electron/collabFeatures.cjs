@@ -7,6 +7,13 @@ const { createChatService } = require("./chatService.cjs");
 const { createProfileService } = require("./profileService.cjs");
 const { setupAdminFeatures } = require("./adminFeatures.cjs");
 const {createOneNoteImport} = require("./oneNoteImport.cjs");
+const {createRefundWorkbook} = require("./refundWorkbook.cjs");
+const {createRefundFormWindow} = require("./refundFormWindow.cjs");
+const {createRefundCsv} = require("./refundCsv.cjs");
+const {createRefundCsvSource} = require("./refundCsvSource.cjs");
+const {createRefundSubmission} = require("./refundSubmission.cjs");
+const refundFeature = require("../shared/refundFeature.json");
+const {BrowserWindow, WebContentsView, session} = require("electron");
 
 const PREVIEW_LENGTH = 140;
 
@@ -47,6 +54,20 @@ function setupCollabFeatures({
     getOutboundToken,
     getUserToken: () => userToken,
     getAccessHeaders
+  });
+  const refundWorkbook = createRefundWorkbook({ storageDir, dialog, getMainWindow, getEmail, client, logger });
+  const refundSubmission = createRefundSubmission({storageDir, getEmail, client, workbook: refundWorkbook});
+  const refundCsv = createRefundCsv({storageDir, dialog, getMainWindow, getEmail, client});
+  const refundCsvSource = createRefundCsvSource({
+    storageDir, dialog, getMainWindow, getEmail, client, logger,
+    onChanged: (payload) => {
+      sendToRenderer("refundRequests:sourceChanged", payload);
+      sendToRenderer("refundRequests:changed", {});
+    }
+  });
+  const refundForm = createRefundFormWindow({
+    BrowserWindow, WebContentsView, session, getMainWindow, getEmail, logger,
+    onStatus: (payload) => sendToRenderer("refundRequests:formStatus", payload)
   });
 
   function sendToRenderer(channel, payload) {
@@ -160,6 +181,10 @@ function setupCollabFeatures({
   // a readable message rather than Electron's "Error invoking remote method" wrapper.
   function handle(channel, fn) {
     ipcMain.handle(channel, async (_event, ...args) => {
+      if (!refundFeature.enabled && (channel.startsWith("refundRequests:") || channel.startsWith("refundWorkbook:")) &&
+          !["refundRequests:hideForm"].includes(channel)) {
+        return {ok: false, error: "Refund features are temporarily disabled pending the approved integration.", reason: "feature_disabled"};
+      }
       try {
         const result = await fn(...args);
         return result && typeof result === "object" && "ok" in result ? result : { ok: true, ...(result === undefined ? {} : { result }) };
@@ -173,6 +198,30 @@ function setupCollabFeatures({
   handle("tasks:save", (record) => ({ ok: true, task: tasks.save(record) }));
   handle("tasks:delete", (id) => ({ ok: tasks.remove(String(id || "")) }));
   handle("tasks:syncNow", () => tasks.sync());
+
+  handle("refundRequests:list", () => client.get("/api/refund-requests"));
+  handle("refundRequests:submit", (payload) => client.post("/api/refund-requests/submit", payload || {}));
+  handle("refundRequests:update", (payload) => client.post("/api/refund-requests/update", payload || {}));
+  handle("refundRequests:openForm", (url) => refundForm.open(url));
+  handle("refundRequests:showForm", (url, bounds) => refundForm.show(url, bounds));
+  handle("refundRequests:hideForm", () => refundForm.hide());
+  handle("refundRequests:csvStatus", () => refundCsv.status());
+  handle("refundRequests:selectCsv", () => refundCsv.select());
+  handle("refundRequests:submitNative", (payload) => refundCsv.submit(payload));
+  handle("refundRequests:retryCsv", () => refundCsv.retry());
+  handle("refundRequests:sourceStatus", () => refundCsvSource.status());
+  handle("refundRequests:trackerStatus", () => refundSubmission.status());
+  handle("refundRequests:connectTracker", () => refundSubmission.select());
+  handle("refundRequests:submitToTracker", (payload) => refundSubmission.submit(payload));
+  handle("refundRequests:retryTracker", () => refundSubmission.retry());
+  handle("refundRequests:selectSource", () => refundCsvSource.select());
+  handle("refundRequests:syncSource", () => refundCsvSource.sync());
+  handle("refundWorkbook:status", () => refundWorkbook.status());
+  handle("refundWorkbook:select", () => refundWorkbook.select());
+  handle("refundWorkbook:sync", () => refundWorkbook.sync());
+  handle("refundWorkbook:syncStatus", () => refundWorkbook.syncStatus());
+  handle("refundWorkbook:resolveConflict", (payload) =>
+    refundWorkbook.resolveConflict(payload?.externalResponseId, payload?.field, payload?.choice));
 
   handle("sops:list", () => ({ ok: true, sops: sops.list() }));
   handle("sops:sync", () => sops.sync());
@@ -218,6 +267,11 @@ function setupCollabFeatures({
   handle("profiles:setAvatar", (payload) => profiles.setAvatar(payload || {}));
   handle("profiles:removeAvatar", () => profiles.removeAvatar());
   handle("profiles:getAvatar", (avatarId) => profiles.getAvatar(String(avatarId || "")));
+  handle("retroMail:list", (folder) => client.get("/api/retro-mail", {folder: String(folder || "inbox")}));
+  handle("retroMail:contacts", () => client.get("/api/retro-mail", {folder: "contacts"}));
+  handle("retroMail:send", (message) => client.post("/api/retro-mail/send", message || {}));
+  handle("retroMail:setState", (payload) => client.post("/api/retro-mail/state", payload || {}));
+  handle("retroMail:delete", (id) => client.post("/api/retro-mail/delete", {id: String(id || "")}));
   handle("gifs:search", (payload) => client.get("/api/gifs/search", { q: payload?.q || "", offset: payload?.offset || 0 }));
   handle("gifs:trending", (payload) => client.get("/api/gifs/trending", { offset: payload?.offset || 0 }));
 
@@ -243,6 +297,7 @@ function setupCollabFeatures({
       if (inboxKey && message.key === inboxKey) return tasks.sync();
       return undefined;
     },
+    refund_requests_updated: () => sendToRenderer("refundRequests:changed", {}),
     sops_updated: () => sops.sync(),
     inbox_updated: (message) => {
       if (inboxKey && Array.isArray(message.keys) && message.keys.includes(inboxKey)) {
@@ -252,6 +307,11 @@ function setupCollabFeatures({
       return undefined;
     },
     profiles_updated: () => profiles.changed(),
+    retro_mail_updated: (message) => {
+      if (inboxKey && Array.isArray(message.keys) && message.keys.includes(inboxKey)) {
+        sendToRenderer("retroMail:changed", {});
+      }
+    },
     ...admin.realtimeHandlers
   };
 
@@ -279,6 +339,8 @@ function setupCollabFeatures({
   }
 
   function stop() {
+    refundCsvSource.stop();
+    refundForm.close();
     started = false;
     tasks.stop();
     sops.stop();

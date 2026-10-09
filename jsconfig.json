@@ -3,7 +3,8 @@
     "baseUrl": "",
     "ignoreDeprecations": "5.0",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "enquote-refund-form": ["./shared/refundForm.cjs"]
     },
     "jsx": "react-jsx",
     "module": "esnext",

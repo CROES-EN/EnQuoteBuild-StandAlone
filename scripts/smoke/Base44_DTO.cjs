@@ -1,8 +1,16 @@
+/* global process */
+
 const assert = require("node:assert/strict");
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function runRetro(win) {
-  const evaluate = (code) => win.webContents.executeJavaScript(code);
+  const evaluate = async (code) => {
+    try {
+      return await win.webContents.executeJavaScript(code);
+    } catch (error) {
+      throw new Error(`Renderer evaluation failed (${String(code).slice(0, 400)}): ${error.message}`);
+    }
+  };
   async function waitFor(code, description) {
     const deadline = Date.now() + 10000;
     while (Date.now() < deadline) {
@@ -52,6 +60,8 @@ async function runRetro(win) {
   })()`);
   await setThemeCode("https://layouts.spacehey.com/layout?id=611");
   await waitFor(`document.body.innerText.includes("That's a link to the layout")`, "link guidance");
+  await setThemeCode("https://www.pimp-my-profile.com/myspace-layouts/");
+  await waitFor(`document.querySelector('textarea[aria-label="Theme code"]')?.value === "https://www.pimp-my-profile.com/myspace-layouts/" && document.body.innerText.includes("That's a link to the layout")`, "Pimp My Profile link guidance");
   await setThemeCode('<!-- layout created by Smoke Tester (thanks) --><style>body{background:url("https://example.invalid/bg.gif") rgb(60,50,40)}.profile-pic:after{background-image:url("https://example.invalid/theme-pfp.gif");content:"";display:inline-block}</style>\nCODE BELOW GOES HERE\n<img src="giforimageurl">');
   await waitFor(`document.querySelector('button[aria-pressed="true"]')?.textContent.trim() === "My theme"`, "theme selected automatically");
   const summary = await evaluate(`[...document.querySelectorAll('[role="status"]')].find((item) => item.textContent.includes("Theme added"))?.textContent || ""`);
@@ -226,6 +236,7 @@ async function runRetro(win) {
   win.webContents.sendInputEvent({type: "keyUp", keyCode: "Escape"});
   await waitFor(`document.querySelector('[role="menu"][data-state="open"]') === null`, "closed theme menu");
   assert.equal(await evaluate(`document.querySelector('a[href="https://layouts.spacehey.com/"]').getAttribute("rel")`), "noopener noreferrer");
+  assert.equal(await evaluate(`document.querySelector('a[href="https://www.pimp-my-profile.com/myspace-layouts/"]').getAttribute("rel")`), "noopener noreferrer");
   async function checkPastedStyles(html, css, expectedColor) {
     await evaluate(`(() => {
       const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set;
@@ -341,26 +352,57 @@ async function runRetro(win) {
   })()`);
   await waitFor(`location.hash === "#/Base44_DTO" && [...document.querySelectorAll("strong")].some((item) => item.textContent === "Retro Teammate")`, "shared teammate directory");
   await evaluate(`[...document.querySelectorAll("button")].find((button) => button.querySelector("strong")?.textContent === "Retro Teammate").click()`);
-  await waitFor(`Boolean(document.querySelector('section[aria-label="Profile contact quicklinks"]'))`, "teammate send message");
-  await click("Send Message");
-  await waitFor(`location.hash === "#/Messages?c=smoke-chat"`, "teammate DM");
-  assert.equal(await evaluate("window.__smokeDmEmail"), "teammate@example.invalid");
-  await evaluate(`(() => {
-    for (const key of ["ArrowLeft","ArrowDown","ArrowRight","ArrowUp","ArrowLeft","ArrowDown","ArrowRight","ArrowUp"]) document.body.dispatchEvent(new KeyboardEvent("keydown", {key,bubbles:true}));
-  })()`);
-  await waitFor(`location.hash === "#/Base44_DTO" && [...document.querySelectorAll("strong")].some((item) => item.textContent === "Retro Teammate")`, "reopened directory");
-  await evaluate(`[...document.querySelectorAll("button")].find((button) => button.querySelector("strong")?.textContent === "Retro Teammate").click()`);
-  await waitFor(`Boolean(document.querySelector('section[aria-label="Profile contact quicklinks"]'))`, "send message again");
-  await click("Send Message");
-  await waitFor(`location.hash === "#/Messages?c=smoke-chat"`, "repeat DM");
-  await evaluate(`(() => {
-    for (const key of ["ArrowLeft","ArrowDown","ArrowRight","ArrowUp","ArrowLeft","ArrowDown","ArrowRight","ArrowUp"]) document.body.dispatchEvent(new KeyboardEvent("keydown", {key,bubbles:true}));
-  })()`);
-  await waitFor(`location.hash === "#/Base44_DTO" && Boolean(document.querySelector('nav[aria-label="EnQuote Space quicklinks"]'))`, "mail navigation");
+  await waitFor(`Boolean(document.querySelector('section[aria-label="Profile contact quicklinks"]'))`, "teammate mail action");
+  await click("Send Mail");
+  await waitFor(`location.hash.includes("#/Base44_DTO?mail=1&to=teammate%40example.invalid")`, "separate mail composer");
+  assert.equal(await evaluate(`document.querySelector('input[type="email"]')?.value`), "teammate@example.invalid");
+  assert.equal(await evaluate(`document.querySelector("form h2")?.textContent`), "New message");
+  assert.equal(await evaluate(`window.__smokeDmEmail || ""`), "", "sending profile mail does not open Messages");
+  await click("Home");
+  await waitFor(`location.hash === "#/Base44_DTO" && Boolean(document.querySelector('nav[aria-label="EnQuote Space quicklinks"]'))`, "profile mail navigation");
+  await click("Browse");
+  await waitFor(`!document.querySelector('[aria-label="Mail Center"]') && document.querySelector('details[aria-label="Profile directory"]')?.open`, "Browse redirects out of Mail");
+  await click("Search");
+  assert.equal(await evaluate(`document.activeElement.getAttribute("aria-label")`), "Search retro profiles", "Search redirects out of Mail and focuses profile search");
   await click("Mail");
-  await waitFor(`location.hash === "#/Messages"`, "Mail opens Messages");
+  await waitFor(`location.hash === "#/Base44_DTO?mail=1" && document.body.innerText.includes("Mail Center")`, "independent Mail Center");
+  assert.equal(await evaluate(`Boolean(document.querySelector('nav[aria-label="EnQuote Space quicklinks"]') && document.querySelector('header img[alt="A place for friends"]'))`), true, "Mail remains inside the main Enspace navigation and header");
+  assert.equal(await evaluate(`Boolean([...document.querySelectorAll("button")].some((button) => button.textContent.trim() === "Back to profile"))`), false, "Mail has no separate Back to profile button");
+  const mailTheme = await evaluate(`(() => ({
+    appearance: document.querySelector('[aria-label="Mail Center"]')?.dataset.appearance,
+    surface: getComputedStyle(document.querySelector(".eq-mail__frame")).backgroundColor,
+    backdrop: document.querySelector('iframe[title="Profile theme background"]')?.srcdoc.includes("background: pink")
+  }))()`);
+  assert.equal(mailTheme.appearance, "gothic", "Mail inherits the current Enspace appearance setting");
+  assert.match(mailTheme.surface, /^rgba\(25, 21, 32, 0\.94\)$/);
+  assert.equal(mailTheme.backdrop, true, "The selected custom Enspace backdrop is retained in Mail");
+  assert.equal(await evaluate(`document.querySelector("form") === null`), true, "opening the Mail Center does not open a Messages composer");
+  await click("Browse");
+  await waitFor(`!document.querySelector('[aria-label="Mail Center"]') && document.querySelector('details[aria-label="Profile directory"]')?.open`, "Browse redirects out of Mail");
+  await click("Search");
+  assert.equal(await evaluate(`document.activeElement.getAttribute("aria-label")`), "Search retro profiles");
+  await click("Home");
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll("button")].find((item) => item.textContent.trim() === "Edit my space");
+    button?.closest("details")?.setAttribute("open", "");
+  })()`);
+  await click("Edit my space");
+  await waitFor(`[...document.querySelectorAll("label")].some((label) => label.textContent.startsWith("CSS") && label.querySelector("textarea"))`, "CSS editor after returning from Mail Center");
+  const flushProbe = ".smoke-flush-probe{color:rgb(17,34,51)}";
+  await evaluate(`(() => {
+    const field = [...document.querySelectorAll("label")].find((label) => label.textContent.startsWith("CSS"))?.querySelector("textarea");
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set;
+    setter.call(field, field.value + ${JSON.stringify(flushProbe)});
+    field.dispatchEvent(new Event("input", {bubbles:true}));
+  })()`);
+  await click("Back to EnQuote");
+  const persistedDraft = await evaluate(`(() => {
+    const entry = Object.entries(localStorage).find(([key]) => key.startsWith("enquote_retro_draft_v1::"));
+    return entry ? JSON.parse(entry[1]).css : "";
+  })()`);
+  assert.ok(persistedDraft.includes(flushProbe), "leaving the editor immediately flushes the latest local draft");
   assert.deepEqual(await evaluate("window.__smokeErrors"), []);
-  console.log("ok   Retro: sizing, secret arrows, editor, isolated code, Tom tribute, return navigation, search/browse, disabled links, teammate DM");
+  console.log("ok   Retro: sizing, secret arrows, editor, isolated code, Tom tribute, return navigation, search/browse, separate mail and durable local draft");
 }
 
 module.exports = {runRetro};

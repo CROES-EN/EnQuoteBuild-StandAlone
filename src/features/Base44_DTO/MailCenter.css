@@ -1,0 +1,211 @@
+.eq-mail {
+  --mail-accent: #3158a7;
+  --mail-accent-strong: #23458d;
+  --mail-border: #d6dfeb;
+  --mail-muted: #61758f;
+  --mail-surface: #fff;
+  --mail-sidebar: #f9fbfd;
+  --mail-toolbar: #edf3f9;
+  --mail-notice: #d8eafa;
+  --mail-highlight: #dceafa;
+  font-family: Tahoma, Verdana, Arial, sans-serif;
+  font-size: 12px;
+}
+
+.eq-mail__frame {
+  background: var(--mail-surface);
+  border-color: var(--mail-border);
+  color: #172c4c;
+  box-shadow: 1px 2px 5px rgba(22, 52, 93, .25), inset 0 1px #fff;
+}
+
+.eq-mail__titlebar {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--mail-accent) 88%, #fff), var(--mail-accent));
+  color: #fff;
+  min-height: 45px;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, .35);
+}
+
+.eq-mail__titlebar button {
+  background: #fff;
+  color: var(--mail-accent);
+}
+
+.eq-mail__masthead {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.eq-mail__sidebar,
+.eq-mail__list,
+.eq-mail__reader {
+  border-color: var(--mail-border);
+}
+
+.eq-mail__sidebar {
+  background: linear-gradient(180deg, var(--mail-sidebar), color-mix(in srgb, var(--mail-sidebar) 92%, var(--mail-accent)));
+}
+
+.eq-mail__toolbar {
+  background: linear-gradient(180deg, #fff, var(--mail-toolbar));
+  border-color: var(--mail-border);
+}
+
+.eq-mail__notice {
+  background: var(--mail-notice);
+  border-color: var(--mail-border);
+  box-shadow: inset 0 1px rgba(255, 255, 255, .65);
+}
+
+.eq-mail__compose {
+  background: var(--mail-accent);
+  color: #fff;
+  border: 1px solid color-mix(in srgb, var(--mail-accent) 75%, #000);
+  border-radius: 3px;
+  box-shadow: inset 0 1px rgba(255, 255, 255, .25);
+}
+
+.eq-mail__compose:hover {
+  background: var(--mail-accent-strong);
+}
+
+.eq-mail__folder {
+  color: #173d7c;
+}
+
+.eq-mail__folder:not(.is-active):hover,
+.eq-mail__items > *:hover {
+  background: #edf3fa;
+}
+
+.eq-mail__folder.is-active {
+  background: #dceafa;
+  box-shadow: inset 1px 1px #c0d4ed;
+  color: #173d7c;
+}
+
+.eq-mail__list {
+  background: #fff;
+}
+
+.eq-mail__items > * {
+  border-color: #e3e9f0;
+}
+
+.eq-mail__reader {
+  background: #fff;
+}
+
+.eq-mail__empty,
+.eq-mail__muted {
+  color: var(--mail-muted);
+}
+
+.eq-mail__link {
+  color: #244f94;
+}
+
+.eq-mail__reader input,
+.eq-mail__reader textarea {
+  border: 1px solid #9db3cb;
+  border-radius: 2px;
+}
+
+.eq-mail[data-appearance="gothic"],
+.eq-mail[data-appearance="imported"] {
+  --mail-accent: #49365c;
+  --mail-accent-strong: #604778;
+  --mail-border: #675572;
+  --mail-muted: #c5b8d0;
+  --mail-surface: rgba(25, 21, 32, .94);
+  --mail-sidebar: rgba(34, 29, 43, .96);
+  --mail-toolbar: rgba(50, 42, 62, .96);
+  --mail-notice: rgba(64, 49, 78, .96);
+  --mail-highlight: rgba(91, 67, 112, .85);
+  color: #f4effa;
+}
+
+.eq-mail[data-appearance="gothic"] .eq-mail__frame,
+.eq-mail[data-appearance="imported"] .eq-mail__frame,
+.eq-mail[data-appearance="gothic"] .eq-mail__sidebar,
+.eq-mail[data-appearance="imported"] .eq-mail__sidebar,
+.eq-mail[data-appearance="gothic"] .eq-mail__list,
+.eq-mail[data-appearance="imported"] .eq-mail__list,
+.eq-mail[data-appearance="gothic"] .eq-mail__reader,
+.eq-mail[data-appearance="imported"] .eq-mail__reader {
+  background-color: var(--mail-surface);
+  color: #f4effa;
+}
+
+.eq-mail[data-appearance="gothic"] .eq-mail__sidebar,
+.eq-mail[data-appearance="imported"] .eq-mail__sidebar {
+  background-color: var(--mail-sidebar);
+}
+
+.eq-mail[data-appearance="gothic"] .eq-mail__toolbar,
+.eq-mail[data-appearance="imported"] .eq-mail__toolbar {
+  background-color: var(--mail-toolbar);
+}
+
+.eq-mail[data-appearance="gothic"] .eq-mail__notice,
+.eq-mail[data-appearance="imported"] .eq-mail__notice {
+  background-color: var(--mail-notice);
+}
+
+.eq-mail[data-appearance="gothic"] .eq-mail__frame :where(*),
+.eq-mail[data-appearance="imported"] .eq-mail__frame :where(*) {
+  color: #f4effa !important;
+  border-color: var(--mail-border);
+}
+
+.eq-mail[data-appearance="gothic"] .eq-mail__titlebar,
+.eq-mail[data-appearance="imported"] .eq-mail__titlebar,
+.eq-mail[data-appearance="gothic"] .eq-mail__compose,
+.eq-mail[data-appearance="imported"] .eq-mail__compose,
+.eq-mail[data-appearance="gothic"] .eq-mail__badge,
+.eq-mail[data-appearance="imported"] .eq-mail__badge {
+  color: #fff !important;
+}
+
+.eq-mail[data-appearance="gothic"] .eq-mail__titlebar button,
+.eq-mail[data-appearance="imported"] .eq-mail__titlebar button {
+  color: var(--mail-accent) !important;
+}
+
+.eq-mail[data-appearance="gothic"] .eq-mail__compose,
+.eq-mail[data-appearance="imported"] .eq-mail__compose,
+.eq-mail[data-appearance="gothic"] .eq-mail__badge,
+.eq-mail[data-appearance="imported"] .eq-mail__badge {
+  background-color: var(--mail-accent);
+}
+
+.eq-mail[data-appearance="gothic"] .eq-mail__items > *,
+.eq-mail[data-appearance="imported"] .eq-mail__items > * {
+  background-color: transparent !important;
+}
+
+.eq-mail[data-appearance="gothic"] .eq-mail__folder.is-active,
+.eq-mail[data-appearance="imported"] .eq-mail__folder.is-active,
+.eq-mail[data-appearance="gothic"] .eq-mail__items > *:hover,
+.eq-mail[data-appearance="imported"] .eq-mail__items > *:hover {
+  background-color: var(--mail-highlight) !important;
+}
+
+.eq-mail[data-appearance="gothic"] .eq-mail__muted,
+.eq-mail[data-appearance="imported"] .eq-mail__muted {
+  color: var(--mail-muted) !important;
+}
+
+.eq-mail[data-appearance="gothic"] .eq-mail__error,
+.eq-mail[data-appearance="imported"] .eq-mail__error {
+  background: #4b1f2b !important;
+  color: #ffdce2 !important;
+}
+
+.eq-mail[data-appearance="gothic"] input,
+.eq-mail[data-appearance="gothic"] textarea,
+.eq-mail[data-appearance="imported"] input,
+.eq-mail[data-appearance="imported"] textarea {
+  background: #fff !important;
+  color: #172c4c !important;
+}

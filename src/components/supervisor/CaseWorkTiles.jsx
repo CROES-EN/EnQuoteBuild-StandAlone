@@ -14,7 +14,7 @@ import {isReadonlyViewing} from "@/features/admin/readonlyViewing";
 import {AGGREGATION_MODE_OPTIONS} from "@/features/supervisorDashboard/periodAggregation";
 import {getStatusLabel} from "@/constants/quoteStatuses";
 import {createPageUrl} from "@/utils";
-import {hasValidQuoteTotal} from "@/features/supervisorDashboard/paidQuoteMetrics";
+import {getQuotePaidDate, hasValidQuoteTotal} from "@/features/supervisorDashboard/paidQuoteMetrics";
 
 const TEAM_KEY = "enquote_case_work_team_v1";
 
@@ -81,7 +81,7 @@ export default function CaseWorkTile({label, value, subtitle, records = [], load
         <p className="text-sm text-muted-foreground">{subtitle} {records.length} contributing rows. {quotes ? "Each current quote is counted once." : "Distinct-case counts may be smaller than the number of events."}</p>
         <Table>
           <TableHeader><TableRow>
-            {(quotes ? ["Quote", "Status", "Quote Total (USD)", "Case", "Site"] : payment ? ["Invoice", "Paid Date", "Amount Paid", "Currency", "Case", "Site"] :
+            {(quotes ? ["Quote", "Status", "Paid Date", "Quote Total (USD)", "Case", "Site"] : payment ? ["Invoice", "Paid Date", "Amount Paid", "Currency", "Case", "Site"] :
               ["Case", "Site", "Edit Date", "Event", "Old Value", "New Value", "Edited By", "Qualification / Review Reason"])
               .map(header => <TableHead key={header}>{header}</TableHead>)}
           </TableRow></TableHeader>
@@ -89,6 +89,7 @@ export default function CaseWorkTile({label, value, subtitle, records = [], load
             {quotes ? <>
               <TableCell><Link className="text-primary underline" to={createPageUrl(`QuoteDetails?id=${encodeURIComponent(event.id)}`)}>{event.quote_number || event.id}</Link></TableCell>
               <TableCell>{getStatusLabel(event.status) || event.status}</TableCell>
+              <TableCell>{getQuotePaidDate(event)}</TableCell>
               <TableCell>{!hasValidQuoteTotal(event) ? "Missing/invalid total" : new Intl.NumberFormat(undefined, {style: "currency", currency: "USD"}).format(Number(event.total))}</TableCell>
               <TableCell><CaseNumberLink caseNumber={event.case_number} /></TableCell>
               <TableCell><SiteIdLink siteId={event.site_id} /></TableCell>

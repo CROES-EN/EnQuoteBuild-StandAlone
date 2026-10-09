@@ -74,6 +74,7 @@ import {openChatDock} from "@/features/collab/chatDockState";
 import {ProfilePicturePicker, UserAvatar} from "@/components/profile/UserAvatar";
 import {isReadonlyViewing} from "@/features/admin/readonlyViewing";
 import {applySidebarOrder, readSidebarOrder, writeSidebarOrder} from "@/lib/sidebarOrder";
+import {userDisplayName} from "@/utils/userDisplayName";
 
 const isDemoMode = ["mock", "local", "salesforce-mock"].includes(import.meta.env.VITE_DATA_SOURCE);
 const appVersion = appPackage?.version || "0.0.0";
@@ -658,20 +659,20 @@ export default function Layout({ children, currentPageName }) {
           <div className="p-4 border-t border-sidebar-border space-y-3">
             {isLocalAuthActive && user?.email && (
               <div
-                title={sidebarCollapsed ? `${user.full_name || user.email} - Switch account` : undefined}
+                title={sidebarCollapsed ? `${(userDisplayName(user) || user.email)} - Switch account` : undefined}
                 className={cn(
                   "rounded-xl bg-sidebar-accent transition",
                   sidebarCollapsed ? "flex w-full items-center justify-center p-0" : "w-full px-4 py-2.5"
                 )}
               >
                 {sidebarCollapsed ? (
-                  readonlyViewing ? <UserAvatar email={user.email} name={user.full_name || user.email} /> : <ProfilePicturePicker email={user.email} name={user.full_name || user.email} compact />
+                  readonlyViewing ? <UserAvatar email={user.email} name={(userDisplayName(user) || user.email)} /> : <ProfilePicturePicker email={user.email} name={(userDisplayName(user) || user.email)} compact />
                 ) : (
                   <div className="flex items-center gap-3">
-                    {readonlyViewing ? <UserAvatar email={user.email} name={user.full_name || user.email} size={42} /> : <ProfilePicturePicker email={user.email} name={user.full_name || user.email} />}
+                    {readonlyViewing ? <UserAvatar email={user.email} name={(userDisplayName(user) || user.email)} size={42} /> : <ProfilePicturePicker email={user.email} name={(userDisplayName(user) || user.email)} />}
                     <button type="button" disabled={readonlyViewing} onClick={handleSwitchAccount} className="min-w-0 text-left">
                       <p className="text-xs text-muted-foreground">{readonlyViewing ? "Viewing as" : "Signed in as"}</p>
-                      <p className="text-sm font-medium text-sidebar-foreground truncate">{user.full_name || user.email}</p>
+                      <p className="text-sm font-medium text-sidebar-foreground truncate">{(userDisplayName(user) || user.email)}</p>
                       <p className="text-xs text-primary mt-0.5">{readonlyViewing ? "Read-only viewing mode" : "Switch account"}</p>
                     </button>
                   </div>

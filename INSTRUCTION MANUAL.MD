@@ -233,9 +233,15 @@ Drill-downs retain qualifying history rows for audit and load 100 rows at a time
 value in USD. Both use live EnQuote quotes currently in exactly these statuses:
 Invoice Paid, Invoice Paid - Materials Required, Materials Pending Shipment,
 or Scheduled. Only current versions not excluded from reporting qualify.
-Both are current snapshots across all dates: the Reporting Period, Latest Day,
-and Daily Average controls do not change them. Each includes contributing quote
-links, current status, case/site identifiers, and quote totals for audit.
+Both filter by recorded invoice paid date within the inclusive Reporting Period.
+The preferred field is paid_at_date, with invoice_paid_date used when it is absent.
+Timestamp dates use the viewer's local calendar, consistent with dashboard quote
+activity; date-only values keep their calendar date. Creation and status-change
+dates are not substituted for payment dates. Missing/invalid paid dates are
+excluded with a visible count because they cannot be assigned to a period.
+Latest Day uses the selected period end; Daily Average divides by all calendar
+days in the period, including days with no payments. Each includes contributing
+quote links, current status, paid date, case/site identifiers, and totals for audit.
 They need no CSV and do not use the optional Paid Invoices import. Paid Quote
 Total is quote value, not reconciled cash receipts. Missing/invalid matching quote
 totals make the dollar amount unavailable with a visible warning rather than
@@ -402,6 +408,13 @@ direct conversations and floating chats. Received messages show the sender's nam
 above the bubble; your own picture appears on the right. Users without a picture
 show initials. Consecutive messages from the same sender reuse the avatar gutter,
 with a new picture/name after a sender change or a gap of five minutes.
+To change your picture, click your avatar in the sidebar. **Choose image** uploads
+a photo (cropped to 256px) or your own animated GIF. **GIPHY** opens a search
+(trending when empty); click a GIF, then **Use GIF**. GIFs keep playing
+everywhere avatars appear. If GIPHY's normal size is over 512 KB, EnQuote
+automatically uses GIPHY's smaller version. The sidebar "Signed in as" label shows
+your real name; if the user directory is slow at sign-in, EnQuote retries in the
+background and replaces the email with your name when it loads.
 Use the **Share something in EnQuote** cursor button beside chat attachments to
 pick an item in the current page content. Chats temporarily hide so you can select
 the page underneath. The click selects the item without activating its normal

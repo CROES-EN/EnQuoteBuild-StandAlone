@@ -113,7 +113,7 @@ Configure these Worker secrets with `npx wrangler secret put <NAME>`:
 | `SNAPSHOT_TOKEN` | App sync | Enables dynamic snapshot sync credentials |
 | `CF_ACCESS_CLIENT_ID` | Entity snapshot sync | Optional Access service-token ID |
 | `CF_ACCESS_CLIENT_SECRET` | Entity snapshot sync | Optional Access service-token secret |
-| `USER_TOKEN_SECRET` | Tasks, SOPs, messages | Signs per-user identity tokens and inbox keys |
+| `USER_TOKEN_SECRET` | Tasks, SOPs, messages, Mail Center | Signs per-user identity tokens and inbox keys |
 
 The two token secrets are required for the Worker to return sync credentials, but a
 missing token does not invalidate an already verified identity; the app logs that sync
@@ -250,6 +250,24 @@ needed for this version change.
 | GET | `/api/chat/inbox?since=` | Poll new inbox messages and unread total |
 | GET | `/api/chat/directory` | Allow-listed chat directory |
 
+The separate retro Mail Center stores independent one-to-one mail and never creates
+or opens a Messages conversation. Apply its additive schema before deploying the
+Worker:
+
+```sh
+npx wrangler d1 migrations apply enquote-sync --remote
+npx wrangler deploy
+```
+
+`GET /api/retro-mail?folder=inbox|sent|saved|junk|trash|contacts` returns only the
+signed-in user's mailbox state. `POST /api/retro-mail/send` delivers to an active
+allow-listed user; `POST /api/retro-mail/state` marks a received message read or
+moves one of the caller's copies between folders; `POST /api/retro-mail/delete`
+permanently removes only the caller's copy from Trash. The recipient's copy is
+independent from the sender's Sent copy. Realtime mail changes are scoped to the
+sender and recipient inbox keys. Drafts remain local to the current computer and
+user.
+
 Collaboration writes stamp server-side `synced_at` cursors with
 `new Date().toISOString()`. Clients should request rows with `synced_at > since`
 and advance `since` to the maximum cursor returned.
@@ -282,3 +300,20 @@ apps also reconcile every 60 seconds as a fallback (`electron/supervisorSync.cjs
 | `OUTBOUND_TOKEN` | Protects enqueue + status endpoints |
 | `BASE44_API_KEY` | Base44 API key for outbound pusher |
 | `BASE44_APP_ID` | Base44 App ID for entity URL construction |
+| `REFUND_INGEST_TOKEN` | Secures Power Automate refund-request submissions |
+
+### Enphase Care refund requests
+
+Apply `migrations/0010_refund_requests.sql` and configure `REFUND_INGEST_TOKEN` before enabling
+the secured Forms ingestion endpoint:
+
+```sh
+npx wrangler d1 execute enquote-sync --remote --file=migrations/0010_refund_requests.sql
+npx wrangler secret put REFUND_INGEST_TOKEN
+npx wrangler deploy
+```
+
+The normalized Forms contract and optional machine ingestion route are documented in
+[`../docs/refund-request-power-automate.md`](../docs/refund-request-power-automate.md). EnQuote
+submissions no longer depend on a Power Automate HTTP flow; the desktop app uses the authenticated
+local workbook synchronization flow described there.

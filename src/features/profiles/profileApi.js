@@ -1,10 +1,16 @@
 import {useEffect, useState} from "react";
 import {createAvatarCache} from "./avatarCache";
+import {AVATAR_TYPES, avatarTypeFromBytes} from "../../../shared/avatarRules.js";
 
 const bridge = () => globalThis.window?.enquoteLocal || {};
 const avatarCache = createAvatarCache({
   load: (id) => call("profiles", "getAvatar", id),
-  createUrl: (result) => URL.createObjectURL(new Blob([result.bytes], {type: result.type || "application/octet-stream"})),
+  createUrl: (result) => {
+    const bytes = result.bytes instanceof Uint8Array ? result.bytes : new Uint8Array(result.bytes);
+    const declaredType = String(result.type || "").split(";")[0].trim().toLowerCase();
+    const type = avatarTypeFromBytes(bytes) || (AVATAR_TYPES.has(declaredType) ? declaredType : "application/octet-stream");
+    return URL.createObjectURL(new Blob([bytes], {type}));
+  },
   revokeUrl: (url) => URL.revokeObjectURL(url)
 });
 if (import.meta.hot) import.meta.hot.dispose(() => avatarCache.dispose());

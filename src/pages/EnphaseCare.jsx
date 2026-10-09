@@ -1,9 +1,14 @@
-import {useCallback, useEffect, useState} from "react";
+import React, {useCallback, useEffect, useState} from "react";
+import {useSearchParams} from "react-router-dom";
 import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
+import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
 import RoleGuard from "@/components/auth/RoleGuard";
 import ReportDataTable from "@/components/supervisor/ReportDataTable";
 import {DEFAULT_SUMMARY_FIELDS} from "@/components/supervisor/CareSubscriptionsTabPanel";
 import {CARE_ACTIVE_TYPE, getActiveCareTable} from "@/features/supervisorDashboard/importedTableStore";
+import RefundRequests from "@/components/enphaseCare/RefundRequests";
+import RefundRequestForm from "@/components/enphaseCare/RefundRequestForm";
+import refundFeature from "../../shared/refundFeature.json";
 
 /**
  * Read-only list of ACTIVE Enphase Care subscriptions, open to every signed-in user. It reads the
@@ -13,6 +18,17 @@ import {CARE_ACTIVE_TYPE, getActiveCareTable} from "@/features/supervisorDashboa
  * already left out using the same rules the Care eligibility check uses.
  */
 function EnphaseCareContent() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const supportsRefundRequests = Boolean(
+    globalThis.window?.enquoteLocal?.refundRequests?.list &&
+    globalThis.window?.enquoteLocal?.refundRequests?.submit &&
+    globalThis.window?.enquoteLocal?.refundRequests?.update &&
+    globalThis.window?.enquoteLocal?.refundRequests?.onChanged
+  );
+  const requestedTab = searchParams.get("tab");
+  const activeTab = refundFeature.enabled && ["refund-requests", "refund-submit"].includes(requestedTab)
+    ? requestedTab
+    : "subscriptions";
   const [table, setTable] = useState(null);
   const [loading, setLoading] = useState(true);
   const [reloading, setReloading] = useState(false);
@@ -45,11 +61,28 @@ function EnphaseCareContent() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">Enphase Care</h1>
         <p className="text-muted-foreground mt-1">
-          Active Enphase Care subscriptions. Search by Site ID or customer name to confirm Care
-          eligibility before an FST visit.
+          {refundFeature.enabled
+            ? "Manage active Enphase Care subscriptions and review customer refund requests."
+            : "View active Enphase Care subscriptions."}
         </p>
       </div>
 
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => setSearchParams((previous) => {
+          const next = new URLSearchParams(previous);
+          if (value === "subscriptions") next.delete("tab");
+          else next.set("tab", value);
+          return next;
+        })}
+        className="space-y-4"
+      >
+        <TabsList className="h-auto flex-wrap justify-start">
+          <TabsTrigger value="subscriptions">Active Subscriptions</TabsTrigger>
+          {refundFeature.enabled && <TabsTrigger value="refund-submit">Submit Request</TabsTrigger>}
+          {refundFeature.enabled && <TabsTrigger value="refund-requests">Refund Requests</TabsTrigger>}
+        </TabsList>
+        <TabsContent value="subscriptions">
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">
@@ -76,6 +109,25 @@ function EnphaseCareContent() {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+        {refundFeature.enabled && <TabsContent value="refund-submit">
+          <RefundRequestForm />
+        </TabsContent>}
+        {refundFeature.enabled && <TabsContent value="refund-requests">
+          {supportsRefundRequests ? (
+            <RefundRequests />
+          ) : (
+            <Card>
+              <CardContent className="p-6 text-sm text-muted-foreground">
+                Refund Requests is not enabled in this running EnQuote session. If you are using
+                <code className="mx-1 rounded bg-muted px-1 py-0.5">npm run desktop:dev</code>,
+                close the app completely and restart it so Electron loads the current preload.
+                This feature is available in the EnQuote desktop app, not a browser preview.
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>}
+      </Tabs>
     </div>
   );
 }

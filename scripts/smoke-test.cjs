@@ -18,7 +18,12 @@ try {
     timeout: 5 * 60 * 1000
   });
 } finally {
-  fs.rmSync(testDataDir, {recursive: true, force: true, maxRetries: 5, retryDelay: 100});
+  try {
+    fs.rmSync(testDataDir, {recursive: true, force: true, maxRetries: 5, retryDelay: 100});
+  } catch (cleanupError) {
+    if (!result?.error) throw cleanupError;
+    console.warn(`Could not clean smoke-test data after process failure: ${cleanupError.message}`);
+  }
 }
 if (result.error) throw result.error;
 process.exit(result.status ?? 1);

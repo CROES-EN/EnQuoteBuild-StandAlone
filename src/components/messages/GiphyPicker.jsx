@@ -9,7 +9,7 @@ import {chatApi} from "@/features/collab/collabApi";
 import {customEmojiQueryKey} from "@/features/collab/customEmojis";
 import {validCustomEmojiName} from "../../../shared/customEmojiRules.js";
 
-export default function GiphyPicker({onPick, query = "", preview = false}) {
+export default function GiphyPicker({onPick, query = "", preview = false, allowSaveEmoji = true, pickLabel = "Send GIF"}) {
   const [items, setItems] = useState([]);
   const [nextOffset, setNextOffset] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -83,15 +83,15 @@ export default function GiphyPicker({onPick, query = "", preview = false}) {
     {!loading && !error && !items.length && <p className="text-xs text-muted-foreground">No matching GIFs.</p>}
     <div className="grid grid-cols-3 gap-2">
       {(preview ? items.slice(0, 6) : items).map(gif => <div key={`${gif.id}-${gif.url}`} className="min-w-0">
-        <button type="button" aria-label={`Send GIF: ${gif.title || "GIF"}`}
+        <button type="button" aria-label={`${pickLabel}: ${gif.title || "GIF"}`}
           className="w-full overflow-hidden rounded-md bg-muted" onClick={() => onPick(gif)} title={gif.title}>
           <img src={gif.previewUrl || gif.url} alt={gif.title || "GIF"} loading="lazy" className="h-24 w-full object-cover" />
         </button>
-        <button type="button" disabled={saving} aria-label={`Save GIF as emoji: ${gif.title || "GIF"}`}
+        {allowSaveEmoji && <button type="button" disabled={saving} aria-label={`Save GIF as emoji: ${gif.title || "GIF"}`}
           onClick={() => {setSavingGif(gif); setName(""); setSaveError("");}}
           className="flex w-full items-center justify-center gap-1 rounded py-1 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground">
           <BookmarkPlus className="h-3 w-3" />Save as emoji
-        </button>
+        </button>}
       </div>)}
     </div>
     <div className="flex items-center justify-between gap-2">

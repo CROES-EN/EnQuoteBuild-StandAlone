@@ -10,6 +10,15 @@ import { handleFstList, handleFstUpsert } from "./fsts.js";
 import { handleUsers } from "./users.js";
 import { handleTasksDelete, handleTasksList, handleTasksUpsert } from "./tasks.js";
 import {
+  handleRefundRequestIngest,
+  handleRefundRequestCsvIngest,
+  handleRefundRequestSubmit,
+  handleRefundRequestNativeSubmit,
+  handleRefundRequestsList,
+  handleRefundRequestWorkbookSync,
+  handleRefundRequestUpdate
+} from "./refund-requests.js";
+import {
   handleSopFileDownload,
   handleSopFileUpload,
   handleSopsDelete,
@@ -38,6 +47,7 @@ import {handleChatImageUpload, handleChatImageDownload} from "./chat-images.js";
 import {handleCustomEmojisList, handleCustomEmojiUpload, handleCustomEmojiDownload, handleCustomEmojiFromGif} from "./custom-emojis.js";
 import {handleChatReactions, handleChatReactionSet} from "./chat.js";
 import {handleRetro} from "./Base44_DTO.js";
+import {handleRetroMail} from "./retro-mail.js";
 import {
   handleAccessPolicy,
   handleAdminAnnouncement,
@@ -70,6 +80,10 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === "/api/Base44_DTO" && ["GET", "POST", "DELETE"].includes(request.method)) return handleRetro(request, env);
+    if (url.pathname === "/api/retro-mail" && ["GET", "POST"].includes(request.method)) return handleRetroMail(request, env);
+    if (url.pathname === "/api/retro-mail/send" && request.method === "POST") return handleRetroMail(request, env);
+    if (url.pathname === "/api/retro-mail/state" && request.method === "POST") return handleRetroMail(request, env);
+    if (url.pathname === "/api/retro-mail/delete" && request.method === "POST") return handleRetroMail(request, env);
     if (url.pathname === "/ws" && request.method === "GET") return handleRealtimeSocket(request, env);
     if (url.pathname === "/api/base44/webhook" && request.method === "POST") return handleWebhook(request, env);
     if (url.pathname === "/api/base44/webhook/snapshot" && request.method === "GET") return handleSnapshot(request, env);
@@ -100,6 +114,13 @@ export default {
     if (url.pathname === "/api/tasks" && request.method === "GET") return handleTasksList(request, env);
     if (url.pathname === "/api/tasks/upsert" && request.method === "POST") return handleTasksUpsert(request, env);
     if (url.pathname === "/api/tasks/delete" && request.method === "POST") return handleTasksDelete(request, env);
+    if (url.pathname === "/api/refund-requests" && request.method === "GET") return handleRefundRequestsList(request, env);
+    if (url.pathname === "/api/refund-requests/submit" && request.method === "POST") return handleRefundRequestSubmit(request, env);
+    if (url.pathname === "/api/refund-requests/submit-native" && request.method === "POST") return handleRefundRequestNativeSubmit(request, env);
+    if (url.pathname === "/api/refund-requests/update" && request.method === "POST") return handleRefundRequestUpdate(request, env);
+    if (url.pathname === "/api/refund-requests/workbook-sync" && request.method === "POST") return handleRefundRequestWorkbookSync(request, env);
+    if (url.pathname === "/api/refund-requests/ingest" && request.method === "POST") return handleRefundRequestIngest(request, env);
+    if (url.pathname === "/api/refund-requests/ingest-csv" && request.method === "POST") return handleRefundRequestCsvIngest(request, env);
     if (url.pathname === "/api/sops" && request.method === "GET") return handleSopsList(request, env);
     if (url.pathname === "/api/sops/upsert" && request.method === "POST") return handleSopsUpsert(request, env);
     if (url.pathname === "/api/sops/delete" && request.method === "POST") return handleSopsDelete(request, env);

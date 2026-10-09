@@ -22,10 +22,12 @@ async function runCaseWork(win) {
         rows: [{"Invoice ID": "inv-1", "Paid Date": "7/1/2026", "Amount Paid": "1250.25", Currency: "USD"}]}
     ];
     window.__smokePaidQuotes = [
-      {id: "paid-1", quote_number: "PAID-001", status: "invoice_paid", total: 1250.25, created_date: "2025-01-01"},
-      {id: "paid-2", status: "invoice_paid_materials_required", total: 20},
-      {id: "paid-3", status: "materials_pending_shipment", total: 30},
-      {id: "paid-4", status: "scheduled", total: 40},
+      {id: "paid-1", quote_number: "PAID-001", status: "invoice_paid", total: 1250.25, created_date: "2025-01-01", paid_at_date: "2026-07-01"},
+      {id: "paid-2", status: "invoice_paid_materials_required", total: 20, invoice_paid_date: "2026-07-02"},
+      {id: "paid-3", status: "materials_pending_shipment", total: 30, paid_at_date: "2026-07-01"},
+      {id: "paid-4", status: "scheduled", total: 40, paid_at_date: "2026-07-02"},
+      {id: "paid-outside", status: "invoice_paid", total: 9000, paid_at_date: "2026-06-30"},
+      {id: "paid-undated", status: "invoice_paid", total: 9000},
       {id: "unpaid", status: "invoiced", total: 9000},
       {id: "old-version", status: "invoice_paid", total: 9000, is_current_version: false},
       {id: "excluded", status: "invoice_paid", total: 9000, exclude_from_reporting: true}
@@ -61,11 +63,31 @@ async function runCaseWork(win) {
   assert.ok(!detail.includes("No work credit"), "subject changes never contribute");
   await evaluate(`document.querySelector('[role="dialog"]').dispatchEvent(new KeyboardEvent("keydown", {key: "Escape", bubbles: true})); true`);
   await sleep(300);
+  await evaluate(`document.querySelector('[data-enquote-share-target="supervisor-tile:invoice_payments_amount"] button').click(); true`);
+  await sleep(300);
+  const paidDetail = await evaluate(`document.querySelector('[role="dialog"]').innerText`);
+  assert.ok(paidDetail.includes("PAID-001") && paidDetail.includes("Scheduled") && paidDetail.includes("Materials Pending Shipment"), "live quote drill-down lists qualifying quotes");
+  assert.ok(paidDetail.includes("2026-07-01") && paidDetail.includes("2026-07-02"), "paid dates appear in drill-down");
+  assert.ok(!paidDetail.includes("paid-outside") && !paidDetail.includes("paid-undated"), "non-period quotes do not contribute");
+  await evaluate(`document.querySelector('[role="dialog"]').dispatchEvent(new KeyboardEvent("keydown", {key: "Escape", bubbles: true})); true`);
+  await sleep(300);
   await evaluate(`[...document.querySelectorAll("button")].find(button => button.textContent === "Case-work team").click(); true`);
   await sleep(300);
   assert.equal(await evaluate('document.getElementById("case-work-team").value.split("\\n").length'), 10);
   await evaluate(`document.querySelector('[role="dialog"]').dispatchEvent(new KeyboardEvent("keydown", {key: "Escape", bubbles: true})); true`);
   await sleep(300);
+  for (const [mode, count, amount] of [["latest_day", "2", "$60.00"], ["daily_average", "2", "$670.13"]]) {
+    await evaluate(`(() => {
+      const params = new URLSearchParams({tab: "dashboard"});
+      params.set("enquoteReportPeriod", JSON.stringify({
+        range: {preset: "custom_range", start: "2026-07-01", end: "2026-07-02"}, mode: ${JSON.stringify(mode)}
+      }));
+      location.hash = "#/SupervisorDashboard?" + params; return true;
+    })()`);
+    await sleep(600);
+    assert.ok((await tileText("invoice_payments_count")).split("\n").includes(count), `${mode} invoice count`);
+    assert.ok((await tileText("invoice_payments_amount")).split("\n").includes(amount), `${mode} quote total`);
+  }
   await evaluate(`(() => {
     const params = new URLSearchParams({tab: "dashboard"});
     params.set("enquoteReportPeriod", JSON.stringify({
@@ -76,14 +98,8 @@ async function runCaseWork(win) {
   await sleep(600);
   assert.ok((await tileText("case_work_worked")).split("\n").includes("0"));
   assert.equal(await evaluate('document.body.innerText.includes("extends outside the imported event dates")'), true);
-  assert.ok((await tileText("invoice_payments_count")).split("\n").includes("4"), "quote count ignores selected period");
-  assert.ok((await tileText("invoice_payments_amount")).split("\n").includes("$1,340.25"), "quote sum ignores selected period");
-  await evaluate(`document.querySelector('[data-enquote-share-target="supervisor-tile:invoice_payments_amount"] button').click(); true`);
-  await sleep(300);
-  const paidDetail = await evaluate(`document.querySelector('[role="dialog"]').innerText`);
-  assert.ok(paidDetail.includes("PAID-001") && paidDetail.includes("Scheduled") && paidDetail.includes("Materials Pending Shipment"), "live quote drill-down lists qualifying quotes");
-  await evaluate(`document.querySelector('[role="dialog"]').dispatchEvent(new KeyboardEvent("keydown", {key: "Escape", bubbles: true})); true`);
-  await sleep(300);
+  assert.ok((await tileText("invoice_payments_count")).split("\n").includes("0"), "quote count respects selected period");
+  assert.ok((await tileText("invoice_payments_amount")).split("\n").includes("$0.00"), "quote sum respects selected period");
   await new Promise(resolve => {
     win.webContents.once("did-finish-load", resolve);
     win.webContents.reload();
@@ -92,7 +108,7 @@ async function runCaseWork(win) {
   assert.ok((await tileText("case_work_worked")).includes("Import Case Work History"), "missing history shows an import prompt, not a zero total");
   assert.ok((await tileText("invoice_payments_count")).split("\n").includes("0"), "empty live quotes show zero count without a payment import");
   assert.ok(!(await tileText("invoice_payments_amount")).includes("Import Paid Invoices"), "live quote sum needs no payment import");
-  console.log("ok Case Work tiles and live paid-quote snapshot: strict counts, all four statuses, drill-downs, date independence and missing history");
+  console.log("ok Case Work and paid-quote tiles: strict counts, all four statuses, paid-date drill-downs, period filtering and missing history");
 }
 
 module.exports = {runCaseWork};

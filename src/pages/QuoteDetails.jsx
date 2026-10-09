@@ -148,6 +148,7 @@ function QuoteDetailsContent() {
  const [boneyardReason, setBoneyardReason] = useState("");
  const [decisionCategory, setDecisionCategory] = useState("no_customer_response");
  const [showPaidDialog, setShowPaidDialog] = useState(false);
+ const [showEditPaidDateDialog, setShowEditPaidDateDialog] = useState(false);
  const [showBulkMaterialOrderSheet, setShowBulkMaterialOrderSheet] = useState(false);
  const [showFstFinder, setShowFstFinder] = useState(false);
  const [reminderDefaults, setReminderDefaults] = useState(null);
@@ -928,6 +929,43 @@ function QuoteDetailsContent() {
  toast.error('Failed to send email notifications');
  }
  setShowPaidDialog(false);
+ };
+
+ const handleEditPaidDate = async () => {
+ if (!paidDate) {
+ toast.error("Select a paid date.");
+ return;
+ }
+ const selectedDate = new Date(`${paidDate}T12:00:00`);
+ if (Number.isNaN(selectedDate.getTime())) {
+ toast.error("Enter a valid paid date.");
+ return;
+ }
+ try {
+ const currentUser = await safeMe();
+ const paidDateISO = selectedDate.toISOString();
+ const previousPaidDate = quote.paid_at_date || quote.invoice_paid_date || null;
+ await updateMutation.mutateAsync({
+ id: quoteId,
+ data: {
+ paid_at_date: paidDateISO,
+ invoice_paid_date: paidDateISO,
+ status_history: [
+ ...(quote.status_history || []),
+ {
+ status: quote.status,
+ changed_by: currentUser.email,
+ changed_at: new Date().toISOString(),
+ reason: `Paid At date corrected from ${previousPaidDate ? format(new Date(previousPaidDate), "MMM d, yyyy") : "not recorded"} to ${format(selectedDate, "MMM d, yyyy")}`
+ }
+ ]
+ }
+ });
+ setShowEditPaidDateDialog(false);
+ toast.success("Paid At date updated.");
+ } catch (error) {
+ toast.error(error?.message || "Could not update the Paid At date.");
+ }
  };
 
  const { data: allUsers = [] } = useQuery({
@@ -1724,14 +1762,36 @@ function QuoteDetailsContent() {
  </div>
  </div>
  )}
- {quote.paid_at_date && (
+ {(quote.paid_at_date || quote.invoice_paid_date) && (
  <div data-enquote-share-target={`quote:${quote.id}:paid-at`} data-enquote-share-label="Payment details" className="flex items-center gap-3">
  <div className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center">
  <CheckCircle className="w-4 h-4 text-emerald-600" />
  </div>
  <div>
+ <div className="flex items-center gap-2">
  <p className="text-sm text-muted-foreground">Paid At</p>
- <p className="font-medium text-foreground">{format(new Date(quote.paid_at_date), "MMM d, yyyy")}</p>
+ {canEditQuote && (
+ <Button
+ type="button"
+ variant="ghost"
+ size="sm"
+ className="h-7 px-2 text-xs text-blue-600 hover:text-blue-700"
+ onClick={() => {
+ const existingPaidAt = quote.paid_at_date || quote.invoice_paid_date;
+ setPaidDate(existingPaidAt && !Number.isNaN(new Date(existingPaidAt).getTime())
+ ? format(new Date(existingPaidAt), "yyyy-MM-dd")
+ : format(new Date(), "yyyy-MM-dd"));
+ setShowEditPaidDateDialog(true);
+ }}
+ disabled={updateMutation.isPending}
+ aria-label="Edit Paid At date"
+ >
+ <Pencil className="mr-1 h-3.5 w-3.5" />
+ Edit
+ </Button>
+ )}
+ </div>
+ <p className="font-medium text-foreground">{format(new Date(quote.paid_at_date || quote.invoice_paid_date), "MMM d, yyyy")}</p>
  <p className="text-xs text-muted-foreground">Stripe transaction: {quote.stripe_transaction_id || "Not recorded"}</p>
  <p className="text-xs text-muted-foreground">Stripe invoice: {quote.stripe_invoice_id || "Not recorded"}</p>
  </div>
@@ -2263,6 +2323,37 @@ function QuoteDetailsContent() {
  className="bg-indigo-600 hover:bg-indigo-700"
  >
  Update Owner
+ </Button>
+ </DialogFooter>
+ </DialogContent>
+ </Dialog>
+
+ {/* Correct an already-recorded payment date without changing payment identifiers or status. */}
+ <Dialog open={showEditPaidDateDialog} onOpenChange={setShowEditPaidDateDialog}>
+ <DialogContent>
+ <DialogHeader>
+ <DialogTitle>Edit Paid At Date</DialogTitle>
+ <DialogDescription>
+ Correct the payment date used for quote and revenue reporting. Stripe transaction and invoice details will not be changed.
+ </DialogDescription>
+ </DialogHeader>
+ <div className="space-y-2">
+ <Label htmlFor="editPaidDate">Paid At Date</Label>
+ <Input
+ id="editPaidDate"
+ type="date"
+ value={paidDate}
+ onChange={(event) => setPaidDate(event.target.value)}
+ />
+ </div>
+ <DialogFooter>
+ <Button type="button" variant="outline" onClick={() => setShowEditPaidDateDialog(false)}>Cancel</Button>
+ <Button
+ type="button"
+ onClick={handleEditPaidDate}
+ disabled={!paidDate || updateMutation.isPending}
+ >
+ {updateMutation.isPending ? "Saving..." : "Save Date"}
  </Button>
  </DialogFooter>
  </DialogContent>

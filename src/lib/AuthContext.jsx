@@ -3,6 +3,7 @@ import {recordError} from '@/features/developerConsole/errorLog';
 import {base44} from '@/api/base44Client';
 import {appParams} from '@/lib/app-params';
 import {getUsers} from '@/api/dataClient';
+import {userDisplayName} from '@/utils/userDisplayName';
 import {isReadonlyViewing} from "@/features/admin/readonlyViewing";
 import ReadonlyAuthProvider from "@/features/admin/ReadonlyAuthProvider";
 
@@ -168,6 +169,28 @@ const AuthProvider = ({children}) => {
       })?.catch?.(() => {});
     }
   }, [user]);
+
+  // A slow Users load at sign-in falls back to the email as the name. Keep retrying in the
+  // background (bounded) so the sidebar, presence, and owner labels get the real name.
+  const needsRealName = Boolean(isLocalAuthActive && user?.email && !userDisplayName(user));
+  useEffect(() => {
+    if (!needsRealName) return undefined;
+    let cancelled = false;
+    const timers = [];
+    const email = user.email.toLowerCase();
+    const attempt = async () => {
+      if (cancelled) return;
+      try {
+        const record = (await getUsers() || []).find((candidate) => candidate.email?.toLowerCase() === email);
+        if (cancelled || !record || !userDisplayName(record)) return;
+        setUser((current) => current?.email?.toLowerCase() === email ? { ...current, ...buildUserFromRecord(record, email) } : current);
+      } catch (error) {
+        console.warn('[Local Auth] Background name lookup failed:', error?.message || error);
+      }
+    };
+    for (const delay of [2000, 15000, 60000, 180000]) timers.push(setTimeout(() => void attempt(), delay));
+    return () => { cancelled = true; timers.forEach(clearTimeout); };
+  }, [needsRealName, user?.email]);
 
   const activateUser = useCallback(async (email) => {
     let record = null;

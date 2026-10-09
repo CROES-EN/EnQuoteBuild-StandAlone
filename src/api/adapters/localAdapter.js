@@ -95,7 +95,13 @@ export const localAdapter = {
   createQuote: (data) => resource("quotes").create(data),
   updateQuote: (recordId, data, expectedVersion) => resource("quotes").update(recordId, data, expectedVersion),
   deleteQuote: (recordId) => resource("quotes").delete(recordId),
-  bulkUpdateQuotes: (updates) => resource("quotes").bulkUpdate(updates),
+  bulkUpdateQuotes: (updates = []) =>
+    resource("quotes").bulkUpdate(
+      updates.map(({id, changes, data, ...fields}) => ({
+        id,
+        changes: changes || data || fields
+      }))
+    ),
 
   getProducts: () => resource("products").list(),
   listProducts: () => resource("products").list(),

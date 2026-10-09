@@ -1,4 +1,4 @@
-import {useEffect, useState} from "react";
+import React, {useEffect, useState} from "react";
 import {bulkUpdateQuotes, createLocalRecord, getQuotes, listLocalCollection} from "@/api/dataClient";
 import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 import {Input} from "@/components/ui/input";
@@ -253,6 +253,7 @@ function QuotesContent() {
     { value: "quote_sent_to_ho", label: "Sent to HO" },
     { value: "ho_approved_invoice_required", label: "HO Approved - Invoice Required" },
     { value: "invoiced", label: "Invoiced" },
+    { value: "scheduled", label: "Scheduled" },
 
   ];
   const allowedBulkStatuses = isApprover
@@ -299,6 +300,7 @@ function QuotesContent() {
         if (newStatus === "submitted") payload.submitted_date = now;
         if (newStatus === "quote_sent_to_ho") payload.quote_sent_to_ho_date = now;
         if (newStatus === "ho_approved_invoice_required") payload.ho_approved_date = now;
+        if (newStatus === "scheduled") payload.scheduled_date = now;
         return payload;
       });
       return bulkUpdateQuotes(updates);

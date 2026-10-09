@@ -1,11 +1,13 @@
 import {useEffect, useMemo, useRef, useState} from "react";
-import {Camera, Loader2, Trash2} from "lucide-react";
+import {ArrowLeft, Camera, Loader2, Search, Trash2} from "lucide-react";
 import {toast} from "sonner";
 import {Button} from "@/components/ui/button";
 import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
 import {Slider} from "@/components/ui/slider";
 import {cn} from "@/lib/utils";
 import {profilesApi, useAvatar} from "@/features/profiles/profileApi";
+import {downloadGiphyAvatar} from "@/features/profiles/giphyAvatar";
+import GiphyPicker from "@/components/messages/GiphyPicker";
 import {MAX_AVATAR_BYTES as MAX_BYTES, MAX_GIF_DIMENSION, gifAvatarError} from "../../../shared/avatarRules.js";
 
 const isGif = (file) => file?.type === "image/gif" || /\.gif$/i.test(file?.name || "");
@@ -75,31 +77,47 @@ export function UserAvatar({email, name, size = 36, className}) {
   );
 }
 
+
 export function ProfilePicturePicker({email, name, compact = false}) {
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState(null);
-  const [preview, setPreview] = useState("");
+  const [gif, setGif] = useState(null);
+  const [browsingGifs, setBrowsingGifs] = useState(false);
+  const [gifQuery, setGifQuery] = useState("");
+  const [filePreview, setFilePreview] = useState("");
   const [zoom, setZoom] = useState([1]);
   const [busy, setBusy] = useState(false);
   const inputRef = useRef(null);
 
   useEffect(() => {
     if (!file) {
-      setPreview("");
+      setFilePreview("");
       return undefined;
     }
     const url = URL.createObjectURL(file);
-    setPreview(url);
+    setFilePreview(url);
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
+  useEffect(() => {
+    if (open) return;
+    setBrowsingGifs(false);
+    setGifQuery("");
+    setGif(null);
+    setFile(null);
+  }, [open]);
+
+  const preview = gif?.url || filePreview;
+  const zoomable = Boolean(file && !isGif(file) && !gif);
+
   const upload = async () => {
-    if (!file) return;
+    if (!file && !gif) return;
     setBusy(true);
     try {
-      await profilesApi.setAvatar(await cropAvatar(file, zoom[0] || 1));
+      await profilesApi.setAvatar(gif ? await downloadGiphyAvatar(gif) : await cropAvatar(file, zoom[0] || 1));
       toast.success("Profile picture updated.");
       setFile(null);
+      setGif(null);
       setOpen(false);
     } catch (error) {
       toast.error(error.message || "Could not update profile picture.");
@@ -114,6 +132,7 @@ export function ProfilePicturePicker({email, name, compact = false}) {
       await profilesApi.removeAvatar();
       toast.success("Profile picture removed.");
       setFile(null);
+      setGif(null);
     } catch (error) {
       toast.error(error.message || "Could not remove profile picture.");
     } finally {
@@ -129,40 +148,74 @@ export function ProfilePicturePicker({email, name, compact = false}) {
           {!compact && <span className="absolute -bottom-1 -right-1 rounded-full bg-orange-600 p-1 text-white"><Camera className="h-3 w-3" /></span>}
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-80 space-y-3">
-        <div>
-          <p className="text-sm font-semibold">Profile picture</p>
-          <p className="text-xs text-muted-foreground">Choose an image or animated GIF. Photos are cropped to 256px. GIFs keep their animation (512 KB max, 1024px per side).</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="relative h-24 w-24 overflow-hidden rounded-full bg-muted">
-            {preview ? <img src={preview} alt="" className="h-full w-full object-cover" style={{transform: `scale(${zoom[0] || 1})`}} /> : <UserAvatar email={email} name={name} size={96} />}
-          </div>
-          <div className="min-w-0 flex-1 space-y-2">
-            <input
-              ref={inputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif,.gif"
-              className="hidden"
-              onChange={(event) => setFile(event.target.files?.[0] || null)}
-            />
-            <Button type="button" variant="outline" size="sm" onClick={() => inputRef.current?.click()}>Choose image</Button>
-            {file && !isGif(file) && (
-              <div className="space-y-1">
-                <p className="text-[11px] text-muted-foreground">Zoom</p>
-                <Slider value={zoom} min={1} max={3} step={0.05} onValueChange={setZoom} />
+      <PopoverContent align="start" className={cn("space-y-3", browsingGifs ? "w-96" : "w-80")}>
+        {browsingGifs ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-label="Back to profile picture" onClick={() => setBrowsingGifs(false)}>
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <input
+                  autoFocus
+                  aria-label="Search GIPHY"
+                  value={gifQuery}
+                  onChange={(event) => setGifQuery(event.target.value)}
+                  placeholder="Search GIPHY"
+                  className="h-9 w-full rounded-md border border-input bg-background pl-8 pr-2 text-sm"
+                />
               </div>
-            )}
+            </div>
+            <div className="max-h-72 overflow-y-auto pr-1">
+              <GiphyPicker
+                query={gifQuery}
+                allowSaveEmoji={false}
+                pickLabel="Use as profile picture"
+                onPick={(picked) => { setGif(picked); setFile(null); setBrowsingGifs(false); }}
+              />
+            </div>
           </div>
-        </div>
-        <div className="flex justify-between gap-2">
-          <Button type="button" variant="ghost" size="sm" onClick={remove} disabled={busy}>
-            <Trash2 className="mr-1 h-4 w-4" />Remove
-          </Button>
-          <Button type="button" size="sm" onClick={upload} disabled={!file || busy} className="bg-orange-600 hover:bg-orange-700">
-            {busy && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}Upload
-          </Button>
-        </div>
+        ) : (
+          <>
+            <div>
+              <p className="text-sm font-semibold">Profile picture</p>
+              <p className="text-xs text-muted-foreground">Choose an image or animated GIF, or pick a GIF from GIPHY. Photos are cropped to 256px. GIFs keep their animation (512 KB max, 1024px per side).</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="relative h-24 w-24 overflow-hidden rounded-full bg-muted">
+                {preview ? <img src={preview} alt="" className="h-full w-full object-cover" style={zoomable ? {transform: `scale(${zoom[0] || 1})`} : undefined} /> : <UserAvatar email={email} name={name} size={96} />}
+              </div>
+              <div className="min-w-0 flex-1 space-y-2">
+                <input
+                  ref={inputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif,.gif"
+                  className="hidden"
+                  onChange={(event) => { setFile(event.target.files?.[0] || null); setGif(null); event.target.value = ""; }}
+                />
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => inputRef.current?.click()}>Choose image</Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setBrowsingGifs(true)}>GIPHY</Button>
+                </div>
+                {zoomable && (
+                  <div className="space-y-1">
+                    <p className="text-[11px] text-muted-foreground">Zoom</p>
+                    <Slider value={zoom} min={1} max={3} step={0.05} onValueChange={setZoom} />
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-between gap-2">
+              <Button type="button" variant="ghost" size="sm" onClick={remove} disabled={busy}>
+                <Trash2 className="mr-1 h-4 w-4" />Remove
+              </Button>
+              <Button type="button" size="sm" onClick={upload} disabled={(!file && !gif) || busy} className="bg-orange-600 hover:bg-orange-700">
+                {busy && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}{gif ? "Use GIF" : "Upload"}
+              </Button>
+            </div>
+          </>
+        )}
       </PopoverContent>
     </Popover>
   );

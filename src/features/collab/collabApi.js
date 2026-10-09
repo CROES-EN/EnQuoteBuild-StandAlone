@@ -42,6 +42,12 @@ const FRIENDLY_ERRORS = {
   gifs_not_configured: "GIF search hasn't been switched on for your team yet.",
   gifs_unavailable: "Could not reach GIPHY. Please try again.",
   invalid_app_link: "That EnQuote link is invalid. Pick the item again.",
+  invalid_submission: "Complete all required refund request fields with valid values.",
+  request_deleted: "This refund request was deleted from the shared tracker. It cannot be resubmitted using the same submission ID.",
+  tracking_flow_not_configured: "Refund tracking is not connected yet. Contact your EnQuote administrator.",
+  tracking_workbook_unavailable: "The refund tracker could not be reached. Your request was not submitted; try again.",
+  tracking_workbook_write_failed: "The refund tracker could not save this request. Your request was not submitted; try again.",
+  submission_failed: "The request could not be saved. Refresh and try again.",
   invalid_assigned_task: "Enter a title, valid due date and time, and notes of up to 2,000 characters."
 };
 
@@ -79,11 +85,36 @@ async function call(path, ...args) {
 
 const list = (value, key) => (Array.isArray(value) ? value : Array.isArray(value?.[key]) ? value[key] : []);
 
+function refundRequestCall(path, ...args) {
+  return call(path, ...args).catch((error) => {
+    if (["not_found", "http_404"].includes(error?.code)) {
+      const unavailable = new Error(
+        "Refund requests are not available on the deployed sync service yet. An EnQuote administrator must deploy the refund-request Worker and apply migration 0010."
+      );
+      unavailable.code = "refund_service_not_deployed";
+      throw unavailable;
+    }
+    throw error;
+  });
+}
+
 export const tasksApi = {
   list: async () => list(await call("tasks.list"), "tasks"),
   save: async (record) => (await call("tasks.save", record))?.task,
   delete: (id) => call("tasks.delete", id),
   syncNow: () => call("tasks.syncNow").catch(() => null)
+};
+
+export const refundRequestsApi = {
+  list: async () => list(await refundRequestCall("refundRequests.list"), "requests"),
+  submit: async (request) => (await refundRequestCall("refundRequests.submit", request))?.request,
+  update: async (requestId, expectedStatus, expectedUpdatedAt, changes) =>
+    (await refundRequestCall("refundRequests.update", { requestId, expectedStatus, expectedUpdatedAt, changes }))?.request,
+  workbookStatus: () => call("refundRequests.workbookStatus"),
+  connectWorkbook: () => call("refundRequests.connectWorkbook"),
+  syncWorkbook: () => refundRequestCall("refundRequests.syncWorkbook"),
+  workbookSyncStatus: () => call("refundRequests.workbookSyncStatus"),
+  resolveWorkbookConflict: (payload) => refundRequestCall("refundRequests.resolveWorkbookConflict", payload)
 };
 
 export const sopsApi = {

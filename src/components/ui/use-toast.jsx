@@ -2,7 +2,7 @@
 import {useEffect, useState} from "react";
 
 const TOAST_LIMIT = 20;
-const TOAST_REMOVE_DELAY = 1000000;
+const TOAST_REMOVE_DELAY = 1000;
 
 const actionTypes = {
   ADD_TOAST: "ADD_TOAST",
@@ -53,6 +53,9 @@ export const reducer = (state, action) => {
       };
 
     case actionTypes.UPDATE_TOAST:
+      if (action.toast.open) {
+        _clearFromRemoveQueue(action.toast.id);
+      }
       return {
         ...state,
         toasts: state.toasts.map((t) =>

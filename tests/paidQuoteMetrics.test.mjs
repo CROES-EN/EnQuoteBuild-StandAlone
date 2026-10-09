@@ -17,10 +17,12 @@ const bundle = await build({
 });
 const module = {exports: {}};
 new Function("require", "module", "exports", bundle.outputFiles[0].text)(createRequire(import.meta.url), module, module.exports);
-const {buildPaidQuoteSnapshot, PAID_QUOTE_STATUSES} = module.exports;
+const {buildPaidQuoteReport, getQuotePaidDate, PAID_QUOTE_STATUSES} = module.exports;
+const range = {start: "2026-07-01", end: "2026-07-02"};
+const buildPaidQuoteSnapshot = quotes => buildPaidQuoteReport(quotes.map(quote => ({paid_at_date: "2026-07-01", ...quote})), range);
 
-test("live snapshot includes exactly four paid statuses, all dates, and reportable current versions", () => {
-  const quotes = PAID_QUOTE_STATUSES.map((status, i) => ({id: `paid-${i}`, status, total: [1250.25, "20.00", 30, 40][i], created_date: "2020-01-01"}));
+test("paid report includes exactly four statuses and reportable current versions", () => {
+  const quotes = PAID_QUOTE_STATUSES.map((status, i) => ({id: `paid-${i}`, status, total: [1250.25, "20.00", 30, 40][i], created_date: "2020-01-01", paid_at_date: "2026-07-01"}));
   const result = buildPaidQuoteSnapshot([...quotes,
     {id: "pending", status: "invoiced", total: 9000},
     {id: "other", status: "approved", total: 9000},
@@ -32,6 +34,37 @@ test("live snapshot includes exactly four paid statuses, all dates, and reportab
   assert.equal(result.amount, 1340.25);
   assert.deepEqual(result.records, quotes);
   assert.deepEqual(result.invalid, []);
+});
+
+test("paid date controls inclusive range, latest day, averages and undated exclusions", () => {
+  const quote = (id, dates) => ({id, status: "scheduled", total: 100, created_date: "2026-07-01", ...dates});
+  const quotes = [
+    quote("start", {paid_at_date: "2026-07-01"}),
+    quote("end", {invoice_paid_date: "2026-07-02"}),
+    quote("before", {paid_at_date: "2026-06-30"}),
+    quote("after", {paid_at_date: "2026-07-03"}),
+    quote("missing", {}),
+    quote("invalid", {paid_at_date: "2026-02-30", invoice_paid_date: "2026-07-01"}),
+    quote("preferred", {paid_at_date: "2026-06-30", invoice_paid_date: "2026-07-01"})
+  ];
+  const report = buildPaidQuoteReport(quotes, range);
+  assert.deepEqual(report.records.map(quote => quote.id), ["start", "end"]);
+  assert.equal(report.count, 2);
+  assert.equal(report.amount, 200);
+  assert.equal(report.undated.length, 2);
+  const latest = buildPaidQuoteReport(quotes, range, "latest_day");
+  assert.deepEqual(latest.records.map(quote => quote.id), ["end"]);
+  assert.equal(latest.amount, 100);
+  const average = buildPaidQuoteReport(quotes.slice(0, 1), range, "daily_average");
+  assert.equal(average.count, 0.5);
+  assert.equal(average.amount, 50);
+  assert.equal(buildPaidQuoteReport(quotes, {start: "2026-08-01", end: "2026-08-02"}).count, 0);
+  assert.equal(buildPaidQuoteReport([{status: "invoice_paid", total: "", paid_at_date: "2026-06-30"}], range).amount, 0, "invalid amounts outside the period do not invalidate its total");
+  assert.equal(buildPaidQuoteReport(quotes.slice(0, 1), range, "latest_day").count, 0, "latest day is period end, not most recent payment day");
+  assert.equal(getQuotePaidDate({paid_at_date: "2026-07-01"}), "2026-07-01");
+  const timestamp = "2026-07-02T01:00:00Z";
+  const local = new Date(timestamp);
+  assert.equal(getQuotePaidDate({paid_at_date: timestamp}), `${local.getFullYear()}-${String(local.getMonth() + 1).padStart(2, "0")}-${String(local.getDate()).padStart(2, "0")}`);
 });
 
 test("invalid totals never produce a misleading partial dollar sum or hide matching quotes", () => {

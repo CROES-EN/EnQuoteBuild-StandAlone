@@ -1,4 +1,6 @@
 const { contextBridge, ipcRenderer } = require("electron");
+// Electron exposes process.argv in sandboxed preloads; requiring node:process prevents bridge setup.
+// eslint-disable-next-line no-undef
 const readonlyViewing = process.argv.includes("--enquote-readonly-preview");
 if (readonlyViewing) {
   contextBridge.exposeInMainWorld("enquotePreview", {
@@ -191,6 +193,33 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
     onChanged: (callback) => subscribe("tasks:changed", callback),
     onDue: (callback) => subscribe("tasks:due", callback)
   },
+  refundRequests: {
+    trackerStatus: () => invoke("refundRequests:trackerStatus"),
+    connectTracker: () => invoke("refundRequests:connectTracker"),
+    submitToTracker: (payload) => invoke("refundRequests:submitToTracker", payload),
+    retryTracker: () => invoke("refundRequests:retryTracker"),
+    sourceStatus: () => invoke("refundRequests:sourceStatus"),
+    selectSource: () => invoke("refundRequests:selectSource"),
+    syncSource: () => invoke("refundRequests:syncSource"),
+    onSourceChanged: (callback) => subscribe("refundRequests:sourceChanged", callback),
+    csvStatus: () => invoke("refundRequests:csvStatus"),
+    selectCsv: () => invoke("refundRequests:selectCsv"),
+    submitNative: (payload) => invoke("refundRequests:submitNative", payload),
+    retryCsv: () => invoke("refundRequests:retryCsv"),
+    openForm: (url) => invoke("refundRequests:openForm", url),
+    showForm: (url, bounds) => invoke("refundRequests:showForm", url, bounds),
+    hideForm: () => invoke("refundRequests:hideForm"),
+    onFormStatus: (callback) => subscribe("refundRequests:formStatus", callback),
+    list: () => invoke("refundRequests:list"),
+    submit: (payload) => invoke("refundRequests:submit", payload),
+    update: (payload) => invoke("refundRequests:update", payload),
+    workbookStatus: () => invoke("refundWorkbook:status"),
+    connectWorkbook: () => invoke("refundWorkbook:select"),
+    syncWorkbook: () => invoke("refundWorkbook:sync"),
+    workbookSyncStatus: () => invoke("refundWorkbook:syncStatus"),
+    resolveWorkbookConflict: (payload) => invoke("refundWorkbook:resolveConflict", payload),
+    onChanged: (callback) => subscribe("refundRequests:changed", callback)
+  },
   sops: {
     list: () => invoke("sops:list"),
     sync: () => invoke("sops:sync"),
@@ -233,6 +262,14 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
     removeAvatar: () => invoke("profiles:removeAvatar"),
     getAvatar: (avatarId) => invoke("profiles:getAvatar", avatarId),
     onChanged: (callback) => subscribe("profiles:changed", callback)
+  },
+  retroMail: {
+    list: (folder) => invoke("retroMail:list", folder),
+    contacts: () => invoke("retroMail:contacts"),
+    send: (message) => invoke("retroMail:send", message),
+    setState: (payload) => invoke("retroMail:setState", payload),
+    delete: (id) => invoke("retroMail:delete", id),
+    onChanged: (callback) => subscribe("retroMail:changed", callback)
   },
   gifs: {
     search: (payload) => invoke("gifs:search", payload),

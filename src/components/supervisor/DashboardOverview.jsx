@@ -85,7 +85,7 @@ import HourlyWaitTimeChart from "@/components/supervisor/HourlyWaitTimeChart";
 import TileGrid from "@/components/supervisor/TileGrid";
 import CaseWorkTile, {CaseWorkSettings, readCaseWorkTeam} from "@/components/supervisor/CaseWorkTiles";
 import {buildCaseWorkReport, caseWorkDisplay, parseHistoryDate} from "@/features/supervisorDashboard/caseWorkMetrics";
-import {buildPaidQuoteSnapshot} from "@/features/supervisorDashboard/paidQuoteMetrics";
+import {buildPaidQuoteReport, getQuotePaidDate} from "@/features/supervisorDashboard/paidQuoteMetrics";
 import {onUserSessionChanged} from "@/lib/userScopedStorage";
 import {
     applyPartialReorder,
@@ -1044,6 +1044,15 @@ export default function DashboardOverview({
   records = [],
   completedStatuses = DEFAULT_COMPLETED_STATUSES,
 }) {
+  const quotesQuery = useQuery({
+    queryKey: ["quotes", "executive-overview"],
+    queryFn: async () => {
+      const quotes = await getQuotes();
+      if (!Array.isArray(quotes)) throw new Error("Quote service returned an invalid response.");
+      return quotes;
+    }
+  });
+  const {data: allQuotes = [], isLoading: quotesLoading, isError: quotesError} = quotesQuery;
   const reportTablesQuery = useQuery({
     queryKey: ["report-tables-for-ops-overview"],
     queryFn: listReportTables
@@ -1051,6 +1060,10 @@ export default function DashboardOverview({
   const {data: reportTables = {}} = reportTablesQuery;
   const rangeRecords = useMemo(() => {
     const dates = new Set(records.map(record => record.date));
+    for (const quote of allQuotes.filter(isReportableQuote)) {
+      const date = getQuotePaidDate(quote);
+      if (date) dates.add(date);
+    }
     for (const [table, column] of [["case_history", "Edit Date"]]) {
       for (const row of reportTables[table]?.rows || []) {
         const parsed = parseHistoryDate(row[column]);
@@ -1058,7 +1071,7 @@ export default function DashboardOverview({
       }
     }
     return [...dates].sort().map(date => ({date}));
-  }, [records, reportTables]);
+  }, [records, reportTables, allQuotes]);
   const defaultPreset = useMemo(() => resolveDefaultPreset(rangeRecords), [rangeRecords]);
   const [rangeValue, setRangeValue] = useReportingPeriodPreference("overview");
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1121,15 +1134,6 @@ export default function DashboardOverview({
     [records, previousRange]
   );
 
-  const quotesQuery = useQuery({
-    queryKey: ["quotes", "executive-overview"],
-    queryFn: async () => {
-      const quotes = await getQuotes();
-      if (!Array.isArray(quotes)) throw new Error("Quote service returned an invalid response.");
-      return quotes;
-    }
-  });
-  const {data: allQuotes = [], isLoading: quotesLoading, isError: quotesError} = quotesQuery;
   const activityQuery = useQuery({
     queryKey: ["quoteActivity", "lifecycle"],
     queryFn: async () => {
@@ -1149,7 +1153,7 @@ export default function DashboardOverview({
   // how allQuotes above already relies on remount-triggered refetching.
   const caseWorkReport = useMemo(() => buildCaseWorkReport(reportTables?.case_history?.rows || [], caseWorkTeam),
     [reportTables, caseWorkTeam]);
-  const paymentReport = useMemo(() => buildPaidQuoteSnapshot(allQuotes), [allQuotes]);
+  const paymentReport = useMemo(() => buildPaidQuoteReport(allQuotes, activeRange, kpiMode), [allQuotes, activeRange, kpiMode]);
 
   const sfdcQuotesTable = reportTables?.sfdc_quotes ?? null;
   const niceCalls = useMemo(() => niceCallContributingRecords(reportTables?.incorta_input?.rows || [], activeRange), [reportTables, activeRange]);
@@ -1466,9 +1470,9 @@ export default function DashboardOverview({
       tiles.push({
         id: `invoice_payments_${metric}`, label, category: "Live from EnQuote",
         render: () => <CaseWorkTile label={label} value={paymentReport[metric]} records={paymentReport.records} quotes
-          modeLabel="Current snapshot - all dates" currency={metric === "amount" ? "USD" : undefined}
+          mode={kpiMode} currency={metric === "amount" ? "USD" : undefined}
           loading={quotesQuery.isLoading} error={quotesQuery.error} onRetry={quotesQuery.refetch}
-          subtitle={`${metric === "count" ? "Number of current, reportable quotes" : "Combined quote total (USD), not reconciled cash receipts"} in Invoice Paid, Invoice Paid - Materials Required, Materials Pending Shipment, or Scheduled. Ignores reporting period and display mode.${metric === "amount" && paymentReport.invalid.length ? ` Total unavailable: ${paymentReport.invalid.length} matching quotes have missing/invalid totals; see contributing records.` : ""}`} />
+          subtitle={`${metric === "count" ? "Number of current, reportable quotes" : "Combined quote total (USD), not reconciled cash receipts"} in Invoice Paid, Invoice Paid - Materials Required, Materials Pending Shipment, or Scheduled, filtered by invoice paid date (local calendar). Latest Day uses period end; Daily Average includes zero-payment days. ${paymentReport.undated.length} qualifying quotes with missing/invalid paid dates excluded; cannot place them in a period.${metric === "amount" && paymentReport.invalid.length ? ` Total unavailable: ${paymentReport.invalid.length} matching quotes have missing/invalid totals; see contributing records.` : ""}`} />
       });
     }
     tiles.push({

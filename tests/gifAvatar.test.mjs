@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {gifAvatarError, MAX_AVATAR_BYTES, MAX_GIF_DIMENSION} from "../shared/avatarRules.js";
+import {avatarTypeFromBytes, gifAvatarError, MAX_AVATAR_BYTES, MAX_GIF_DIMENSION} from "../shared/avatarRules.js";
 
 function header(width, height, signature = "GIF89a") {
   const bytes = new Uint8Array(10);
@@ -24,4 +24,12 @@ test("GIF avatar rules enforce exact byte/dimension bounds and recognized header
   exactLimit.set(header(1, 1));
   assert.equal(gifAvatarError(exactLimit), null);
   assert.equal(gifAvatarError(new Uint8Array(MAX_AVATAR_BYTES + 1)), "file_too_large");
+});
+
+test("avatar MIME type is recovered from image bytes when stored metadata is missing", () => {
+  assert.equal(avatarTypeFromBytes(header(1, 1)), "image/gif");
+  assert.equal(avatarTypeFromBytes(Uint8Array.from([0x89, 0x50, 0x4e, 0x47])), "image/png");
+  assert.equal(avatarTypeFromBytes(Uint8Array.from([0xff, 0xd8, 0xff])), "image/jpeg");
+  assert.equal(avatarTypeFromBytes(new TextEncoder().encode("RIFF1234WEBP")), "image/webp");
+  assert.equal(avatarTypeFromBytes(new Uint8Array()), "");
 });

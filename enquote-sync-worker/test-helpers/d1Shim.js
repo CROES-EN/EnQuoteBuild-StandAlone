@@ -43,7 +43,17 @@ export function createSupervisorD1(migrations = ["0002_supervisor_records.sql"])
 }
 
 export function createCollabD1() {
-  return createSupervisorD1(["0005_collab.sql", "0008_chat_reactions.sql", "0009_custom_emojis.sql"]);
+  return createSupervisorD1([
+    "0005_collab.sql",
+    "0008_chat_reactions.sql",
+    "0009_custom_emojis.sql",
+    { sql: `CREATE TABLE admin_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_by TEXT NOT NULL, updated_at TEXT NOT NULL);
+      CREATE TABLE admin_user_overrides (
+        email TEXT PRIMARY KEY, app_role TEXT, additional_roles TEXT, allow_pages TEXT NOT NULL DEFAULT '[]',
+        deny_pages TEXT NOT NULL DEFAULT '[]', updated_by TEXT NOT NULL, updated_at TEXT NOT NULL
+      );` },
+    "0010_refund_requests.sql"
+  ]);
 }
 
 // 0006 alters presence_sessions, which lives in schema.sql rather than a migration.
