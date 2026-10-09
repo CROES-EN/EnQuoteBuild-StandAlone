@@ -348,6 +348,12 @@ Status snapshot tiles use the theme's matched card/background text colors, with
 colored dots identifying each status. Primary action buttons use matched theme
 colors without decorative glow shadows.
 
+Outline/ghost button labels, dialog headings, and close icons follow the active
+light or dark theme throughout the app. Colored actions keep their semantic hues
+with contrast-checked text, including hover states. Custom themes use the same
+readability checks. Legacy slate/indigo styling follows the current theme rather
+than fixed light-theme colors.
+
 In **Messages**, copy a screenshot, click the message composer, and press **Ctrl+V**
 to preview it. Remove a preview with its X button or press Send to share it, with
 or without text. PNG, JPEG, WebP, and GIF images are supported, up to **5 MB each**
@@ -438,6 +444,11 @@ Space between detail rows belongs to the preceding field's selection area, so
 clicking between Site ID and Case Number selects Site ID rather than the whole card.
 Shared quote fields and sections include the quote number in their link label
 (for example, `Status History - Q-123`). Whole-quote `Quote Q-123` labels stay unchanged.
+Shared quote links carry the quote reference as well as the record ID, so they can
+open the same quote on a PC with a different synchronized local ID. Existing chat
+links labeled with a quote reference also use this lookup. The destination uses
+the local record ID for edits and preserves the selected section's highlight.
+Ambiguous references show an error instead of opening an arbitrary quote.
 Auto-Drafter details use the draft reference, or the real quote number once sent.
 The composer keeps a full-width text area with compact, borderless action icons
 at the lower right. Text grows up to a scrollable six-line area; Enter sends,
@@ -600,6 +611,12 @@ those charts do not use the new activity filters. Quote/activity/review load fai
 show retry controls instead of zero-shaped report totals.
 
 ### SOP Library sections and pages
+
+Web links in SOP pages, version-history previews, and Word attachments open
+separately in your browser, rather than replacing the EnQuote window. **Open
+original** behaves the same way. Return to EnQuote to continue from the selected
+SOP. Links to sections within an SOP scroll inside that page without changing
+EnQuote's route.
 
 Sections are the top level of the SOP Library (the equivalent of OneNote workbooks):
 **Sections > Parent pages > Subpages**. There is no separate workbook level. Every

@@ -31,6 +31,11 @@ export function appLinkUrl(item) {
   if (!validAppLink(item)) throw new Error("This EnQuote link is invalid.");
   const [pathname, query] = splitAppPath(item.path);
   const params = new URLSearchParams(query);
+  if (pathname === "/QuoteDetails" && !params.has("quoteNumber")) {
+    const reference = item.label.match(/^Quote ((?:Q|AI)-[A-Za-z0-9-]+)$/) ||
+      item.label.match(/ - ((?:Q|AI)-[A-Za-z0-9-]+)$/);
+    if (reference) params.set("quoteNumber", reference[1]);
+  }
   params.set(APP_LINK_QUERY, JSON.stringify(item.target));
   return `${pathname}?${params}`;
 }

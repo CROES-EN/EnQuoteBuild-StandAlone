@@ -117,3 +117,11 @@ test("interactive links inside selectable cards do not change card selection", a
   });
   assert.deepEqual(selected, []);
 });
+
+test("chat selection routes include an encoded stable quote reference", async () => {
+  const {QuoteCard} = await loadQuoteCard();
+  const card = QuoteCard({quote: {...quote, id: "local & id", quote_number: "Q-6895953751"}});
+  const route = new URL(card.props.children.props["data-enquote-share-route"], "https://local.invalid");
+  assert.equal(route.searchParams.get("id"), "local & id");
+  assert.equal(route.searchParams.get("quoteNumber"), "Q-6895953751");
+});

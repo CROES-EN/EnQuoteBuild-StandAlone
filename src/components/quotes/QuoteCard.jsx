@@ -50,7 +50,7 @@ export default function QuoteCard({ quote, index = 0, selectable = false, isSele
       <div
         role={selectable ? "checkbox" : "link"}
         data-enquote-share-target={`quote:${quote.id}`}
-        data-enquote-share-route={createPageUrl(`QuoteDetails?id=${encodeURIComponent(quote.id)}`)}
+        data-enquote-share-route={createPageUrl(`QuoteDetails?id=${encodeURIComponent(quote.id)}${quote.quote_number ? `&quoteNumber=${encodeURIComponent(quote.quote_number)}` : ""}`)}
         aria-label={`Quote ${quote.quote_number || quote.site_id || quote.id}`}
         aria-checked={selectable ? isSelected : undefined}
         tabIndex={0}

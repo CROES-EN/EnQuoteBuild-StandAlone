@@ -1,8 +1,8 @@
 import {useEffect, useState} from "react";
-import DOMPurify from "dompurify";
 import {Download, FileText, Loader2} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {sopsApi} from "@/features/collab/collabApi";
+import SopRichContent from "./SopRichContent";
 
 export const DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
@@ -43,7 +43,7 @@ export default function SopFilePreview({file}) {
           const mammoth = await import("mammoth");
           const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
           const converted = await mammoth.convertToHtml({arrayBuffer});
-          html = DOMPurify.sanitize(converted.value || "");
+          html = converted.value || "";
         } else if (type === "text/plain") {
           text = new TextDecoder().decode(bytes);
         }
@@ -72,7 +72,7 @@ export default function SopFilePreview({file}) {
   } else if (state.type === "application/pdf") {
     body = <iframe src={state.url} title={file.name} className="h-[75vh] w-full border-0" />;
   } else if (state.html !== null) {
-    body = <div className="sop-content max-h-[75vh] overflow-auto px-4 py-3" dangerouslySetInnerHTML={{__html: state.html}} />;
+    body = <SopRichContent className="max-h-[75vh] overflow-auto px-4 py-3" html={state.html} />;
   } else if (state.text !== null) {
     body = <pre className="max-h-[75vh] overflow-auto whitespace-pre-wrap px-4 py-3 text-sm text-foreground">{state.text}</pre>;
   } else {

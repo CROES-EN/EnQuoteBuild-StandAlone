@@ -192,7 +192,9 @@ test("quote section labels retain the reference while whole-quote labels remain 
   };
   const main = {getAttribute: () => null, querySelectorAll: () => [field], querySelector: () => ({})};
   for (label of ["Status History", "Quote Activity", "Follow-Up History", "Notes & Terms", "Scope of Work", "Quote Details", "Line Items", "Site ID 123"]) {
-    assert.equal(describeAppElement(field, "/QuoteDetails?id=q1").label, `${label} - Q-123`);
+    const link = describeAppElement(field, "/QuoteDetails?id=q1");
+    assert.equal(link.label, `${label} - Q-123`);
+    assert.equal(new URL(link.path, "https://local.invalid").searchParams.get("quoteNumber"), "Q-123");
   }
   label = "x".repeat(160);
   const shortened = describeAppElement(field, "/QuoteDetails?id=q1").label;

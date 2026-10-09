@@ -49,7 +49,7 @@ async function run() {
   await sleep(PAGE_SETTLE_MS);
 
   const failures = [];
-  const pages = process.argv.includes("--case-work-only") || process.argv.includes("--stability-only") || process.argv.includes("--sop-sections-only") || process.argv.includes("--retro-only") || process.argv.includes("--console-only") ? [] : ["Dashboard", ...pageNames().filter((name) => name !== "Dashboard")];
+  const pages = process.argv.includes("--case-work-only") || process.argv.includes("--stability-only") || process.argv.includes("--sop-sections-only") || process.argv.includes("--retro-only") || process.argv.includes("--console-only") || process.argv.includes("--theme-contrast-only") || process.argv.includes("--sop-links-only") ? [] : ["Dashboard", ...pageNames().filter((name) => name !== "Dashboard")];
   for (const page of pages) {
     consoleErrors.length = 0;
     await win.webContents.executeJavaScript(`window.__smokeErrors.length = 0; location.hash = "#/${page}"; true`);
@@ -80,6 +80,12 @@ async function run() {
   }
 
   if (pages.length) console.log(`\n${pages.length - failures.length}/${pages.length} pages rendered cleanly.`);
+  if (!failures.length && process.argv.includes("--sop-links-only")) {
+    await require("./sop-links.cjs").runSopLinks(win);
+  }
+  if (!failures.length && process.argv.includes("--theme-contrast-only")) {
+    await require("./theme-contrast.cjs").runThemeContrast(win);
+  }
   if (!failures.length && process.argv.includes("--sop-sections-only")) {
     await require("./sop-sections.cjs").runSopSections(win);
   }

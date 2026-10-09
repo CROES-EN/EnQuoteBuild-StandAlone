@@ -1,4 +1,4 @@
-import {useState} from "react";
+import {useEffect, useState} from "react";
 import {base44} from "@/api/base44Client";
 import {
     bulkUpdateQuotes,
@@ -79,6 +79,7 @@ import TaskDialog from "@/components/collab/TaskDialog";
 import {quoteLabel} from "@/components/collab/QuotePicker";
 import {hasCollabBridge} from "@/features/collab/collabApi";
 import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
+import {canonicalSharedQuotePath, resolveSharedQuote} from "@/features/collab/sharedQuoteLink";
 
 // Only these users can grant/revoke pre-approval
 const PRE_APPROVAL_USERS = ["smosley@enphaseenergy.com", "REDACTED-USER1@example.invalid"];
@@ -130,6 +131,7 @@ function QuoteDetailsContent() {
  const location = useLocation();
  const urlParams = new URLSearchParams(location.search);
  const quoteId = urlParams.get("id");
+ const quoteNumber = urlParams.get("quoteNumber");
 
  const [showRejectDialog, setShowRejectDialog] = useState(false);
  const [rejectionReason, setRejectionReason] = useState("");
@@ -157,13 +159,19 @@ function QuoteDetailsContent() {
  const [stripeInvoiceId, setStripeInvoiceId] = useState("");
  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
 
- const { data: quote, isLoading } = useQuery({
- queryKey: ["quote", quoteId],
+ const { data: quote, isLoading, error: quoteError } = useQuery({
+ queryKey: ["quote", quoteId, quoteNumber],
  queryFn: async () => {
- return getQuoteById(quoteId);
+ return resolveSharedQuote(quoteId, quoteNumber, {getQuoteById, getQuotes});
  },
- enabled: !!quoteId
+ enabled: !!(quoteId || quoteNumber)
  });
+
+ const needsCanonicalQuoteId = quote && quote.id !== quoteId;
+ useEffect(() => {
+ if (!needsCanonicalQuoteId) return;
+ navigate(canonicalSharedQuotePath(location.pathname, location.search, quoteId, quote), {replace: true});
+ }, [needsCanonicalQuoteId, quote, quoteId, location.pathname, location.search, navigate]);
 
  const updateMutation = useMutation({
  mutationFn: ({ id, data }) => updateQuote(id, data),
@@ -1221,7 +1229,7 @@ function QuoteDetailsContent() {
  URL.revokeObjectURL(url);
  };
 
- if (isLoading) {
+ if (isLoading || needsCanonicalQuoteId) {
  return (
  <div className="min-h-screen bg-background flex items-center justify-center">
  <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
@@ -1229,11 +1237,12 @@ function QuoteDetailsContent() {
  );
  }
 
- if (!quote) {
+ if (quoteError || !quote) {
  return (
  <div className="min-h-screen bg-background flex items-center justify-center">
  <Card className="p-8 text-center">
- <h2 className="text-xl font-semibold text-foreground mb-2">Quote not found</h2>
+ <h2 className="text-xl font-semibold text-foreground mb-2">{quoteError ? "Could not open quote" : "Quote not found"}</h2>
+ {quoteError && <p role="alert" className="text-sm text-muted-foreground">{quoteError.message}</p>}
  <Link to={createPageUrl("Quotes")}>
  <Button className="mt-4">Back to Quotes</Button>
  </Link>

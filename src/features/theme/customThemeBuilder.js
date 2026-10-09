@@ -1,5 +1,12 @@
 const AA_CONTRAST = 4.5;
 
+const ACTION_COLORS = {
+  red: "#b91c1c", rose: "#be123c", yellow: "#a16207", amber: "#b45309",
+  orange: "#c2410c", green: "#15803d", emerald: "#047857", teal: "#0f766e",
+  cyan: "#0e7490", sky: "#0369a1", blue: "#1d4ed8", purple: "#7e22ce",
+  violet: "#6d28d9", fuchsia: "#a21caf", pink: "#be185d", lime: "#4d7c0f"
+};
+
 export const DENSITY_OPTIONS = {
   comfortable: { label: "Comfortable", scale: 1, fontScale: 1 },
   cozy: { label: "Cozy", scale: 0.94, fontScale: 0.98 },
@@ -159,6 +166,20 @@ function toneFrom(base, lightness, saturationCap = 100) {
   return { h: base.h, s: Math.min(base.s, saturationCap), l: clampPercent(lightness) };
 }
 
+function readableAccentText(color, surfaces, isDark, minimum = AA_CONTRAST) {
+  for (let step = 0; step <= 100; step += 1) {
+    const candidate = toneFrom(color, Math.round(color.l + ((isDark ? 100 : 0) - color.l) * step / 100));
+    if (surfaces.every(surface => contrastRatio(hslToHex(candidate), hslToHex(surface)) >= minimum)) {
+      return candidate;
+    }
+  }
+  return { h: 0, s: 0, l: isDark ? 100 : 0 };
+}
+
+function hoverTone(background, foreground) {
+  return toneFrom(background, background.l + (relativeLuminance(hslToHex(foreground)) > 0.5 ? -4 : 4));
+}
+
 function modeFromSettings(settings) {
   if (settings.mode === "dark" || settings.mode === "light") return settings.mode;
   const source = settings.backgroundTint || settings.background || DEFAULT_CUSTOM_COLORS.backgroundTint;
@@ -218,9 +239,13 @@ export function buildCustomTheme(settings = {}) {
   const sidebarBorder = toneFrom(sidebar, sidebar.l < 50 ? sidebar.l + 18 : sidebar.l - 14, Math.min(sidebar.s, 28));
 
   const primaryForeground = readableForegroundHsl(primary);
+  const surfaces = [background, card, popover, secondary, muted];
+  const primaryText = readableAccentText(primary, surfaces, isDark);
   const accentForeground = readableForegroundHsl(accent);
   const destructive = isDark ? { h: 0, s: 72, l: 46 } : { h: 0, s: 78, l: 52 };
   const warning = isDark ? { h: 38, s: 72, l: 58 } : { h: 35, s: 82, l: 45 };
+  const destructiveForeground = readableForegroundHsl(destructive);
+  const warningForeground = readableForegroundHsl(warning);
   const densityOption = DENSITY_OPTIONS[normalized.density] || DENSITY_OPTIONS.comfortable;
 
   const variables = {
@@ -231,7 +256,9 @@ export function buildCustomTheme(settings = {}) {
     "--popover": hslToVarString(popover),
     "--popover-foreground": hslToVarString(readableForegroundHsl(popover)),
     "--primary": hslToVarString(primary),
+    "--primary-text": hslToVarString(primaryText),
     "--primary-foreground": hslToVarString(primaryForeground),
+    "--primary-hover": hslToVarString(hoverTone(primary, primaryForeground)),
     "--secondary": hslToVarString(secondary),
     "--secondary-foreground": hslToVarString(readableForegroundHsl(secondary)),
     "--muted": hslToVarString(muted),
@@ -239,9 +266,11 @@ export function buildCustomTheme(settings = {}) {
     "--accent": hslToVarString(accent),
     "--accent-foreground": hslToVarString(accentForeground),
     "--destructive": hslToVarString(destructive),
-    "--destructive-foreground": hslToVarString(readableForegroundHsl(destructive)),
+    "--destructive-foreground": hslToVarString(destructiveForeground),
+    "--destructive-hover": hslToVarString(hoverTone(destructive, destructiveForeground)),
     "--warning": hslToVarString(warning),
-    "--warning-foreground": hslToVarString(readableForegroundHsl(warning)),
+    "--warning-foreground": hslToVarString(warningForeground),
+    "--warning-hover": hslToVarString(hoverTone(warning, warningForeground)),
     "--border": hslToVarString(border),
     "--input": hslToVarString(border),
     "--ring": hslToVarString(primary),
@@ -262,6 +291,9 @@ export function buildCustomTheme(settings = {}) {
     "--sidebar-border": hslToVarString(sidebarBorder),
     "--sidebar-ring": hslToVarString(primary)
   };
+  for (const [family, color] of Object.entries(ACTION_COLORS)) {
+    variables[`--action-${family}`] = hslToVarString(readableAccentText(hexToHsl(color), surfaces, isDark, 5));
+  }
 
   return {
     variables,

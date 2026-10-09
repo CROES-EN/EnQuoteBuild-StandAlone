@@ -336,7 +336,7 @@ function QuotesContent() {
             <Button
               variant={alertsOnly ? "default" : "outline"}
               onClick={() => setAlertsOnly(!alertsOnly)}
-              className={alertsOnly ? "bg-amber-500 hover:bg-amber-600" : "border-amber-300 text-amber-700 hover:bg-amber-50"}
+              className={alertsOnly ? "bg-warning text-warning-foreground hover:bg-warning/90" : "border-amber-300 text-amber-700 hover:bg-amber-50"}
             >
               <AlertCircle className="w-4 h-4 mr-2" />
               Alerts
@@ -357,7 +357,7 @@ function QuotesContent() {
             <Button
               variant={duplicatesOnly ? "default" : "outline"}
               onClick={() => setDuplicatesOnly((prev) => !prev)}
-              className={duplicatesOnly ? "bg-amber-600 hover:bg-amber-700" : "border-slate-300"}
+              className={duplicatesOnly ? "bg-warning text-warning-foreground hover:bg-warning/90" : "border-slate-300"}
               title="Sites with 2 or more quotes that share the exact same total"
             >
               <AlertCircle className="w-4 h-4 mr-2" />

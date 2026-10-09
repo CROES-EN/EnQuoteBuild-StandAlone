@@ -73,6 +73,11 @@ export function describeAppElement(element, path) {
   const baseLabel = element.getAttribute("data-enquote-share-label") || element.getAttribute("aria-label") || text(element) || element.getAttribute("title") || "Shared item";
   const quoteContext = element.closest("[data-enquote-share-quote-number]");
   const quoteNumber = quoteContext?.getAttribute("data-enquote-share-quote-number");
+  if (quoteNumber && splitAppPath(destination)[0] === "/QuoteDetails") {
+    const destinationParams = new URLSearchParams(splitAppPath(destination)[1]);
+    destinationParams.set("quoteNumber", quoteNumber);
+    destination = `/QuoteDetails?${destinationParams}`;
+  }
   const suffix = quoteNumber && quoteContext !== element && baseLabel !== `Quote ${quoteNumber}`
     ? ` - ${quoteNumber}` : "";
   const label = baseLabel.slice(0, Math.max(0, 160 - suffix.length)) + suffix;

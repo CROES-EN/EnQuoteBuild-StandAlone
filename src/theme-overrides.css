@@ -1,8 +1,8 @@
 ﻿/**
  * EnQuote theme override stylesheet.
  *
- * HOW THIS WORKS: ThemeContext.jsx sets CSS custom properties (variables) directly on
- * <html style="--theme-bg-primary: ...">, based on the active theme from themes.js. The rules
+ * HOW THIS WORKS: ThemeContext.jsx sets the current theme's semantic CSS custom properties
+ * (--background, --foreground, --primary, etc.) on <html>. The legacy aliases and rules
  * below redirect the app's EXISTING Tailwind utility classes (bg-white, bg-slate-50,
  * text-slate-900, border-slate-200, etc. - already used throughout every component built today)
  * to read from those variables instead of their normal fixed Tailwind color values.
@@ -11,10 +11,8 @@
  * variable VALUES change per theme (see themes.js) - the class-to-variable mapping below stays
  * the same for every theme.
  *
- * "light-plus" (the default theme) defines its variables to exactly match the values these
- * Tailwind classes already resolve to (bg-white = #ffffff, slate-50 = #f8fafc, slate-900 =
- * #0f172a, etc.) - so with the default theme active, these overrides change NOTHING visually
- * from how the app looked before this feature existed.
+ * Legacy utilities now follow the same accessible surface/foreground pairs as the shared
+ * components, in both preset and custom themes.
  *
  * !important is used deliberately and only here, in this one centralized file, specifically to
  * win against Tailwind's own utility-class specificity without needing to touch Tailwind's
@@ -22,21 +20,19 @@
  */
 
 :root {
-  /* Fallback values in case a theme somehow fails to apply its variables via JS (e.g. before
-     React has hydrated) - matches light-plus, so the very first paint before hydration is never
-     jarring or broken-looking, regardless of which theme was last selected. */
-  --theme-bg-primary: rgb(255 255 255);
-  --theme-bg-secondary: rgb(248 250 252);
-  --theme-bg-tertiary: rgb(241 245 249);
-  --theme-border: rgb(226 232 240);
-  --theme-border-subtle: rgb(241 245 249);
-  --theme-text-primary: rgb(15 23 42);
-  --theme-text-secondary: rgb(71 85 105);
-  --theme-text-muted: rgb(148 163 184);
-  --theme-accent: rgb(79 70 229);
-  --theme-accent-bg: rgb(238 242 255);
-  --theme-input-bg: rgb(255 255 255);
-  --theme-scrollbar: rgb(203 213 225);
+  --theme-bg-primary: hsl(var(--background));
+  --theme-bg-secondary: hsl(var(--card));
+  --theme-bg-tertiary: hsl(var(--muted));
+  --theme-border: hsl(var(--border));
+  --theme-border-subtle: hsl(var(--border) / 0.6);
+  --theme-text-primary: hsl(var(--foreground));
+  --theme-text-secondary: hsl(var(--foreground));
+  --theme-text-muted: hsl(var(--muted-foreground));
+  --theme-accent: hsl(var(--primary));
+  --theme-accent-text: hsl(var(--primary-text, var(--primary)));
+  --theme-accent-bg: hsl(var(--secondary));
+  --theme-input-bg: hsl(var(--background));
+  --theme-scrollbar: hsl(var(--border));
 }
 
 /* Smooth, non-jarring transition when switching themes - applied broadly but only affects
@@ -100,18 +96,81 @@ body {
 }
 
 /* Accent - used for primary buttons, links, active tab highlighting throughout the app */
+.text-primary,
 .text-indigo-600,
 .text-indigo-700 {
-  color: var(--theme-accent) !important;
+  color: var(--theme-accent-text) !important;
+}
+.hover\:text-primary:hover {
+  color: var(--theme-accent-text) !important;
 }
 .bg-indigo-50 {
   background-color: var(--theme-accent-bg) !important;
 }
 .bg-indigo-600 {
   background-color: var(--theme-accent) !important;
+  color: hsl(var(--primary-foreground)) !important;
+}
+.hover\:bg-indigo-700:hover,
+.hover\:bg-primary\/90:hover {
+  background-color: hsl(var(--primary-hover, var(--primary))) !important;
+  color: hsl(var(--primary-foreground)) !important;
+}
+.hover\:bg-warning\/90:hover {
+  background-color: hsl(var(--warning-hover, var(--warning))) !important;
+}
+.hover\:bg-destructive\/90:hover {
+  background-color: hsl(var(--destructive-hover, var(--destructive))) !important;
 }
 .border-indigo-200 {
   border-color: var(--theme-accent) !important;
+}
+
+/* Semantic outline/ghost action colors are contrast-checked by the theme builder. */
+.theme-button:is([data-button-variant="outline"], [data-button-variant="ghost"])[class*="text-red-"] { --theme-action-color: hsl(var(--action-red)); }
+.theme-button:is([data-button-variant="outline"], [data-button-variant="ghost"])[class*="text-rose-"] { --theme-action-color: hsl(var(--action-rose)); }
+.theme-button:is([data-button-variant="outline"], [data-button-variant="ghost"])[class*="text-yellow-"] { --theme-action-color: hsl(var(--action-yellow)); }
+.theme-button:is([data-button-variant="outline"], [data-button-variant="ghost"])[class*="text-amber-"] { --theme-action-color: hsl(var(--action-amber)); }
+.theme-button:is([data-button-variant="outline"], [data-button-variant="ghost"])[class*="text-orange-"] { --theme-action-color: hsl(var(--action-orange)); }
+.theme-button:is([data-button-variant="outline"], [data-button-variant="ghost"])[class*="text-green-"] { --theme-action-color: hsl(var(--action-green)); }
+.theme-button:is([data-button-variant="outline"], [data-button-variant="ghost"])[class*="text-emerald-"] { --theme-action-color: hsl(var(--action-emerald)); }
+.theme-button:is([data-button-variant="outline"], [data-button-variant="ghost"])[class*="text-teal-"] { --theme-action-color: hsl(var(--action-teal)); }
+.theme-button:is([data-button-variant="outline"], [data-button-variant="ghost"])[class*="text-cyan-"] { --theme-action-color: hsl(var(--action-cyan)); }
+.theme-button:is([data-button-variant="outline"], [data-button-variant="ghost"])[class*="text-sky-"] { --theme-action-color: hsl(var(--action-sky)); }
+.theme-button:is([data-button-variant="outline"], [data-button-variant="ghost"])[class*="text-blue-"] { --theme-action-color: hsl(var(--action-blue)); }
+.theme-button:is([data-button-variant="outline"], [data-button-variant="ghost"])[class*="text-purple-"] { --theme-action-color: hsl(var(--action-purple)); }
+.theme-button:is([data-button-variant="outline"], [data-button-variant="ghost"])[class*="text-violet-"] { --theme-action-color: hsl(var(--action-violet)); }
+.theme-button:is([data-button-variant="outline"], [data-button-variant="ghost"])[class*="text-fuchsia-"] { --theme-action-color: hsl(var(--action-fuchsia)); }
+.theme-button:is([data-button-variant="outline"], [data-button-variant="ghost"])[class*="text-pink-"] { --theme-action-color: hsl(var(--action-pink)); }
+.theme-button:is([data-button-variant="outline"], [data-button-variant="ghost"])[class*="text-lime-"] { --theme-action-color: hsl(var(--action-lime)); }
+
+.theme-button:is([data-button-variant="outline"], [data-button-variant="ghost"]):is(
+  [class*="text-red-"], [class*="text-rose-"], [class*="text-yellow-"], [class*="text-amber-"],
+  [class*="text-orange-"], [class*="text-green-"], [class*="text-emerald-"], [class*="text-teal-"],
+  [class*="text-cyan-"], [class*="text-sky-"], [class*="text-blue-"], [class*="text-purple-"],
+  [class*="text-violet-"], [class*="text-fuchsia-"], [class*="text-pink-"], [class*="text-lime-"]
+) {
+  color: var(--theme-action-color) !important;
+}
+.dark .theme-button:is([data-button-variant="outline"], [data-button-variant="ghost"]):is(
+  [class*="text-red-"], [class*="text-rose-"], [class*="text-yellow-"], [class*="text-amber-"],
+  [class*="text-orange-"], [class*="text-green-"], [class*="text-emerald-"], [class*="text-teal-"],
+  [class*="text-cyan-"], [class*="text-sky-"], [class*="text-blue-"], [class*="text-purple-"],
+  [class*="text-violet-"], [class*="text-fuchsia-"], [class*="text-pink-"], [class*="text-lime-"]
+) {
+  background-color: hsl(var(--background)) !important;
+}
+.dark .theme-button:is([data-button-variant="outline"], [data-button-variant="ghost"]):is(.text-indigo-600, .text-indigo-700) {
+  color: var(--theme-accent-text) !important;
+}
+.theme-button:is([data-button-variant="outline"], [data-button-variant="ghost"]):is(
+  [class*="text-red-"], [class*="text-rose-"], [class*="text-yellow-"], [class*="text-amber-"],
+  [class*="text-orange-"], [class*="text-green-"], [class*="text-emerald-"], [class*="text-teal-"],
+  [class*="text-cyan-"], [class*="text-sky-"], [class*="text-blue-"], [class*="text-purple-"],
+  [class*="text-violet-"], [class*="text-fuchsia-"], [class*="text-pink-"], [class*="text-lime-"],
+  .text-primary, .text-indigo-600, .text-indigo-700
+):hover {
+  background-color: hsl(var(--secondary)) !important;
 }
 
 /* Brighter semantic colors for Workload badges on every dark theme. */

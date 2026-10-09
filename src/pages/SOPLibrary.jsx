@@ -1,6 +1,5 @@
 import {useEffect, useMemo, useRef, useState} from "react";
 import {useLocation, useNavigate} from "react-router-dom";
-import DOMPurify from "dompurify";
 import {format} from "date-fns";
 import {ArchiveRestore, BookOpen, ExternalLink, History, Loader2, Pencil, Plus, RefreshCw, Trash2} from "lucide-react";
 import {toast} from "sonner";
@@ -28,6 +27,7 @@ import SopFilePreview from "@/components/sop/SopFilePreview";
 import SopHistoryDialog from "@/components/sop/SopHistoryDialog";
 import SopNotebookNav from "@/components/sop/SopNotebookNav";
 import SopOneNoteImport from "@/components/sop/SopOneNoteImport";
+import SopRichContent from "@/components/sop/SopRichContent";
 import {
   compareOrderThenTitle,
   createSectionRecord,
@@ -109,7 +109,6 @@ function saveNavCollapsed(value) {
 }
 
 function SopViewer({doc, sectionName, onEdit, onHistory, onDelete}) {
-  const html = useMemo(() => DOMPurify.sanitize(doc.content_html || ""), [doc.content_html]);
   const hasContent = stripHtml(doc.content_html).trim().length > 0;
   return (
     <div className="space-y-5">
@@ -124,8 +123,10 @@ function SopViewer({doc, sectionName, onEdit, onHistory, onDelete}) {
         </div>
         <div className="flex flex-wrap gap-2">
           {isSafeUrl(doc.source_url) && (
-            <Button variant="outline" size="sm" onClick={() => window.open(doc.source_url.trim(), "_blank")}>
-              <ExternalLink className="mr-1 h-4 w-4" /> Open original
+            <Button variant="outline" size="sm" asChild>
+              <a href={doc.source_url.trim()} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="mr-1 h-4 w-4" /> Open original
+              </a>
             </Button>
           )}
           <Button variant="outline" size="sm" onClick={onHistory}><History className="mr-1 h-4 w-4" /> History</Button>
@@ -136,7 +137,7 @@ function SopViewer({doc, sectionName, onEdit, onHistory, onDelete}) {
         </div>
       </div>
       {doc.summary && <p className="rounded-md bg-muted px-4 py-3 text-sm text-muted-foreground">{doc.summary}</p>}
-      {hasContent && <div className="sop-content" dangerouslySetInnerHTML={{__html: html}} />}
+      {hasContent && <SopRichContent html={doc.content_html} />}
       {(doc.files || []).map((file) => <SopFilePreview key={file.fileId} file={file} />)}
       {!hasContent && !(doc.files || []).length && !doc.summary && (
         <p className="text-sm text-muted-foreground">This SOP has no content yet. Click Edit to add some.</p>

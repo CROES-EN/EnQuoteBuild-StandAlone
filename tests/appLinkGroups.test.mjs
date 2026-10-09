@@ -83,6 +83,62 @@ test("Quote Details renders stable selectable label/value groups, rows, totals, 
   assert.match(html, /class="quote-detail-fields"/);
 });
 
+test("Quote Details canonicalizes shared IDs before showing editable content and surfaces lookup failures", async () => {
+  const quote = {id: "recipient-local", quote_number: "Q-6895953751", status: "draft_without_internal", items: []};
+  const search = new URLSearchParams({id: "sender-local", quoteNumber: quote.quote_number,
+    enquoteShareTarget: JSON.stringify({kind: "record", value: "quote:sender-local:status"})});
+  const effects = [];
+  const navigations = [];
+  let query, lookupError;
+  const Page = await load("src\\pages\\QuoteDetails.jsx", {
+    react: {...React, useEffect: callback => effects.push(callback)},
+    "@tanstack/react-query": {
+      useQuery: options => {
+        if (options.queryKey[0] !== "quote") return {data: options.queryKey[0] === "deletionRequest" ? null : []};
+        query = options;
+        return {data: lookupError ? null : quote, error: lookupError, isLoading: false};
+      },
+      useMutation: () => ({}), useQueryClient: () => ({})
+    },
+    "react-router-dom": {
+      useNavigate: () => (...args) => navigations.push(args),
+      useLocation: () => ({pathname: "/QuoteDetails", search: `?${search}`}), Link: wrapper
+    },
+    "@/api/dataClient": {getQuoteById: async () => null, getQuotes: async () => [quote]},
+    "@/components/auth/RoleGuard": Object.assign(wrapper, {useUserRole: () => ({
+      roles: [], user: {email: "owner@example.com"}
+    })}),
+    "@/utils": {createPageUrl: value => `/${value}`},
+    "@/features/collab/collabApi": {hasCollabBridge: () => false},
+    "lucide-react": new Proxy({}, {get: () => () => null}),
+    sonner: {toast: {}}, "framer-motion": {motion: {div: wrapper}}
+  });
+  const html = renderToStaticMarkup(React.createElement(Page));
+  assert.ok(!html.includes('data-enquote-share-target="quote:recipient-local"'),
+    "do not expose controls still bound to the sender's ID");
+  assert.match(html, /animate-spin/);
+  assert.deepEqual(query.queryKey, ["quote", "sender-local", quote.quote_number]);
+  assert.equal(await query.queryFn(), quote);
+  effects.forEach(callback => callback());
+  assert.equal(navigations.length, 1);
+  const [route, options] = navigations[0];
+  const params = new URL(route, "https://local.invalid").searchParams;
+  assert.equal(params.get("id"), quote.id);
+  assert.equal(JSON.parse(params.get("enquoteShareTarget")).value, "quote:recipient-local:status");
+  assert.deepEqual(options, {replace: true});
+  search.set("id", quote.id);
+  search.set("enquoteShareTarget", params.get("enquoteShareTarget"));
+  const opened = renderToStaticMarkup(React.createElement(Page));
+  assert.ok(opened.includes('data-enquote-share-target="quote:recipient-local:status"'));
+  assert.deepEqual(query.queryKey, ["quote", quote.id, quote.quote_number],
+    "the resolved page and update invalidations use the real local ID");
+  lookupError = new Error("This quote reference matches multiple records.");
+  const failed = renderToStaticMarkup(React.createElement(Page));
+  assert.match(failed, /Could not open quote/);
+  assert.match(failed, /This quote reference matches multiple records/);
+  assert.ok(!failed.includes("Quote not found"), "lookup errors must not look like a missing quote");
+});
+
 test("dashboard grid attaches whole-tile targets and exact reporting routes to draggable wrappers", async () => {
   const range = {preset: "last_7_days", start: "2026-10-01", end: "2026-10-07"};
   const paths = [];

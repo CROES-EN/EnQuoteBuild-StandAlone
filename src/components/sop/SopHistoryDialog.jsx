@@ -1,5 +1,4 @@
 import {useEffect, useState} from "react";
-import DOMPurify from "dompurify";
 import {format} from "date-fns";
 import {History, Loader2, RotateCcw} from "lucide-react";
 import {toast} from "sonner";
@@ -8,6 +7,7 @@ import {Badge} from "@/components/ui/badge";
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import {sopsApi} from "@/features/collab/collabApi";
 import {cn} from "@/lib/utils";
+import SopRichContent from "./SopRichContent";
 
 function formatStamp(value) {
   const time = Date.parse(value || "");
@@ -94,10 +94,7 @@ export default function SopHistoryDialog({doc, open, onOpenChange, onRestored}) 
                   <div className="overflow-y-auto p-4">
                     <h3 className="text-lg font-semibold text-foreground">{selected.record.title}</h3>
                     {selected.record.summary && <p className="mt-1 text-sm text-muted-foreground">{selected.record.summary}</p>}
-                    <div
-                      className="sop-content mt-3"
-                      dangerouslySetInnerHTML={{__html: DOMPurify.sanitize(selected.record.content_html || "")}}
-                    />
+                    <SopRichContent className="mt-3" html={selected.record.content_html} />
                     {(selected.record.files || []).length > 0 && (
                       <p className="mt-3 text-xs text-muted-foreground">
                         Attachments: {selected.record.files.map((file) => file.name).join(", ")}
