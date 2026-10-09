@@ -116,6 +116,9 @@ test("dashboard recipients use the shared period immediately and reveal hidden l
   globalThis.window = {localStorage: {getItem: () => JSON.stringify({hidden: ["improper_quote_requests"]})}};
   try {
     const Page = await load("src\\components\\supervisor\\DashboardOverview.jsx", {
+      "@/components/supervisor/CaseWorkTiles": Object.assign(() => null, {
+        CaseWorkSettings: () => null, readCaseWorkTeam: () => ["Test team member"]
+      }),
       "@tanstack/react-query": {useQuery: ({queryKey}) => ({
         data: queryKey[0] === "report-tables-for-ops-overview" ? {} : [],
         isLoading: false, isError: false
