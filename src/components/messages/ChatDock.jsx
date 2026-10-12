@@ -236,19 +236,20 @@ export default function ChatDock() {
       {error && <div role="alert" className="pointer-events-auto max-w-sm rounded border border-border bg-card p-2 text-sm text-card-foreground">
         {error} <button type="button" className="underline" onClick={() => setReload(value => value + 1)}>Retry</button>
       </div>}
-      {minimizedTabs.length > 0 && <div className={cn("pointer-events-auto relative z-10 flex max-w-full shrink-0 gap-1 overflow-x-auto bg-background",
+      {minimizedTabs.length > 0 && <div className={cn("pointer-events-auto relative z-10 flex max-w-full shrink-0 gap-1 overflow-x-auto",
         expanded ? "h-10" : "h-14 pr-[72px]")} aria-label="Open chats">
         {minimizedTabs.map(tab => {
           const unread = conversations.find(item => item.id === tab.id)?.unread || 0;
           const title = titleFor(tab.id);
           return (
-            <div key={tab.id} className="flex w-44 shrink-0 items-center rounded-md border border-border bg-card text-card-foreground">
+            <div key={tab.id} style={{borderRadius: "min(var(--radius), 0.75rem)"}}
+              className="flex w-44 shrink-0 items-center overflow-hidden border border-border bg-card text-card-foreground">
               <button type="button" aria-expanded={false} aria-label={`Open chat with ${title}`}
-                onClick={() => dispatch({type: "open", id: tab.id})} className="flex min-w-0 flex-1 self-stretch items-center gap-2 rounded-l-md p-2 text-left text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+                onClick={() => dispatch({type: "open", id: tab.id})} className="flex min-w-0 flex-1 self-stretch items-center gap-2 p-2 text-left text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
                 <MessageSquare className="h-4 w-4 shrink-0" /><span className="truncate">{title}</span>
                 {unread > 0 && <span aria-label={`${unread} unread messages`} className="rounded-full bg-primary px-1.5 text-xs text-primary-foreground">{unread > 99 ? "99+" : unread}</span>}
               </button>
-              <button type="button" aria-label={`Close chat with ${title}`} onClick={() => dispatch({type: "close", id: tab.id})} className="flex w-7 shrink-0 self-stretch items-center justify-center rounded-r-md hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"><X className="h-3.5 w-3.5" /></button>
+              <button type="button" aria-label={`Close chat with ${title}`} onClick={() => dispatch({type: "close", id: tab.id})} className="flex w-7 shrink-0 self-stretch items-center justify-center hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"><X className="h-3.5 w-3.5" /></button>
             </div>
           );
         })}

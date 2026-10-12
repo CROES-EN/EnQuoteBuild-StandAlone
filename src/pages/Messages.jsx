@@ -19,7 +19,8 @@ import {
 } from "lucide-react";
 import {toast} from "sonner";
 import {Button} from "@/components/ui/button";
-import {Textarea} from "@/components/ui/textarea";
+import MessageComposer from "@/components/messages/MessageComposer";
+import InlineMessageBody from "@/components/messages/InlineMessageBody";
 import {Card, CardContent} from "@/components/ui/card";
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
@@ -160,12 +161,6 @@ export default function MessagesPage({conversationId, compact = false, visible =
   const appearanceStyles = useMemo(() => chatAppearanceStyles(appearance), [appearance]);
   const scrollRef = useRef(null);
   const composerRef = useRef(null);
-  useEffect(() => {
-    const composer = composerRef.current;
-    if (!composer) return;
-    composer.style.height = "auto";
-    composer.style.height = `${Math.min(120, composer.scrollHeight)}px`;
-  }, [draft, visible, activeId]);
   useEffect(() => {
     if (compact && visible) composerRef.current?.focus({preventScroll: true});
   }, [compact, visible]);
@@ -447,9 +442,11 @@ export default function MessagesPage({conversationId, compact = false, visible =
 
   const addEmoji = (emoji, type) => {
     if (pasteInFlight.current) return;
-    const attachment = {type, emojiId: emoji.id, name: emoji.name || emoji.label,
-      ...(emoji.sourceGifId ? {sourceGifId: emoji.sourceGifId} : {})};
-    setAttachments(list => list.length >= MAX_ATTACHMENTS ? list : [...list, attachment]);
+    try {
+      composerRef.current?.insertEmoji(emoji, type);
+    } catch (error) {
+      toast.error(error.message || "Could not insert emoji.");
+    }
     setGifOpen(false);
   };
 
@@ -612,7 +609,7 @@ export default function MessagesPage({conversationId, compact = false, visible =
                           <div className={cn("flex min-w-0 max-w-[75%] flex-col", mine ? "items-end" : "items-start")}>
                             {showSender && <span className="mb-0.5 px-1 text-xs font-medium text-foreground">{displayName(message.sender, names)}</span>}
                             <MessageBubble message={message} mine={mine} bubbleStyle={bubbleStyle}>
-                            {message.body && !gifOnly && <p className={cn("whitespace-pre-wrap break-words", removed && "italic opacity-70")}>{message.body}</p>}
+                            {message.body && !gifOnly && <p className={cn("whitespace-pre-wrap break-words", removed && "italic opacity-70")}><InlineMessageBody body={message.body} /></p>}
                             {(message.attachments || []).length > 0 && (
                               <div className={cn("flex flex-col", !gifOnly && "gap-1")}>
                                 {message.attachments.map((attachment, attachmentIndex) => (
@@ -693,10 +690,10 @@ export default function MessagesPage({conversationId, compact = false, visible =
                   </div>
                 )}
                 <div className="rounded-md border border-input bg-background focus-within:ring-1 focus-within:ring-ring">
-                  <Textarea
+                  <MessageComposer
                     ref={composerRef}
                     value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
+                    onChange={setDraft}
                     onPaste={pasteScreenshots}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -704,12 +701,9 @@ export default function MessagesPage({conversationId, compact = false, visible =
                         send();
                       }
                     }}
-                    rows={1}
                     maxLength={MAX_BODY}
                     aria-label="Message text"
                     title="Enter to send, Shift+Enter for a new line. Paste screenshots with Ctrl+V."
-                    placeholder="Type a message"
-                    className="min-h-10 w-full resize-none border-0 bg-transparent shadow-none focus-visible:ring-0"
                   />
                   <div className="flex items-center justify-end gap-1 px-1 pb-1" aria-label="Message composer actions">
                   <Button type="button" size="icon" variant="ghost" className="h-7 w-7" aria-label="Share something in EnQuote"
@@ -725,7 +719,7 @@ export default function MessagesPage({conversationId, compact = false, visible =
                     aria-label="Attach a quote"
                     title="Attach a quote"
                     onClick={() => setPickerOpen(true)}
-                    disabled={pasting || attachments.length >= MAX_ATTACHMENTS}
+                    disabled={pasting}
                   >
                     <Paperclip className="h-4 w-4" />
                   </Button>

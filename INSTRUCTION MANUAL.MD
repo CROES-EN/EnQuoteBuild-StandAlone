@@ -480,6 +480,17 @@ controls; SLA timing or Mentioned replaces the old separate day-threshold list.
 The main Dashboard does not display Coaching Feedback or Attention Required.
 Quote alerts remain available on the Quotes page; this does not delete feedback
 or dismiss any alerts.
+Chat emojis insert at the message cursor, both in Messages and in the chat dock.
+Built-in emojis are text; custom emojis display inline in the composer and sent
+messages. Backspace/Delete removes them, and Ctrl+Z undoes insertion. GIFs,
+screenshots, and shared items remain separate attachments. Older emoji
+attachments still display normally. Custom emoji references count toward the
+existing 4,000-character message limit.
+Minimized chat tabs use a transparent dock background and cap their corner radius
+at 12 px so the maximum theme radius does not distort the tab or close control.
+The message launcher remains circular.
+The UI-only emoji update does not change Windows notification formatting;
+notifications may display the custom emoji reference instead of its short name.
 Auto-Drafter details use the draft reference, or the real quote number once sent.
 
 In EnSpace, **Games** in the top quicklinks bar opens an arcade with Snake,

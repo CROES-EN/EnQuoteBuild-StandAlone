@@ -164,6 +164,10 @@ function respond(path, args) {
     return Promise.resolve({ok: true, conversation: {id: "smoke-chat"}});
   }
   if (key === "chat.me") return Promise.resolve({email: IDENTITY.email, unreadTotal: 0});
+  if (key === "chat.reactions") return Promise.resolve({ok: true, reactions: {}});
+  if (key === "chat.emojis") return Promise.resolve({ok: true, emojis: [{id: "c".repeat(64), name: "pepe-pray"}]});
+  if (key === "chat.getEmoji") return Promise.resolve({ok: true,
+    dataUrl: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"});
   if (key === "chat.directory") return Promise.resolve([...USERS.map((user) => ({email: user.email, name: user.full_name})),
     {email: "teammate@example.invalid", name: "Retro Teammate"}]);
   if (key === "chat.send") {

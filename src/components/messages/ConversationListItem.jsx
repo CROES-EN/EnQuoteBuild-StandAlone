@@ -3,6 +3,7 @@ import {Users} from "lucide-react";
 import {UserAvatar} from "@/components/profile/UserAvatar";
 import {displayName} from "./ConversationDialogs";
 import {cn} from "@/lib/utils";
+import {inlineEmojiPreview} from "@/features/collab/inlineEmojis";
 
 function formatListTime(value) {
   const time = Date.parse(value || "");
@@ -39,7 +40,7 @@ export default function ConversationListItem({conversation, meEmail, names, acti
         <span className="flex items-center justify-between gap-2">
           <span className="truncate text-xs text-muted-foreground">
             {conversation.lastMessagePreview
-              ? `${conversation.lastSender === meEmail ? "You" : displayName(conversation.lastSender, names)}: ${conversation.lastMessagePreview}`
+              ? `${conversation.lastSender === meEmail ? "You" : displayName(conversation.lastSender, names)}: ${inlineEmojiPreview(conversation.lastMessagePreview)}`
               : "No messages yet"}
           </span>
           {conversation.unread > 0 && <span aria-label={`${conversation.unread} unread messages`} className="inline-flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-semibold text-white">{conversation.unread > 99 ? "99+" : conversation.unread}</span>}
