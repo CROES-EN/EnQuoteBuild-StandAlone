@@ -85,6 +85,14 @@ test("fresh Electron startup registers every emoji preload method before authent
   const payload = {gifId: "gif123", name: "team"};
   assert.equal((await globals.enquoteLocal.chat.saveGifEmoji(payload)).emoji.name, "team");
   assert.deepEqual(calls, ["/api/chat/emojis", {route: "/api/chat/emojis/from-gif", payload}]);
+  assert.equal(typeof globals.enquoteLocal.retroGames.list, "function");
+  assert.equal(typeof globals.enquoteLocal.retroGames.get, "function");
+  assert.equal(typeof globals.enquoteLocal.retroGames.act, "function");
+  assert.equal(typeof globals.enquoteLocal.retroGames.scores, "function");
+  assert.equal(typeof globals.enquoteLocal.retroGames.score, "function");
+  await globals.enquoteLocal.retroGames.list();
+  await globals.enquoteLocal.retroGames.act({action: "challenge"});
+  assert.deepEqual(calls.slice(-2), ["/api/retro-games", {route: "/api/retro-games", payload: {action: "challenge"}}]);
   mocks["../shared/refundFeature.json"].enabled = false;
   const before = calls.length;
   for (const channel of ["refundRequests:list", "refundRequests:submitToTracker", "refundWorkbook:sync", "refundRequests:syncSource"]) {

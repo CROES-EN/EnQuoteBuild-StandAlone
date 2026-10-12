@@ -3,7 +3,7 @@
 const assert = require("node:assert/strict");
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function runRetro(win) {
+async function runRetro(win, {arcadeOnly = false} = {}) {
   const evaluate = async (code) => {
     try {
       return await win.webContents.executeJavaScript(code);
@@ -50,6 +50,226 @@ async function runRetro(win) {
   await click("Home");
   assert.equal(await evaluate(`document.querySelector('input[aria-label="Search retro profiles"]').value`), "");
   assert.equal(await evaluate(`document.querySelector('nav[aria-label="EnQuote Space quicklinks"] button[title^="Forum:" ]').disabled`), true);
+  await click("Games");
+  await waitFor(`location.hash === "#/Base44_DTO?games=1" && Boolean(document.querySelector('[aria-label="EnSpace Games"]'))`, "arcade navigation");
+  win.showInactive();
+  assert.equal(await evaluate(`document.body.innerText.includes("EST. 1985")`), false);
+  if (process.env.ENQUOTE_ARCADE_SCREENSHOT) {
+    await sleep(300);
+    require("node:fs").writeFileSync(process.env.ENQUOTE_ARCADE_SCREENSHOT, (await win.webContents.capturePage()).toPNG());
+  }
+  await click("Play Snake");
+  await click("Start");
+  assert.equal(await evaluate(`document.activeElement.getAttribute("aria-label").startsWith("Snake board")`), true);
+  await evaluate(`document.activeElement.dispatchEvent(new KeyboardEvent("keydown", {key:"ArrowUp", bubbles:true}))`);
+  const frames = [];
+  for (let sample = 0; sample < 6; sample++) {
+    frames.push(await evaluate(`document.querySelector('[data-testid="arcade-snake-head"]').getAttribute("transform")`));
+    await sleep(25);
+  }
+  assert.ok(new Set(frames).size >= 3, `Snake moves on animation frames rather than snapping once per grid tick: ${JSON.stringify(frames)}`);
+  await click("Pause");
+  assert.equal(await evaluate(`document.querySelector('[aria-label="EnSpace Games"] [role="status"]').textContent.includes("Paused")`), true);
+  await click("Resume");
+  await waitFor(`document.querySelector('[aria-label="EnSpace Games"] .enspace-score').textContent.includes("Game over")`, "completed Snake score");
+  await waitFor(`document.body.innerText.includes("Shared leaderboard updated.")`, "shared Snake best");
+  assert.equal(await evaluate(`window.__smokeCalls["retroGames.score"]`), 1, "a completed run uploads once");
+  await click("Back to games");
+  await click("Play Memory Match");
+  const card = `[...document.querySelectorAll('[aria-label="EnSpace Games"] button')].find(button => button.getAttribute("aria-label")?.startsWith("Card 1:"))`;
+  await evaluate(`(${card}).click()`);
+  assert.equal(await evaluate(`Boolean((${card}).querySelector('svg'))`), true);
+  await evaluate(`window.__arcadeOriginalRandom = Math.random; Math.random = () => 0; true`);
+  await click("New game");
+  await evaluate(`Math.random = window.__arcadeOriginalRandom; delete window.__arcadeOriginalRandom`);
+  assert.equal(await evaluate(`(${card}).textContent.trim()`), "?");
+  for (let index = 0; index < 8; index++) {
+    await evaluate(`(() => {
+      const buttons=[...document.querySelectorAll('[aria-label="EnSpace Games"] button[aria-label^="Card "]')];
+      buttons[${index}].click();
+    })()`);
+    await sleep(30);
+    await evaluate(`(() => {
+      const buttons=[...document.querySelectorAll('[aria-label="EnSpace Games"] button[aria-label^="Card "]')];
+      buttons[${index + 8}].click();
+    })()`);
+    await sleep(30);
+  }
+  await waitFor(`document.querySelector('[aria-label="EnSpace Games"] .enspace-score').textContent.includes("All pairs found in 8 moves")`, "Memory Match completion");
+  await waitFor(`window.__smokeArcadeScores.memory === 8`, "shared memory best");
+  assert.equal(await evaluate(`window.__smokeCalls["retroGames.score"]`), 2, "Memory Match uploads only after completion");
+  await click("Back to games");
+  await click("High scores");
+  await waitFor(`Boolean(document.querySelector('[aria-label="Arcade high scores"]')) && document.body.innerText.includes("smoke.test@enphaseenergy.com: 8")`, "shared leaderboard");
+  assert.ok(await evaluate(`document.querySelector('[aria-label="Arcade high scores"]').textContent.includes("This PC: 8")`), "personal best is durable");
+  await click("Sync personal bests");
+  await waitFor(`document.body.innerText.includes("Personal bests synced.")`, "retry saved personal scores");
+  await click("Back to games");
+  await click("Play Tic-Tac-Toe");
+  await evaluate(`document.querySelector('button[aria-label="Row 1, column 1: empty"]').click()`);
+  assert.equal(await evaluate(`document.querySelectorAll('[aria-label="EnSpace Games"] button[aria-label$=": X"]').length`), 1);
+  assert.equal(await evaluate(`document.querySelectorAll('[aria-label="EnSpace Games"] button[aria-label$=": O"]').length`), 1);
+  await click("Back to games");
+  await click("Play Solitaire");
+  await evaluate(`document.querySelector('button[aria-label^="Draw a card."]').click()`);
+  await waitFor(`document.querySelector('[aria-label="EnSpace Games"] [role="status"]').textContent.includes("Moves: 1")`, "solitaire draw");
+  await click("Undo");
+  assert.equal(await evaluate(`document.querySelector('[aria-label="EnSpace Games"] [role="status"]').textContent`), "Moves: 0");
+  await click("Back to games");
+  await click("Play Neon Rider");
+  await click("Expand map");
+  await click("Expand map");
+  await click("Fit map");
+  assert.equal(await evaluate(`document.querySelector('[aria-label="Neon Rider track drawing canvas"]').getAttribute("viewBox")`), "0 0 14400 8000");
+  await click("View start");
+  await click("Ride");
+  await sleep(150);
+  assert.ok(await evaluate(`document.querySelector('[aria-label="EnSpace Games"] .enspace-score').textContent.startsWith("riding")`));
+  await click("Pause ride");
+  await click("Clear track");
+  assert.equal(await evaluate(`document.querySelector('[aria-label="Neon Rider track drawing canvas"]').querySelectorAll('line').length`), 0);
+  await click("Fit map");
+  const canvas = await evaluate(`(() => {
+    const canvas = document.querySelector('[aria-label="Neon Rider track drawing canvas"]');
+    canvas.scrollIntoView({block:"center"});
+    const rect = canvas.getBoundingClientRect();
+    return {x:Math.round(rect.x+rect.width*.4),y:Math.round(rect.y+rect.height*.4),
+      endX:Math.round(rect.x+rect.width*.6),endY:Math.round(rect.y+rect.height*.5)};
+  })()`);
+  win.webContents.sendInputEvent({type: "mouseDown", x: canvas.x, y: canvas.y, button: "left", clickCount: 1});
+  win.webContents.sendInputEvent({type: "mouseMove", x: canvas.endX, y: canvas.endY, button: "left"});
+  win.webContents.sendInputEvent({type: "mouseUp", x: canvas.endX, y: canvas.endY, button: "left", clickCount: 1});
+  await waitFor(`document.querySelector('[aria-label="Neon Rider track drawing canvas"]').querySelectorAll('line').length > 0`, "drawn track");
+  assert.ok(await evaluate(`Number(document.querySelector('[aria-label="Neon Rider track drawing canvas"] line').getAttribute('x2')) > 900`),
+    "drawing uses expanded world coordinates rather than the original 900-pixel canvas");
+  await click("Undo stroke");
+  assert.equal(await evaluate(`document.querySelector('[aria-label="Neon Rider track drawing canvas"]').querySelectorAll('line').length`), 0);
+  await click("View start");
+  await click("Example track");
+  assert.equal(await evaluate(`document.querySelector('[aria-label="Neon Rider track drawing canvas"]').querySelectorAll('line').length`), 4);
+  await click("Back to games");
+  await click("Challenge a teammate");
+  await waitFor(`Boolean(document.querySelector('.enspace-arcade-select option[value="teammate@example.invalid"]'))`, "challenge directory");
+  await evaluate(`(() => {
+    const field = document.querySelector('.enspace-arcade-select');
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(field, "teammate@example.invalid");
+    field.dispatchEvent(new Event("change", {bubbles:true}));
+  })()`);
+  await click("Send challenge");
+  await waitFor(`document.body.innerText.includes("Cancel invitation")`, "created online challenge");
+  await click("Cancel invitation");
+  await waitFor(`document.querySelector('[aria-label="EnSpace Games"] [role="status"]')?.textContent === "cancelled"`, "cancelled challenge");
+  await click("Back to challenges");
+  await evaluate(`window.__smokeGames.unshift({
+    id:"incoming-tic",kind:"tic",challenger:"teammate@example.invalid",opponent:"smoke.test@enphaseenergy.com",
+    status:"pending",turn:"teammate@example.invalid",version:1,board:Array(9).fill(null)
+  })`);
+  await waitFor(`document.body.innerText.includes("(invited you)")`, "incoming invitation");
+  await click("Open match");
+  await click("Accept");
+  await waitFor(`document.querySelector('[aria-label="EnSpace Games"] [role="status"]')?.textContent === "Opponent's turn"`, "accepted match");
+  await evaluate(`(() => {
+    const game = window.__smokeGames.find(game=>game.id==="incoming-tic");
+    game.board[0]="X";game.turn="smoke.test@enphaseenergy.com";game.version++;
+  })()`);
+  await waitFor(`document.querySelector('[aria-label="EnSpace Games"] [role="status"]')?.textContent === "Your turn"`, "opponent move refresh");
+  await evaluate(`document.querySelector('button[aria-label="Online row 1, column 2: empty"]').click()`);
+  await waitFor(`Boolean(document.querySelector('button[aria-label="Online row 1, column 2: O"]'))`, "online move");
+  await click("Back to challenges");
+  await evaluate(`window.__smokeGames.unshift({
+    id:"incoming-memory",kind:"memory",challenger:"teammate@example.invalid",opponent:"smoke.test@enphaseenergy.com",
+    status:"pending",turn:"teammate@example.invalid",version:1,cards:Array(16).fill(null),open:[],matched:[],
+    scores:{"teammate@example.invalid":0,"smoke.test@enphaseenergy.com":0}
+  })`);
+  await waitFor(`[...document.querySelectorAll('li')].some(item=>item.textContent.includes('Memory Match'))`, "incoming memory challenge");
+  await evaluate(`[...document.querySelectorAll('li')].find(item=>item.textContent.includes('Memory Match')).querySelector('button').click()`);
+  await click("Accept");
+  await evaluate(`window.__smokeGames.find(game=>game.id==="incoming-memory").turn="smoke.test@enphaseenergy.com"`);
+  await waitFor(`document.querySelector('[aria-label="EnSpace Games"] [role="status"]')?.textContent === "Your turn"`, "online memory turn");
+  await evaluate(`document.querySelector('button[aria-label="Online card 1: face down"]').click()`);
+  await waitFor(`Boolean(document.querySelector('button[aria-label="Online card 1: SUN"] svg'))`, "online memory icon reveal");
+  await evaluate(`document.querySelector('button[aria-label="Online card 2: face down"]').click()`);
+  await waitFor(`Boolean(document.querySelector('button[aria-label="Online card 2: SUN, matched"]'))`, "online matching pair");
+  await click("Back to challenges");
+  for (const [kind, name] of [["connect","Connect Four"],["checkers","Checkers"],["battleship","Battleship"]]) {
+    await click("Back to games");
+    await click(`Play ${name}`);
+    assert.equal(await evaluate(`document.querySelectorAll('[aria-label="EnSpace Games"] select')[1].value`), kind, `${name} tile preselects its challenge game`);
+    await waitFor(`document.querySelectorAll('[aria-label="EnSpace Games"] select')[0]?.textContent.includes("Retro Teammate")`, "published EnSpace teammate name");
+    assert.equal(await evaluate(`document.querySelectorAll('[aria-label="EnSpace Games"] select')[0].textContent.includes("unpublished@example.invalid")`), false, "unpublished users excluded");
+    await evaluate(`(() => {
+      const selects = document.querySelectorAll('[aria-label="EnSpace Games"] select');
+      for (const [select, value] of [[selects[0],"teammate@example.invalid"]]) {
+        Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,"value").set.call(select,value);
+        select.dispatchEvent(new Event("change",{bubbles:true}));
+      }
+    })()`);
+    await click("Send challenge");
+    await waitFor(`document.querySelector('[aria-label="EnSpace Games"] h4')?.textContent.startsWith(${JSON.stringify(name)})`, `${name} invitation`);
+    await evaluate(`(() => {
+      const game=window.__smokeGames.at(-1);game.status="active";game.version++;
+    })()`);
+    await waitFor(`Boolean(document.querySelector('[aria-label="${kind === "connect" ? "Connect Four board" : kind === "checkers" ? "Checkers board" : "Your Battleship fleet"}"]'))`, `${name} board`);
+    if (kind === "connect") {
+      await evaluate(`document.querySelector('[aria-label="Drop in column 1"]').click()`);
+      await waitFor(`document.querySelector('[aria-label="Row 6, column 1: X"]')?.textContent === "X"`, "Connect Four saved drop");
+    } else if (kind === "checkers") {
+      await evaluate(`document.querySelector('[aria-label="Checkers row 6, column 1: your piece"]').click()`);
+      await evaluate(`document.querySelector('[aria-label="Checkers row 5, column 2: empty"]').click()`);
+      await waitFor(`Boolean(document.querySelector('[aria-label="Checkers row 5, column 2: your piece"]'))`, "Checkers saved move");
+    } else {
+      await evaluate(`document.querySelector('[aria-label="Fleet A1: water"]').click()`);
+      await waitFor(`Boolean(document.querySelector('[aria-label="Fleet E1: ship"]'))`, "manual saved ship placement");
+    }
+    await click("Mail");
+    await click("Games");
+    await click(`Play ${name}`);
+    await waitFor(`[...document.querySelectorAll('li')].some(item=>item.textContent.includes(${JSON.stringify(name)}))`, "saved match lobby");
+    await evaluate(`[...document.querySelectorAll('li')].find(item=>item.textContent.includes(${JSON.stringify(name)})).querySelector('button').click()`);
+    await waitFor(`Boolean(document.querySelector('[aria-label="${kind === "connect" ? "Row 6, column 1: X" : kind === "checkers" ? "Checkers row 5, column 2: your piece" : "Fleet E1: ship"}"]'))`, `${name} restored after screen closes`);
+    if (kind === "battleship") {
+      await click("Horizontal");
+      await click("Randomize fleet");
+      await click("Ready to battle");
+      await waitFor(`document.body.innerText.includes("Fleet locked.")`, "locked private fleet");
+      await evaluate(`(() => {
+        const game=window.__smokeGames.at(-1);game.phase="playing";game.ready[game.opponent]=true;game.turn=game.challenger;game.version++;
+      })()`);
+      await waitFor(`Boolean(document.querySelector('[aria-label="Battleship targets"]'))`, "ready enemy waters");
+      await evaluate(`document.querySelector('[aria-label="Fire at A1: unknown"]').click()`);
+      await waitFor(`Boolean(document.querySelector('[aria-label="Fire at A1: hit"]'))`, "saved Battleship shot");
+      await click("Back to challenges");
+      await evaluate(`[...document.querySelectorAll('li')].find(item=>item.textContent.includes("Battleship")).querySelector('button').click()`);
+      await waitFor(`Boolean(document.querySelector('[aria-label="Fire at A1: hit"]'))`, "restored Battleship shot");
+    }
+    await click("Back to challenges");
+  }
+  await click("Back to games");
+  await evaluate(`window.__smokeGamesUnavailable=true; true`);
+  await click("Play Connect Four");
+  await waitFor(`document.body.innerText.includes("Online games require the updated EnQuote Worker")`, "missing games service error");
+  await waitFor(`document.querySelectorAll('[aria-label="EnSpace Games"] select')[0]?.textContent.includes("Retro Teammate")`, "profiles still load when games service is unavailable");
+  assert.equal(await evaluate(`[...document.querySelectorAll("button")].find(button=>button.textContent.trim()==="Send challenge").disabled`), true);
+  const failedCalls = await evaluate(`window.__smokeCalls["retroGames.list"]`);
+  await sleep(5500);
+  assert.equal(await evaluate(`window.__smokeCalls["retroGames.list"]`), failedCalls, "permanent deployment errors do not repeatedly poll");
+  await evaluate(`delete window.__smokeGamesUnavailable; true`);
+  await click("Refresh");
+  await waitFor(`!document.body.innerText.includes("Online games require the updated EnQuote Worker")`, "manual refresh recovers after service deployment");
+  await click("Mail");
+  assert.equal(await evaluate(`location.hash`), "#/Base44_DTO?mail=1");
+  await click("Games");
+  assert.equal(await evaluate(`Boolean(document.querySelector('[aria-label="EnSpace Games"]'))`), true);
+  await click("Search");
+  await waitFor(`document.activeElement.getAttribute("aria-label") === "Search retro profiles"`, "search after games");
+  await click("Home");
+  win.hide();
+  if (arcadeOnly) {
+    await click("Back to EnQuote");
+    assert.equal(await evaluate("location.hash"), "#/Workload?tab=saved");
+    console.log("ok   EnSpace arcade: local games, scores, large maps, all five online games, saved boards/setup after reopening, and return navigation.");
+    return;
+  }
   await click("Edit my space");
   assert.equal(await evaluate(`document.querySelector('button[aria-pressed="true"]')?.textContent.trim()`), "Classic blue");
   assert.equal(await evaluate(`[...document.querySelectorAll("button")].find((item) => item.textContent.trim() === "My theme").disabled`), true, "My theme waits for pasted code");

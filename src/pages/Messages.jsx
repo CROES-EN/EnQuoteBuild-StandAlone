@@ -1,5 +1,6 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {Link, useLocation, useNavigate} from "react-router-dom";
+import {quoteDetailsPath} from "../../shared/appLinkRules.js";
 import {format, isToday} from "date-fns";
 import {
   AlertCircle,
@@ -95,7 +96,7 @@ function AttachmentChip({attachment, onRemove}) {
 
   return (
     <span className={className}>
-      <Link to={createPageUrl(`QuoteDetails?id=${encodeURIComponent(attachment.quoteId)}`)} className="truncate font-medium hover:underline">
+      <Link to={quoteDetailsPath(attachment.quoteId, attachment.label)} className="truncate font-medium hover:underline">
         <FileText className="mr-1.5 inline h-3.5 w-3.5" />
         {attachment.label}
       </Link>

@@ -263,6 +263,13 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
     getAvatar: (avatarId) => invoke("profiles:getAvatar", avatarId),
     onChanged: (callback) => subscribe("profiles:changed", callback)
   },
+  retroGames: {
+    list: () => invoke("retroGames:list"),
+    get: (id) => invoke("retroGames:get", id),
+    act: (payload) => invoke("retroGames:act", payload),
+    scores: () => invoke("retroGames:scores"),
+    score: (payload) => invoke("retroGames:score", payload)
+  },
   retroMail: {
     list: (folder) => invoke("retroMail:list", folder),
     contacts: () => invoke("retroMail:contacts"),

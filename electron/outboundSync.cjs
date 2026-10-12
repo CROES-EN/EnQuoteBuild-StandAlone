@@ -6,6 +6,7 @@ const {notificationEventId} = require("./notificationEvents.cjs");
 
 const DEFAULT_INTERVAL_MS = 30 * 1000;
 const REQUEST_TIMEOUT_MS = 20000;
+const STATUS_WAIT_MS = 60000;
 const CONFLICT_PREFIX = "CONFLICT:";
 
 function requestJson(urlString, { method = "GET", headers = {}, body = null } = {}) {
@@ -51,6 +52,7 @@ function toRemotePayload(quote) {
 function createOutboundSync({ repository, config, logger = console, onAfterWrite }) {
   const { workerUrl, outboundToken, intervalMs = DEFAULT_INTERVAL_MS } = config || {};
   let running = false;
+  let flushRequested = false;
   const awaitingRemoteStatus = new Map();
   let timer = null;
   const isConfigured = Boolean(workerUrl && outboundToken);
@@ -100,7 +102,9 @@ function createOutboundSync({ repository, config, logger = console, onAfterWrite
 
   async function handleRealtimeStatus(data) {
     if (data?.entityType !== "quote" || typeof data.quoteId !== "string" || !data.quoteId) return { updated: 0 };
-    const result = { local_id: data.quoteId };
+    const awaiting = awaitingRemoteStatus.get(data.quoteId);
+    if (data.itemId && (!awaiting || awaiting.itemId !== data.itemId)) return {updated: 0};
+    const result = { local_id: data.quoteId, ...(awaiting?.revision ? {revision: awaiting.revision} : {}) };
     if (data.status === "pushed" || data.status === "adopted") {
       result.remote_id = data.remoteId || null;
     } else if (data.status === "conflict") {
@@ -112,29 +116,40 @@ function createOutboundSync({ repository, config, logger = console, onAfterWrite
     }
 
     const update = await repository.markOutboundSynced([result]);
-    if (data.itemId && awaitingRemoteStatus.get(data.quoteId) === data.itemId) {
+    if (data.itemId && awaiting?.itemId === data.itemId) {
       awaitingRemoteStatus.delete(data.quoteId);
     }
     if (update.updated) onAfterWrite?.();
+    if (awaiting && !result.error) void flush();
     return update;
   }
 
   async function flush() {
-    if (running) return { skipped: "already-running" };
+    if (running) {
+      flushRequested = true;
+      return { skipped: "already-running" };
+    }
     if (!isConfigured) return { skipped: "not-configured" };
     running = true;
     try {
       const pending = await repository.listPendingOutboundQuotes();
-      const eligible = pending.filter((entry) => !awaitingRemoteStatus.has(entry.local_id));
+      const eligible = pending.filter(entry => {
+        const awaiting = awaitingRemoteStatus.get(entry.local_id);
+        if (!awaiting) return true;
+        if (Date.now() - awaiting.queuedAt < STATUS_WAIT_MS) return false;
+        awaitingRemoteStatus.delete(entry.local_id);
+        return true;
+      });
       const results = [];
       for (const entry of eligible) {
         try {
           const message = buildQuoteMessage(entry);
           // /api/outbound/enqueue only stores to D1 and never calls Base44, so quote
           // creates/edits must go through /api/inbound/base44 to actually reach Base44.
-          const result = await sendOne(message, inboundUrl());
+          const result = {...await sendOne(message, inboundUrl()),
+            ...(entry.quote._rev ? {revision: entry.quote._rev} : {})};
           if (result.queued) {
-            awaitingRemoteStatus.set(entry.local_id, result.item_id);
+            awaitingRemoteStatus.set(entry.local_id, {itemId: result.item_id, revision: entry.quote._rev, queuedAt: Date.now()});
             continue;
           }
           results.push(result);
@@ -221,7 +236,13 @@ logger.warn(`[outbound-sync] -> local_id=${r.local_id}: ${r.error}`);
         conflicts: conflicts.length
       };
     } catch (error) { logger.warn("[outbound-sync] Flush failed:", error.message); return { error: error.message }; }
-    finally { running = false; }
+    finally {
+      running = false;
+      if (flushRequested) {
+        flushRequested = false;
+        queueMicrotask(() => void flush());
+      }
+    }
   }
 
   return {

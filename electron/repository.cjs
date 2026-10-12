@@ -280,7 +280,7 @@ function sanitizeRecord(value) {
 // open with an older revision correctly fails its optimistic-concurrency check on save
 // instead of silently overwriting data this import just brought in. See update() below.
 function mergeRecordsById(existingList, incomingList, options = {}) {
-  const { bumpRevField = null, onWinnerIsUpdate = null } = options;
+  const { bumpRevField = null, onWinnerIsUpdate = null, retainExisting = null } = options;
   const existing = Array.isArray(existingList) ? existingList : [];
   const incoming = Array.isArray(incomingList) ? incomingList : [];
   if (incoming.length === 0) return existing;
@@ -321,6 +321,7 @@ function mergeRecordsById(existingList, incomingList, options = {}) {
     const key = base44IdToLocalId.has(incomingKey) ? base44IdToLocalId.get(incomingKey) : incomingKey;
     const current = byId.get(key);
     const matchedViaBase44Id = key !== incomingKey;
+    if (current && retainExisting?.(current)) continue;
 
     let winner;
     let winnerIsIncoming;
@@ -746,7 +747,7 @@ function repositoryFor(userDataPath) {
     });
   }
 
-  return {
+  const repository = {
     async list() { return (await read()).quotes; },
     async get(id) { return (await read()).quotes.find(quote => quote.id === id) || null; },
     async create(record) {
@@ -946,6 +947,7 @@ function repositoryFor(userDataPath) {
         ...normalized,
         quotes: mergeRecordsById(current.quotes, normalized.quotes, {
           bumpRevField: "_rev",
+          retainExisting: quote => current.outboundQueue.some(entry => entry.local_id === quote.id && entry.status === "pending"),
           onWinnerIsUpdate: (winner) => {
             if (winner.quote_number) {
               changedQuoteNumbers.push(winner.quote_number);
@@ -1133,6 +1135,7 @@ function repositoryFor(userDataPath) {
       const parsed = z.array(z.object({
         local_id: z.string().min(1),
         remote_id: z.string().nullable().optional(),
+        revision: z.number().int().positive().optional(),
         error: z.string().nullable().optional()
       })).parse(results || []);
       if (!parsed.length) return { updated: 0 };
@@ -1155,6 +1158,9 @@ function repositoryFor(userDataPath) {
         const index = data.quotes.findIndex(item => item.id === result.local_id);
         if (index >= 0) {
           data.quotes[index] = { ...data.quotes[index], base44_synced_at: now, base44_id: entry.remote_id };
+          if (result.revision !== undefined && data.quotes[index]._rev !== result.revision) {
+            enqueueOutboundUpdate(data, data.quotes[index]);
+          }
         }
         updated += 1;
       }
@@ -1591,6 +1597,10 @@ function repositoryFor(userDataPath) {
       return { email: targetKey, tempPassword };
     }
   };
+  // Every method shares one data file. Queue the entire operation, not only its
+  // final write, so sync acknowledgements and navigation cannot overwrite a save.
+  return Object.fromEntries(Object.entries(repository).map(([name, method]) =>
+    [name, (...args) => serializedWrite(() => method(...args))]));
 }
 
 module.exports = {

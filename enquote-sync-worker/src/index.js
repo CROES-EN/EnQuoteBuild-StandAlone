@@ -48,6 +48,8 @@ import {handleCustomEmojisList, handleCustomEmojiUpload, handleCustomEmojiDownlo
 import {handleChatReactions, handleChatReactionSet} from "./chat.js";
 import {handleRetro} from "./Base44_DTO.js";
 import {handleRetroMail} from "./retro-mail.js";
+import {handleRetroGames} from "./retro-games.js";
+import {handleRetroScores} from "./retro-scores.js";
 import {
   handleAccessPolicy,
   handleAdminAnnouncement,
@@ -79,6 +81,8 @@ import { json } from "./util.js";
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname === "/api/retro-games" && ["GET", "POST"].includes(request.method)) return handleRetroGames(request, env);
+    if (url.pathname === "/api/retro-scores" && ["GET", "POST"].includes(request.method)) return handleRetroScores(request, env);
     if (url.pathname === "/api/Base44_DTO" && ["GET", "POST", "DELETE"].includes(request.method)) return handleRetro(request, env);
     if (url.pathname === "/api/retro-mail" && ["GET", "POST"].includes(request.method)) return handleRetroMail(request, env);
     if (url.pathname === "/api/retro-mail/send" && request.method === "POST") return handleRetroMail(request, env);

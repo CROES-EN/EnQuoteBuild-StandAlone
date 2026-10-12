@@ -17,6 +17,69 @@ function respond(path, args) {
   const key = path.join(".");
   window.__smokeCalls[key] = (window.__smokeCalls[key] || 0) + 1;
   const last = path[path.length - 1];
+  if (key.startsWith("retroGames.")) {
+    const games = window.__smokeGames ||= [];
+    const scores = window.__smokeArcadeScores ||= {};
+    if (key === "retroGames.scores") return Promise.resolve({ok: true, personal: {...scores},
+      boards: Object.fromEntries(["snake", "memory", "solitaire"].map(kind => [kind,
+        scores[kind] === undefined ? [] : [{email: IDENTITY.email, value: scores[kind]}]]))});
+    if (key === "retroGames.score") {
+      const {kind, value} = args[0];
+      scores[kind] = scores[kind] === undefined ? value : kind === "snake" ? Math.max(scores[kind], value) : Math.min(scores[kind], value);
+      return Promise.resolve({ok: true, kind, best: scores[kind]});
+    }
+    if (key === "retroGames.list") {
+      if (window.__smokeGamesUnavailable) return Promise.resolve({ok:false,error:"http_404"});
+      return Promise.resolve({ok: true, me: IDENTITY.email, players: ["teammate@example.invalid", "unpublished@example.invalid"], games: structuredClone(games)});
+    }
+    if (key === "retroGames.get") return Promise.resolve({ok: true, game: structuredClone(games.find(game => game.id === args[0])), serverNow: Date.now()});
+    const payload = args[0];
+    if (payload.action === "challenge") {
+      const game = {id: payload.id, kind: payload.kind, challenger: IDENTITY.email, opponent: payload.to,
+        status: "pending", turn: IDENTITY.email, version: 1, board: Array(9).fill(null)};
+      if (payload.kind === "connect") game.board = Array(42).fill(null);
+      if (payload.kind === "checkers") {
+        game.forced = null;
+        game.board = Array.from({length:64}, (_, i) => {
+          const row = Math.floor(i / 8);
+          return (row + i % 8) % 2 && (row < 3 || row > 4)
+            ? {side: row < 3 ? payload.to : IDENTITY.email, king:false, forward: row < 3 ? 1 : -1} : null;
+        });
+      }
+      if (payload.kind === "battleship") Object.assign(game, {phase:"setup",turn:null,fleet:[],incoming:[],shots:[],sunk:[],
+        ready:{[IDENTITY.email]:false,[payload.to]:false}});
+      games.push(game);
+      return Promise.resolve({ok: true, game: structuredClone(game), serverNow: Date.now()});
+    }
+    const game = games.find(game => game.id === payload.id);
+    if (payload.action === "cancel") {game.status = "cancelled"; game.version++;}
+    if (payload.action === "accept") {game.status = "active"; game.version++;}
+    if (payload.action === "decline") {game.status = "declined"; game.version++;}
+    if (payload.action === "place") {
+      game.fleet[payload.ship] = Array.from({length:[5,4,3,3,2][payload.ship]}, (_, i) => payload.index + i * (payload.vertical ? 10 : 1));
+      game.version++;
+    }
+    if (payload.action === "randomize") {game.fleet = [[0,1,2,3,4],[10,11,12,13],[20,21,22],[30,31,32],[40,41]]; game.version++;}
+    if (payload.action === "ready") {game.ready[IDENTITY.email] = true; game.version++;}
+    if (payload.action === "move") {
+      if (game.kind === "tic") {game.board[payload.index] = game.challenger === IDENTITY.email ? "X" : "O"; game.turn = game.challenger;}
+      else if (game.kind === "connect") {
+        let row = 5; while (game.board[row * 7 + payload.index]) row--;
+        game.board[row * 7 + payload.index] = IDENTITY.email; game.turn = game.opponent;
+      }
+      else if (game.kind === "checkers") {
+        game.board[payload.index] = game.board[payload.from]; game.board[payload.from] = null; game.turn = game.opponent;
+      }
+      else if (game.kind === "battleship") {game.shots.push({index:payload.index,hit:true}); game.turn = game.opponent;}
+      else {
+        game.cards[payload.index] = "SUN";
+        game.open.push(payload.index);
+        if (game.open.length === 2) {game.matched.push(...game.open); game.open = []; game.scores[IDENTITY.email]++;}
+      }
+      game.version++;
+    }
+    return Promise.resolve({ok: true, game: structuredClone(game), serverNow: Date.now()});
+  }
   if (process.argv.includes("--console-only")) {
     if (key === "admin.policy") return Promise.resolve({ok: true, me: USERS[0]});
     if (key === "admin.overview") return Promise.resolve({ok: true, users: USERS});
@@ -75,6 +138,17 @@ function respond(path, args) {
   if (key === "collections.list") return Promise.resolve(args[0] === "users" ? USERS :
     args[0] === "supervisorReportTables" ? window.__smokeWorkTables || [] : []);
   if (key === "quotes.list") return Promise.resolve(window.__smokePaidQuotes || []);
+  if (key === "tasks.list") return Promise.resolve(window.__smokeTasks || []);
+  if (key === "quotes.get") return Promise.resolve((window.__smokePaidQuotes || []).find(quote => quote.id === args[0]) || null);
+  if (key === "quotes.update") return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      if (window.__smokeQuoteSaveFail) {reject(new Error("Could not persist quote")); return;}
+      const index = window.__smokePaidQuotes.findIndex(quote => quote.id === args[0]);
+      const record = {...window.__smokePaidQuotes[index],...args[1],_rev:(window.__smokePaidQuotes[index]._rev || 1)+1};
+      window.__smokePaidQuotes[index] = record;
+      resolve(structuredClone(record));
+    }, window.__smokeQuoteSaveDelay || 0);
+  });
   if (key === "largeTables.get" || key === "updater.getState") return Promise.resolve(null);
   if (key === "ui.getInfo") return Promise.resolve({ appVersion: "smoke", uiVersion: null });
   if (key === "remoteSync.checkStatus") return Promise.resolve({ ok: true });

@@ -16,6 +16,7 @@ import {ArrowLeft} from "lucide-react";
 import {TOM_TRIBUTE} from "./tribute";
 import {NavigationQuicklinks, ProfileActions} from "./Quicklinks";
 import MailCenter from "./MailCenter";
+import Arcade from "./games/Arcade";
 
 const DRAFT_KEY = "enquote_retro_draft_v1";
 const MAX_FRIEND_TILES = 8;
@@ -67,6 +68,7 @@ export default function Base44_DTO() {
   const navigate = useNavigate();
   const query = new URLSearchParams(location.search);
   const mailMode = query.get("mail") === "1";
+  const gamesMode = !mailMode && query.get("games") === "1";
   const mailRecipient = query.get("to") || "";
   const [profiles, setProfiles] = useState([]);
   const [cursor, setCursor] = useState(null);
@@ -179,17 +181,17 @@ export default function Base44_DTO() {
     if (focusSearch) searchRef.current?.focus();
   }
   function navigateFromMail(destination) {
-    if (!mailMode) {
+    if (!mailMode && !gamesMode) {
       if (destination === "home") home();
       else browse(destination === "search");
       return;
     }
     if (destination === "home") {
       home();
-      navigate("/Base44_DTO");
+      navigate("/Base44_DTO", {state: location.state});
       return;
     }
-    navigate(`/Base44_DTO?browse=1${destination === "search" ? "&search=1" : ""}`);
+    navigate(`/Base44_DTO?browse=1${destination === "search" ? "&search=1" : ""}`, {state: location.state});
   }
   function home() {
     selectionVersion.current++;
@@ -201,15 +203,15 @@ export default function Base44_DTO() {
   }
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    if (mailMode || params.get("browse") !== "1" || !directoryRef.current) return;
+    if (mailMode || gamesMode || params.get("browse") !== "1" || !directoryRef.current) return;
     directoryRef.current.open = true;
     directoryRef.current.scrollIntoView({block: "nearest"});
     if (params.get("search") === "1") searchRef.current?.focus();
     navigate("/Base44_DTO", {replace: true, state: location.state});
-  }, [location.search, location.state, mailMode, navigate]);
+  }, [location.search, location.state, mailMode, gamesMode, navigate]);
   async function messageProfile() {
     if (!canMessage) return;
-    navigate(`/Base44_DTO?mail=1&to=${encodeURIComponent(viewed.email)}`);
+    navigate(`/Base44_DTO?mail=1&to=${encodeURIComponent(viewed.email)}`, {state: location.state});
   }
   function closeSpace() {
     selectionVersion.current++;
@@ -341,12 +343,12 @@ export default function Base44_DTO() {
             <img src={`${import.meta.env.BASE_URL}Base44_DTO.png`} alt="A place for friends" width="1024" height="379" className="block h-auto w-full" />
           </h1>
           <div className="flex flex-wrap items-center gap-2">
-            {isOwnProfileView && <Button size="sm" variant="secondary" onClick={editOwnProfile}>Edit my profile</Button>}
-            {!editing && preview && viewed?.email && viewed.email !== user.email && <ProfileActions name={viewed.name} onMessage={messageProfile} canMessage={canMessage} />}
+            {!gamesMode && isOwnProfileView && <Button size="sm" variant="secondary" onClick={editOwnProfile}>Edit my profile</Button>}
+            {!gamesMode && !editing && preview && viewed?.email && viewed.email !== user.email && <ProfileActions name={viewed.name} onMessage={messageProfile} canMessage={canMessage} />}
             <Button size="sm" variant="secondary" onClick={closeSpace}><ArrowLeft className="mr-2 h-4 w-4" />Back to EnQuote</Button>
           </div>
         </div>
-        <details open={preview && !editing ? undefined : true} key={preview && !editing ? "profile-tools" : "editing-tools"} className="mt-2">
+        {!gamesMode && <details open={preview && !editing ? undefined : true} key={preview && !editing ? "profile-tools" : "editing-tools"} className="mt-2">
         <summary className="cursor-pointer text-xs">Profile tools</summary>
         <div className="mt-2 flex flex-wrap gap-2">
           <Button size="sm" variant="secondary" onClick={editDraft}>Edit my space</Button>
@@ -357,13 +359,14 @@ export default function Base44_DTO() {
           {profiles.some((profile) => profile.email === user.email) && <Button size="sm" variant="secondary" disabled={busy} onClick={remove}>Remove my shared page</Button>}
         </div>
         {preview && !editing && <div className="mt-2 flex gap-2"><Button size="sm" variant="secondary" onClick={() => setAnimate((value) => !value)}>{animate ? "Pause CSS animations" : "Enable CSS animations"}</Button><Button size="sm" variant="secondary" onClick={() => setPreview(null)}>Stop preview</Button></div>}
-        </details>
+        </details>}
         <NavigationQuicklinks onHome={() => navigateFromMail("home")}
           onBrowse={() => navigateFromMail("browse")} onSearch={() => navigateFromMail("search")}
-          onMail={() => navigate("/Base44_DTO?mail=1")} />
+          onMail={() => navigate("/Base44_DTO?mail=1", {state: location.state})}
+          onGames={() => navigate("/Base44_DTO?games=1", {state: location.state})} />
       </header>
       {error && !mailMode && <div role="alert" className="mb-4 rounded border border-red-400 bg-white p-3 text-red-800">{error}</div>}
-      {mailMode ? <MailCenter initialRecipient={mailRecipient} appearance={draft.appearance} themeCode={draft.css} /> : <div className={preview && !editing ? "" : "space-y-3"}>
+      {gamesMode ? <Arcade key={user.email} /> : mailMode ? <MailCenter initialRecipient={mailRecipient} appearance={draft.appearance} themeCode={draft.css} /> : <div className={preview && !editing ? "" : "space-y-3"}>
         <details aria-label="Profile directory" ref={directoryRef} key={preview ? "viewing" : "browsing"} open={preview ? undefined : true} className={`border border-[#76a4de] bg-white ${preview && !editing ? "hidden [&[open]]:block" : ""}`}>
           <summary className="cursor-pointer bg-[#ffdbb6] px-3 py-2 text-sm font-bold">Your friends&apos; spaces</summary>
           <div className="p-3">

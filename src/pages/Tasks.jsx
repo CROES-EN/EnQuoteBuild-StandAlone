@@ -1,5 +1,6 @@
 import {useEffect, useMemo, useState} from "react";
 import {Link, useLocation} from "react-router-dom";
+import {quoteDetailsPath} from "../../shared/appLinkRules.js";
 import {
   addDays,
   addMonths,
@@ -29,6 +30,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardList,
+  Copy,
   FileText,
   ListTodo,
   MoreHorizontal,
@@ -38,7 +40,6 @@ import {
   Trash2
 } from "lucide-react";
 import {toast} from "sonner";
-import {createPageUrl} from "@/utils";
 import {cn} from "@/lib/utils";
 import {tasksApi, useTasks} from "@/features/collab/collabApi";
 import TaskDialog, {TASK_TYPES} from "@/components/collab/TaskDialog";
@@ -85,6 +86,7 @@ async function saveQuietly(task, patch, message) {
 }
 
 function TaskRow({ task, now, highlightedId, onEdit }) {
+  const [copyingPhone, setCopyingPhone] = useState(false);
   const highlighted = Boolean(highlightedId) && task.id === highlightedId;
   const due = new Date(task.due_at);
   const done = task.status === "done";
@@ -100,6 +102,19 @@ function TaskRow({ task, now, highlightedId, onEdit }) {
       });
     } catch (error) {
       toast.error(error.message);
+    }
+  }
+
+  async function copyPhone() {
+    setCopyingPhone(true);
+    try {
+      await navigator.clipboard.writeText(task.contact_phone);
+      toast.success("Phone number copied");
+    } catch (error) {
+      console.warn("[tasks] Could not copy phone number:", error);
+      toast.error("Could not copy the phone number. Select the number and copy it manually.");
+    } finally {
+      setCopyingPhone(false);
     }
   }
 
@@ -127,7 +142,7 @@ function TaskRow({ task, now, highlightedId, onEdit }) {
             Case {task.case_number}
           </CaseNumberLink>}
           {task.quote_id && (
-            <Link to={createPageUrl(`QuoteDetails?id=${task.quote_id}`)} className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium text-foreground hover:bg-accent">
+            <Link to={quoteDetailsPath(task.quote_id, task.quote_label)} className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium text-foreground hover:bg-accent">
               <FileText className="h-3 w-3" />{task.quote_label || "Quote"}
             </Link>
           )}
@@ -145,7 +160,16 @@ function TaskRow({ task, now, highlightedId, onEdit }) {
           {(task.contact_name || task.contact_phone) && (
             <span className="inline-flex items-center gap-1">
               <Phone className="h-3 w-3" />
-              {[task.contact_name, task.contact_phone].filter(Boolean).join(" \u00b7 ")}
+              {task.contact_name}
+              {task.contact_name && task.contact_phone && <span aria-hidden="true"> &middot; </span>}
+              {task.contact_phone && <>
+                <span className="select-text">{task.contact_phone}</span>
+                <button type="button" disabled={copyingPhone} onClick={copyPhone}
+                  aria-label={`Copy phone number ${task.contact_phone}`} title="Copy phone number"
+                  className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2">
+                  <Copy className="h-3 w-3" />
+                </button>
+              </>}
             </span>
           )}
           {done && task.completed_at && <span>Done {format(new Date(task.completed_at), "MMM d, h:mm a")}</span>}

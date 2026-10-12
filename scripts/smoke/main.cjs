@@ -33,7 +33,7 @@ async function run() {
     height: 900,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"), contextIsolation: false, sandbox: false, nodeIntegration: false,
-      backgroundThrottling: !process.argv.includes("--console-only"),
+      backgroundThrottling: !process.argv.includes("--console-only") && !process.argv.includes("--arcade-only") && !process.argv.includes("--retro-only"),
       additionalArguments: process.argv.includes("--console-only") ? ["--console-only"] : []
     }
   });
@@ -49,7 +49,7 @@ async function run() {
   await sleep(PAGE_SETTLE_MS);
 
   const failures = [];
-  const pages = process.argv.includes("--case-work-only") || process.argv.includes("--stability-only") || process.argv.includes("--sop-sections-only") || process.argv.includes("--retro-only") || process.argv.includes("--console-only") || process.argv.includes("--theme-contrast-only") || process.argv.includes("--sop-links-only") ? [] : ["Dashboard", ...pageNames().filter((name) => name !== "Dashboard")];
+  const pages = process.argv.includes("--quote-links-only") || process.argv.includes("--case-work-only") || process.argv.includes("--stability-only") || process.argv.includes("--sop-sections-only") || process.argv.includes("--retro-only") || process.argv.includes("--arcade-only") || process.argv.includes("--console-only") || process.argv.includes("--theme-contrast-only") || process.argv.includes("--sop-links-only") ? [] : ["Dashboard", ...pageNames().filter((name) => name !== "Dashboard")];
   for (const page of pages) {
     consoleErrors.length = 0;
     await win.webContents.executeJavaScript(`window.__smokeErrors.length = 0; location.hash = "#/${page}"; true`);
@@ -62,6 +62,7 @@ async function run() {
         errorScreen: /Something went wrong/i.test(text),
         signInScreen: /Sign in to EnQuote|Setting up your account/i.test(text),
         notFound: /page not found/i.test(text),
+        dashboardRemovedPanels: /Coaching Feedback|Attention Required/i.test(text),
         textLength: text.trim().length,
         pageErrors: window.__smokeErrors.slice()
       };
@@ -72,6 +73,7 @@ async function run() {
     if (state.errorScreen) problems.push('shows "Something went wrong"');
     if (state.signInScreen) problems.push("shows sign-in/setup instead of the requested page");
     if (state.notFound) problems.push("shows page-not-found");
+    if (page === "Dashboard" && state.dashboardRemovedPanels) problems.push("shows removed coaching/attention panels");
     state.pageErrors.forEach((message) => problems.push(message));
     consoleErrors.forEach((message) => problems.push(`console: ${message}`));
 
@@ -80,6 +82,10 @@ async function run() {
   }
 
   if (pages.length) console.log(`\n${pages.length - failures.length}/${pages.length} pages rendered cleanly.`);
+  if (!failures.length && process.argv.includes("--quote-links-only")) {
+    await require("./quote-links.cjs").runQuoteLinks(win);
+    if (consoleErrors.length) throw new Error(`Quote-link console errors: ${[...new Set(consoleErrors)].join(" | ")}`);
+  }
   if (!failures.length && process.argv.includes("--sop-links-only")) {
     await require("./sop-links.cjs").runSopLinks(win);
   }
@@ -93,8 +99,9 @@ async function run() {
     await require("./stability.cjs").runStability(win);
     if (consoleErrors.length) throw new Error(`Stability console errors: ${[...new Set(consoleErrors)].join(" | ")}`);
   }
-  if (!failures.length && process.argv.includes("--retro-only")) {
-    await require("./Base44_DTO.cjs").runRetro(win);
+  if (!failures.length && (process.argv.includes("--retro-only") || process.argv.includes("--arcade-only"))) {
+    await require("./Base44_DTO.cjs").runRetro(win, {arcadeOnly: process.argv.includes("--arcade-only")});
+    if (consoleErrors.length) throw new Error(`EnSpace console errors: ${[...new Set(consoleErrors)].join(" | ")}`);
   }
   if (!failures.length && process.argv.includes("--console-only")) {
     await require("./developer-console.cjs").runDeveloperConsole(win);

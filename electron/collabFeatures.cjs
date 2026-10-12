@@ -264,6 +264,11 @@ function setupCollabFeatures({
   handle("Base44_DTO:get", (email) => client.get("/api/Base44_DTO", {email: String(email || "")}));
   handle("Base44_DTO:save", (profile) => client.post("/api/Base44_DTO", profile));
   handle("Base44_DTO:remove", () => client.delete("/api/Base44_DTO"));
+  handle("retroGames:list", () => client.get("/api/retro-games"));
+  handle("retroGames:get", (id) => client.get("/api/retro-games", {id: String(id || "")}));
+  handle("retroGames:act", (payload) => client.post("/api/retro-games", payload || {}));
+  handle("retroGames:scores", () => client.get("/api/retro-scores"));
+  handle("retroGames:score", (payload) => client.post("/api/retro-scores", payload || {}));
   handle("profiles:setAvatar", (payload) => profiles.setAvatar(payload || {}));
   handle("profiles:removeAvatar", () => profiles.removeAvatar());
   handle("profiles:getAvatar", (avatarId) => profiles.getAvatar(String(avatarId || "")));

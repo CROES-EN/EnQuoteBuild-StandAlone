@@ -79,7 +79,7 @@ import TaskDialog from "@/components/collab/TaskDialog";
 import {quoteLabel} from "@/components/collab/QuotePicker";
 import {hasCollabBridge} from "@/features/collab/collabApi";
 import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
-import {canonicalSharedQuotePath, resolveSharedQuote} from "@/features/collab/sharedQuoteLink";
+import {canonicalSharedQuotePath, resolveSharedQuote, SharedQuoteAmbiguityError} from "@/features/collab/sharedQuoteLink";
 
 // Only these users can grant/revoke pre-approval
 const PRE_APPROVAL_USERS = ["smosley@enphaseenergy.com", "REDACTED-USER1@example.invalid"];
@@ -167,7 +167,7 @@ function QuoteDetailsContent() {
  enabled: !!(quoteId || quoteNumber)
  });
 
- const needsCanonicalQuoteId = quote && quote.id !== quoteId;
+ const needsCanonicalQuoteId = quote && String(quote.id) !== quoteId;
  useEffect(() => {
  if (!needsCanonicalQuoteId) return;
  navigate(canonicalSharedQuotePath(location.pathname, location.search, quoteId, quote), {replace: true});
@@ -175,10 +175,12 @@ function QuoteDetailsContent() {
 
  const updateMutation = useMutation({
  mutationFn: ({ id, data }) => updateQuote(id, data),
- onSuccess: () => {
+ onSuccess: (savedQuote) => {
+ if (savedQuote?.id) queryClient.setQueriesData({queryKey: ["quote", savedQuote.id]}, savedQuote);
  queryClient.invalidateQueries({ queryKey: ["quote", quoteId] });
  queryClient.invalidateQueries({ queryKey: ["quotes"] });
- }
+ },
+ onError: error => toast.error(error?.message || "Could not save quote changes.")
  });
 
  const deleteMutation = useMutation({
@@ -1238,11 +1240,27 @@ function QuoteDetailsContent() {
  }
 
  if (quoteError || !quote) {
+ const candidates = quoteError instanceof SharedQuoteAmbiguityError ? quoteError.candidates : [];
  return (
  <div className="min-h-screen bg-background flex items-center justify-center">
  <Card className="p-8 text-center">
- <h2 className="text-xl font-semibold text-foreground mb-2">{quoteError ? "Could not open quote" : "Quote not found"}</h2>
+ <h2 className="text-xl font-semibold text-foreground mb-2">{candidates.length ? "Choose quote version" : quoteError ? "Could not open quote" : "Quote not found"}</h2>
  {quoteError && <p role="alert" className="text-sm text-muted-foreground">{quoteError.message}</p>}
+ {candidates.length > 0 && <ul aria-label="Matching quote records" className="mt-4 space-y-2 text-left">
+ {candidates.map(candidate => <li key={candidate.id} className="rounded-md border border-border p-3">
+ <Link className="font-medium text-primary underline"
+   to={canonicalSharedQuotePath(location.pathname, location.search, quoteId, candidate)}>
+ {candidate.quote_number || "Quote"} - v{candidate.version_number || 1}
+ </Link>
+ <p className="text-sm text-muted-foreground">
+ {[candidate.is_current_version === true ? "Current version" : candidate.is_current_version === false ? "Older version" : null,
+ candidate.site_id ? `Site ${candidate.site_id}` : null,
+ candidate.case_number ? `Case ${candidate.case_number}` : null,
+ candidate.status, candidate.updated_date ? `Updated ${candidate.updated_date}` : null].filter(Boolean).join(" / ")}
+ </p>
+ <p className="text-xs text-muted-foreground">Record: {candidate.id}</p>
+ </li>)}
+ </ul>}
  <Link to={createPageUrl("Quotes")}>
  <Button className="mt-4">Back to Quotes</Button>
  </Link>

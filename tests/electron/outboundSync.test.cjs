@@ -6,7 +6,10 @@ const { createOutboundSync } = require("../../electron/outboundSync.cjs");
 async function withWorker(responseBody, run) {
   let requestPath;
   let requestBody = "";
+  let requestCount = 0;
   const server = http.createServer((request, response) => {
+    requestCount++;
+    requestBody = "";
     requestPath = request.url;
     request.on("data", (chunk) => { requestBody += chunk; });
     request.on("end", () => {
@@ -17,7 +20,7 @@ async function withWorker(responseBody, run) {
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const { port } = server.address();
   try {
-    await run(`http://127.0.0.1:${port}`, () => ({ requestPath, requestBody: JSON.parse(requestBody) }));
+    await run(`http://127.0.0.1:${port}`, () => ({ requestPath, requestBody: JSON.parse(requestBody), requestCount }));
   } finally {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
@@ -109,6 +112,7 @@ test("keeps queued quotes pending until their WebSocket status arrives", async (
 
     await sync.flush();
     assert.deepEqual(repository.acknowledgements, []);
+    repository.listPendingOutboundQuotes = async () => [];
 
     const result = await sync.handleRealtimeStatus({
       type: "outbound_status",
@@ -160,4 +164,68 @@ test("sends queued quote deletions to the Worker Base44 route and acknowledges s
       type: "delete"
     }]);
   });
+});
+
+test("immediate quote acknowledgements identify the exact revision sent", async () => {
+  await withWorker({ok:true,status:"pushed",remote_id:"base44-1"}, async workerUrl => {
+    const repository = makeRepository();
+    repository.listPendingOutboundQuotes = async () => [{
+      local_id:"local-quote-1",kind:"update",quote:{id:"local-quote-1",_rev:7,items:[{name:"New item"}]}
+    }];
+    const sync = createOutboundSync({repository,config:{workerUrl,outboundToken:"test-token"}});
+    await sync.flush();
+    assert.equal(repository.acknowledgements[0].revision, 7);
+  });
+});
+
+test("queued acknowledgements preserve sent revision and reject a different in-flight item", async () => {
+  await withWorker({ok:false,queued:true,itemId:"worker-revision-7"}, async workerUrl => {
+    const repository = makeRepository();
+    repository.listPendingOutboundQuotes = async () => [{
+      local_id:"local-quote-1",kind:"update",quote:{id:"local-quote-1",_rev:7}
+    }];
+    const sync = createOutboundSync({repository,config:{workerUrl,outboundToken:"test-token"}});
+    await sync.flush();
+    assert.deepEqual(await sync.handleRealtimeStatus({entityType:"quote",quoteId:"local-quote-1",itemId:"different",status:"pushed"}), {updated:0});
+    repository.listPendingOutboundQuotes = async () => [];
+    await sync.handleRealtimeStatus({entityType:"quote",quoteId:"local-quote-1",itemId:"worker-revision-7",status:"pushed",remoteId:"base44-1"});
+    assert.equal(repository.acknowledgements[0].revision, 7);
+    assert.deepEqual(await sync.handleRealtimeStatus({entityType:"quote",quoteId:"local-quote-1",itemId:"obsolete",status:"pushed"}), {updated:0});
+  });
+});
+
+test("a missing realtime acknowledgement retries rather than leaving a quote stuck indefinitely", async context => {
+  context.mock.timers.enable({apis:["Date"],now:Date.now()});
+  await withWorker({ok:false,queued:true,itemId:"queued"}, async (workerUrl, getRequest) => {
+    const repository = makeRepository();
+    const sync = createOutboundSync({repository,config:{workerUrl,outboundToken:"test-token"}});
+    await sync.flush();
+    await sync.flush();
+    assert.equal(getRequest().requestCount, 1);
+    context.mock.timers.tick(61000);
+    await sync.flush();
+    assert.equal(getRequest().requestCount, 2);
+    assert.deepEqual(repository.acknowledgements, [], "only an actual acknowledgement marks a push complete");
+  });
+});
+
+test("saving during a running flush schedules an immediate follow-up instead of waiting for the interval", {timeout:5000}, async () => {
+  let release, finish;
+  const blocked = new Promise(resolve => {release = resolve;});
+  const followed = new Promise(resolve => {finish = resolve;});
+  let reads = 0;
+  const repository = makeRepository();
+  repository.listPendingOutboundQuotes = async () => {
+    reads++;
+    if (reads === 1) await blocked;
+    else finish();
+    return [];
+  };
+  const sync = createOutboundSync({repository,config:{workerUrl:"http://127.0.0.1:1",outboundToken:"test-token"}});
+  const first = sync.flush();
+  assert.deepEqual(await sync.flush(), {skipped:"already-running"});
+  release();
+  await first;
+  await followed;
+  assert.equal(reads, 2);
 });

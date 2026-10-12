@@ -1,5 +1,19 @@
 export const APP_LINK_QUERY = "enquoteShareTarget";
 
+export function quoteReferenceFromLabel(label) {
+  if (typeof label !== "string") return null;
+  const reference = label.trim().match(/^(?:Quote\s+)?((?:Q|AI)-[A-Za-z0-9-]+)$/i) ||
+    label.trim().match(/ - ((?:Q|AI)-[A-Za-z0-9-]+)$/i);
+  return reference?.[1] || null;
+}
+
+export function quoteDetailsPath(id, label) {
+  const params = new URLSearchParams({id: String(id)});
+  const reference = quoteReferenceFromLabel(label);
+  if (reference) params.set("quoteNumber", reference);
+  return `/QuoteDetails?${params}`;
+}
+
 export function splitAppPath(value) {
   const index = value.indexOf("?");
   return index < 0 ? [value, ""] : [value.slice(0, index), value.slice(index + 1)];
@@ -32,9 +46,8 @@ export function appLinkUrl(item) {
   const [pathname, query] = splitAppPath(item.path);
   const params = new URLSearchParams(query);
   if (pathname === "/QuoteDetails" && !params.has("quoteNumber")) {
-    const reference = item.label.match(/^Quote ((?:Q|AI)-[A-Za-z0-9-]+)$/) ||
-      item.label.match(/ - ((?:Q|AI)-[A-Za-z0-9-]+)$/);
-    if (reference) params.set("quoteNumber", reference[1]);
+    const reference = quoteReferenceFromLabel(item.label);
+    if (reference) params.set("quoteNumber", reference);
   }
   params.set(APP_LINK_QUERY, JSON.stringify(item.target));
   return `${pathname}?${params}`;

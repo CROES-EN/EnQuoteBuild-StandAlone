@@ -11,6 +11,7 @@ import {cn} from "@/lib/utils";
 import QuoteCard from "@/components/quotes/QuoteCard";
 import QuoteStatusSnapshot from "@/components/quotes/QuoteStatusSnapshot";
 import StatusAlerts from "@/components/dashboard/StatusAlerts";
+import {selectQuoteAlerts} from "@/features/quotes/quoteAlertSelection";
 import {computeQuoteAlert, userHasAlertAccess} from "@/utils/quoteSLA";
 import BulkActionBar from "@/components/quotes/BulkActionBar";
 import {Checkbox} from "@/components/ui/checkbox";
@@ -223,23 +224,16 @@ function QuotesContent() {
     return 0;
   });
 
+  const alertQuotes = selectQuoteAlerts(quotes, dismissals, myMentions, user?.email, isAdmin);
+  const alertQuoteIds = new Set(alertQuotes.map(quote => quote.id));
   const alertsFilteredQuotes = alertsOnly
-    ? baseFilteredQuotes.filter((q) => {
-        if (dismissedQuoteIds.has(q.id)) return false;
-        const alert = computeQuoteAlert(q);
-        return userHasAlertAccess(alert, q, user?.email, isAdmin) || mentionedQuoteIds.has(q.id);
-      })
-    : baseFilteredQuotes;
+    ? baseFilteredQuotes.filter(quote => alertQuoteIds.has(quote.id)) : baseFilteredQuotes;
 
   const filteredQuotes = duplicatesOnly
     ? alertsFilteredQuotes.filter((q) => duplicateSiteIds.has(q.site_id))
     : alertsFilteredQuotes;
 
-  const alertCount = quotes.filter((q) => {
-    if (dismissedQuoteIds.has(q.id)) return false;
-    const alert = computeQuoteAlert(q);
-    return userHasAlertAccess(alert, q, user?.email, isAdmin) || mentionedQuoteIds.has(q.id);
-  }).length;
+  const alertCount = alertQuotes.length;
 
   // --- Bulk selection & status update ---
   const { toast } = useToast();
@@ -512,8 +506,7 @@ function QuotesContent() {
           </Card>
         )}
 
-        {/* Status Alerts - reflects the currently filtered quote list */}
-        <StatusAlerts quotes={filteredQuotes} />
+        <StatusAlerts quotes={alertQuotes} preselected />
 
         {/* Bulk select-all control */}
         {bulkMode && !isLoading && filteredQuotes.length > 0 && (

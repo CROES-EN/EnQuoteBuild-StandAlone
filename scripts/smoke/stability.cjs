@@ -3,6 +3,7 @@ const {app} = require("electron");
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function runStability(win) {
+  win.showInactive();
   async function evaluate(code) {
     const result = await win.webContents.executeJavaScript(`(() => {
       try {
@@ -128,6 +129,7 @@ async function runStability(win) {
   const chatColors = await evaluate(`(() => {
     const style = getComputedStyle(document.documentElement);
     const probe = document.createElement("span");
+    probe.style.transition = "none";
     document.body.appendChild(probe);
     function token(name) {
       probe.style.backgroundColor = "hsl(" + style.getPropertyValue(name) + ")";
@@ -172,6 +174,24 @@ async function runStability(win) {
   await sleep(300);
   assert.deepEqual(await evaluate(`window.__smokeUploadedAvatar`), {type: "image/gif", bytes: gif});
   console.log("ok   GIF profile picker: accepts GIFs and uploads original bytes without flattening");
+  await evaluate(`(() => {
+    window.__smokeTasks = [{id:"copy-phone-task",title:"Phone copy stability check",type:"call",status:"open",
+      due_at:new Date(Date.now()+3600000).toISOString(),contact_name:"Test contact",contact_phone:"1-484-624-1346"}];
+    Object.defineProperty(navigator,"clipboard",{configurable:true,value:{writeText:async text => {
+      if(window.__smokeClipboardFail) throw new Error("Clipboard unavailable");
+      window.__smokeCopiedPhone=text;
+    }}});
+    return true;
+  })()`);
+  await navigate("Tasks");
+  await click('[aria-label="Copy phone number 1-484-624-1346"]');
+  assert.equal(await evaluate(`window.__smokeCopiedPhone`), "1-484-624-1346", "copies only the full phone number");
+  await evaluate(`window.__smokeClipboardFail=true; true`);
+  await click('[aria-label="Copy phone number 1-484-624-1346"]');
+  assert.equal(await evaluate(`document.body.innerText.includes("Could not copy the phone number")`), true);
+  assert.equal(await evaluate(`document.querySelector('[aria-label="Copy phone number 1-484-624-1346"]').disabled`), false, "copy control recovers from clipboard failure");
+  await evaluate(`delete navigator.clipboard; delete window.__smokeClipboardFail; true`);
+  console.log("ok   Tasks: exact phone number copying, visible clipboard errors, and retry recovery");
   await navigate("Dashboard");
   await navigate("SOPLibrary");
   const samples = [];
@@ -179,7 +199,7 @@ async function runStability(win) {
   try {
     await win.webContents.debugger.sendCommand("Performance.enable");
     for (let cycle = 0; cycle < 6; cycle++) {
-      for (const page of ["Users", "Messages", "SOPLibrary", "Dashboard"]) await navigate(page);
+      for (const page of ["Users", "Tasks", "Messages", "SOPLibrary", "Dashboard"]) await navigate(page);
       const state = await evaluate(`({errors: window.__smokeErrors.slice(), crashed: /Something went wrong/i.test(document.body.innerText)})`);
       assert.deepEqual(state.errors, [], `No uncaught errors in navigation cycle ${cycle + 1}`);
       assert.equal(state.crashed, false);
@@ -195,7 +215,7 @@ async function runStability(win) {
     type, cpuPercent: Number(cpu.percentCPUUsage.toFixed(2)),
     workingSetMB: Number((memory.workingSetSize / 1024).toFixed(1))
   }));
-  console.log("ok   Stability: 24 repeated page transitions without uncaught errors");
+  console.log("ok   Stability: 30 repeated page transitions without uncaught errors");
   console.log(`JS heap samples (MB, before GC): ${samples.map((bytes) => bytes ? (bytes / 1048576).toFixed(1) : "unavailable").join(", ")}`);
   console.log(`Idle process metrics (test fixtures, not a production benchmark): ${JSON.stringify(metrics)}`);
 }

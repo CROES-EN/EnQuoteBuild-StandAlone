@@ -6,10 +6,10 @@ function Unavailable({label}) {
   return <button type="button" disabled title={`${label}: not available in EnQuote Space`} className="cursor-not-allowed px-1.5 py-1 text-xs opacity-50">{label}</button>;
 }
 
-export function NavigationQuicklinks({onHome, onBrowse, onSearch, onMail}) {
+export function NavigationQuicklinks({onHome, onBrowse, onSearch, onMail, onGames}) {
   return (
     <nav aria-label="EnQuote Space quicklinks" className="mt-2 flex flex-wrap items-center gap-x-1 border-t border-white/30 pt-1 text-white">
-      {[["Home", onHome], ["Browse", onBrowse], ["Search", onSearch], ["Mail", onMail]].map(([label, action]) =>
+      {[["Home", onHome], ["Browse", onBrowse], ["Search", onSearch], ["Mail", onMail], ["Games", onGames]].map(([label, action]) =>
         <button key={label} type="button" onClick={action} className="px-1.5 py-1 text-xs hover:underline">{label}</button>)}
       {UNAVAILABLE_NAV.map((label) => <Unavailable key={label} label={label} />)}
       <span className="px-1.5 text-[10px] text-white/70">Faded links are unavailable.</span>

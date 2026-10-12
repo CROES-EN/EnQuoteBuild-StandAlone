@@ -446,10 +446,114 @@ Shared quote fields and sections include the quote number in their link label
 (for example, `Status History - Q-123`). Whole-quote `Quote Q-123` labels stay unchanged.
 Shared quote links carry the quote reference as well as the record ID, so they can
 open the same quote on a PC with a different synchronized local ID. Existing chat
-links labeled with a quote reference also use this lookup. The destination uses
+links labeled with a quote reference also use this lookup. Task quote badges and
+standard message quote attachments use their stored quote labels to recover the
+reference, including existing tasks/messages created on another PC. Lookup checks
+the exact local ID, synchronized Base44 ID, and unique quote number across the full
+stored quote database, including older versions, regardless of visible list filters
+or recent-page limits. It does not guess a quote from a site or case number.
+The destination uses
 the local record ID for edits and preserves the selected section's highlight.
-Ambiguous references show an error instead of opening an arbitrary quote.
+When the reference has older versions and exactly one current version, reference
+lookup opens that current version. Exact ID links still open the requested version.
+If multiple current records match, **Choose quote version** lists matching records
+with their versions, site/case, status, and IDs. Select the correct record rather
+than having EnQuote guess. If all matching records are historical, they remain
+selectable. The selected record keeps the shared section highlight.
+Validate shared lookup with `node --test tests\sharedQuoteLink.test.mjs` and,
+after building, `node scripts\smoke-test.cjs --quote-links-only`.
+**Update Quote** saves independently of the editor screen. A confirmed save updates
+the quote cache and displays **Quote changes saved**; navigating away does not cancel
+the save or pull you back to the editor when it completes. Failures remain visible
+as notifications. Local repository operations serialize their full read-modify-write
+cycle, so status changes, navigation writes, and sync acknowledgements preserve items.
+An acknowledgement for an older pushed revision leaves newer edits queued, and
+inbound snapshots do not replace quotes with pending local edits. Saving locally
+does not mean Base44 has acknowledged the edit yet; network errors/conflicts stay queued.
+Desktop persistence fixes require a full desktop update, not only a UI hotfix.
+The Quotes **Attention Required** box shows exactly the quotes counted by the
+**Alerts** button, using the same SLA assignments, unresolved mentions, and
+dismissals. It remains independent of search/status/coordinator filters so its
+count matches the Alerts badge. The Alerts button still filters the main quote
+list and is unchanged. The attention box retains View, Log, Dismiss, and collapse
+controls; SLA timing or Mentioned replaces the old separate day-threshold list.
+The main Dashboard does not display Coaching Feedback or Attention Required.
+Quote alerts remain available on the Quotes page; this does not delete feedback
+or dismiss any alerts.
 Auto-Drafter details use the draft reference, or the real quote number once sent.
+
+In EnSpace, **Games** in the top quicklinks bar opens an arcade with Snake,
+icon-based Memory Match, Tic-Tac-Toe against the computer, draw-one Klondike
+Solitaire (with Undo), and **Neon Rider**, an original draw-and-ride track toy.
+Snake uses arrow keys/WASD or
+direction buttons and pauses when the board loses focus or the window is hidden.
+Space toggles pause while the board is focused. Each game has a New game button;
+leaving a local game resets it. Snake glides between grid steps while retaining
+grid-based steering and collisions. Neon Rider supports maps up to 14,400 x 8,000,
+Expand map, Zoom in/out, Fit map, Pan map, View start, and Follow rider controls.
+Its local tracks reset when leaving the game. It is not the official Line Rider.
+Games do not change work records.
+The arcade has an '80s neon-cabinet look with pixel-style lettering and static
+scanlines, with no flashing effects or external fonts.
+**Challenge a teammate** opens online Tic-Tac-Toe, turn-based Memory Match,
+Connect Four, Battleship, and Checkers.
+Connect Four, Battleship, and Checkers also have dedicated arcade tiles marked
+Online / 2 Players / Auto-Saved. Their Play buttons open challenges with that
+game preselected; existing saved matches remain accessible through Open match.
+The teammate list shows published EnSpace profiles by name and email, excludes
+your own profile, and loads every directory page. When the games service is
+available, only profiles whose email is on the allowed teammate list can be chosen.
+If the games Worker/migrations are unavailable, profiles still load but Send challenge
+stays disabled and the service error remains visible. Refresh or reopen after deployment.
+Choose a teammate and game; invitations appear in their Games lobby,
+which refreshes every five seconds. The recipient can accept or decline;
+the sender can cancel a pending invite. The sender goes first. Memory matches
+earn another turn; misses display briefly before passing play to the other person.
+Matches and turns are verified by the Worker, with hidden cards withheld.
+Connect Four uses a seven-column, six-row board with gravity and four-in-a-row wins.
+Battleship uses private 10 x 10 boards with five ships of lengths 5, 4, 3, 3, 2.
+Select a ship and orientation, then click its starting cell, or use Randomize fleet.
+Each placement is saved immediately. Ready to battle locks the fleet; both players
+must be ready before firing one shot per turn. Unhit enemy ships are never sent
+to the opponent. Checkers follows American rules: compulsory captures, multi-jumps,
+forward-only ordinary pieces, kings moving both ways, and promotion ending a turn.
+Capturing all pieces or blocking every enemy move wins; 80 turns without a capture
+or promotion is a draw.
+You can close Games or EnQuote and return using **Open match**, or resign.
+Every confirmed action saves the board, turn, and private setup in the shared database.
+Wait for Saving to finish before closing; errors mean the action is not confirmed.
+Active matches never expire and remain listed regardless of inactivity.
+Invites expire after 24 hours. The lobby also shows up to 100 nonactive matches
+updated within the last seven days. These are private matches,
+not a public leaderboard.
+
+**High scores** shows team-wide top-ten leaderboards and your personal best on
+this PC. Snake ranks the highest completed-run score; Memory Match and Solitaire
+rank the fewest moves in a completed game. Scores save automatically at game end,
+never from an unfinished Memory Match or Solitaire game. Personal scores are
+scoped to the signed-in user. Failed shared uploads show an explicit Retry action;
+**Sync personal bests** on the High scores screen uploads personal bests saved
+while offline. Completing another game also retries that game's saved best.
+Scores are authenticated, bounded, and update each player's best atomically, but
+local-game results are honor-system submissions, not anti-cheat verified replays.
+Online matches and the Neon Rider sandbox are not scored.
+
+Online challenges require a **full desktop release**, not a UI-only hotfix,
+because they add preload/main-process handlers. Before releasing that installer,
+apply the games migration and deploy the Worker from `enquote-sync-worker`:
+`npx wrangler d1 execute enquote-sync --file=.\migrations\0012_retro_games.sql --remote`,
+`npx wrangler d1 execute enquote-sync --file=.\migrations\0013_retro_scores.sql --remote`,
+`npx wrangler d1 execute enquote-sync --file=.\migrations\0014_retro_strategy.sql --remote`,
+then `npm run deploy`. Local games remain usable on older desktop builds; online
+play shows upgrade guidance when the desktop handlers are unavailable.
+Validation: `node --test tests\enSpaceGames.test.mjs tests\arcadeExtraGames.test.mjs tests\arcadeScores.test.mjs`,
+Worker `node --test test\retro-games.test.js test\retro-scores.test.js`, and, after building,
+`node scripts\smoke-test.cjs --arcade-only`.
+Task contact phone numbers have a **Copy phone number** button that copies only
+the number, preserving its formatting. Copy success or failure appears as a
+notification; the number can also be selected and copied manually.
+Validate task clipboard behavior and repeated navigation with
+`node scripts\smoke-test.cjs --stability-only` after building.
 The composer keeps a full-width text area with compact, borderless action icons
 at the lower right. Text grows up to a scrollable six-line area; Enter sends,
 Shift+Enter inserts a newline, and Ctrl+V still pastes screenshots.

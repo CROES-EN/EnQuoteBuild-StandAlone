@@ -1,47 +1,20 @@
 import {useState} from "react";
 import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
-import {base44} from "@/api/base44Client";
+import {useUserRole} from "@/components/auth/RoleGuard";
+import {selectQuoteAlerts} from "@/features/quotes/quoteAlertSelection";
+import {computeQuoteAlert} from "@/utils/quoteSLA";
+import {getStatusLabel} from "@/constants/quoteStatuses";
+import {toast} from "sonner";
 import {createLocalRecord, createLocalRecords, listLocalCollection} from "@/api/dataClient";
 import {Link} from "react-router-dom";
 import {createPageUrl} from "@/utils";
 import {Card} from "@/components/ui/card";
 import {Button} from "@/components/ui/button";
 import {AlertCircle, CheckCheck, ChevronDown, ChevronUp, Clock, Loader2, MessageSquarePlus, X} from "lucide-react";
-import {differenceInDays, parseISO} from "date-fns";
 import LogFollowUpDialog from "@/components/quotes/LogFollowUpDialog";
-import {INVOICE_PAID_ALERT_CUTOFF} from "@/utils/quoteSLA";
 import {SiteIdLink} from "@/components/links/ExternalIdLinks";
 
-const STATUS_THRESHOLDS = {
-  draft_without_internal: 3,
-  draft_without_fst: 3,
-  submitted: 3,
-  approved: 5,
-  rejected: 5,
-  quote_sent_to_ho: 5,
-  ho_approved_invoice_required: 7,
-  ho_rejected: 5,
-  invoiced: 14,
-  invoice_paid: 2,
-  pending_materials: 10,
-};
-
-const STATUS_LABELS = {
-  draft_without_internal: "Draft",
-  draft_without_fst: "Missing Details",
-  submitted: "Awaiting Approval",
-  approved: "Approved",
-  rejected: "Rejected",
-  quote_sent_to_ho: "Sent to HO",
-  ho_approved_invoice_required: "Awaiting Invoice",
-  ho_rejected: "HO Rejected",
-  invoiced: "Awaiting Payment",
-  invoice_paid: "Awaiting Scheduling",
-  pending_materials: "Pending Materials",
-  on_hold: "On Hold"
-};
-
-export default function StatusAlerts({ quotes }) {
+export default function StatusAlerts({ quotes, preselected = false }) {
   const queryClient = useQueryClient();
   const [collapsed, setCollapsed] = useState(false);
   const [logQuote, setLogQuote] = useState(null);
@@ -52,10 +25,7 @@ export default function StatusAlerts({ quotes }) {
     "REDACTED-USER1@example.invalid",
     "ajennings@enphaseenergy.com"
   ];
-  const { data: currentUser } = useQuery({
-    queryKey: ["currentUser"],
-    queryFn: () => base44.auth.me(),
-  });
+  const {user: currentUser, isAdmin} = useUserRole();
   const canClearAll = ALLOWED_CLEAR_ALL_EMAILS.includes(
     (currentUser?.email || "").toLowerCase()
   );
@@ -70,7 +40,7 @@ export default function StatusAlerts({ quotes }) {
   // dismissals appear as an empty list FOREVER, regardless of what was actually dismissed.
   // Routed through listLocalCollection() -- the same function every other collection
   // (quotes, reviews, etc.) already uses correctly.
-  const { data: dismissals = [], isLoading: dismissalsLoading } = useQuery({
+  const { data: dismissals = [], isLoading: dismissalsLoading, error: dismissalsError } = useQuery({
     queryKey: ["statusAlertDismissals"],
     queryFn: async () => {
       return await listLocalCollection("statusAlertDismissals");
@@ -78,6 +48,12 @@ export default function StatusAlerts({ quotes }) {
   });
 
   const dismissedQuoteIds = dismissals.map(d => d.quote_id);
+  const {data: mentions = [], error: mentionsError} = useQuery({
+    queryKey: ["quoteAlerts", "mentions", currentUser?.email],
+    queryFn: async () => (await listLocalCollection("quoteAlerts"))
+      .filter(item => item.mentioned_email === currentUser.email && !item.is_resolved),
+    enabled: !preselected && Boolean(currentUser?.email)
+  });
 
   const dismissMutation = useMutation({
     mutationFn: async (quoteId) => {
@@ -85,7 +61,8 @@ export default function StatusAlerts({ quotes }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["statusAlertDismissals"] });
-    }
+    },
+    onError: error => toast.error(error.message || "Could not dismiss quote alert.")
   });
 
   const clearAllMutation = useMutation({
@@ -97,70 +74,16 @@ export default function StatusAlerts({ quotes }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["statusAlertDismissals"] });
-    }
+    },
+    onError: error => toast.error(error.message || "Could not clear quote alerts.")
   });
 
-  const now = new Date();
-  const allAlerts = [];
-
-  quotes.forEach(quote => {
-    if (quote.status === "scheduled") return;
-    if (quote.status === "on_hold") return;
-    if (quote.exclude_from_reporting) return;
-    // Matches Base44's actual live dashboard behavior exactly (confirmed via Base44's
-    // own investigation of its real dashboard code): there is NO reason-based
-    // suppression - every ho_rejected quote is alertable after 5 days regardless of
-    // whether ho_rejection_reason is populated. This is a deliberate parity choice,
-    // not an oversight - do not re-add a reason check without re-confirming against
-    // Base44's actual current dashboard logic first.
-
-    // Draft quotes are only flagged if they've been previously submitted — i.e.
-    // they went through the approval/review cycle (submitted → rejected/approved/
-    // missing details) and bounced back to draft. A fresh draft is not flagged.
-    const isDraft = quote.status === "draft_without_internal" || quote.status === "draft_without_fst";
-    if (isDraft) {
-      const wasSubmitted = (quote.status_history || []).some(
-        (entry) => entry.status === "submitted"
-      );
-      if (!wasSubmitted) return;
-    }
-
-    const threshold = STATUS_THRESHOLDS[quote.status];
-    if (!threshold) return;
-
-    let statusDate;
-    if (quote.status_history?.length > 0) {
-      statusDate = parseISO(quote.status_history[quote.status_history.length - 1].changed_at);
-    } else if (quote.created_date) {
-      statusDate = parseISO(quote.created_date);
-    }
-
-    if (!statusDate) return;
-
-    // Legacy Invoice Paid quotes (moved before the scheduling-alert cutoff) are
-    // exempt — only quotes transitioned on/after the cutoff are flagged.
-    if (quote.status === "invoice_paid") {
-      const paidDate = quote.invoice_paid_date ? parseISO(quote.invoice_paid_date) : statusDate;
-      if (paidDate && paidDate < INVOICE_PAID_ALERT_CUTOFF) return;
-    }
-
-    const daysInStatus = differenceInDays(now, statusDate);
-
-    if (daysInStatus >= threshold) {
-      allAlerts.push({
-        quote,
-        daysInStatus,
-        threshold,
-        status: quote.status
-      });
-    }
-  });
-
-  allAlerts.sort((a, b) => b.daysInStatus - a.daysInStatus);
-
-  const alerts = allAlerts.filter(a => !dismissedQuoteIds.includes(a.quote.id));
+  const alerts = (preselected ? quotes : selectQuoteAlerts(quotes, dismissals, mentions, currentUser?.email, isAdmin))
+    .map(quote => ({quote, status: quote.status, alert: computeQuoteAlert(quote)}));
 
   if (dismissalsLoading) return null;
+  if (dismissalsError) return <p role="alert">Could not load alert dismissals: {dismissalsError.message}</p>;
+  if (mentionsError) return <p role="alert">Could not load quote alerts: {mentionsError.message}</p>;
   if (alerts.length === 0) return null;
 
   const handleClearAll = () => {
@@ -220,7 +143,7 @@ export default function StatusAlerts({ quotes }) {
                     {alert.quote.site_id ? <SiteIdLink siteId={alert.quote.site_id} className="font-medium" /> : alert.quote.quote_number}
                   </span>
                   <span className="text-xs text-muted-foreground shrink-0">
-                    {STATUS_LABELS[alert.status] || alert.status}
+                    {getStatusLabel(alert.status) || alert.status}
                   </span>
                   <Link
                     to={createPageUrl(`QuoteDetails?id=${alert.quote.id}`)}
@@ -241,7 +164,7 @@ export default function StatusAlerts({ quotes }) {
                     Log
                   </Button>
                   <span className="text-xs font-medium text-amber-700">
-                    {alert.daysInStatus} days
+                    {alert.alert?.timeLabel || "Mentioned"}
                   </span>
                   <button
                     onClick={() => dismissMutation.mutate(alert.quote.id)}

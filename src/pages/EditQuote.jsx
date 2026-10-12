@@ -1,4 +1,4 @@
-﻿import {useState} from "react";
+﻿import {useEffect, useRef, useState} from "react";
 import {base44} from "@/api/base44Client";
 import {
     createQuote,
@@ -28,6 +28,11 @@ function EditQuoteContent() {
  const location = useLocation();
  const urlParams = new URLSearchParams(location.search);
  const quoteId = urlParams.get("id");
+ const activeEditor = useRef(quoteId);
+ useEffect(() => {
+ activeEditor.current = quoteId;
+ return () => { activeEditor.current = null; };
+ }, [quoteId]);
  // Set when a save is rejected because the quote changed elsewhere since this form loaded
  // it (see updateMutation's onError below). Showing a clear "someone/something else
  // changed this" message and a reload action is much safer than either silently failing
@@ -117,11 +122,13 @@ function EditQuoteContent() {
  return saveQuoteEdit({quote, data, user, getQuotes, createQuote, updateQuote});
  },
  onSuccess: (newQuote) => {
+ const targetQuoteId = newQuote?.id || quoteId;
+ if (newQuote) queryClient.setQueriesData({queryKey: ["quote", targetQuoteId]}, newQuote);
  queryClient.invalidateQueries({ queryKey: ["quote", quoteId] });
  queryClient.invalidateQueries({ queryKey: ["quotes"] });
+ toast.success("Quote changes saved");
  // Navigate to the new quote if a new version was created
- const targetQuoteId = newQuote?.id || quoteId;
- navigate(createPageUrl(`QuoteDetails?id=${targetQuoteId}`));
+ if (activeEditor.current === quoteId) navigate(createPageUrl(`QuoteDetails?id=${targetQuoteId}`));
  },
  onError: (error) => {
  // Electron's IPC boundary only reliably forwards an Error's `message` (wrapped as
@@ -130,6 +137,12 @@ function EditQuoteContent() {
  // signal is detected via a marker WITHIN the message, not a `.code` property or an
  // exact prefix match, and the original text is recovered by slicing after the marker.
  const message = String(error?.message || "");
+ if (activeEditor.current !== quoteId) {
+ toast.error(message || "Failed to save quote changes. Reopen the quote and try again.");
+ queryClient.invalidateQueries({ queryKey: ["quotes"] });
+ queryClient.invalidateQueries({ queryKey: ["quote", quoteId] });
+ return;
+ }
  if (message.startsWith("VERSION_RETIREMENT:")) {
  setConflictError(message.slice("VERSION_RETIREMENT:".length).trim());
  queryClient.invalidateQueries({ queryKey: ["quotes"] });

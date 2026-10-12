@@ -60,6 +60,50 @@ test("concurrent collection writes stay serialized without losing records", asyn
   });
 });
 
+test("saved line items survive immediate submission and manual status changes", async () => {
+  await withUserData(async directory => {
+    await writeFileWithoutMigrationFlag(directory);
+    const repository = repositoryFor(directory);
+    const original = await repository.get("quote-1");
+    const items = [{product_id:"new-part",name:"Added part",quantity:2,total:27}];
+    await withTimeout(Promise.all([
+      repository.update(original.id, {items,total:27}, original._rev || 1),
+      repository.update(original.id, {status:"submitted"}),
+      repository.createCollectionRecord("activities", {id:"submit-log"})
+    ]), "save then submit");
+    for (const status of ["approved","quote_sent_to_ho","draft_without_internal"]) {
+      await repository.update(original.id, {status});
+      assert.deepEqual((await repository.get(original.id)).items, items);
+    }
+    assert.deepEqual((await repositoryFor(directory).get(original.id)).items, items);
+  });
+});
+
+test("acknowledging an older push keeps newer items and status pending, and inbound snapshots cannot erase them", async () => {
+  await withUserData(async directory => {
+    await writeFileWithoutMigrationFlag(directory);
+    const repository = repositoryFor(directory);
+    const quote = await repository.create({status:"draft",quote_number:"Q-pending",items:[]});
+    const sent = (await repository.listPendingOutboundQuotes()).find(entry => entry.local_id === quote.id);
+    const items = [{product_id:"added",quantity:1,total:10}];
+    await repository.update(quote.id, {items,total:10}, quote._rev);
+    await repository.update(quote.id, {status:"submitted"});
+    await repository.markOutboundSynced([{local_id:quote.id,remote_id:"remote-pending",revision:sent.quote._rev}]);
+    let pending = (await repository.listPendingOutboundQuotes()).find(entry => entry.local_id === quote.id);
+    assert.equal(pending.kind, "update");
+    assert.equal(pending.remote_id, "remote-pending");
+    assert.deepEqual(pending.quote.items, items);
+    assert.equal(pending.quote.status, "submitted");
+    await repository.importData({version:1,quotes:[{id:"remote-pending",quote_number:"Q-pending",
+      status:"draft",items:[],updated_date:"2099-01-01T00:00:00Z"}]});
+    assert.deepEqual((await repository.get(quote.id)).items, items, "unacknowledged edits survive an inbound echo");
+    assert.equal((await repository.get(quote.id)).status, "submitted");
+    pending = (await repository.listPendingOutboundQuotes()).find(entry => entry.local_id === quote.id);
+    await repository.markOutboundSynced([{local_id:quote.id,remote_id:"remote-pending",revision:pending.quote._rev}]);
+    assert.equal((await repository.listPendingOutboundQuotes()).some(entry => entry.local_id === quote.id), false);
+  });
+});
+
 test("snapshot import keeps the local migration flag", async () => {
   await withUserData(async (directory) => {
     await writeFileWithoutMigrationFlag(directory);
@@ -72,3 +116,37 @@ test("snapshot import keeps the local migration flag", async () => {
     assert.equal(raw.meta.sharedPasswordMigrationCompleted, true);
   });
 });
+
+  test("quote updates survive simultaneous navigation writes and sync acknowledgements", async () => {
+    await withUserData(async directory => {
+      await writeFileWithoutMigrationFlag(directory);
+      const repository = repositoryFor(directory);
+      const quote = await repository.create({id:"demo-quote-save",quote_number:"Q-save",status:"draft",scope_of_work:"Before"});
+      await withTimeout(Promise.all([
+        repository.update(quote.id, {scope_of_work:"Saved changes"}, quote._rev),
+        repository.createCollectionRecord("activities", {id:"navigation-activity"}),
+        repository.markOutboundSynced([{local_id:quote.id,remote_id:"remote-save"}])
+      ]), "save during navigation");
+      const saved = await repository.get(quote.id);
+      assert.equal(saved.scope_of_work, "Saved changes");
+      assert.equal(saved.base44_id, "remote-save");
+      assert.equal((await repository.listCollection("activities")).length, 1);
+      const reopened = repositoryFor(directory);
+      assert.equal((await reopened.get(quote.id)).scope_of_work, "Saved changes", "changes persist on disk after reopening");
+    });
+  });
+
+  test("simultaneous updates check revisions atomically instead of silently replacing a confirmed save", async () => {
+    await withUserData(async directory => {
+      await writeFileWithoutMigrationFlag(directory);
+      const repository = repositoryFor(directory);
+      const quote = await repository.get("quote-1");
+      const results = await withTimeout(Promise.allSettled([
+        repository.update(quote.id, {scope_of_work:"First"}, quote._rev || 1),
+        repository.update(quote.id, {scope_of_work:"Second"}, quote._rev || 1)
+      ]), "concurrent quote edits");
+      assert.equal(results.filter(result => result.status === "fulfilled").length, 1);
+      assert.match(results.find(result => result.status === "rejected").reason.message, /CONFLICT:/);
+      assert.equal((await repository.get(quote.id)).scope_of_work, "First");
+    });
+  });

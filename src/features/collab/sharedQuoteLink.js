@@ -1,15 +1,37 @@
+export class SharedQuoteAmbiguityError extends Error {
+  constructor(message, candidates) {
+    super(message);
+    this.name = "SharedQuoteAmbiguityError";
+    this.candidates = candidates;
+  }
+}
+
+function resolveReferenceMatches(matches) {
+  if (matches.length <= 1) return matches[0] || null;
+  const current = matches.filter(quote => quote.is_current_version !== false);
+  if (current.length === 1) return current[0];
+  throw new SharedQuoteAmbiguityError(
+    "This quote reference matches multiple records. Select the quote below to open it.",
+    current.length ? current : matches
+  );
+}
+
 export async function resolveSharedQuote(id, quoteNumber, {getQuoteById, getQuotes}) {
   const exact = id ? await getQuoteById(id) : null;
   if (exact) return exact;
   if (!id && !quoteNumber) return null;
   const quotes = await getQuotes();
-  const aliases = id ? quotes.filter(quote => quote.id === id || quote.base44_id === id) : [];
-  if (aliases.length > 1) throw new Error("This shared quote ID matches multiple records. Open the quote from Quotes instead.");
+  const aliases = id ? quotes.filter(quote => String(quote.id) === String(id) ||
+    (quote.base44_id != null && String(quote.base44_id) === String(id))) : [];
+  if (aliases.length > 1) throw new SharedQuoteAmbiguityError(
+    "This shared quote ID matches multiple records. Select the quote below to open it.", aliases);
   if (aliases.length === 1) return aliases[0];
-  if (!quoteNumber) return null;
-  const matches = quotes.filter(quote => quote.quote_number === quoteNumber);
-  if (matches.length > 1) throw new Error("This quote reference matches multiple records. Open the quote from Quotes instead.");
-  return matches[0] || null;
+  const reference = quoteNumber || quoteReferenceFromLabel(id);
+  if (!reference) return null;
+  const normalized = reference.trim().toUpperCase();
+  const matches = quotes.filter(quote => typeof quote.quote_number === "string" &&
+    quote.quote_number.trim().toUpperCase() === normalized);
+  return resolveReferenceMatches(matches);
 }
 
 export function canonicalSharedQuotePath(pathname, search, requestedId, quote) {
@@ -28,4 +50,4 @@ export function canonicalSharedQuotePath(pathname, search, requestedId, quote) {
   }
   return `${pathname}?${params}`;
 }
-import {APP_LINK_QUERY} from "../../../shared/appLinkRules.js";
+import {APP_LINK_QUERY, quoteReferenceFromLabel} from "../../../shared/appLinkRules.js";
