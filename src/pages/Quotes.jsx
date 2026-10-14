@@ -14,6 +14,7 @@ import QuoteCard from "@/components/quotes/QuoteCard";
 import InvoiceNumberDialog from "@/components/quotes/InvoiceNumberDialog";
 import LogFollowUpDialog from "@/components/quotes/LogFollowUpDialog";
 import {buildInvoiceNumberEdit, canEditQuoteRecord} from "@/features/quotes/invoiceNumber";
+import {buildRmaLookup} from "@/features/rma/rmaRecords";
 import QuoteStatusSnapshot from "@/components/quotes/QuoteStatusSnapshot";
 import StatusAlerts from "@/components/dashboard/StatusAlerts";
 import {selectQuoteAlerts} from "@/features/quotes/quoteAlertSelection";
@@ -181,6 +182,12 @@ function QuotesContent() {
   const goldenQuoteIds = new Set([...goldenQuoteEvaluations(autoDrafterRecords, quotes).byQuoteId.entries()]
     .filter(([, evaluation]) => evaluation.golden).map(([id]) => id));
   const isGoldenQuote = (quote) => goldenQuoteIds.has(String(quote.id));
+
+  const { data: panelRmas } = useQuery({
+    queryKey: ["pvPanelRMAs"],
+    queryFn: () => listLocalCollection("rmas"),
+  });
+  const findPanelRma = React.useMemo(() => buildRmaLookup(panelRmas), [panelRmas]);
 
   const [invoiceEditQuote, setInvoiceEditQuote] = useState(null);
   const [logQuote, setLogQuote] = useState(null);
@@ -615,6 +622,7 @@ function QuotesContent() {
                   golden={isGoldenQuote(quote)}
                   onEditInvoiceNumber={!bulkMode && canEditQuoteRecord(quote, user, { isApprover, isAdmin }) ? setInvoiceEditQuote : undefined}
                   onLogFollowUp={!bulkMode && canEditQuoteRecord(quote, user, { isApprover, isAdmin }) ? setLogQuote : undefined}
+                  panelRma={findPanelRma({ caseNumber: quote.case_number, quoteId: quote.id, quoteNumber: quote.quote_number })}
                 />
               );
             })}

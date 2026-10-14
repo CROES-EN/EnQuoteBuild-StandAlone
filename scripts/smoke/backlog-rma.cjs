@@ -24,6 +24,7 @@ async function runBacklogRma(win) {
     if (window.__smokeRmaClipboardFail) throw new Error("RMA clipboard unavailable");
     window.__smokeRmaClipboard = text;
   }}}); true`);
+  if (process.env.ENQUOTE_PERF_PROBE) return runAutoDrafterPerfProbe(win, evaluate);
   const click = async text => {
     const found = await evaluate(`(() => {
       const button = [...document.querySelectorAll('button')].find(node => node.textContent.trim() === ${JSON.stringify(text)});
@@ -475,6 +476,9 @@ async function runBacklogRma(win) {
   assert.equal(records[0].submission_preparation.checklist["Gather panel model and serial numbers."], true);
   assert.equal(await evaluate(`window.__smokeCollections.autoDrafterGeneratedDrafts.length`), 1,
     "Panel RMA does not remove the automatically generated quote draft for additional wiring");
+  await sleep(400);
+  assert.match(await evaluate(`[...document.querySelectorAll('[data-panel-rma-badge]')].map(node => node.textContent).join("|")`),
+    /PV RMA · New/, "Auto-Drafter tiles show that a PV RMA exists for the case");
   await click("Panel RMA: New");
   await click("Next"); await click("Next");
   await click("Open Warranty claim form");
@@ -505,7 +509,7 @@ async function runBacklogRma(win) {
     location.hash = "#/QuoteDetails?id=rma-quote"; return true;
   })()`);
   await sleep(1800);
-  await click("Submit / edit Panel RMA");
+  await click("Submit / Edit Panel RMA");
   await click("Next"); await click("Next"); await click("Next");
   await click("Update RMA");
   await sleep(500);
@@ -516,6 +520,10 @@ async function runBacklogRma(win) {
   await click("List View");
   assert.ok(await evaluate(`Boolean([...document.querySelectorAll('a')].find(node => node.textContent === "RMA-Q1" && node.href.includes("rma-quote")))`),
     "Tracker links the originating quote");
+  await evaluate(`location.hash = "#/Quotes"; true`);
+  await sleep(1500);
+  assert.match(await evaluate(`document.querySelector('[data-quote-card-panel-rma]')?.innerText || ""`), /PV RMA · New/,
+    "Quotes page tiles show that a PV RMA exists for the quote");
   await evaluate(`delete navigator.clipboard; delete window.__smokeRmaClipboard; delete window.__smokeRmaClipboardFail; true`);
   console.log("ok   SOP checklist, source-change warning, refresh errors, draft copying and clipboard recovery");
   console.log("ok   Prefilled Panel RMA, extra fields, save/reopen, no duplicates, independent drafting and tracker");
@@ -566,7 +574,7 @@ async function runBacklogRma(win) {
   assert.equal(await evaluate(`(() => {
     const quote = document.querySelector('[data-enquote-share-scope="groups"]');
     const review = quote?.querySelector('[aria-label="Request review"]');
-    const button = [...document.querySelectorAll('button')].find(node => node.textContent === "Submit / edit Panel RMA");
+    const button = [...document.querySelectorAll('button')].find(node => node.textContent === "Submit / Edit Panel RMA");
     return Boolean(review && review.contains(button) && review.innerText.includes("Verify device warranty"));
   })()`), true, "Review reasons and actions are inside the quote, not floating above its layout");
   await evaluate(`document.querySelector('[aria-label="Routing flag explanations"] > summary').click(); true`);
@@ -803,6 +811,106 @@ async function runBacklogRma(win) {
   assert.equal(await evaluate(`window.__smokeCollections.rmas.length`), 1, "Opening the email does not save an RMA");
   await evaluate(`document.dispatchEvent(new KeyboardEvent("keydown", {key:"Escape", bubbles:true})); true`);
   console.log("ok   RMA Wizard Settings configure email submission for a manufacturer");
+}
+
+// Measures Auto-Drafter dialog responsiveness with a large report (ENQUOTE_PERF_PROBE=1).
+async function runAutoDrafterPerfProbe(win, evaluate) {
+  const caseCount = Number(process.env.ENQUOTE_PERF_PROBE_CASES) || 400;
+  await evaluate(`(() => {
+    window.__smokeCollections = {rmas: [], autoDrafterGeneratedDrafts: [], pvManufacturers: []};
+    window.__smokePaidQuotes = [];
+    const rows = [];
+    for (let i = 0; i < ${caseCount}; i++) rows.push({"Case Number": String(100000 + i), "Enlighten Site ID": String(500000 + i),
+      "O&M Status": "Quote Requested", Status: "Open", "Case Comment Created By": "Perf Requester",
+      "Case Comment": "O&M_QUOTE_REQUEST\\nSite Information\\nSite ID: " + (500000 + i) + "\\nCase Number: " + (100000 + i) +
+        "\\nRecommended Scope of Work\\nScope Description: Replace microinverters and wiring on array " + i +
+        ".\\nProducts\\nItem Name: IQ8A\\nQuantity: 3\\nItem Name: Q Cable\\nQuantity: 2"});
+    window.__smokeWorkTables = [{id: "quoteRequestCases", reportType: "quoteRequestCases",
+      columns: ["Case Number", "Enlighten Site ID", "O&M Status", "Status", "Case Comment", "Case Comment Created By"], rows}];
+    location.hash = "#/AutoDrafter"; return true;
+  })()`);
+  let previous = -1, stable = 0;
+  for (let attempt = 0; attempt < 300; attempt++) {
+    await sleep(1000);
+    const drafts = await evaluate(`window.__smokeCollections.autoDrafterGeneratedDrafts.length`);
+    stable = drafts === previous ? stable + 1 : 0;
+    if (drafts >= caseCount || stable >= 5) break;
+    previous = drafts;
+  }
+  await sleep(1500);
+  const profiling = Boolean(process.env.ENQUOTE_PERF_PROFILE);
+  if (profiling) {
+    win.webContents.debugger.attach("1.3");
+    await win.webContents.debugger.sendCommand("Profiler.enable");
+    await win.webContents.debugger.sendCommand("Profiler.setSamplingInterval", {interval: 200});
+    await win.webContents.debugger.sendCommand("Profiler.start");
+  }
+  const domInfo = await evaluate(`(() => {
+    const all = document.querySelectorAll('*').length;
+    const top = [...document.querySelectorAll('body *')]
+      .map(el => ({el, n: el.getElementsByTagName('*').length}))
+      .filter(x => x.n > all * 0.15 && x.n < all * 0.95)
+      .sort((a, b) => a.n - b.n).slice(0, 8)
+      .map(x => x.el.tagName + '.' + String(x.el.className).slice(0, 60) + ' [' + [...x.el.attributes].map(a => a.name).filter(n => n.startsWith('data-')).join(',') + '] = ' + x.n);
+    const svg = document.querySelectorAll('svg').length;
+    const styleSheets = document.styleSheets.length;
+    const anims = document.getAnimations().map(a => (a.animationName || a.constructor.name) + '@' + (a.effect && a.effect.target ? (a.effect.target.className && String(a.effect.target.className).slice(0, 40)) : ''));
+    const animSummary = Object.entries(anims.reduce((m, k) => (m[k] = (m[k] || 0) + 1, m), {})).sort((a, b) => b[1] - a[1]).slice(0, 8);
+    let t0 = performance.now();
+    for (let i = 0; i < 5; i++) { document.body.style.setProperty('--perf-probe', String(i)); getComputedStyle(document.body).animationName; }
+    const bodyVarRecalc = (performance.now() - t0) / 5;
+    t0 = performance.now();
+    for (let i = 0; i < 5; i++) { document.body.classList.toggle('perf-probe'); document.body.offsetHeight; }
+    const classLayout = (performance.now() - t0) / 5;
+    const rules = [...document.styleSheets].reduce((s, sh) => { try { return s + sh.cssRules.length; } catch { return s; } }, 0);
+    return JSON.stringify({all, svg, styleSheets, rules, anims: anims.length, animSummary, bodyVarRecalc, classLayout, top});
+  })()`);
+  console.log(`perf-dom ${domInfo}`);
+  const result = await evaluate(`(async () => {
+    const frame = () => new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
+    const tiles = document.querySelectorAll('[data-enquote-share-target^="auto-drafter-case:"]').length;
+    let t = performance.now();
+    document.querySelector('[data-remove-case]').click();
+    while (!document.querySelector('[data-remove-case-dialog] textarea')) await frame();
+    await frame();
+    const openMs = performance.now() - t;
+    const textarea = document.querySelector('[data-remove-case-dialog] textarea');
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set;
+    const sample = "Customer already handled this ok";
+    let text = "";
+    let dispatchTotal = 0;
+    t = performance.now();
+    for (const character of sample) {
+      text += character;
+      setter.call(textarea, text);
+      const before = performance.now();
+      textarea.dispatchEvent(new Event("input", {bubbles: true}));
+      dispatchTotal += performance.now() - before;
+      await frame();
+    }
+    const keystrokeMs = (performance.now() - t) / sample.length;
+    const dispatchMs = dispatchTotal / sample.length;
+    document.dispatchEvent(new KeyboardEvent("keydown", {key: "Escape", bubbles: true}));
+    t = performance.now();
+    while (document.querySelector('[data-remove-case-dialog]')) await frame();
+    const closeMs = performance.now() - t;
+    return {tiles, drafts: window.__smokeCollections.autoDrafterGeneratedDrafts.length,
+      openMs: Math.round(openMs), keystrokeMs: Math.round(keystrokeMs * 10) / 10, dispatchMs: Math.round(dispatchMs * 10) / 10, closeMs: Math.round(closeMs)};
+  })()`);
+  console.log(`perf ${JSON.stringify(result)}`);
+  if (profiling) {
+    const {profile} = await win.webContents.debugger.sendCommand("Profiler.stop");
+    const deltas = new Map();
+    profile.samples.forEach((id, index) => deltas.set(id, (deltas.get(id) || 0) + (profile.timeDeltas[index] || 0)));
+    const self = new Map();
+    for (const node of profile.nodes) {
+      const frame = node.callFrame;
+      const key = `${frame.functionName || "(anonymous)"} ${String(frame.url).split("/").pop()}:${frame.lineNumber + 1}`;
+      self.set(key, (self.get(key) || 0) + (deltas.get(node.id) || 0) / 1000);
+    }
+    [...self.entries()].sort((a, b) => b[1] - a[1]).slice(0, 30)
+      .forEach(([key, ms]) => console.log(`prof ${ms.toFixed(0).padStart(7)}ms ${key}`));
+  }
 }
 
 module.exports = {runBacklogRma};

@@ -2,6 +2,25 @@ import {RMA_STATUSES} from "../../components/rma/rmaUtils.js";
 
 export const rmaCaseKey = value => String(value ?? "").trim().toLowerCase();
 
+// Spreadsheet exports drop leading zeros and some users type "#", so link lookups ignore both.
+const looseCaseKey = value => rmaCaseKey(value).replace(/^#\s*/, "").replace(/^0+(?=\d)/, "");
+
+/** Index Panel RMAs once so tiles can find the RMA for a case or quote in constant time. */
+export function buildRmaLookup(rmas = []) {
+  const byCase = new Map(), byQuoteId = new Map(), byQuoteNumber = new Map();
+  for (const rma of rmas || []) {
+    if (!rma || rma.deleted) continue;
+    const caseKey = looseCaseKey(rma.case_id);
+    if (caseKey && !byCase.has(caseKey)) byCase.set(caseKey, rma);
+    if (rma.source_quote_id && !byQuoteId.has(rma.source_quote_id)) byQuoteId.set(rma.source_quote_id, rma);
+    const numberKey = rmaCaseKey(rma.source_quote_number);
+    if (numberKey && !byQuoteNumber.has(numberKey)) byQuoteNumber.set(numberKey, rma);
+  }
+  return ({caseNumber, quoteId, quoteNumber} = {}) =>
+    (quoteId && byQuoteId.get(quoteId)) || (quoteNumber && byQuoteNumber.get(rmaCaseKey(quoteNumber))) ||
+    (caseNumber && byCase.get(looseCaseKey(caseNumber))) || null;
+}
+
 export function buildRmaRecord(formData, existingRma, email, now = new Date().toISOString()) {
   if (!email?.trim()) throw new Error("Sign in before saving a Panel RMA.");
   const fields = ["case_owner", "site_id", "case_id", "panel_manufacturer", "panel_model",

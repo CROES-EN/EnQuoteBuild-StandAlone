@@ -102,6 +102,9 @@
     /*noinspection ALL*/
     @apply bg-background text-foreground;
     font-size: calc(16px * var(--font-scale, 1));
+    /* Radix dialogs set this inherited variable on <body> when they lock scrolling, which forces a
+       style recalculation of every element on each open/close. Nothing reads it, so pin it. */
+    --removed-body-scroll-bar-size: 0px !important;
   }
 }
 /* In-app Ctrl+F find (see components/FindBar.jsx) */

@@ -1,4 +1,4 @@
-import {useState} from "react";
+import {memo, useMemo, useState} from "react";
 import {Card} from "@/components/ui/card";
 import {Badge} from "@/components/ui/badge";
 import {Button} from "@/components/ui/button";
@@ -17,6 +17,7 @@ import {useCareEligibilityIndex} from "@/features/supervisorDashboard/careEligib
 import {getEligibilityFromIndex} from "@/features/supervisorDashboard/careEligibility";
 import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
 import RequestReviewSummary from "@/components/autoDrafter/RequestReviewSummary";
+import PanelRmaBadge from "@/components/rma/PanelRmaBadge";
 import {getRequestRoutingFlags} from "@/features/autoDrafter/requestRoutingFlags";
 
 /**
@@ -68,7 +69,7 @@ function generateDraftReferenceNumber() {
   return `AI-${ts}${rand}`;
 }
 
-export default ({
+function AutoDrafterCaseTile({
                   row,
                   index = 0,
                   caseNumberCol,
@@ -88,10 +89,10 @@ export default ({
                   hygiene,
                   automaticDrafting = false,
                   careEligibility
-                }) => {
+                }) {
   const comment = commentCol ? row[commentCol] || "" : "";
 
-  const {request: parsedRequest} = parseQuoteRequestCase(comment);
+  const {request: parsedRequest} = useMemo(() => parseQuoteRequestCase(comment), [comment]);
   const quoteCategory = parsedRequest.quoteCategory;
   const customerName = parsedRequest.customer;
   const siteAddress = parsedRequest.siteAddress;
@@ -158,7 +159,7 @@ export default ({
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: index * 0.03 }}
+        transition={{ delay: Math.min(index, 12) * 0.03 }}
         className="flex h-full flex-col"
       >
         <div
@@ -202,6 +203,7 @@ export default ({
               <RequestReviewSummary compact classification={classification} hygiene={hygiene}
                 routingFlags={getRequestRoutingFlags(comment, savedDraftCareEligibility)}
                 sourceWarnings={savedDraftRecord.parseWarnings || []} onCorrectCategory={onCorrectCategory} />
+              {panelRma && <div className="flex"><PanelRmaBadge rma={panelRma} /></div>}
               {/* CARE_SHIELD_ABOVE_TOTAL: positioned directly above the divider line and the
                   dollar total below it, right-aligned so it sits visually right above the $
                   figure - per explicit request, moved here from next to the Site ID title. */}
@@ -249,7 +251,7 @@ export default ({
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.03 }}
+      transition={{ delay: Math.min(index, 12) * 0.03 }}
       className="flex h-full flex-col"
     >
       <Card data-enquote-share-target={caseNumber ? `auto-drafter-case:${caseNumber}` : undefined}
@@ -290,6 +292,7 @@ export default ({
         <div className="space-y-2 text-sm flex-1">
           <RequestReviewSummary compact classification={classification} hygiene={hygiene}
             routingFlags={getRequestRoutingFlags(comment, rawCaseCareEligibility)} onCorrectCategory={onCorrectCategory} />
+          {panelRma && <div className="flex"><PanelRmaBadge rma={panelRma} /></div>}
           {hasParsedFields ? (
             <>
               {siteAddress && (
@@ -348,3 +351,5 @@ export default ({
     </motion.div>
   );
 }
+
+export default memo(AutoDrafterCaseTile);

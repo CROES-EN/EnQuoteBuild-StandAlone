@@ -1,4 +1,4 @@
-import React, {useMemo, useState} from "react";
+import React, {useDeferredValue, useMemo, useState} from "react";
 import {Download} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
@@ -9,6 +9,7 @@ import {buildQuoteRequestHygieneReport, HYGIENE_VERIFICATION_NOTE} from "@/featu
 import {buildHygieneWorkbook, hygieneWorkbookFileName} from "@/features/autoDrafter/hygieneWorkbookExport";
 import {useCaseIdIndex} from "@/features/links/caseIdIndexCache";
 
+const PAGE_SIZE = 100;
 const XLSX_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 function downloadFile(fileName, data, type) {
@@ -27,10 +28,20 @@ export default function QuoteRequestHygieneReview({table, authorFilter = ""}) {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
   const caseIndex = useCaseIdIndex();
-  const term = search.trim().toLowerCase();
-  const records = report.records.filter(record => (!authorFilter || record.author.toLowerCase() === authorFilter.toLowerCase()) &&
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  // Typing stays responsive on large reports; the table catches up right after.
+  const deferredSearch = useDeferredValue(search);
+  const term = deferredSearch.trim().toLowerCase();
+  const records = useMemo(() => report.records.filter(record => (!authorFilter || record.author.toLowerCase() === authorFilter.toLowerCase()) &&
     (!flaggedOnly || record.flags.length) &&
-    (!term || [record.author, record.caseNumber, record.siteId, ...record.flags].some(value => value.toLowerCase().includes(term))));
+    (!term || [record.author, record.caseNumber, record.siteId, ...record.flags].some(value => value.toLowerCase().includes(term)))),
+  [report, authorFilter, flaggedOnly, term]);
+  const authorRows = useMemo(() => {
+    const recordAuthors = new Set(records.map(record => record.author.toLowerCase()));
+    return report.authors.filter(author => (!authorFilter || author.author.toLowerCase() === authorFilter.toLowerCase()) &&
+      (!term || author.author.toLowerCase().includes(term) || recordAuthors.has(author.author.toLowerCase())));
+  }, [report, authorFilter, term, records]);
+  const shownRecords = records.slice(0, visibleCount);
   async function exportWorkbook() {
     setExporting(true);
     setExportError("");
@@ -53,9 +64,9 @@ export default function QuoteRequestHygieneReview({table, authorFilter = ""}) {
       {report.importedAt && <p className="text-xs">Imported {new Date(report.importedAt).toLocaleString()}{report.sourceFileName ? ` from ${report.sourceFileName}` : ""}</p>}
     </div>
     <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-      <Input aria-label="Search hygiene review" placeholder="Search comment author, case, or issue..." value={search} onChange={event => setSearch(event.target.value)} />
+      <Input aria-label="Search hygiene review" placeholder="Search comment author, case, or issue..." value={search} onChange={event => {setSearch(event.target.value); setVisibleCount(PAGE_SIZE);}} />
       <label className="flex items-center gap-2 whitespace-nowrap text-sm">
-        <Checkbox checked={flaggedOnly} onCheckedChange={value => setFlaggedOnly(value === true)} />Flagged only
+        <Checkbox checked={flaggedOnly} onCheckedChange={value => {setFlaggedOnly(value === true); setVisibleCount(PAGE_SIZE);}} />Flagged only
       </label>
       <Button type="button" variant="outline" size="sm" className="whitespace-nowrap" disabled={!records.length || exporting} data-hygiene-export
         title={`Exports the ${records.length} request case${records.length === 1 ? "" : "s"} shown below (current author, search and Flagged only filters) as a formatted Excel workbook.`}
@@ -67,9 +78,7 @@ export default function QuoteRequestHygieneReview({table, authorFilter = ""}) {
     <div className="overflow-x-auto">
       <Table>
         <TableHeader><TableRow><TableHead>Comment author (requester to verify)</TableHead><TableHead>Request cases</TableHead><TableHead>Flagged cases</TableHead><TableHead>Flagged-case rate</TableHead></TableRow></TableHeader>
-        <TableBody>{report.authors.filter(author => (!authorFilter || author.author.toLowerCase() === authorFilter.toLowerCase()) &&
-          (!term || author.author.toLowerCase().includes(term) ||
-          records.some(record => record.author.toLowerCase() === author.author.toLowerCase()))).map(author => <TableRow key={author.author.toLowerCase()}>
+        <TableBody>{authorRows.map(author => <TableRow key={author.author.toLowerCase()}>
           <TableCell>{author.author}</TableCell><TableCell>{author.requests}</TableCell><TableCell>{author.flagged}</TableCell><TableCell>{Math.round(author.flagged / author.requests * 100)}%</TableCell>
         </TableRow>)}</TableBody>
       </Table>
@@ -79,7 +88,7 @@ export default function QuoteRequestHygieneReview({table, authorFilter = ""}) {
         <TableHeader><TableRow>
           <TableHead>Case / Site</TableHead><TableHead>Comment author</TableHead><TableHead>Current O&M Status</TableHead><TableHead>Review findings</TableHead>
         </TableRow></TableHeader>
-        <TableBody>{records.map((record, index) => <TableRow key={`${record.caseNumber}-${index}`}>
+        <TableBody>{shownRecords.map((record, index) => <TableRow key={`${record.caseNumber}-${index}`}>
           <TableCell><CaseNumberLink caseNumber={record.caseNumber} fallback="Missing case number" /><br /><SiteIdLink siteId={record.siteId} fallback="No Site ID" /></TableCell>
           <TableCell>{record.author}{record.created && <p className="text-xs text-muted-foreground">{record.created}</p>}</TableCell>
           <TableCell>{record.omStatus || "Blank / unavailable"}</TableCell>
@@ -93,6 +102,10 @@ export default function QuoteRequestHygieneReview({table, authorFilter = ""}) {
           {!records.length && <TableRow><TableCell colSpan={4} className="text-center">No matching request cases.</TableCell></TableRow>}
         </TableBody>
       </Table>
+      {records.length > shownRecords.length && <div className="flex items-center justify-center gap-3 py-3 text-sm text-muted-foreground">
+        Showing {shownRecords.length} of {records.length} request cases
+        <Button type="button" variant="outline" size="sm" onClick={() => setVisibleCount(count => count + PAGE_SIZE)}>Show {Math.min(PAGE_SIZE, records.length - shownRecords.length)} more</Button>
+      </div>}
     </div>
   </div>;
 }

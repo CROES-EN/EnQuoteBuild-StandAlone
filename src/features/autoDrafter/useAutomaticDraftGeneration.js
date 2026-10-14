@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState} from "react";
+import {useEffect, useMemo, useRef, useState} from "react";
 import {runAutomaticDraftBatch} from "@/features/autoDrafter/automaticDraftGeneration";
 import {listGeneratedDrafts, createGeneratedDraftIfMissing} from "@/features/autoDrafter/autoDrafterDraftsStore";
 import {generateQuoteDraft} from "@/features/quoteDraftAgent/draftEngine";
@@ -10,7 +10,7 @@ export function useAutomaticDraftGeneration({candidates, enabled, ownerEmail, on
   const savedCallback = useRef(onSaved);
   const cancelCurrent = useRef(() => {});
   savedCallback.current = onSaved;
-  const signature = JSON.stringify(candidates);
+  const signature = useMemo(() => JSON.stringify(candidates), [candidates]);
   useEffect(() => {
     let cancelled = false;
     cancelCurrent.current = () => {cancelled = true;};

@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useRef, useState} from "react";
+import {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {useSearchParams} from "react-router-dom";
 import {APP_LINK_QUERY} from "../../shared/appLinkRules.js";
 import {Button} from "@/components/ui/button";
@@ -12,7 +12,7 @@ import {useAuth} from "@/lib/AuthContext";
 import {useQuery, useQueryClient} from "@tanstack/react-query";
 import PanelRmaRequestDialog from "@/components/rma/PanelRmaRequestDialog";
 import RMAList from "@/components/rma/RMAList";
-import {rmaCaseKey} from "@/features/rma/rmaRecords";
+import {buildRmaLookup} from "@/features/rma/rmaRecords";
 import {classifyQuoteRequest, requestCategoryCounts} from "@/features/autoDrafter/requestClassification";
 import {alternateRequestType, preferQuoteRequestComment, quoteRequestCommentEvidence} from "@/features/quoteRequestIntake/quoteRequestComment";
 import AlternateRequestList from "@/components/autoDrafter/AlternateRequestList";
@@ -67,6 +67,7 @@ const quoteCaseKey = value => reviewCaseKey(value).replace(/^#\s*/, "").replace(
 
 const REPORT_TYPE = "quoteRequestCases";
 const REPORT_LABEL = "Quote Request Cases";
+const TILE_PAGE_SIZE = 48;
 
 export const AutoDrafter = () => {
     const [searchParams, setSearchParams] = useSearchParams();
@@ -92,7 +93,8 @@ export const AutoDrafter = () => {
     const [restoringCase, setRestoringCase] = useState("");
     const [panelRmaTarget, setPanelRmaTarget] = useState(null);
     const panelRmasQuery = useQuery({queryKey: ["pvPanelRMAs"], queryFn: () => listLocalCollection("rmas")});
-    const panelRmas = (panelRmasQuery.data || []).filter(record => record.source_category === "panel_rma");
+    const panelRmas = useMemo(() => (panelRmasQuery.data || []).filter(record => record.source_category === "panel_rma"), [panelRmasQuery.data]);
+    const findPanelRma = useMemo(() => buildRmaLookup(panelRmasQuery.data), [panelRmasQuery.data]);
     function openPanelRma(caseNumber, siteId, notes = "") {
         setPanelRmaTarget({caseNumber, siteId, notes});
     }
@@ -284,8 +286,8 @@ export const AutoDrafter = () => {
         }
     }
 
-    const rows = table?.rows ?? [];
-    const columns = table?.columns ?? [];
+    const rows = useMemo(() => table?.rows ?? [], [table]);
+    const columns = useMemo(() => table?.columns ?? [], [table]);
 
     // Best-effort column name detection - the real Salesforce export's exact header text can
     // vary slightly (e.g. "Case Comment" vs "Case Comments"), so this matches loosely rather
@@ -318,105 +320,120 @@ export const AutoDrafter = () => {
     // O&M_CARE_CANCELLATION / O&M_ESCALATION / O&M_RETURN comments are not quote requests.
     // Cases with only those (plus plain notes) move to Alternate Requests; a case that also
     // has a real quote request stays in Quote Requests and appears in both.
-    const alternateTypeByRow = new Map(commentCol ? rows.map(row => [row, alternateRequestType(row[commentCol])])
-        .filter(([, type]) => type) : []);
-    const caseKeyOf = row => caseNumberCol ? reviewCaseKey(row[caseNumberCol]) : "";
-    const alternateCaseKeys = new Set([...alternateTypeByRow.keys()].map(caseKeyOf).filter(Boolean));
-    const quoteRequestCaseKeys = new Set(alternateCaseKeys.size && commentCol ? rows
-        .filter(row => !alternateTypeByRow.has(row) && quoteRequestCommentEvidence(row[commentCol]).hasRequest)
-        .map(caseKeyOf).filter(Boolean) : []);
-    const quoteRows = rows.filter(row => !alternateTypeByRow.has(row) &&
-        !(alternateCaseKeys.has(caseKeyOf(row)) && !quoteRequestCaseKeys.has(caseKeyOf(row))));
-    const alternateEntries = (() => {
-        const byKey = new Map();
-        alternateTypeByRow.forEach((type, row) => {
-            const key = `${caseKeyOf(row) || `row-${byKey.size}`}|${type.value}`;
-            const existing = byKey.get(key);
-            if (!existing || preferQuoteRequestComment(row[commentCol], existing.row[commentCol], row[createdCol], existing.row[createdCol])) {
-                byKey.set(key, {row, type});
-            }
-        });
-        const authorCol = findColumn(["case comment created by", "comment created by"]);
-        const omStatusCol = findColumn(["o&m status"]);
-        return [...byKey.entries()].map(([key, {row, type}]) => ({
-            key, type, row,
-            caseNumber: caseNumberCol ? String(row[caseNumberCol] ?? "").trim() : "",
-            siteId: siteIdCol ? String(row[siteIdCol] ?? "").trim() : "",
-            comment: String(row[commentCol] || ""),
-            created: createdCol ? String(row[createdCol] ?? "").trim() : "",
-            author: authorCol ? String(row[authorCol] ?? "").trim() : "",
-            status: [statusCol && row[statusCol], omStatusCol && row[omStatusCol]].filter(Boolean).join(" · ")
-        })).sort((a, b) => (Date.parse(b.created) || 0) - (Date.parse(a.created) || 0));
-    })();
+    // Everything derived from the imported report only changes with the report, so it is computed
+    // once per import instead of on every keystroke or dialog toggle.
+    const {alternateEntries, dedupedQualifyingRows, latestRowByCase} = useMemo(() => {
+        const alternateTypeByRow = new Map(commentCol ? rows.map(row => [row, alternateRequestType(row[commentCol])])
+            .filter(([, type]) => type) : []);
+        const caseKeyOf = row => caseNumberCol ? reviewCaseKey(row[caseNumberCol]) : "";
+        const alternateCaseKeys = new Set([...alternateTypeByRow.keys()].map(caseKeyOf).filter(Boolean));
+        const quoteRequestCaseKeys = new Set(alternateCaseKeys.size && commentCol ? rows
+            .filter(row => !alternateTypeByRow.has(row) && quoteRequestCommentEvidence(row[commentCol]).hasRequest)
+            .map(caseKeyOf).filter(Boolean) : []);
+        const quoteRows = rows.filter(row => !alternateTypeByRow.has(row) &&
+            !(alternateCaseKeys.has(caseKeyOf(row)) && !quoteRequestCaseKeys.has(caseKeyOf(row))));
+        const alternateEntries = (() => {
+            const byKey = new Map();
+            alternateTypeByRow.forEach((type, row) => {
+                const key = `${caseKeyOf(row) || `row-${byKey.size}`}|${type.value}`;
+                const existing = byKey.get(key);
+                if (!existing || preferQuoteRequestComment(row[commentCol], existing.row[commentCol], row[createdCol], existing.row[createdCol])) {
+                    byKey.set(key, {row, type});
+                }
+            });
+            const authorCol = findColumn(["case comment created by", "comment created by"]);
+            const omStatusCol = findColumn(["o&m status"]);
+            return [...byKey.entries()].map(([key, {row, type}]) => ({
+                key, type, row,
+                caseNumber: caseNumberCol ? String(row[caseNumberCol] ?? "").trim() : "",
+                siteId: siteIdCol ? String(row[siteIdCol] ?? "").trim() : "",
+                comment: String(row[commentCol] || ""),
+                created: createdCol ? String(row[createdCol] ?? "").trim() : "",
+                author: authorCol ? String(row[authorCol] ?? "").trim() : "",
+                status: [statusCol && row[statusCol], omStatusCol && row[omStatusCol]].filter(Boolean).join(" · ")
+            })).sort((a, b) => (Date.parse(b.created) || 0) - (Date.parse(a.created) || 0));
+        })();
 
-    // Salesforce exports one row per comment. Prefer requests over later notes,
-    // then the newest request revision.
-    const dedupedQualifyingRows = caseNumberCol
-        ? (() => {
-        const byCaseNumber = new Map();
-        quoteRows.forEach((row, originalIndex) => {
+        // Salesforce exports one row per comment. Prefer requests over later notes,
+        // then the newest request revision.
+        const dedupedQualifyingRows = caseNumberCol
+            ? (() => {
+            const byCaseNumber = new Map();
+            quoteRows.forEach((row, originalIndex) => {
+                const key = reviewCaseKey(row[caseNumberCol]);
+                if (!key) {
+                    // No case number at all -- can't dedupe meaningfully, always keep.
+                    byCaseNumber.set(`__no-case-number-${originalIndex}__`, row);
+                    return;
+                }
+                const existing = byCaseNumber.get(key);
+                if (!existing) {
+                    byCaseNumber.set(key, row);
+                    return;
+                }
+                if (preferQuoteRequestComment(row[commentCol], existing[commentCol], row[createdCol], existing[createdCol])) {
+                    byCaseNumber.set(key, row);
+                }
+            });
+            return Array.from(byCaseNumber.values());
+              })()
+            : quoteRows;
+        const latestRowByCase = new Map();
+        for (const row of rows) {
             const key = reviewCaseKey(row[caseNumberCol]);
-            if (!key) {
-                // No case number at all -- can't dedupe meaningfully, always keep.
-                byCaseNumber.set(`__no-case-number-${originalIndex}__`, row);
-                return;
-            }
-            const existing = byCaseNumber.get(key);
-            if (!existing) {
-                byCaseNumber.set(key, row);
-                return;
-            }
-            if (preferQuoteRequestComment(row[commentCol], existing[commentCol], row[createdCol], existing[createdCol])) {
-                byCaseNumber.set(key, row);
-            }
-        });
-        return Array.from(byCaseNumber.values());
-          })()
-        : quoteRows;
+            const previous = latestRowByCase.get(key);
+            if (!previous || preferQuoteRequestComment(row[commentCol], previous[commentCol], row[createdCol], previous[createdCol])) latestRowByCase.set(key, row);
+        }
+        return {alternateEntries, dedupedQualifyingRows, latestRowByCase};
+    }, [rows, columns]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // A case that already has a real EnQuote quote (Q-###, any status) is hidden and never auto-drafted.
     const hasRealQuote = row => existingQuoteCaseNumbers.has(quoteCaseKey(row[caseNumberCol]));
     // Cases moved out manually (quote not needed, Panel RMA filed...) are hidden until restored.
-    const removedRecords = Object.values(generatedDraftsByCase).filter(record => record.removedFromAutoDrafter)
-        .sort((a, b) => String(b.removedFromAutoDrafter.removedAt || "").localeCompare(String(a.removedFromAutoDrafter.removedAt || "")));
-    const removedCaseKeys = new Set(removedRecords.map(record => quoteCaseKey(record.caseNumber ?? record.id)));
-    const awaitingRows = caseNumberCol ? dedupedQualifyingRows.filter(row => !hasRealQuote(row) &&
-        !removedCaseKeys.has(quoteCaseKey(row[caseNumberCol]))) : dedupedQualifyingRows;
+    const removedRecords = useMemo(() => Object.values(generatedDraftsByCase).filter(record => record.removedFromAutoDrafter)
+        .sort((a, b) => String(b.removedFromAutoDrafter.removedAt || "").localeCompare(String(a.removedFromAutoDrafter.removedAt || ""))),
+    [generatedDraftsByCase]);
+    const awaitingRows = useMemo(() => {
+        const removedCaseKeys = new Set(removedRecords.map(record => quoteCaseKey(record.caseNumber ?? record.id)));
+        return caseNumberCol ? dedupedQualifyingRows.filter(row => !hasRealQuote(row) &&
+            !removedCaseKeys.has(quoteCaseKey(row[caseNumberCol]))) : dedupedQualifyingRows;
+    }, [dedupedQualifyingRows, existingQuoteCaseNumbers, removedRecords, caseNumberCol]); // eslint-disable-line react-hooks/exhaustive-deps
+    const automaticCandidates = useMemo(() => awaitingRows.map(row => ({
+        caseNumber: String(row[caseNumberCol] || "").trim(),
+        siteId: String(row[siteIdCol] || "").trim(),
+        comment: String(row[commentCol] || "")
+    })), [awaitingRows, caseNumberCol, siteIdCol, commentCol]);
     const automaticDrafts = useAutomaticDraftGeneration({
         ownerEmail: user?.email,
-        candidates: awaitingRows.map(row => ({
-            caseNumber: String(row[caseNumberCol] || "").trim(),
-            siteId: String(row[siteIdCol] || "").trim(),
-            comment: String(row[commentCol] || "")
-        })),
+        candidates: automaticCandidates,
         enabled: automaticDraftsEnabled && Boolean(user?.email) && !loading && !draftsLoading && !draftsError &&
             quotesLoaded && !quotesLoadError && !clearing && !clearingDrafts,
         onSaved: record => setGeneratedDraftsByCase(previous => ({...previous, [record.caseNumber ?? record.id]: record}))
     });
-    const savedDraftsByCaseKey = new Map(Object.values(generatedDraftsByCase).map(record => [reviewCaseKey(record.caseNumber ?? record.id), record]));
-    const classificationsByRow = new Map(awaitingRows.map(row => [row,
+    const savedDraftsByCaseKey = useMemo(() => new Map(Object.values(generatedDraftsByCase)
+        .map(record => [reviewCaseKey(record.caseNumber ?? record.id), record])), [generatedDraftsByCase]);
+    const classificationsByRow = useMemo(() => new Map(awaitingRows.map(row => [row,
         classifyQuoteRequest(commentCol ? row[commentCol] : "",
             savedDraftsByCaseKey.get(reviewCaseKey(row[caseNumberCol]))?.draft?.items || [],
-            {caseNumber: caseNumberCol ? row[caseNumberCol] : undefined})]));
-    const hygieneColumns = quoteRequestReportColumns(columns);
-    const categoryCounts = requestCategoryCounts(classificationsByRow.values());
-    const typeRows = awaitingRows.filter(row => requestType === "all" || classificationsByRow.get(row).type === requestType);
-    const goldenEvaluations = goldenQuoteEvaluations(Object.values(generatedDraftsByCase), allQuotes);
-    const goldenRecords = [...goldenEvaluations.byCase.values()].filter(evaluation => evaluation.golden)
+            {caseNumber: caseNumberCol ? row[caseNumberCol] : undefined})])), [awaitingRows, savedDraftsByCaseKey, commentCol, caseNumberCol]);
+    const hygieneColumns = useMemo(() => quoteRequestReportColumns(columns), [columns]);
+    const categoryCounts = useMemo(() => requestCategoryCounts(classificationsByRow.values()), [classificationsByRow]);
+    const typeRows = useMemo(() => awaitingRows.filter(row => requestType === "all" || classificationsByRow.get(row).type === requestType),
+        [awaitingRows, classificationsByRow, requestType]);
+    const goldenEvaluations = useMemo(() => goldenQuoteEvaluations(Object.values(generatedDraftsByCase), allQuotes), [generatedDraftsByCase, allQuotes]);
+    const goldenRecords = useMemo(() => [...goldenEvaluations.byCase.values()].filter(evaluation => evaluation.golden)
         .map(evaluation => evaluation.record)
         .filter(record => !search.trim() || [record.caseNumber, record.siteId, record.realQuoteNumber]
             .some(value => String(value || "").toLowerCase().includes(search.trim().toLowerCase())))
-        .sort((a, b) => String(b.sentAt || "").localeCompare(String(a.sentAt || "")));
+        .sort((a, b) => String(b.sentAt || "").localeCompare(String(a.sentAt || ""))), [goldenEvaluations, search]);
     function latestSourceRow(caseNumber) {
-        return rows.filter(row => reviewCaseKey(row[caseNumberCol]) === reviewCaseKey(caseNumber))
-            .reduce((previous, row) => !previous || preferQuoteRequestComment(row[commentCol], previous[commentCol],
-                row[createdCol], previous[createdCol]) ? row : previous, null);
+        return latestRowByCase.get(reviewCaseKey(caseNumber)) || null;
     }
     // Quotes sent before Golden Quotes existed have no recorded SOP check; capture it once from the report.
-    const snapshotTargets = table && caseNumberCol && commentCol ? Object.values(generatedDraftsByCase)
+    const snapshotTargets = useMemo(() => table && caseNumberCol && commentCol ? Object.values(generatedDraftsByCase)
         .filter(record => record.sentToQuotes && !record.requestSnapshot)
         .map(record => ({record, row: latestSourceRow(record.caseNumber ?? record.id)}))
-        .filter(target => target.row) : [];
+        .filter(target => target.row) : [], [table, generatedDraftsByCase, latestRowByCase]); // eslint-disable-line react-hooks/exhaustive-deps
     const snapshotKey = snapshotTargets.map(target => target.record.caseNumber ?? target.record.id).join("|");
     const snapshotTargetsRef = useRef(snapshotTargets);
     snapshotTargetsRef.current = snapshotTargets;
@@ -441,10 +458,10 @@ export const AutoDrafter = () => {
     }, [snapshotKey]);
     // Unsent, unedited drafts saved with joined range digits (e.g. "16-24" as 1624 hours) are
     // corrected to the request's upper bound once, so tiles and totals stop showing them.
-    const correctionTargets = draftsLoading ? [] : Object.values(generatedDraftsByCase).map(record => {
+    const correctionTargets = useMemo(() => draftsLoading ? [] : Object.values(generatedDraftsByCase).map(record => {
         const row = table && caseNumberCol && commentCol ? latestSourceRow(record.caseNumber ?? record.id) : null;
         return automaticSourceInputCorrection(record, row ? String(row[commentCol] || "") : record.sourceComment, {placeholderPrice: placeholderUnitPrice, categoryAverages: DEVICE_CATEGORY_AVERAGES});
-    }).filter(Boolean);
+    }).filter(Boolean), [draftsLoading, generatedDraftsByCase, table, latestRowByCase]); // eslint-disable-line react-hooks/exhaustive-deps
     const correctionKey = correctionTargets.map(record => `${record.caseNumber ?? record.id}:${record.inputCorrections.at(-1).changes.join(",")}`).join("|");
     const correctionTargetsRef = useRef(correctionTargets);
     correctionTargetsRef.current = correctionTargets;
@@ -510,11 +527,45 @@ export const AutoDrafter = () => {
         }
     }
     const term = search.trim().toLowerCase();
-    const filteredRows = term
+    const filteredRows = useMemo(() => term
         ? typeRows.filter((row) =>
             columns.some((col) => String(row[col] ?? "").toLowerCase().includes(term))
         )
-        : typeRows;
+        : typeRows, [typeRows, term, columns]);
+    // Rendering every tile at once makes each dialog open/close recalculate styles for the whole grid.
+    const [tileLimit, setTileLimit] = useState(TILE_PAGE_SIZE);
+    useEffect(() => { setTileLimit(TILE_PAGE_SIZE); }, [term, requestType]);
+    const visibleRows = useMemo(() => filteredRows.slice(0, tileLimit), [filteredRows, tileLimit]);
+    // Cached so opening a dialog, typing a removal note or toggling menus does not re-render every tile.
+    const requestTiles = useMemo(() => visibleRows.map((row, idx) => {
+                                    const caseNumberValue = caseNumberCol ? String(row[caseNumberCol] ?? "").trim() : null;
+                                    return (
+                                        <AutoDrafterCaseTile
+                                            key={caseNumberValue ?? idx}
+                                            row={row}
+                                            index={idx}
+                                            caseNumberCol={caseNumberCol}
+                                            siteIdCol={siteIdCol}
+                                            statusCol={statusCol}
+                                            commentCol={commentCol}
+                                            createdCol={createdCol}
+                                            reportType={REPORT_TYPE}
+                                            savedDraftRecord={caseNumberValue ? savedDraftsByCaseKey.get(reviewCaseKey(caseNumberValue)) || null : null}
+                                            onDraftSaved={() => loadGeneratedDrafts()}
+                                            onViewDraft={() => setSelectedCaseNumber(caseNumberValue)}
+                                            onPanelRma={() => openPanelRma(caseNumberValue, siteIdCol ? row[siteIdCol] : "", commentCol ? String(row[commentCol] || "") : "")}
+                                            onCorrectCategory={caseNumberValue ? () => setCategoryTarget({caseNumber: caseNumberValue,
+                                                comment: commentCol ? String(row[commentCol] || "") : "", classification: classificationsByRow.get(row)}) : undefined}
+                                            onRemove={caseNumberValue ? () => openRemoveCase(caseNumberValue, siteIdCol ? String(row[siteIdCol] ?? "").trim() : "") : undefined}
+                                            panelRma={findPanelRma({caseNumber: caseNumberValue})}
+                                            classification={classificationsByRow.get(row)}
+                                            hygiene={assessQuoteRequestHygiene(row, hygieneColumns)}
+                                            automaticDrafting
+                                            careEligibility={!careQuery.isError && careQuery.data ? getEligibilityFromIndex(siteIdCol ? row[siteIdCol] : "", careQuery.data) : null}
+                                        />
+                                    );
+                                }), [visibleRows, caseNumberCol, siteIdCol, statusCol, commentCol, createdCol, savedDraftsByCaseKey,
+        findPanelRma, classificationsByRow, hygieneColumns, careQuery.data, careQuery.isError, loadGeneratedDrafts]); // eslint-disable-line react-hooks/exhaustive-deps
     async function exportWorkbook() {
         setExporting(true);
         try {
@@ -551,7 +602,7 @@ export const AutoDrafter = () => {
                 golden: draftRecord?.sentToQuotes ? Boolean(golden.byCase.get(reviewCaseKey(caseNumber))?.golden) : null,
                 careEligibility: !careQuery.isError && careQuery.data ? getEligibilityFromIndex(siteId, careQuery.data) : null,
                 careError: careQuery.isError,
-                panelRma: (panelRmasQuery.data || []).find(record => rmaCaseKey(record.case_id) === rmaCaseKey(caseNumber)) || null,
+                panelRma: findPanelRma({caseNumber}),
                 skippedReason: skippedByCase.get(reviewCaseKey(caseNumber)) || ""
             };
         });
@@ -833,36 +884,24 @@ export const AutoDrafter = () => {
                                 </p>
                             </Card>
                         ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                {filteredRows.map((row, idx) => {
-                                    const caseNumberValue = caseNumberCol ? String(row[caseNumberCol] ?? "").trim() : null;
-                                    return (
-                                        <AutoDrafterCaseTile
-                                            key={caseNumberValue ?? idx}
-                                            row={row}
-                                            index={idx}
-                                            caseNumberCol={caseNumberCol}
-                                            siteIdCol={siteIdCol}
-                                            statusCol={statusCol}
-                                            commentCol={commentCol}
-                                            createdCol={createdCol}
-                                            reportType={REPORT_TYPE}
-                                            savedDraftRecord={caseNumberValue ? savedDraftsByCaseKey.get(reviewCaseKey(caseNumberValue)) || null : null}
-                                            onDraftSaved={() => loadGeneratedDrafts()}
-                                            onViewDraft={() => setSelectedCaseNumber(caseNumberValue)}
-                                            onPanelRma={() => openPanelRma(caseNumberValue, siteIdCol ? row[siteIdCol] : "", commentCol ? String(row[commentCol] || "") : "")}
-                                            onCorrectCategory={caseNumberValue ? () => setCategoryTarget({caseNumber: caseNumberValue,
-                                                comment: commentCol ? String(row[commentCol] || "") : "", classification: classificationsByRow.get(row)}) : undefined}
-                                            onRemove={caseNumberValue ? () => openRemoveCase(caseNumberValue, siteIdCol ? String(row[siteIdCol] ?? "").trim() : "") : undefined}
-                                            panelRma={(panelRmasQuery.data || []).find(record => rmaCaseKey(record.case_id) === rmaCaseKey(caseNumberValue))}
-                                            classification={classificationsByRow.get(row)}
-                                            hygiene={assessQuoteRequestHygiene(row, hygieneColumns)}
-                                            automaticDrafting
-                                            careEligibility={!careQuery.isError && careQuery.data ? getEligibilityFromIndex(siteIdCol ? row[siteIdCol] : "", careQuery.data) : null}
-                                        />
-                                    );
-                                })}
-                            </div>
+                            <>
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                    {requestTiles}
+                                </div>
+                                {filteredRows.length > visibleRows.length && (
+                                    <div className="flex items-center justify-center gap-3 pt-4" data-auto-drafter-show-more>
+                                        <span className="text-sm text-muted-foreground">
+                                            Showing {visibleRows.length} of {filteredRows.length} cases
+                                        </span>
+                                        <Button variant="outline" size="sm" onClick={() => setTileLimit((limit) => limit + TILE_PAGE_SIZE)}>
+                                            Show {Math.min(TILE_PAGE_SIZE, filteredRows.length - visibleRows.length)} more
+                                        </Button>
+                                        <Button variant="ghost" size="sm" onClick={() => setTileLimit(filteredRows.length)}>
+                                            Show all
+                                        </Button>
+                                    </div>
+                                )}
+                            </>
                         )}
                     </>
                 )}

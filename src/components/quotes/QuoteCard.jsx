@@ -15,8 +15,9 @@ import {useCareEligibilityIndex} from "@/features/supervisorDashboard/careEligib
 import {getEligibilityFromIndex} from "@/features/supervisorDashboard/careEligibility";
 import {SiteIdLink} from "@/components/links/ExternalIdLinks";
 import {showsInvoiceNumber} from "@/features/quotes/invoiceNumber";
+import PanelRmaBadge from "@/components/rma/PanelRmaBadge";
 
-export default function QuoteCard({ quote, index = 0, selectable = false, isSelected = false, onToggleSelect, alert = null, hasMention = false, mentionPriority, mentionMessage, mentionedBy, onClearAlert, golden = false, onEditInvoiceNumber, onLogFollowUp }) {
+export default function QuoteCard({ quote, index = 0, selectable = false, isSelected = false, onToggleSelect, alert = null, hasMention = false, mentionPriority, mentionMessage, mentionedBy, onClearAlert, golden = false, onEditInvoiceNumber, onLogFollowUp, panelRma = null }) {
   const navigate = useNavigate();
   const { total: calculatedTotal } = calculateQuoteTotals(quote);
   const effectiveLevel = getEffectiveLevel(alert, hasMention, mentionPriority);
@@ -151,6 +152,7 @@ export default function QuoteCard({ quote, index = 0, selectable = false, isSele
           )}
           
           <div className="space-y-2 text-sm flex-1">
+            {panelRma && <div className="flex" data-quote-card-panel-rma><PanelRmaBadge rma={panelRma} /></div>}
             {/* CARE_SHIELD_ABOVE_TOTAL: positioned directly above the divider line and the
                 dollar total below it, right-aligned so it sits visually right above the $
                 figure - per explicit request, moved here from next to the Site ID title. */}
