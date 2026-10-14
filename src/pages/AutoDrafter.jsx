@@ -25,9 +25,6 @@ import {useRequestCareEligibility} from "@/features/autoDrafter/useRequestCareEl
 import {getEligibilityFromIndex} from "@/features/supervisorDashboard/careEligibility";
 import {useAutomaticDraftGeneration} from "@/features/autoDrafter/useAutomaticDraftGeneration";
 import {reviewCaseKey} from "@/features/autoDrafter/caseKey";
-
-// Case numbers match even when a spreadsheet dropped leading zeros or a "#" prefix.
-const quoteCaseKey = value => reviewCaseKey(value).replace(/^#\s*/, "").replace(/^0+(?=\d)/, "");
 import {goldenQuoteEvaluations, requestSnapshot} from "@/features/goldenQuotes/goldenQuotes";
 import {
   AlertDialog,
@@ -39,11 +36,20 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from "@/components/ui/alert-dialog";
-import {Download, FileText, Search, Sparkles, Trash2, Upload} from "lucide-react";
+import {Archive, Download, FileText, Search, Sparkles, Trash2, Undo2, Upload} from "lucide-react";
 import {autoDrafterExportFileName, buildAutoDrafterWorkbook} from "@/features/autoDrafter/autoDrafterWorkbookExport";
 import {useCaseIdIndex} from "@/features/links/caseIdIndexCache";
 import {deleteReportTable, getReportTable} from "@/features/supervisorDashboard/importedTableStore";
-import {clearAllGeneratedDrafts, listGeneratedDrafts, saveGeneratedDraft} from "@/features/autoDrafter/autoDrafterDraftsStore";
+import {
+  AUTO_DRAFTER_REMOVAL_REASONS,
+  clearAllGeneratedDrafts,
+  listGeneratedDrafts,
+  removalReasonLabel,
+  removeCaseFromAutoDrafter,
+  restoreCaseToAutoDrafter,
+  saveGeneratedDraft
+} from "@/features/autoDrafter/autoDrafterDraftsStore";
+import {Textarea} from "@/components/ui/textarea";
 import {loadLearnedSwaps} from "@/features/quoteDraftAgent/learnedSwapsStore";
 import ImportAsTableDialog from "@/components/supervisor/ImportAsTableDialog";
 import SalesforceImportButton from "@/components/supervisor/SalesforceImportButton";
@@ -54,6 +60,9 @@ import {
 import AutoDrafterCaseTile from "@/components/autoDrafter/AutoDrafterCaseTile";
 import AutoDrafterDraftDetails from "@/components/autoDrafter/AutoDrafterDraftDetails";
 import {getQuotes, listLocalCollection} from "@/api/dataClient";
+
+// Case numbers match even when a spreadsheet dropped leading zeros or a "#" prefix.
+const quoteCaseKey = value => reviewCaseKey(value).replace(/^#\s*/, "").replace(/^0+(?=\d)/, "");
 
 const REPORT_TYPE = "quoteRequestCases";
 const REPORT_LABEL = "Quote Request Cases";
@@ -73,6 +82,12 @@ export const AutoDrafter = () => {
     const showPanelRmas = view === "panel-rmas";
     const showGolden = view === "golden";
     const showAlternate = view === "alternate";
+    const showRemoved = view === "removed";
+    const [removeTarget, setRemoveTarget] = useState(null);
+    const [removeReason, setRemoveReason] = useState("quote_not_needed");
+    const [removeNote, setRemoveNote] = useState("");
+    const [removing, setRemoving] = useState(false);
+    const [restoringCase, setRestoringCase] = useState("");
     const [panelRmaTarget, setPanelRmaTarget] = useState(null);
     const panelRmasQuery = useQuery({queryKey: ["pvPanelRMAs"], queryFn: () => listLocalCollection("rmas")});
     const panelRmas = (panelRmasQuery.data || []).filter(record => record.source_category === "panel_rma");
@@ -359,7 +374,12 @@ export const AutoDrafter = () => {
 
     // A case that already has a real EnQuote quote (Q-###, any status) is hidden and never auto-drafted.
     const hasRealQuote = row => existingQuoteCaseNumbers.has(quoteCaseKey(row[caseNumberCol]));
-    const awaitingRows = caseNumberCol ? dedupedQualifyingRows.filter(row => !hasRealQuote(row)) : dedupedQualifyingRows;
+    // Cases moved out manually (quote not needed, Panel RMA filed...) are hidden until restored.
+    const removedRecords = Object.values(generatedDraftsByCase).filter(record => record.removedFromAutoDrafter)
+        .sort((a, b) => String(b.removedFromAutoDrafter.removedAt || "").localeCompare(String(a.removedFromAutoDrafter.removedAt || "")));
+    const removedCaseKeys = new Set(removedRecords.map(record => quoteCaseKey(record.caseNumber ?? record.id)));
+    const awaitingRows = caseNumberCol ? dedupedQualifyingRows.filter(row => !hasRealQuote(row) &&
+        !removedCaseKeys.has(quoteCaseKey(row[caseNumberCol]))) : dedupedQualifyingRows;
     const automaticDrafts = useAutomaticDraftGeneration({
         ownerEmail: user?.email,
         candidates: awaitingRows.map(row => ({
@@ -442,6 +462,48 @@ export const AutoDrafter = () => {
         })();
         return () => {cancelled = true;};
     }, [correctionKey]);
+    function openRemoveCase(caseNumber, siteId) {
+        setRemoveReason("quote_not_needed");
+        setRemoveNote("");
+        setRemoveTarget({caseNumber, siteId});
+    }
+    async function confirmRemoveCase() {
+        if (!removeTarget) return;
+        setRemoving(true);
+        try {
+            const record = await removeCaseFromAutoDrafter(removeTarget.caseNumber, {
+                reason: removeReason, note: removeNote, removedBy: user?.email, siteId: removeTarget.siteId
+            });
+            setGeneratedDraftsByCase(previous => {
+                const next = {...previous};
+                for (const key of Object.keys(next)) if (reviewCaseKey(key) === reviewCaseKey(record.caseNumber)) delete next[key];
+                return {...next, [record.caseNumber]: record};
+            });
+            toast.success(`Case ${removeTarget.caseNumber} moved out of Auto-Drafter (${removalReasonLabel(removeReason)}).`);
+            setRemoveTarget(null);
+        } catch (error) {
+            toast.error(error.message || "Could not remove the case.");
+        } finally {
+            setRemoving(false);
+        }
+    }
+    async function restoreCase(record) {
+        const key = String(record.caseNumber ?? record.id);
+        setRestoringCase(key);
+        try {
+            const restored = await restoreCaseToAutoDrafter(key);
+            setGeneratedDraftsByCase(previous => {
+                const next = {...previous};
+                for (const existingKey of Object.keys(next)) if (reviewCaseKey(existingKey) === reviewCaseKey(key)) delete next[existingKey];
+                return restored ? {...next, [restored.caseNumber]: restored} : next;
+            });
+            toast.success(`Case ${key} is back in Auto-Drafter.`);
+        } catch (error) {
+            toast.error(error.message || "Could not restore the case.");
+        } finally {
+            setRestoringCase("");
+        }
+    }
     const term = search.trim().toLowerCase();
     const filteredRows = term
         ? typeRows.filter((row) =>
@@ -579,7 +641,7 @@ export const AutoDrafter = () => {
                             <Upload className="w-4 h-4 mr-2"/>
                             Import File
                         </Button>
-                        {Object.keys(generatedDraftsByCase).length > 0 && (
+                        {Object.values(generatedDraftsByCase).some(record => record.draft || !record.removedFromAutoDrafter) && (
                             <Button
                                 variant="outline"
                                 className="border-rose-200 text-rose-600 hover:bg-rose-50"
@@ -614,6 +676,7 @@ export const AutoDrafter = () => {
                                     <SelectItem value="golden">Golden Quotes ({[...goldenEvaluations.byCase.values()].filter(evaluation => evaluation.golden).length})</SelectItem>
                                     <SelectItem value="panel-rmas">Panel RMA Requests ({panelRmas.length})</SelectItem>
                                     <SelectItem value="alternate">Alternate Requests ({alternateEntries.length})</SelectItem>
+                                    <SelectItem value="removed">Removed Cases ({removedRecords.length})</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -664,7 +727,44 @@ export const AutoDrafter = () => {
                     <button className="underline ml-2" onClick={() => careQuery.refetch()}>Retry Care verification</button>
                 </p>}
                 {panelRmasQuery.isError && <p role="alert" className="mb-3 text-destructive">Could not load Panel RMA links: {panelRmasQuery.error.message} <button className="underline" onClick={() => panelRmasQuery.refetch()}>Retry</button></p>}
-                {showAlternate ? (
+                {showRemoved ? (
+                    <div className="space-y-3">
+                        <p className="text-sm text-muted-foreground">Cases moved out of Auto-Drafter are not drafted automatically. Restore a case to bring it back to Quote Requests.</p>
+                        {(() => {
+                            const shown = removedRecords.filter(record => !term || [record.caseNumber, record.siteId,
+                                record.removedFromAutoDrafter.note, removalReasonLabel(record.removedFromAutoDrafter.reason)]
+                                .some(value => String(value || "").toLowerCase().includes(term)));
+                            if (!shown.length) return <Card className="p-12 text-center border-border">
+                                <Archive className="w-12 h-12 text-slate-300 mx-auto mb-4"/>
+                                <h3 className="text-lg font-semibold text-foreground mb-2">No removed cases</h3>
+                                <p className="text-muted-foreground">{term ? "Try adjusting your search" : "Use Remove on a case tile to move it out of Auto-Drafter."}</p>
+                            </Card>;
+                            return <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                {shown.map(record => {
+                                    const key = String(record.caseNumber ?? record.id);
+                                    const removal = record.removedFromAutoDrafter;
+                                    const removedAt = removal.removedAt && !Number.isNaN(new Date(removal.removedAt).getTime())
+                                        ? new Date(removal.removedAt).toLocaleString() : "Unknown time";
+                                    return <Card key={key} data-removed-case={key} className="p-5 space-y-2">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div>
+                                                <h3 className="font-semibold">Case #{key}</h3>
+                                                <p className="text-sm text-muted-foreground">{record.siteId ? `Site ${record.siteId}` : "No site ID"}</p>
+                                            </div>
+                                            <Badge variant="secondary">{removalReasonLabel(removal.reason)}</Badge>
+                                        </div>
+                                        {removal.note && <p className="text-sm whitespace-pre-wrap">{removal.note}</p>}
+                                        <p className="text-xs text-muted-foreground">Removed {removedAt}{removal.removedBy ? ` by ${removal.removedBy}` : ""}{record.draft ? " ? Review draft kept" : ""}</p>
+                                        <Button size="sm" variant="outline" className="w-full" disabled={restoringCase === key}
+                                            data-restore-case={key} onClick={() => restoreCase(record)}>
+                                            <Undo2 className="w-4 h-4 mr-2"/>{restoringCase === key ? "Restoring..." : "Restore to Auto-Drafter"}
+                                        </Button>
+                                    </Card>;
+                                })}
+                            </div>;
+                        })()}
+                    </div>
+                ) : showAlternate ? (
                     !table ? <p className="py-8 text-center text-sm text-muted-foreground">{loading ? "Loading..." : "Import the Salesforce report to see alternate requests."}</p>
                         : <AlternateRequestList entries={alternateEntries.filter(entry => !term ||
                             [entry.caseNumber, entry.siteId, entry.author, entry.comment].some(value => value.toLowerCase().includes(term)))} />
@@ -744,6 +844,7 @@ export const AutoDrafter = () => {
                                             onDraftSaved={() => loadGeneratedDrafts()}
                                             onViewDraft={() => setSelectedCaseNumber(caseNumberValue)}
                                             onPanelRma={() => openPanelRma(caseNumberValue, siteIdCol ? row[siteIdCol] : "", commentCol ? String(row[commentCol] || "") : "")}
+                                            onRemove={caseNumberValue ? () => openRemoveCase(caseNumberValue, siteIdCol ? String(row[siteIdCol] ?? "").trim() : "") : undefined}
                                             panelRma={(panelRmasQuery.data || []).find(record => rmaCaseKey(record.case_id) === rmaCaseKey(caseNumberValue))}
                                             classification={classificationsByRow.get(row)}
                                             hygiene={assessQuoteRequestHygiene(row, hygieneColumns)}
@@ -790,6 +891,37 @@ export const AutoDrafter = () => {
                     </AlertDialogContent>
                 </AlertDialog>
 
+                <Dialog open={Boolean(removeTarget)} onOpenChange={open => {if (!open && !removing) setRemoveTarget(null);}}>
+                    <DialogContent className="max-w-md" data-remove-case-dialog>
+                        <DialogHeader>
+                            <DialogTitle>Remove case {removeTarget?.caseNumber} from Auto-Drafter?</DialogTitle>
+                            <DialogDescription>The case stops appearing in Quote Requests and is not drafted automatically. Any review draft is kept. Restore it any time from Removed Cases.</DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-3">
+                            <div className="space-y-1">
+                                <label htmlFor="remove-case-reason" className="text-sm font-medium">Reason</label>
+                                <Select value={removeReason} onValueChange={setRemoveReason}>
+                                    <SelectTrigger id="remove-case-reason" aria-label="Removal reason"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        {AUTO_DRAFTER_REMOVAL_REASONS.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-1">
+                                <label htmlFor="remove-case-note" className="text-sm font-medium">Note {removeReason === "other" ? "(required)" : "(optional)"}</label>
+                                <Textarea id="remove-case-note" value={removeNote} onChange={event => setRemoveNote(event.target.value)}
+                                    placeholder={removeReason === "panel_rma_filed" ? "e.g. RMA emailed to the manufacturer" : "Why this case does not need a quote"} />
+                            </div>
+                            <div className="flex justify-end gap-2">
+                                <Button variant="outline" disabled={removing} onClick={() => setRemoveTarget(null)}>Cancel</Button>
+                                <Button data-confirm-remove-case disabled={removing || (removeReason === "other" && !removeNote.trim())} onClick={confirmRemoveCase}>
+                                    {removing ? "Removing..." : "Remove case"}
+                                </Button>
+                            </div>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+
                 <AlertDialog open={clearDraftsConfirmOpen} onOpenChange={setClearDraftsConfirmOpen}>
                     <AlertDialogContent>
                         <AlertDialogHeader>
@@ -799,6 +931,7 @@ export const AutoDrafter = () => {
                                 shown here, so cases return to their raw, not-yet-drafted state. This cannot be
                                 undone - you will need to click "Generate Draft" again for each case. Drafts
                                 already sent to Quotes are real Quote records and are NOT affected by this.
+                                Removed cases stay removed.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>

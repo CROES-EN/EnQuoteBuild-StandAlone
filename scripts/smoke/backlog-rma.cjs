@@ -147,6 +147,30 @@ async function runBacklogRma(win) {
   console.log("ok   Care Cancellation / Escalation / Return comments are separated into Alternate Requests");
   assert.equal(await evaluate(`[...document.querySelectorAll('button')].some(node => /^Filters/.test(node.textContent.trim()))`), false, "Filters button is removed");
   assert.equal(await evaluate(`window.__smokeCollections.autoDrafterGeneratedDrafts.length`), 1, "Only the structured request without a real quote generates a draft automatically");
+  const setFieldValue = (selector, value) => evaluate(`(() => {
+    const node = document.querySelector(${JSON.stringify(selector)});
+    const prototype = node instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(prototype, "value").set.call(node, ${JSON.stringify(value)});
+    node.dispatchEvent(new Event("input", {bubbles:true}));
+    return true;
+  })()`);
+  await evaluate(`document.querySelector('[data-remove-case="filter-marker"]').click(); true`);
+  await sleep(300);
+  assert.ok(await evaluate(`Boolean(document.querySelector('[data-remove-case-dialog]'))`), "Remove opens a reason dialog");
+  await setFieldValue("#remove-case-note", "Customer declined");
+  await evaluate(`document.querySelector('[data-confirm-remove-case]').click(); true`);
+  await sleep(600);
+  assert.equal(await caseTileCount(), 3, "A removed case leaves Quote Requests");
+  assert.equal(await evaluate(`window.__smokeCollections.autoDrafterGeneratedDrafts.find(record => record.caseNumber === "filter-marker")?.removedFromAutoDrafter?.reason`),
+    "quote_not_needed", "Removal reason is saved");
+  await selectView("Removed Cases");
+  assert.match(await evaluate(`document.querySelector('[data-removed-case="filter-marker"]')?.innerText || ""`), /Quote not needed[\s\S]*Customer declined/);
+  await evaluate(`document.querySelector('[data-restore-case="filter-marker"]').click(); true`);
+  await sleep(600);
+  assert.equal(await evaluate(`window.__smokeCollections.autoDrafterGeneratedDrafts.some(record => record.caseNumber === "filter-marker")`), false, "Restoring an undrafted case drops its placeholder");
+  await selectView("Quote Requests");
+  assert.equal(await caseTileCount(), 4, "A restored case returns to Quote Requests");
+  console.log("ok   Cases can be removed from Auto-Drafter with a reason and restored");
   await evaluate(`document.querySelector('[aria-label="Request review"] > summary').click(); true`);
   assert.match(await evaluate("document.body.innerText"), /LPUP\/TPUP/);
   await evaluate(`document.querySelector('[aria-label="Request review"] > summary').click(); true`);
@@ -654,6 +678,45 @@ async function runBacklogRma(win) {
   }
   await evaluate(`${goldenButton}.click(); true`);
   console.log("ok   Golden Quotes appear on Auto-Drafter and the Quotes page only when the SOP was followed perfectly");
+
+  await evaluate(`location.hash = "#/PVPanelRMAs"; true`);
+  await sleep(1300);
+  await click("Wizard Settings");
+  await sleep(300);
+  await evaluate(`document.querySelector('[data-rma-settings-manufacturer="Smoke Panels"]').click(); true`);
+  await sleep(200);
+  await evaluate(`document.querySelector('#rma-settings-method').click(); true`);
+  await sleep(200);
+  await evaluate(`[...document.querySelectorAll('[role="option"]')].find(node => node.textContent === "Email").click(); true`);
+  await sleep(200);
+  await evaluate(`document.querySelector('[data-save-rma-settings]').click(); true`);
+  await sleep(200);
+  assert.match(await evaluate("document.body.innerText"), /Add at least one To email address/, "Email method requires a recipient");
+  await setFieldValue("#rma-settings-to", "claims@smoke-panels.example");
+  await setFieldValue("#rma-settings-instructions", "Attach the flash test report.");
+  await evaluate(`document.querySelector('[data-save-rma-settings]').click(); true`);
+  await sleep(600);
+  assert.deepEqual(await evaluate(`(() => {
+    const record = window.__smokeCollections.pvManufacturers.find(item => item.name === "Smoke Panels");
+    return [record.rma_submission_method, record.rma_email_to];
+  })()`), ["email", "claims@smoke-panels.example"], "Wizard settings are saved on the manufacturer");
+  await evaluate(`location.hash = "#/AutoDrafter"; true`);
+  await sleep(1500);
+  await click("Submit Panel RMA");
+  await evaluate(`document.querySelector('[aria-label="Panel Manufacturer"]').click(); true`);
+  await sleep(200);
+  await evaluate(`[...document.querySelectorAll('[role="option"]')].find(node => node.textContent === "Smoke Panels").click(); true`);
+  await click("Next");
+  await click("Next");
+  const emailBlock = await evaluate(`document.querySelector('[data-rma-email-submission]')?.innerText || ""`);
+  assert.match(emailBlock, /claims@smoke-panels\.example/, "Email manufacturers show the configured recipient");
+  assert.match(await evaluate(`document.querySelector('[data-rma-config-instructions]')?.innerText || ""`), /flash test report/);
+  await evaluate(`window.__smokeOpened = []; window.open = url => {window.__smokeOpened.push(url); return null;}; true`);
+  await click("Open in email app");
+  assert.match(await evaluate(`window.__smokeOpened[0] || ""`), /^mailto:claims%40smoke-panels\.example\?subject=Panel%20RMA%20request/, "Email opens through a mailto link");
+  assert.equal(await evaluate(`window.__smokeCollections.rmas.length`), 1, "Opening the email does not save an RMA");
+  await evaluate(`document.dispatchEvent(new KeyboardEvent("keydown", {key:"Escape", bubbles:true})); true`);
+  console.log("ok   RMA Wizard Settings configure email submission for a manufacturer");
 }
 
 module.exports = {runBacklogRma};

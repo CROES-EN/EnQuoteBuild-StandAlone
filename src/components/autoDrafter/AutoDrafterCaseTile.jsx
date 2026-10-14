@@ -2,7 +2,7 @@ import {useState} from "react";
 import {Card} from "@/components/ui/card";
 import {Badge} from "@/components/ui/badge";
 import {Button} from "@/components/ui/button";
-import {Calendar, ClipboardList, FileText, Loader2, MapPin, Package, ShieldCheck, Sparkles, User} from "lucide-react";
+import {Archive, Calendar, ClipboardList, FileText, Loader2, MapPin, Package, ShieldCheck, Sparkles, User} from "lucide-react";
 import {format} from "date-fns";
 import {motion} from "framer-motion";
 import {toast} from "sonner";
@@ -81,6 +81,7 @@ export default ({
                   onViewDraft,
                   golden = null,
                   onPanelRma,
+                  onRemove,
                   panelRma,
                   classification,
                   hygiene,
@@ -232,8 +233,12 @@ export default ({
             </div>
           </Card>
         </div>
-        {onPanelRma && <Button variant="outline" size="sm" className="mt-2 w-full" disabled={!String(caseNumber ?? "").trim()} onClick={onPanelRma}>
-          {panelRma ? `Panel RMA: ${panelRma.current_status}` : "Submit Panel RMA"}</Button>}
+        {(onPanelRma || onRemove) && <div className="mt-2 flex gap-2">
+          {onPanelRma && <Button variant="outline" size="sm" className="flex-1" disabled={!String(caseNumber ?? "").trim()} onClick={onPanelRma}>
+            {panelRma ? `Panel RMA: ${panelRma.current_status}` : "Submit Panel RMA"}</Button>}
+          {onRemove && <Button variant="outline" size="sm" data-remove-case={caseNumber} title="Move this case out of Auto-Drafter"
+            className="text-rose-600 hover:bg-rose-50" onClick={onRemove}><Archive className="w-4 h-4 mr-1"/>Remove</Button>}
+        </div>}
       </motion.div>
     );
   }
@@ -333,8 +338,12 @@ export default ({
           </Button>
         </div>}
       </Card>
-      {onPanelRma && <Button size="sm" variant="outline" className="mt-2 w-full" disabled={isGenerating || !String(caseNumber ?? "").trim()} onClick={onPanelRma}>
-        {panelRma ? `Panel RMA: ${panelRma.current_status}` : "Submit Panel RMA"}</Button>}
+      {(onPanelRma || onRemove) && <div className="mt-2 flex gap-2">
+        {onPanelRma && <Button size="sm" variant="outline" className="flex-1" disabled={isGenerating || !String(caseNumber ?? "").trim()} onClick={onPanelRma}>
+          {panelRma ? `Panel RMA: ${panelRma.current_status}` : "Submit Panel RMA"}</Button>}
+        {onRemove && <Button size="sm" variant="outline" data-remove-case={caseNumber} title="Move this case out of Auto-Drafter"
+          className="text-rose-600 hover:bg-rose-50" disabled={isGenerating} onClick={onRemove}><Archive className="w-4 h-4 mr-1"/>Remove</Button>}
+      </div>}
     </motion.div>
   );
 }

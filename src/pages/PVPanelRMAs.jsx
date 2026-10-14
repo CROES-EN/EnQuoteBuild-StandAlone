@@ -7,13 +7,14 @@ import {Input} from "@/components/ui/input";
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
-import {Download, LayoutDashboard, List, Plus, Search} from "lucide-react";
+import {Download, LayoutDashboard, List, Plus, Search, Settings2} from "lucide-react";
 import {cn} from "@/lib/utils";
 import {toast} from "sonner";
 import RoleGuard, {useUserRole} from "@/components/auth/RoleGuard";
 import RMAForm from "@/components/rma/RMAForm";
 import RMADashboard from "@/components/rma/RMADashboard";
 import RMAList from "@/components/rma/RMAList";
+import RmaWizardSettings from "@/components/rma/RmaWizardSettings";
 import {getDaysInCurrentStatus, getDaysOpen} from "@/components/rma/rmaUtils";
 
 const QUICK_FILTERS = [
@@ -206,6 +207,10 @@ function PVPanelRMAsContent() {
  <List className="w-4 h-4 mr-2" />
  List View
  </TabsTrigger>
+ <TabsTrigger value="wizard-settings">
+ <Settings2 className="w-4 h-4 mr-2" />
+ Wizard Settings
+ </TabsTrigger>
  </TabsList>
  {rmasError && <p role="alert">Could not load Panel RMAs: {rmasError.message} <button className="underline" onClick={() => reloadRmas()}>Retry</button></p>}
  <TabsContent value="dashboard" className="mt-4">
@@ -213,6 +218,9 @@ function PVPanelRMAsContent() {
  </TabsContent>
  <TabsContent value="list" className="mt-4">
  <RMAList rmas={filteredRmas} onEdit={handleEdit} isLoading={isLoading} />
+ </TabsContent>
+ <TabsContent value="wizard-settings" className="mt-4">
+ <RmaWizardSettings manufacturers={manufacturers} userEmail={currentUser?.email || ""} />
  </TabsContent>
  </Tabs>
  </div>

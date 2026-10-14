@@ -159,8 +159,9 @@ function respond(path, args) {
     const records = window.__smokeCollections?.autoDrafterGeneratedDrafts || [];
     const index = records.findIndex(record => record.id === args[1]);
     if (index < 0) return Promise.reject(new Error("Record not found"));
-    records[index] = structuredClone(args[2]);
-    return Promise.resolve(structuredClone(args[2]));
+    // Like electron/repository.cjs, updates merge into the stored record.
+    records[index] = {...records[index], ...structuredClone(args[2]), id: records[index].id};
+    return Promise.resolve(structuredClone(records[index]));
   }
   if (key === "collections.delete" && args[0] === "autoDrafterGeneratedDrafts") {
     const records = window.__smokeCollections?.autoDrafterGeneratedDrafts || [];

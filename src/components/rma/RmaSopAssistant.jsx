@@ -5,6 +5,8 @@ import DOMPurify from "dompurify";
 import {sopsApi, subscribe} from "@/features/collab/collabApi";
 import {selectRmaSops, suggestedRmaChecklist, buildRmaSubmissionText, manufacturerFormResources, manufacturerMatches} from "@/features/rma/rmaSopGuidance";
 import {openManufacturerForm} from "@/features/rma/manufacturerForms";
+import {buildMailtoUrl, buildRmaEmail, findManufacturerConfig, rmaEmailText} from "@/features/rma/manufacturerSubmission";
+import {listLocalCollection} from "@/api/dataClient";
 import ManufacturerFormSetup from "./ManufacturerFormSetup";
 import SopRichContent from "@/components/sop/SopRichContent";
 import SopFilePreview from "@/components/sop/SopFilePreview";
@@ -34,6 +36,11 @@ export default function RmaSopAssistant({data, preparation, onChange, onBusyChan
   const [formError, setFormError] = useState("");
   const [showSetup, setShowSetup] = useState(false);
   const query = useQuery({queryKey: ["rma-sop-library"], queryFn: () => sopsApi.list()});
+  const manufacturersQuery = useQuery({queryKey: ["pvManufacturers"], queryFn: () => listLocalCollection("pvManufacturers")});
+  const config = useMemo(() => findManufacturerConfig(manufacturersQuery.data || [], data.panel_manufacturer),
+    [manufacturersQuery.data, data.panel_manufacturer]);
+  const usesEmail = config?.configured && (config.method === "email" || config.method === "both");
+  const email = usesEmail ? buildRmaEmail(config, data, preparation) : null;
   useEffect(() => subscribe("sops", "onChanged", items => {
     if (Array.isArray(items)) setUpdates(items);
   }), []);
@@ -81,6 +88,21 @@ export default function RmaSopAssistant({data, preparation, onChange, onBusyChan
       toast.success("Submission draft copied. Review it and attach evidence before sending.");
     } catch (error) {toast.error(error.message || "Could not copy the submission draft.");}
   }
+  async function copyEmail() {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("Clipboard is unavailable. Try again in the desktop app.");
+      await navigator.clipboard.writeText(rmaEmailText(email));
+      toast.success("Email copied. Paste it into a new message and attach the evidence files.");
+    } catch (error) {toast.error(error.message || "Could not copy the email.");}
+  }
+  async function openEmail() {
+    const {url, truncated} = buildMailtoUrl(email);
+    if (truncated) {
+      try {await navigator.clipboard?.writeText?.(rmaEmailText(email));} catch {/* the toast below still explains */}
+      toast.info("The email was too long for a mail link, so it was shortened. The full text is on your clipboard.");
+    }
+    window.open(url);
+  }
   function useSource() {
     change("sources", referencedSources());
   }
@@ -100,15 +122,35 @@ export default function RmaSopAssistant({data, preparation, onChange, onBusyChan
   return <section className="space-y-3 rounded-lg border border-border p-4" aria-label="SOP-guided Panel RMA preparation">
     <h3 className="font-semibold">SOP-guided submission preparation</h3>
     <div className="space-y-2 rounded border border-border p-3">
-      <h4 className="font-semibold">{data.panel_manufacturer || "Manufacturer"} forms and portals</h4>
+      <h4 className="font-semibold">{data.panel_manufacturer || "Manufacturer"} {usesEmail && config.method === "email" ? "submission" : "forms and portals"}</h4>
       <p className="text-xs text-muted-foreground">Open your form, fill it out, then return here. Saved manufacturer forms and SOP links are listed below. No case data is sent automatically.</p>
+      {config?.instructions && <p className="whitespace-pre-wrap rounded bg-muted p-2 text-sm" data-rma-config-instructions>{config.instructions}</p>}
+      {email && <div className="space-y-2 rounded border border-primary/40 p-3" data-rma-email-submission>
+        <p className="text-sm font-medium">{data.panel_manufacturer} accepts RMA requests by email.</p>
+        <dl className="grid grid-cols-[auto_1fr] gap-x-2 text-sm">
+          <dt className="text-muted-foreground">To</dt><dd className="break-all">{email.to.join("; ")}</dd>
+          {email.cc.length > 0 && <><dt className="text-muted-foreground">Cc</dt><dd className="break-all">{email.cc.join("; ")}</dd></>}
+          <dt className="text-muted-foreground">Subject</dt><dd>{email.subject}</dd>
+        </dl>
+        <details><summary className="cursor-pointer text-sm">Preview email</summary>
+          <pre className="max-h-64 overflow-auto whitespace-pre-wrap text-xs">{email.body}</pre></details>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" onClick={openEmail}>Open in email app</Button>
+          <Button type="button" variant="outline" onClick={copyEmail}>Copy email</Button>
+        </div>
+        <p className="text-xs text-muted-foreground">Attach photos, serial labels and test results in your email app before sending. EnQuote does not send the email.</p>
+      </div>}
+      {config?.configured && config.method !== "email" && config.formUrl && <div className="text-sm">
+        <Button type="button" variant="outline" disabled={opening} onClick={() => openForm(config.formUrl)}>Open {data.panel_manufacturer} claim form</Button>
+        <p className="break-all text-xs text-muted-foreground">{config.formUrl} ? Source: RMA Wizard Settings</p>
+      </div>}
       {resources.map(resource => <div key={resource.url} className="text-sm">
         <Button type="button" variant="outline" disabled={opening} onClick={() => openForm(resource.url)}>Open {resource.label}</Button>
         <p className="break-all text-xs text-muted-foreground">{resource.url} · Source: {resource.sourceTitle}</p>
       </div>)}
       {formFiles.map(({file, doc}) => <ManufacturerFile key={`${doc.id}:${file.fileId || file.name}`}
         file={file} source={doc.title} label={`Open saved form: ${file.name}`} />)}
-      {!resources.length && !formFiles.length && <p className="text-sm">No forms configured for this manufacturer yet. Add one below to reuse it on future RMAs.</p>}
+      {!resources.length && !formFiles.length && !email && !config?.formUrl && <p className="text-sm">No forms configured for this manufacturer yet. Add one below to reuse it on future RMAs.</p>}
       <Button type="button" variant="outline" onClick={() => setShowSetup(value => !value)}>{showSetup ? "Hide form setup" : "Add manufacturer form"}</Button>
       {showSetup && <ManufacturerFormSetup key={data.panel_manufacturer} manufacturer={data.panel_manufacturer}
         initialUrl={formUrl} onBusyChange={onBusyChange} onSaved={items => {setUpdates(items);setShowSetup(false);}} />}

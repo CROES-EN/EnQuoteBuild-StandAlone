@@ -241,6 +241,12 @@ saved/edited drafts are never overwritten; real Quotes are never created or sent
 automatically. Search and request-type selections only change what is displayed.
 Cases that already have a real EnQuote quote (a Q-### number, in any status) are
 hidden from the Auto-Drafter list and never drafted automatically.
+Use **Remove** on a case tile to move a case out of Auto-Drafter when no quote is
+needed. Choose a reason (**Quote not needed**, **Panel RMA filed** or **Other**,
+which needs a note). Removed cases are not drafted automatically; any review
+draft is kept. The **Removed Cases** view lists the reason, note, who removed the
+case and when, and **Restore to Auto-Drafter** brings it back. **Clear Generated
+Drafts** discards review drafts but keeps removed cases removed.
 Requests without a case number or a usable structured scope/line items remain
 visible with an explicit preparation message instead of an empty generated quote.
 Generation errors identify the case and provide **Retry automatic drafts**.
@@ -430,6 +436,23 @@ dialog reports those explicitly rather than choosing or overwriting one.
 Browser development remains local-only. This expansion needs the updated
 desktop and Worker deployed together; the old Worker does not accept these
 collections.
+
+### RMA Wizard Settings
+
+The **Wizard Settings** tab on the PV Panel RMA Tracker sets how each
+manufacturer accepts claims: **Online form / portal**, **Email**, or **Form and
+email**. You can save a claim form URL (HTTPS only), To/Cc addresses, a subject,
+an opening message and instructions. The subject and opening message support
+`{case}` `{site}` `{manufacturer}` `{model}` `{quantity}` `{serials}`. Settings are
+stored on the shared manufacturer record. Existing manufacturer names cannot be
+renamed here, because RMAs reference them by name.
+
+In step 3 of the Panel RMA wizard, email manufacturers show the recipients and
+subject, a preview, **Open in email app** (a `mailto:` link to the default mail
+app) and **Copy email**. Attachments are added in the mail app; EnQuote never
+sends the email. Mail links are limited to about 1,900 characters. Longer emails
+are shortened in the link and the full text is copied to the clipboard.
+Manufacturers without settings keep using the SOP links and saved forms.
 
 ### SOP-guided Panel RMA preparation
 

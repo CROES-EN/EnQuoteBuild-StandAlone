@@ -159,6 +159,60 @@ export async function deleteGeneratedDraft(caseNumber) {
 export async function clearAllGeneratedDrafts() {
   const existing = await listLocalOnly();
   for (const record of existing) {
+    // Cases removed from Auto-Drafter stay removed; only their review drafts are discarded.
+    if (record.removedFromAutoDrafter) {
+      // Collection updates merge fields, so cleared fields are written as null.
+      if (record.draft) await saveGeneratedDraft(record.caseNumber ?? record.id, {...record, draft: null, parseWarnings: null});
+      continue;
+    }
     await deleteGeneratedDraft(record.caseNumber ?? record.id);
   }
+}
+
+export const AUTO_DRAFTER_REMOVAL_REASONS = [
+  {value: "quote_not_needed", label: "Quote not needed"},
+  {value: "panel_rma_filed", label: "Panel RMA filed"},
+  {value: "other", label: "Other"}
+];
+
+export function removalReasonLabel(value) {
+  return AUTO_DRAFTER_REMOVAL_REASONS.find(option => option.value === value)?.label || "Other";
+}
+
+/**
+ * Moves a case out of Auto-Drafter. The removal is stored on the case's one record in this
+ * collection (creating it when no draft exists yet), so automatic drafting - which never
+ * creates a second record for a case - cannot bring the case back.
+ */
+export async function removeCaseFromAutoDrafter(caseNumber, {reason, note = "", removedBy = "", siteId = ""}) {
+  const key = String(caseNumber ?? "").trim();
+  if (!key) throw new Error("A case number is required to remove a case from Auto-Drafter.");
+  if (!AUTO_DRAFTER_REMOVAL_REASONS.some(option => option.value === reason)) throw new Error("Choose why this case is being removed.");
+  const trimmedNote = String(note || "").trim();
+  if (reason === "other" && !trimmedNote) throw new Error("Add a note explaining why this case is being removed.");
+  const existing = (await listLocalOnly()).find(item => reviewCaseKey(item.caseNumber ?? item.id) === reviewCaseKey(key));
+  const removal = {reason, note: trimmedNote, removedBy: String(removedBy || "").trim(), removedAt: new Date().toISOString()};
+  const record = existing
+    ? {...existing, removedFromAutoDrafter: removal}
+    : {siteId: String(siteId || "").trim(), removedFromAutoDrafter: removal};
+  const id = existing ? (existing.caseNumber ?? existing.id) : key;
+  await saveGeneratedDraft(id, record);
+  return {...record, id: String(id), caseNumber: String(id)};
+}
+
+/**
+ * Returns a removed case to Auto-Drafter. A saved draft is kept; a case removed before it was
+ * drafted loses its placeholder record so automatic drafting can draft it again.
+ */
+export async function restoreCaseToAutoDrafter(caseNumber) {
+  const existing = (await listLocalOnly()).find(item => reviewCaseKey(item.caseNumber ?? item.id) === reviewCaseKey(caseNumber));
+  if (!existing?.removedFromAutoDrafter) return null;
+  const id = existing.caseNumber ?? existing.id;
+  if (!existing.draft && !existing.sentToQuotes) {
+    await deleteGeneratedDraft(id);
+    return null;
+  }
+  const restored = {...existing, removedFromAutoDrafter: null};
+  await saveGeneratedDraft(id, restored);
+  return {...restored, id: String(id), caseNumber: String(id)};
 }
