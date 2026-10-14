@@ -25,6 +25,9 @@ import {useRequestCareEligibility} from "@/features/autoDrafter/useRequestCareEl
 import {getEligibilityFromIndex} from "@/features/supervisorDashboard/careEligibility";
 import {useAutomaticDraftGeneration} from "@/features/autoDrafter/useAutomaticDraftGeneration";
 import {reviewCaseKey} from "@/features/autoDrafter/caseKey";
+
+// Case numbers match even when a spreadsheet dropped leading zeros or a "#" prefix.
+const quoteCaseKey = value => reviewCaseKey(value).replace(/^#\s*/, "").replace(/^0+(?=\d)/, "");
 import {goldenQuoteEvaluations, requestSnapshot} from "@/features/goldenQuotes/goldenQuotes";
 import {
   AlertDialog,
@@ -159,7 +162,7 @@ export const AutoDrafter = () => {
             const quotes = await getQuotes();
             const caseNumbers = new Set(
                 (quotes || [])
-                    .map((quote) => String(quote.case_number ?? "").trim().toLowerCase())
+                    .map((quote) => quoteCaseKey(quote.case_number))
                     .filter(Boolean)
             );
             setExistingQuoteCaseNumbers(caseNumbers);
@@ -354,12 +357,12 @@ export const AutoDrafter = () => {
           })()
         : quoteRows;
 
-    // Every report case is listed; automatic drafting still skips cases that already have a real quote.
-    const awaitingRows = dedupedQualifyingRows;
-    const hasRealQuote = row => existingQuoteCaseNumbers.has(String(row[caseNumberCol] ?? "").trim().toLowerCase());
+    // A case that already has a real EnQuote quote (Q-###, any status) is hidden and never auto-drafted.
+    const hasRealQuote = row => existingQuoteCaseNumbers.has(quoteCaseKey(row[caseNumberCol]));
+    const awaitingRows = caseNumberCol ? dedupedQualifyingRows.filter(row => !hasRealQuote(row)) : dedupedQualifyingRows;
     const automaticDrafts = useAutomaticDraftGeneration({
         ownerEmail: user?.email,
-        candidates: awaitingRows.filter(row => !caseNumberCol || !hasRealQuote(row)).map(row => ({
+        candidates: awaitingRows.map(row => ({
             caseNumber: String(row[caseNumberCol] || "").trim(),
             siteId: String(row[siteIdCol] || "").trim(),
             comment: String(row[commentCol] || "")

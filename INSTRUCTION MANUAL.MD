@@ -239,7 +239,8 @@ Eligible imported requests automatically generate saved **review drafts** while
 Auto-Drafter is open. Drafts are generated sequentially, not all at once. Existing
 saved/edited drafts are never overwritten; real Quotes are never created or sent
 automatically. Search and request-type selections only change what is displayed.
-Cases that already have a real quote are never drafted automatically.
+Cases that already have a real EnQuote quote (a Q-### number, in any status) are
+hidden from the Auto-Drafter list and never drafted automatically.
 Requests without a case number or a usable structured scope/line items remain
 visible with an explicit preparation message instead of an empty generated quote.
 Generation errors identify the case and provide **Retry automatic drafts**.
