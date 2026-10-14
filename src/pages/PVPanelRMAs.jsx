@@ -93,6 +93,14 @@ function PVPanelRMAsContent() {
  onError: (error) => toast.error(error.message || "Failed to save RMA")
  });
 
+ const statusMutation = useMutation({
+ mutationFn: ({ rma, status }) => saveRmaRecord({formData: {...rma, current_status: status}, existingRma: rma, email: currentUser?.email},
+   {list: listLocalCollection, create: createLocalRecord, update: updateLocalRecord}),
+ onSuccess: (_, { status }) => toast.success(`Status changed to ${status}.`),
+ onError: (error) => toast.error(error.message || "Failed to change RMA status"),
+ onSettled: () => queryClient.invalidateQueries({ queryKey: ["pvPanelRMAs"] })
+ });
+
  const handleEdit = (rma) => {
  setEditingRma(rma);
  setShowForm(true);
@@ -217,7 +225,9 @@ function PVPanelRMAsContent() {
  <RMADashboard rmas={filteredRmas} />
  </TabsContent>
  <TabsContent value="list" className="mt-4">
- <RMAList rmas={filteredRmas} onEdit={handleEdit} isLoading={isLoading} />
+ <RMAList rmas={filteredRmas} onEdit={handleEdit} isLoading={isLoading}
+   onStatusChange={(rma, status) => statusMutation.mutate({ rma, status })}
+   statusSavingId={statusMutation.isPending ? statusMutation.variables?.rma?.id : null} />
  </TabsContent>
  <TabsContent value="wizard-settings" className="mt-4">
  <RmaWizardSettings manufacturers={manufacturers} userEmail={currentUser?.email || ""} />

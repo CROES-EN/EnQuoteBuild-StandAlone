@@ -724,6 +724,49 @@ async function runBacklogRma(win) {
 
   await evaluate(`location.hash = "#/PVPanelRMAs"; true`);
   await sleep(1300);
+  // Real mouse input: the browser decides whether a click submits the form after React re-renders.
+  const realClick = async text => {
+    const point = await evaluate(`(() => {
+      const button = [...document.querySelectorAll('button')].find(node => node.textContent.trim() === ${JSON.stringify(text)});
+      if (!button) return null;
+      button.scrollIntoView({block:"center"});
+      const rect = button.getBoundingClientRect();
+      return {x: Math.round(rect.x + rect.width / 2), y: Math.round(rect.y + rect.height / 2)};
+    })()`);
+    assert.ok(point, `Button exists: ${text}`);
+    win.webContents.sendInputEvent({type:"mouseDown", x:point.x, y:point.y, button:"left", clickCount:1});
+    win.webContents.sendInputEvent({type:"mouseUp", x:point.x, y:point.y, button:"left", clickCount:1});
+    await sleep(500);
+  };
+  await click("List View");
+  await evaluate(`document.querySelector('tbody tr').click(); true`);
+  await sleep(500);
+  const statusBefore = await evaluate(`window.__smokeCollections.rmas[0].current_status`);
+  await realClick("Next"); await realClick("Next"); await realClick("Next");
+  assert.match(await evaluate("document.body.innerText"), /Step 4 of 4/, "Step 4 stays open after a real click on Next");
+  assert.ok(await evaluate(`Boolean(document.querySelector('[role="dialog"][data-state="open"]'))`), "RMA dialog stays open on step 4");
+  assert.equal(await evaluate(`window.__smokeCollections.rmas[0].current_status`), statusBefore, "Reaching step 4 does not save");
+  console.log("ok   RMA wizard: real clicks reach step 4 without auto-saving or closing");
+  await evaluate(`document.dispatchEvent(new KeyboardEvent("keydown", {key:"Escape", bubbles:true})); true`);
+  await sleep(400);
+  const newStatus = statusBefore === "Manufacturer Reviewing" ? "Waiting for Customer" : "Manufacturer Reviewing";
+  await evaluate(`(() => {
+    const select = document.querySelector('[data-rma-status-select]');
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(select, ${JSON.stringify(newStatus)});
+    select.dispatchEvent(new Event("change", {bubbles:true}));
+    return true;
+  })()`);
+  await sleep(700);
+  const statusRecord = await evaluate(`(() => {
+    const rma = window.__smokeCollections.rmas[0];
+    return {status: rma.current_status, last: (rma.status_history || []).at(-1) || null, dialog: Boolean(document.querySelector('[role="dialog"][data-state="open"]'))};
+  })()`);
+  assert.equal(statusRecord.status, newStatus, "Inline status change saves the RMA");
+  assert.equal(statusRecord.last?.new_status, newStatus, "Inline status change is recorded in status history");
+  assert.equal(statusRecord.last?.previous_status, statusBefore);
+  assert.equal(statusRecord.dialog, false, "Changing status inline does not open the wizard");
+  console.log("ok   RMA list changes status inline with history");
+  await sleep(300);
   await click("Wizard Settings");
   await sleep(300);
   await evaluate(`document.querySelector('[data-rma-settings-manufacturer="Smoke Panels"]').click(); true`);

@@ -51,15 +51,34 @@ export default function RMAForm({ rma, users, manufacturers, defaultOwner, onSav
   const handleSubmit = (e) => {
     e.preventDefault();
     if (isLoading) return;
-    if (step !== 3) {next(); return;}
-    onSave(formData);
+    // Enter advances through the wizard; saving only happens from the explicit Save button.
+    if (step !== 3) next();
+  };
+  const step0Valid = Boolean(formData.case_id.trim() && formData.site_id.trim() && formData.panel_manufacturer.trim());
+  const goToStep = (target) => {
+    if (target === step) return;
+    if (target > 0 && !step0Valid) { next(); return; }
+    if (target > 1 && step <= 1 && !document.getElementById("rma-quantity")?.reportValidity()) return;
+    setStep(target);
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       <fieldset disabled={isLoading || configSaving} className="space-y-5">
-      <p role="status" className="font-semibold">Step {step + 1} of 4: {steps[step]}</p>
-      <p className="text-xs text-muted-foreground">Your entries stay in this wizard while manufacturer forms are open. Save at the final step to keep them in the shared tracker.</p>
+      <div className="space-y-2">
+        <p role="status" className="font-semibold">Step {step + 1} of 4: {steps[step]}</p>
+        <ol className="grid grid-cols-4 gap-1.5" aria-label="RMA wizard steps">
+          {steps.map((label, index) => (
+            <li key={label}>
+              <button type="button" onClick={() => goToStep(index)} aria-current={index === step ? "step" : undefined}
+                className="w-full text-left" title={label} data-rma-step={index}>
+                <span className={`block h-1.5 rounded-full ${index <= step ? "bg-primary" : "bg-muted"}`} />
+                <span className={`mt-1 block truncate text-[11px] ${index === step ? "font-medium text-foreground" : "text-muted-foreground"}`}>{label}</span>
+              </button>
+            </li>
+          ))}
+        </ol>
+      </div>
       <div hidden={step !== 0} className="space-y-5">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
@@ -209,8 +228,9 @@ export default function RMAForm({ rma, users, manufacturers, defaultOwner, onSav
       <div className="flex justify-end gap-3 pt-4 border-t border-border">
         <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
         {step > 0 && <Button type="button" variant="outline" onClick={() => setStep(value => value - 1)}>Back</Button>}
-        {step < 3 ? <Button type="button" onClick={next}
-          disabled={step === 0 && (!formData.case_id.trim() || !formData.site_id.trim() || !formData.panel_manufacturer.trim())}>Next</Button> : <Button type="submit" disabled={isLoading}>
+        {step < 3 ? <Button key="rma-next" type="button" onClick={next}
+          disabled={step === 0 && !step0Valid}>Next</Button> : <Button key="rma-save" type="button" disabled={isLoading}
+          onClick={() => { if (!isLoading) onSave(formData); }} data-rma-save>
           {isLoading ? "Saving..." : (rma?.id ? "Update RMA" : "Create RMA")}
         </Button>}
       </div>

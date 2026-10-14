@@ -8,7 +8,7 @@ import {
     DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import RMAStatusBadge from "@/components/rma/RMAStatusBadge";
-import {getDaysInCurrentStatus, getDaysOpen} from "@/components/rma/rmaUtils";
+import {getDaysInCurrentStatus, getDaysOpen, RMA_STATUSES} from "@/components/rma/rmaUtils";
 import {ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Columns3, ExternalLink, Inbox, Pencil} from "lucide-react";
 import {format} from "date-fns";
 import {cn} from "@/lib/utils";
@@ -35,7 +35,7 @@ const COLUMNS = [
 
 const PAGE_SIZE = 10;
 
-export default function RMAList({ rmas, onEdit, isLoading }) {
+export default function RMAList({ rmas, onEdit, isLoading, onStatusChange, statusSavingId }) {
   const [sortKey, setSortKey] = useState("last_updated");
   const [sortDir, setSortDir] = useState("desc");
   const [columns, setColumns] = useState(COLUMNS);
@@ -89,7 +89,15 @@ export default function RMAList({ rmas, onEdit, isLoading }) {
   const renderCell = (rma, key) => {
     switch (key) {
       case "current_status":
-        return <RMAStatusBadge status={rma.current_status} size="sm" />;
+        if (!onStatusChange) return <RMAStatusBadge status={rma.current_status} size="sm" />;
+        return <select aria-label={`Status for RMA ${rma.case_id || rma.site_id || ""}`.trim()} data-rma-status-select={rma.id}
+          className="max-w-[12rem] rounded border border-border bg-background px-1.5 py-1 text-xs disabled:opacity-60"
+          value={rma.current_status || ""} disabled={statusSavingId === rma.id}
+          onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}
+          onChange={e => { e.stopPropagation(); if (e.target.value !== rma.current_status) onStatusChange(rma, e.target.value); }}>
+          {!RMA_STATUSES.includes(rma.current_status) && <option value={rma.current_status || ""}>{rma.current_status || "No status"}</option>}
+          {RMA_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
+        </select>;
       case "days_open":
         return <span className={cn("font-medium", getDaysOpen(rma) > 30 && "text-rose-600")}>{getDaysOpen(rma)}</span>;
       case "days_in_current_status":
