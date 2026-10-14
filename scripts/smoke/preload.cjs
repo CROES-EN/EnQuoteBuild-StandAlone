@@ -168,11 +168,11 @@ function respond(path, args) {
     window.__smokeCollections.autoDrafterGeneratedDrafts = records.filter(record => record.id !== args[1]);
     return Promise.resolve({ok:true});
   }
-  if (key.startsWith("collections.") && args[0] === "autoDrafterCustomProducts" && key !== "collections.list") {
+  if (key.startsWith("collections.") && ["autoDrafterCustomProducts", "autoDrafterLearnedSwaps"].includes(args[0]) && key !== "collections.list") {
     const collections = window.__smokeCollections ||= {};
-    const rows = (collections.autoDrafterCustomProducts ||= []).filter(row => row.id !== (key === "collections.create" ? args[1].id : args[1]));
+    const rows = (collections[args[0]] ||= []).filter(row => row.id !== (key === "collections.create" ? args[1].id : args[1]));
     if (key !== "collections.delete") rows.push(structuredClone(key === "collections.create" ? args[1] : args[2]));
-    collections.autoDrafterCustomProducts = rows;
+    collections[args[0]] = rows;
     return Promise.resolve(key === "collections.delete" ? {ok:true} : structuredClone(rows[rows.length - 1]));
   }
   if (["collections.create", "collections.update"].includes(key) && ["rmas", "pvManufacturers"].includes(args[0])) {

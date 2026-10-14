@@ -29,9 +29,9 @@ Quantity: 1`);
   assert.equal(classification.hasPanelRequest, false);
 });
 
-test("there are exactly seven mutually exclusive categories and uncertainty becomes review notes", () => {
+test("there are exactly eight mutually exclusive categories and uncertainty becomes review notes", () => {
   assert.deepEqual(REQUEST_TYPES.map(option => option.label), ["Panel RMA", "Panel RMA + On-Demand", "Enphase RMA",
-    "Enphase RMA + On-Demand", "LPUP/TPUP", "On-Demand only", "Unclassified"]);
+    "Enphase RMA + On-Demand", "LPUP/TPUP", "Enphase Care", "On-Demand only", "Unclassified"]);
   const unconfirmed = classifyQuoteRequest(`Quote Request\nScope Description: Install new solar panels\nProducts\nItem Name: Solar panel\nQuantity: 2`);
   assert.equal(unconfirmed.type, "on_demand");
   assert.match(unconfirmed.reviewNotes[0], /panel RMA is not confirmed/);

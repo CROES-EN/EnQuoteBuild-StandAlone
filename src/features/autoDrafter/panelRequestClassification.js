@@ -1,5 +1,6 @@
 import {parseQuoteRequestCase} from "./parseQuoteRequestCase.js";
 import {isAffirmative, indicatesActiveWarrantyOrRma} from "../quoteDraftAgent/requestDeviceEvidence.js";
+import {isPlaceholderItemName, isPvModuleHandlingService, isPvModuleName, isServiceLine} from "./pvModuleRecognition.js";
 
 export const REQUEST_TYPES = [
   {value: "panel_rma_only", label: "Panel RMA only"},
@@ -23,7 +24,7 @@ function mentionsPanels(text) {
 }
 
 function panelHandlingService(item) {
-  return !EXTRA_WORK.test(item.name) && !PAID_WORK.test(item.name) && (
+  return isPvModuleHandlingService(item.name) || !EXTRA_WORK.test(item.name) && !PAID_WORK.test(item.name) && (
     /^(?:labor|installation|array removal and reinstallation)$/i.test(item.name) ||
     mentionsPanels(item.name) && /\b(?:rma|replac(?:e|ement)|removal|reinstallation)\b/i.test(item.name));
 }
@@ -32,20 +33,24 @@ export function suggestPanelRequestType(comment, quoteLineItems = []) {
   const text = String(comment || "");
   const {request} = parseQuoteRequestCase(text);
   const parts = [...request.products, ...request.materials];
-  const sourceItems = [...parts, ...request.services]
-    .filter(item => String(item.name || "").trim() && !/^(?:none|none required|n\/a)$/i.test(item.name.trim()));
-  const currentItems = quoteLineItems
-    .filter(item => String(item.name || "").trim() && !/^(?:none|none required|n\/a)$/i.test(item.name.trim()));
-  const isPvModule = item => /\bpv[\s-]+modules?\b/i.test(item.name);
-  if ([...sourceItems, ...currentItems].some(isPvModule)) {
+  const sourceItems = [...parts, ...request.services].filter(item => !isPlaceholderItemName(item.name));
+  const currentItems = quoteLineItems.filter(item => !isPlaceholderItemName(item.name));
+  // Services are never the module itself ("Solar Module Replacement" is the job, not the part).
+  const isPvModule = item => !request.services.includes(item) && !isServiceLine(item) && isPvModuleName(item.name, {product: true, genericPanels: false});
+  const modules = [...sourceItems, ...currentItems].filter(isPvModule);
+  if (modules.length) {
     const quotedItems = currentItems.length ? currentItems : sourceItems;
-    const mixed = quotedItems.some(item => !isPvModule(item));
+    const mixed = quotedItems.some(item => !isPvModule(item) && !panelHandlingService(item));
     const origin = currentItems.some(isPvModule) ? "current quote" : "imported request";
+    const moduleName = String(modules[0].name).trim();
+    const rmaNote = /^no$/i.test(String(request.rmaRequired || "").trim())
+      ? " The request says RMA Required: No - confirm whether this is a warranty claim or a paid replacement."
+      : "";
     return {
       type: mixed ? "panel_and_quote" : "panel_rma_only",
       reason: mixed
-        ? `PV Module line item detected in the ${origin}, along with other quoted items. Route as Panel RMA + On-Demand and review the separate work; manufacturer eligibility and coverage still require verification.`
-        : `PV Module line item detected in the ${origin}. Route as Panel RMA; manufacturer eligibility and coverage still require verification.`
+        ? `PV module (${moduleName}) detected in the ${origin}, along with other quoted items. Route as Panel RMA + On-Demand and review the separate work; manufacturer eligibility and coverage still require verification.${rmaNote}`
+        : `PV module (${moduleName}) detected in the ${origin}. Route as Panel RMA; manufacturer eligibility and coverage still require verification.${rmaNote}`
     };
   }
   const warranty = request.warrantyReplacements || [];

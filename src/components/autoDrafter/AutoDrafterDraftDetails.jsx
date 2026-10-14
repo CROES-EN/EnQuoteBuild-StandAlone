@@ -148,7 +148,7 @@ function generateRealQuoteNumber() {
 
 export default function AutoDrafterDraftDetails({
   record, caseNumber, sourceComment, classification, hygiene, careEligibility, careError,
-  onRetryCare, onPanelRma, onHygieneReview, onBack, onRecordUpdated
+  onRetryCare, onPanelRma, onHygieneReview, onCorrectCategory, onBack, onRecordUpdated
 }) {
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
@@ -501,8 +501,8 @@ export default function AutoDrafterDraftDetails({
       )}
 
       <CareEligibilityBanner siteId={record.siteId || draft.site_id} eligibility={careEligibility} />
-      <RequestReviewSummary classification={isEditing ? classifyQuoteRequest(source, draft.items || []) :
-        classification || classifyQuoteRequest(source, draft.items || [])} hygiene={hygiene}
+      <RequestReviewSummary classification={isEditing ? classifyQuoteRequest(source, draft.items || [], {caseNumber}) :
+        classification || classifyQuoteRequest(source, draft.items || [], {caseNumber})} hygiene={hygiene} onCorrectCategory={onCorrectCategory}
         routingFlags={routingFlags} sourceWarnings={sourceWarnings}
         careError={careError} onRetryCare={onRetryCare} onPanelRma={onPanelRma} onHygieneReview={onHygieneReview} />
 

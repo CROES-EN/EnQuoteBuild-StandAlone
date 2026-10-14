@@ -18,6 +18,7 @@ import {PRODUCT_CATALOG} from "./productCatalog";
 import {isMicroinverterMention, mentionsCompetingMicroinverterBrand, isAffirmative, indicatesActiveWarrantyOrRma} from "./requestDeviceEvidence.js";
 import {findLearnedCorrection} from "./learnedCorrections";
 import {findProductAlias} from "./productAliases";
+import {isPvModuleName} from "../autoDrafter/pvModuleRecognition.js";
 import {
     checkCombiner6CDependency,
     checkIQ8AdvisoryAccessories,
@@ -585,12 +586,17 @@ function matchLineItem(requestedName, requestedQuantity, requestedUnit, notes, c
     }
   }
 
+  // The catalog sells no PV modules, only module accessories, so a requested module
+  // ("Solar Module", "REC Alpha Pure REC395AA", "Solaria PowerXT-355R AC module") must stay
+  // unmatched instead of picking up a cable "...Max Module Pitch" or "Module Clamps".
+  const isPvModule = !isService && isPvModuleName(requestedName, {product: true});
+
   // A request must contain at least one specific/technical word (not just
   // generic terms like "cable", "connector", "wire" alone) before this
   // engine will attempt ANY specific-SKU match -- phrase match included.
   // This is checked first so a coincidental word overlap in an unrelated
   // item's name can never bypass the safeguard.
-  const canAttemptSpecificMatch = hasSpecificTerm(coreTokens);
+  const canAttemptSpecificMatch = !isPvModule && hasSpecificTerm(coreTokens);
 
   // Strongest signal: the requested name appears nearly verbatim, as whole
   // words, inside a catalog item's name (e.g. "Q Cable" inside
@@ -719,8 +725,8 @@ function matchLineItem(requestedName, requestedQuantity, requestedUnit, notes, c
   // linear quantity by a flat "per each" average price would produce a
   // wildly inflated total, so quantity is capped to 1 and the item is
   // flagged for manual review instead.
-  const guessedCategory = guessCategoryFromText(requestedName)
-    || guessCategoryFromText(notes, {allowDeviceCategories: false})
+  const guessedCategory = (isPvModule ? null : guessCategoryFromText(requestedName)
+    || guessCategoryFromText(notes, {allowDeviceCategories: false}))
     || categoryHint || "Wiring & Cable Management";
   const averagePrice = CATEGORY_AVERAGES[guessedCategory] || 25;
   const fallbackTaxCategory = PRODUCT_CATALOG.find((i) => i.category === guessedCategory)?.tax_category
@@ -1003,7 +1009,8 @@ const NON_ENPHASE_PANEL_BRANDS = [
 // specific enough to the actual part.
 const PANEL_MODULE_PHRASE_PATTERN = /\bsolar\s*panel\b|\bpv\s*mod(?:ule)?s?\b/i;
 
-function mentionsNonEnphasePanelOrModule(text) {
+function mentionsNonEnphasePanelOrModule(text, name) {
+  if (name && isPvModuleName(name)) return true;
   const lower = String(text || "").toLowerCase();
   if (NON_ENPHASE_PANEL_BRANDS.some((brand) => lower.includes(brand))) return true;
   return PANEL_MODULE_PHRASE_PATTERN.test(lower);
@@ -1021,7 +1028,7 @@ export function detectQuoteBlockingIssues(request) {
   ];
   for (const line of productAndMaterialLines) {
     const searchText = `${line.name || ""} ${line.notes || ""}`;
-    if (mentionsNonEnphasePanelOrModule(searchText)) {
+    if (mentionsNonEnphasePanelOrModule(searchText, line.name)) {
       issues.push({
         type: "non_enphase_panel",
         itemName: line.name,

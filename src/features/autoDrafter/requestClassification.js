@@ -2,6 +2,8 @@ import {suggestPanelRequestType} from "./panelRequestClassification.js";
 import {getRequestRoutingFlags} from "./requestRoutingFlags.js";
 import {quoteRequestCommentEvidence} from "../quoteRequestIntake/quoteRequestComment.js";
 import {parseQuoteRequestCase} from "./parseQuoteRequestCase.js";
+import {isPlaceholderItemName} from "./pvModuleRecognition.js";
+import {findCategoryCaseOverride, findCategoryRule} from "./categoryLearning.js";
 
 export const REQUEST_TYPES = [
   {value: "panel_rma_only", label: "Panel RMA", tone: "amber"},
@@ -9,6 +11,7 @@ export const REQUEST_TYPES = [
   {value: "enphase_rma", label: "Enphase RMA", tone: "blue"},
   {value: "enphase_and_quote", label: "Enphase RMA + On-Demand", tone: "teal"},
   {value: "lpup_tpup", label: "LPUP/TPUP", tone: "violet"},
+  {value: "enphase_care", label: "Enphase Care", tone: "green"},
   {value: "on_demand", label: "On-Demand only", tone: "neutral"},
   {value: "unclassified", label: "Unclassified", tone: "rose"}
 ];
@@ -23,7 +26,60 @@ export function requestCategoryCounts(classifications) {
   return REQUEST_TYPES.map(option => ({...option, count: counts.get(option.value) || 0}))
     .sort((a, b) => b.count - a.count);
 }
-export function classifyQuoteRequest(comment, quoteLineItems = []) {
+const CARE = /\benphase\s+care\b|\bcare\s+(?:plan|subscription|enrol(?:l)?ment)\b/i;
+const CARE_INTENT = /\b(?:subscri|enrol|plan|renew|quote|consult|upsell|options?)/i;
+
+// Enphase Care subscription/enrollment requests carry no products or field work; they go to the Care
+// team instead of being priced as On-Demand quotes.
+export function isEnphaseCareRequest(comment) {
+  const text = String(comment || "");
+  const {request} = parseQuoteRequestCase(text);
+  const real = items => (items || []).filter(item => !isPlaceholderItemName(item.name));
+  const services = real(request.services).map(item => item.name);
+  if (real(request.products).length || real(request.materials).length || real(request.warrantyReplacements).length) return false;
+  const structured = Boolean(request.scopeDescription || request.problemDescription || services.length);
+  const scope = request.scopeDescription || (structured ? "" : text);
+  const scopeIsCare = CARE.test(scope) && CARE_INTENT.test(scope);
+  if (services.length) return services.every(name => CARE.test(name)) && (scopeIsCare || !scope.trim() || CARE.test(scope));
+  return scopeIsCare;
+}
+
+// The text a learned category rule is matched against: the requested work, not the findings.
+function requestedWorkText(comment) {
+  const {request} = parseQuoteRequestCase(comment);
+  const names = [...request.products, ...request.materials, ...request.services, ...request.warrantyReplacements]
+    .map(item => item.name).filter(Boolean);
+  const text = [request.scopeDescription, ...names].filter(Boolean).join("\n");
+  return text || String(comment || "");
+}
+
+function corrected(automatic, type, correction, source) {
+  const option = REQUEST_TYPES.find(item => item.value === type);
+  if (!option || type === automatic.type) return {...automatic, learned: correction ? {...correction, source, matchesAutomatic: true} : null};
+  const by = correction.taughtBy ? ` by ${correction.taughtBy}` : "";
+  const reason = source === "case"
+    ? `Category corrected${by}${correction.note ? `: ${correction.note}` : "."}`
+    : `Learned rule${by}: requests mentioning "${correction.phrase}" are ${option.label}.`;
+  return {...automatic, ...option, type, reason, reviewNotes: [], automaticType: automatic.type,
+    learned: {...correction, source}};
+}
+
+// Reviewer corrections (categoryLearning.js) win over the automatic category: a per-case correction
+// first, then the most specific learned phrase rule.
+export function classifyQuoteRequest(comment, quoteLineItems = [], {caseNumber} = {}) {
+  const automatic = classifyAutomatically(comment, quoteLineItems);
+  const key = caseNumber || parseQuoteRequestCase(comment).request.caseNumber;
+  const override = key ? findCategoryCaseOverride(key) : null;
+  if (override) return corrected(automatic, override.category, override, "case");
+  const rule = findCategoryRule(requestedWorkText(comment));
+  if (rule) return corrected(automatic, rule.category, rule, "rule");
+  return automatic;
+}
+
+function classifyAutomatically(comment, quoteLineItems = []) {
+  if (isEnphaseCareRequest(comment)) {
+    return category("enphase_care", "Enphase Care subscription or enrollment request with no products or field work. Route to the Care team instead of drafting an On-Demand quote.");
+  }
   const panel = suggestPanelRequestType(comment, quoteLineItems);
   const notes = [];
   if (panel.reviewCode === "panel_and_device_rma") {

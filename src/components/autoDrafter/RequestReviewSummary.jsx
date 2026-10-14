@@ -31,7 +31,7 @@ function ReviewIssues({issues, compact}) {
 
 export default function RequestReviewSummary({
   classification, routingFlags = [], hygiene, sourceWarnings = [], compact = false,
-  careError, onRetryCare, onPanelRma, onHygieneReview
+  careError, onRetryCare, onPanelRma, onHygieneReview, onCorrectCategory
 }) {
   const hygieneIssues = [...new Map((hygiene?.flags || []).map(issue => [issueKey(issue), issue])).values()]
     .sort((a, b) => Number(/differs|does not match/.test(b)) - Number(/differs|does not match/.test(a)));
@@ -52,8 +52,14 @@ export default function RequestReviewSummary({
       </div>
     </div>}
     {hasCategory && <div className="space-y-1.5">
-      {!compact && <RequestTypeBadge classification={classification} />}
+      {!compact && <div className="flex flex-wrap items-center gap-2">
+        <RequestTypeBadge classification={classification} />
+        {classification.learned && classification.learned.matchesAutomatic !== true &&
+          <Badge variant="outline" className="text-xs" data-category-learned-badge>Reviewer-taught</Badge>}
+      </div>}
       <p className="text-muted-foreground">{classification.reason}</p>
+      {onCorrectCategory && <Button variant="link" size="sm" className="h-auto p-0 text-xs" data-correct-category
+        onClick={event => {event.stopPropagation(); onCorrectCategory();}}>Wrong category? Correct it</Button>}
       {categoryNotes.length > 0 && <ul aria-label="Category review notes" className="list-disc pl-4 space-y-1 text-amber-700">
         {categoryNotes.map(note => <li key={note}>{note}</li>)}
       </ul>}

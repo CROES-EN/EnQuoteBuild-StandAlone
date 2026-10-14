@@ -603,21 +603,23 @@ async function runBacklogRma(win) {
       ["review", "Inspect solar panels for damage"],
       ["other", "Repair AC cabling"],
       ["module-only", "Replace failed equipment"],
-      ["module-mixed", "Replace failed equipment and provide mounting hardware"]
+      ["module-mixed", "Replace failed equipment and provide mounting hardware"],
+      ["care", "Enphase Care enrollment quote and enrollment service."]
     ];
     window.__smokeWorkTables[0].rows = scopes.map(([key, scope]) => ({
       "Case Number": "category-" + key, "Enlighten Site ID": "005678",
       "O&M Status": "Quote Requested", Status: "Open", "Case Comment Created By": "Category Requester",
       "Case Comment": "Quote Requests\\nSite ID: 005678\\nCase Number: category-" + key + "\\nScope Description: " + scope +
         (key.startsWith("module-") ? "\\nRMA Required: No\\nProducts\\nItem Name: Compatible Replacement PV Module\\nQuantity: 1" : "") +
-        (key === "module-mixed" ? "\\nAdditional Materials\\nItem Name: Mounting Hardware\\nQuantity: 1" : "")
+        (key === "module-mixed" ? "\\nAdditional Materials\\nItem Name: Mounting Hardware\\nQuantity: 1" : "") +
+        (key === "care" ? "\\nProducts\\nNone required\\nServices\\nService Name: Enphase Care Enrollment\\nQuantity: 1" : "")
     }));
     location.hash = "#/PVPanelRMAs"; return true;
   })()`);
   await sleep(400);
   await evaluate(`location.hash = "#/AutoDrafter"; true`);
   await sleep(1500);
-  assert.equal(await caseTileCount(), 11);
+  assert.equal(await caseTileCount(), 12);
   assert.ok(await evaluate(`Boolean(document.querySelector('[aria-label="Select request view"]'))`), "View dropdown replaces the three section buttons");
   await selectRequestType("All request types");
   await evaluate(`document.querySelector('[aria-label="Filter by request type"]').click(); true`);
@@ -627,10 +629,51 @@ async function runBacklogRma(win) {
   await evaluate(`document.querySelector('[aria-label="Filter by request type"]').dispatchEvent(new KeyboardEvent("keydown", {key:"Escape",bubbles:true})); true`);
   await sleep(200);
   for (const [category, count] of [["Panel RMA (", 2], ["Enphase RMA (", 3], ["LPUP/TPUP (", 1],
-    ["Panel RMA + On-Demand", 2], ["Enphase RMA + On-Demand", 1], ["On-Demand only", 2], ["Unclassified", 0]]) {
+    ["Panel RMA + On-Demand", 2], ["Enphase RMA + On-Demand", 1], ["Enphase Care", 1], ["On-Demand only", 2], ["Unclassified", 0]]) {
     await selectRequestType(category);
     assert.equal(await caseTileCount(), count, `${category} isolates its matching cases`);
   }
+  const chooseDialogOption = async (trigger, label) => {
+    await evaluate(`document.querySelector(${JSON.stringify(trigger)}).click(); true`);
+    await sleep(200);
+    await evaluate(`(() => {
+      const option = [...document.querySelectorAll('[role="listbox"][data-state="open"] [role="option"]')].find(node => node.textContent.startsWith(${JSON.stringify(label)}));
+      if (!option) throw new Error("Missing option: " + ${JSON.stringify(label)});
+      option.click(); return true;
+    })()`);
+    await sleep(200);
+  };
+  const openCategoryCorrection = async caseNumber => {
+    await evaluate(`document.querySelector('[data-enquote-share-target="auto-drafter-case:${caseNumber}"] [aria-label="Request review"] > summary').click(); true`);
+    await sleep(200);
+    await evaluate(`document.querySelector('[data-enquote-share-target="auto-drafter-case:${caseNumber}"] [data-correct-category]').click(); true`);
+    await sleep(300);
+    assert.ok(await evaluate(`Boolean(document.querySelector('[data-category-correction-dialog]'))`), "Correct category opens the correction dialog");
+  };
+  await selectRequestType("All request types");
+  await openCategoryCorrection("category-other");
+  await chooseDialogOption("#category-correction-type", "Enphase RMA");
+  await evaluate(`document.querySelector('[data-category-teach]').click(); true`);
+  await sleep(150);
+  await setFieldValue("#category-rule-phrase", "Repair AC cabling");
+  await evaluate(`document.querySelector('[data-confirm-category-correction]').click(); true`);
+  await sleep(1200);
+  assert.deepEqual(await evaluate(`(window.__smokeCollections.autoDrafterLearnedSwaps || []).filter(record => String(record.kind).startsWith("category_")).map(record => record.kind + ":" + record.category).sort()`),
+    ["category_case:enphase_rma", "category_rule:enphase_rma"], "Case correction and learned rule are saved");
+  await selectRequestType("Enphase RMA (");
+  assert.equal(await caseTileCount(), 4, "The corrected case moves to its new category");
+  await openCategoryCorrection("category-other");
+  assert.match(await evaluate(`document.querySelector('[data-category-learned]').innerText`), /corrected/);
+  await evaluate(`document.querySelector('[data-category-reset]').click(); true`);
+  await sleep(1200);
+  assert.equal(await caseTileCount(), 4, "The learned rule still categorizes the case after its per-case correction is reset");
+  await openCategoryCorrection("category-other");
+  assert.match(await evaluate(`document.querySelector('[data-category-learned]').innerText`), /Learned rule: "Repair AC cabling"/);
+  await evaluate(`document.querySelector('[data-category-forget-rule]').click(); true`);
+  await sleep(1200);
+  assert.equal(await caseTileCount(), 3, "Forgetting the rule restores the automatic category");
+  assert.equal(await evaluate(`(window.__smokeCollections.autoDrafterLearnedSwaps || []).filter(record => String(record.kind).startsWith("category_")).length`), 0);
+  console.log("ok   Wrong categories can be corrected per case and taught as reusable rules");
   await selectRequestType("All request types");
   assert.equal(await evaluate(`document.querySelectorAll('[aria-label="Request review"][open]').length`), 0, "All tiles start minimal");
   assert.equal(await evaluate(`[...document.querySelectorAll('[role="option"], button')].some(node => /Improper/.test(node.textContent))`), false, "Improper Requests is retired");
@@ -638,11 +681,11 @@ async function runBacklogRma(win) {
   assert.equal(await caseTileCount(), 0, "Panel RMA record view is distinct from quote tiles");
   assert.equal(await evaluate(`window.__smokeCollections.rmas.length`), 1, "View changes preserve tracker records");
   await selectView("Quote Requests");
-  assert.equal(await caseTileCount(), 11);
+  assert.equal(await caseTileCount(), 12);
   if (process.env.ENQUOTE_SMOKE_TILE_SCREENSHOT) {
     require("node:fs").writeFileSync(process.env.ENQUOTE_SMOKE_TILE_SCREENSHOT, (await win.webContents.capturePage()).toPNG());
   }
-  console.log("ok   Seven mutually exclusive case categories and minimal expandable tiles");
+  console.log("ok   Eight mutually exclusive case categories and minimal expandable tiles");
   await evaluate(`(() => {
     const draft = {scope_of_work: "Repair AC cabling", items: [{name: "AC Cabling", quantity: 1, unit_price: 50}], labor_hours: 2, travel_hours: 1, miles_traveled: 20};
     const quote = (id, caseNumber, status) => ({...draft, id, quote_number: id.toUpperCase(), case_number: caseNumber, site_id: "005678",

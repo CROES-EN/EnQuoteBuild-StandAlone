@@ -9,6 +9,7 @@ const tones = {
   violet: "border-violet-300 bg-violet-50 text-violet-800",
   orange: "border-orange-300 bg-orange-50 text-orange-900",
   rose: "border-rose-300 bg-rose-50 text-rose-800",
+  green: "border-emerald-300 bg-emerald-50 text-emerald-800",
   neutral: "border-border bg-muted text-muted-foreground"
 };
 

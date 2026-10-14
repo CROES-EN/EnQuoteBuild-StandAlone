@@ -129,7 +129,7 @@ Item Name: ${name}
 Quantity: 1`;
     const only = suggestPanelRequestType(comment);
     assert.equal(only.type, "panel_rma_only", name);
-    assert.match(only.reason, /PV Module line item detected/);
+    assert.match(only.reason, /PV module \(.+\) detected/);
     assert.equal(suggestPanelRequestType(`${comment}\nAdditional Materials\nItem Name: Mounting and Electrical Hardware\nQuantity: Unknown`).type, "panel_and_quote");
     assert.equal(suggestPanelRequestType(`${comment}\nServices\nService Name: System Testing and Verification\nQuantity: 1`).type, "panel_and_quote");
     assert.equal(suggestPanelRequestType(`${comment}\nServices\nService Name: PV Module Replacement\nQuantity: 1`).type, "panel_rma_only");

@@ -73,17 +73,34 @@ totals and Golden Quote are never blank because the page was still loading.
 ### Panel request badges and Data Hygiene
 
 Auto-Drafter automatically classifies the retained comment on every request.
-The **Case category** filter separates exactly seven mutually exclusive groups:
+The **Case category** filter separates exactly eight mutually exclusive groups:
 **Panel RMA**, **Panel RMA + On-Demand**, **Enphase RMA**,
-**Enphase RMA + On-Demand**, **LPUP/TPUP**, **On-Demand only**, and
-**Unclassified** (no recognizable request). Every case appears in exactly one.
+**Enphase RMA + On-Demand**, **LPUP/TPUP**, **Enphase Care**, **On-Demand only**,
+and **Unclassified** (no recognizable request). Every case appears in exactly one.
+**Enphase Care** holds Care subscription/enrollment requests with no products,
+materials or warranty replacements (every requested service is an Enphase Care
+service); route these to the Care team instead of drafting an On-Demand quote.
 Mixed categories mean an RMA request plus separately quoted work; they do not
 approve billing or coverage. Uncertainty no longer creates a separate group:
 an unconfirmed panel RMA, panel plus other-device RMAs, or a device RMA from an
 unestablished manufacturer is placed in its closest category with an amber
 **review note** on the tile.
-Classification updates on each new import;
-there is no manual classification button or override. Electrical/service panels
+Classification updates on each new import.
+
+**Correcting a wrong category (self-learning):** expand a tile's request review
+(or open the draft) and click **Wrong category? Correct it**. Pick the correct
+category and save; that case keeps it on every later import and shows a
+**Reviewer-taught** badge. Tick **Teach EnQuote** to also apply the fix to
+future requests:
+- *Requests mentioning this phrase are the category above* - any request whose
+  scope or requested item names contain the phrase (case-insensitive, at least
+  4 characters) gets that category. The longest matching phrase wins.
+- *This phrase is a PV module* - the phrase is recognized as a solar module
+  everywhere (category routing and draft matching).
+
+Reopen the dialog to **Use automatic category** for a case or **Forget this
+rule**. Learning is stored locally with your learned item swaps and does not
+change the comment or any submitted quote. Electrical/service panels
 are not treated as PV panels. Classification uses the **requested scope, panel
 parts and Warranty Replacements**, not incidental panel mentions in findings,
 installed equipment or technician access instructions. Panel leads, clips and
@@ -146,9 +163,17 @@ Routing badges stay visible in that group; expand **Why these routing flags?**
 for full explanations. Longer intake/source lists expand in place. Repeated
 Site ID/Case Number mismatch warnings are counted once, and those mismatches are
 shown before less critical template issues.
-**PV Module rule:** any quoted line item containing `PV Module` (case-insensitive,
-including longer names such as Compatible Replacement PV Module) routes to
-**Panel RMA**, even when RMA Required is unknown or says No. If other non-PV-Module
+**PV Module rule:** any requested product/material or quoted line item named as a
+module routes to **Panel RMA**, even when RMA Required is unknown or says No
+(a tile note asks you to confirm warranty vs. paid replacement when it says No).
+Anything named "module" counts (`Solar Module`, `PV Module`, `AC Module`), as do
+known panel brands/models (REC, Qcells/Q.PEAK, Solaria, SunPower/Maxeon, Silfab,
+LONGi and others). Accessories (module clamps/clips, cables such as "Max Module
+Pitch", connectors, critter guard), other devices' modules (battery, comms, cell
+modem, controller, IQ devices) and services ("Module Replacement", "Module-level
+diagnostics") are not modules. A bare "Solar panel" item relies on the scope and
+RMA evidence instead. Modules are never priced as a catalog accessory; they stay
+**Not in Catalog** for manual pricing. If other non-PV-Module
 quoted items also exist, including materials or services, it routes to
 **Panel RMA + On-Demand**. This rule checks imported items and saved/edited draft
 items; it is a workflow-routing rule, not confirmation of manufacturer eligibility

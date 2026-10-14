@@ -59,6 +59,7 @@ import {
 } from "@/features/quoteRequestIntake/autoDrafterSalesforceSettings";
 import AutoDrafterCaseTile from "@/components/autoDrafter/AutoDrafterCaseTile";
 import AutoDrafterDraftDetails from "@/components/autoDrafter/AutoDrafterDraftDetails";
+import CategoryCorrectionDialog from "@/components/autoDrafter/CategoryCorrectionDialog";
 import {getQuotes, listLocalCollection} from "@/api/dataClient";
 
 // Case numbers match even when a spreadsheet dropped leading zeros or a "#" prefix.
@@ -84,6 +85,7 @@ export const AutoDrafter = () => {
     const showAlternate = view === "alternate";
     const showRemoved = view === "removed";
     const [removeTarget, setRemoveTarget] = useState(null);
+    const [categoryTarget, setCategoryTarget] = useState(null);
     const [removeReason, setRemoveReason] = useState("quote_not_needed");
     const [removeNote, setRemoveNote] = useState("");
     const [removing, setRemoving] = useState(false);
@@ -394,7 +396,8 @@ export const AutoDrafter = () => {
     const savedDraftsByCaseKey = new Map(Object.values(generatedDraftsByCase).map(record => [reviewCaseKey(record.caseNumber ?? record.id), record]));
     const classificationsByRow = new Map(awaitingRows.map(row => [row,
         classifyQuoteRequest(commentCol ? row[commentCol] : "",
-            savedDraftsByCaseKey.get(reviewCaseKey(row[caseNumberCol]))?.draft?.items || [])]));
+            savedDraftsByCaseKey.get(reviewCaseKey(row[caseNumberCol]))?.draft?.items || [],
+            {caseNumber: caseNumberCol ? row[caseNumberCol] : undefined})]));
     const hygieneColumns = quoteRequestReportColumns(columns);
     const categoryCounts = requestCategoryCounts(classificationsByRow.values());
     const typeRows = awaitingRows.filter(row => requestType === "all" || classificationsByRow.get(row).type === requestType);
@@ -424,7 +427,7 @@ export const AutoDrafter = () => {
             for (const {record, row} of snapshotTargetsRef.current) {
                 if (cancelled) return;
                 const comment = String(row[commentCol] || "");
-                const updated = {...record, requestSnapshot: requestSnapshot(classifyQuoteRequest(comment, record.draft?.items || []),
+                const updated = {...record, requestSnapshot: requestSnapshot(classifyQuoteRequest(comment, record.draft?.items || [], {caseNumber: record.caseNumber ?? record.id}),
                     assessQuoteRequestHygiene(row, quoteRequestReportColumns(columns)))};
                 try {
                     await saveGeneratedDraft(record.caseNumber ?? record.id, updated);
@@ -462,6 +465,8 @@ export const AutoDrafter = () => {
         })();
         return () => {cancelled = true;};
     }, [correctionKey]);
+    const categoryDialog = <CategoryCorrectionDialog target={categoryTarget} onClose={() => setCategoryTarget(null)}
+        taughtBy={user?.full_name || user?.email} onSaved={() => loadGeneratedDrafts()} />;
     function openRemoveCase(caseNumber, siteId) {
         setRemoveReason("quote_not_needed");
         setRemoveNote("");
@@ -581,7 +586,7 @@ export const AutoDrafter = () => {
         }
         const sourceRow = latestSourceRow(selectedCaseNumber);
         const sourceComment = sourceRow && commentCol ? String(sourceRow[commentCol] || "") : selectedRecord.sourceComment || "";
-        const classification = classifyQuoteRequest(sourceComment, selectedRecord.draft?.items || []);
+        const classification = classifyQuoteRequest(sourceComment, selectedRecord.draft?.items || [], {caseNumber: selectedCaseNumber});
         return (
             <>
             <AutoDrafterDraftDetails
@@ -594,6 +599,7 @@ export const AutoDrafter = () => {
                 onRetryCare={() => careQuery.refetch()}
                 onPanelRma={() => openPanelRma(selectedCaseNumber, selectedRecord.siteId)}
                 onHygieneReview={() => setHygieneOpen(true)}
+                onCorrectCategory={() => setCategoryTarget({caseNumber: selectedCaseNumber, comment: sourceComment, classification})}
                 caseNumber={selectedCaseNumber}
                 onBack={backToTiles}
                 onRecordUpdated={(updatedRecord) => {
@@ -602,6 +608,7 @@ export const AutoDrafter = () => {
             />
             {panelRmaDialog}
             {hygieneDialog}
+            {categoryDialog}
             </>
         );
     }
@@ -790,7 +797,7 @@ export const AutoDrafter = () => {
                                     row={{caseNumber: caseNumberValue, siteId: record.siteId || "", comment}}
                                     caseNumberCol="caseNumber" siteIdCol="siteId" commentCol="comment" reportType={REPORT_TYPE}
                                     savedDraftRecord={record} onViewDraft={() => setSelectedCaseNumber(caseNumberValue)}
-                                    classification={classifyQuoteRequest(comment, record.draft?.items || [])}
+                                    classification={classifyQuoteRequest(comment, record.draft?.items || [], {caseNumber: caseNumberValue})}
                                     careEligibility={!careQuery.isError && careQuery.data ? getEligibilityFromIndex(record.siteId, careQuery.data) : null} />;
                             })}
                         </div>}
@@ -844,6 +851,8 @@ export const AutoDrafter = () => {
                                             onDraftSaved={() => loadGeneratedDrafts()}
                                             onViewDraft={() => setSelectedCaseNumber(caseNumberValue)}
                                             onPanelRma={() => openPanelRma(caseNumberValue, siteIdCol ? row[siteIdCol] : "", commentCol ? String(row[commentCol] || "") : "")}
+                                            onCorrectCategory={caseNumberValue ? () => setCategoryTarget({caseNumber: caseNumberValue,
+                                                comment: commentCol ? String(row[commentCol] || "") : "", classification: classificationsByRow.get(row)}) : undefined}
                                             onRemove={caseNumberValue ? () => openRemoveCase(caseNumberValue, siteIdCol ? String(row[siteIdCol] ?? "").trim() : "") : undefined}
                                             panelRma={(panelRmasQuery.data || []).find(record => rmaCaseKey(record.case_id) === rmaCaseKey(caseNumberValue))}
                                             classification={classificationsByRow.get(row)}
@@ -860,6 +869,7 @@ export const AutoDrafter = () => {
 
                 {panelRmaDialog}
                 {hygieneDialog}
+                {categoryDialog}
                 <ImportAsTableDialog
                     open={importDialogOpen}
                     onOpenChange={setImportDialogOpen}

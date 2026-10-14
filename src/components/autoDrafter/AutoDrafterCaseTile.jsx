@@ -82,6 +82,7 @@ export default ({
                   golden = null,
                   onPanelRma,
                   onRemove,
+                  onCorrectCategory,
                   panelRma,
                   classification,
                   hygiene,
@@ -200,7 +201,7 @@ export default ({
             <div className="space-y-2 text-sm flex-1">
               <RequestReviewSummary compact classification={classification} hygiene={hygiene}
                 routingFlags={getRequestRoutingFlags(comment, savedDraftCareEligibility)}
-                sourceWarnings={savedDraftRecord.parseWarnings || []} />
+                sourceWarnings={savedDraftRecord.parseWarnings || []} onCorrectCategory={onCorrectCategory} />
               {/* CARE_SHIELD_ABOVE_TOTAL: positioned directly above the divider line and the
                   dollar total below it, right-aligned so it sits visually right above the $
                   figure - per explicit request, moved here from next to the Site ID title. */}
@@ -288,7 +289,7 @@ export default ({
 
         <div className="space-y-2 text-sm flex-1">
           <RequestReviewSummary compact classification={classification} hygiene={hygiene}
-            routingFlags={getRequestRoutingFlags(comment, rawCaseCareEligibility)} />
+            routingFlags={getRequestRoutingFlags(comment, rawCaseCareEligibility)} onCorrectCategory={onCorrectCategory} />
           {hasParsedFields ? (
             <>
               {siteAddress && (

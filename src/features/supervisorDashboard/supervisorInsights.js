@@ -166,7 +166,7 @@ export function buildAutoDrafterAccuracy(records, swaps = []) {
     }
   }
   const items = confidence.high + confidence.medium + confidence.low;
-  const activeSwaps = (swaps || []).filter(swap => !swap.is_deleted);
+  const activeSwaps = (swaps || []).filter(swap => !swap.is_deleted && swap.kind !== "category_case" && swap.kind !== "category_rule");
   return {
     drafts: drafts.length, sent: sent.length, sentUnedited, sentEdited: sent.length - sentUnedited,
     uneditedRate: sent.length ? percent(sentUnedited, sent.length) : null,
