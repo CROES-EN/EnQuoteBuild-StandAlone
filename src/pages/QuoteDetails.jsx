@@ -66,6 +66,8 @@ import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/c
 import {Switch} from "@/components/ui/switch";
 import {Checkbox} from "@/components/ui/checkbox";
 import StatusBadge from "@/components/quotes/StatusBadge";
+import InvoiceNumberDialog from "@/components/quotes/InvoiceNumberDialog";
+import {buildInvoiceNumberEdit, showsInvoiceNumber} from "@/features/quotes/invoiceNumber";
 import {motion} from "framer-motion";
 import RoleGuard, {useUserRole} from "@/components/auth/RoleGuard";
 import {generateCustomerQuotePDF, generateQuotePDF} from "@/components/quotes/QuotePDFGenerator";
@@ -160,6 +162,8 @@ function QuoteDetailsContent() {
  const [stripeTransactionId, setStripeTransactionId] = useState("");
  const [stripeInvoiceId, setStripeInvoiceId] = useState("");
  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
+ // "mark" = HO Approved -> Invoiced; "edit" = correct the recorded invoice number.
+ const [invoiceDialogMode, setInvoiceDialogMode] = useState(null);
 
  const { data: quote, isLoading, error: quoteError } = useQuery({
  queryKey: ["quote", quoteId, quoteNumber],
@@ -634,24 +638,50 @@ function QuoteDetailsContent() {
  }
  };
 
- const handleMarkInvoiced = async () => {
+ const handleEditInvoiceNumber = async (value) => {
+ try {
+ const currentUser = await safeMe();
+ const data = buildInvoiceNumberEdit(quote, value, currentUser.email);
+ if (data) {
+ await updateMutation.mutateAsync({ id: quoteId, data });
+ toast.success("Invoice number updated.");
+ }
+ setInvoiceDialogMode(null);
+ } catch (error) {
+ toast.error(error?.message || "Could not update the invoice number.");
+ }
+ };
+
+ const handleMarkInvoiced = async (value) => {
+ const nextInvoiceNumber = String(value || "").trim();
+ if (!nextInvoiceNumber) {
+ toast.error("Enter the invoice number.");
+ return;
+ }
  const user = await safeMe();
+ try {
  await updateMutation.mutateAsync({
  id: quoteId,
  data: { 
  status: "invoiced",
  invoiced_date: new Date().toISOString(),
+ invoice_number: nextInvoiceNumber,
  status_history: [
  ...(quote.status_history || []),
  {
  status: "invoiced",
  changed_by: user.email,
  changed_at: new Date().toISOString(),
- reason: null
+ reason: `Invoice number ${nextInvoiceNumber}`
  }
  ]
  }
  });
+ } catch (error) {
+ toast.error(error?.message || "Could not mark the quote as invoiced.");
+ return;
+ }
+ setInvoiceDialogMode(null);
  await closeRejectedSiblings(quote, "invoiced");
  
  try {
@@ -665,7 +695,7 @@ function QuoteDetailsContent() {
  sendEmailSafe({
  to: dist.recipient_email,
  subject: `Quote Invoiced: ${quote.site_id || quote.quote_number}`,
- body: `A quote has been marked as invoiced.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}`
+ body: `A quote has been marked as invoiced.\n\nSite ID: ${quote.site_id}\nInvoice Number: ${nextInvoiceNumber}\nTotal: $${quote.total.toFixed(2)}`
  }).then(() => ({ email: dist.recipient_email, success: true }))
  .catch(err => ({ email: dist.recipient_email, success: false }))
  ),
@@ -673,7 +703,7 @@ function QuoteDetailsContent() {
  sendEmailSafe({
  to: quote.created_by,
  subject: `Your Quote Invoiced: ${quote.site_id || quote.quote_number}`,
- body: `Your quote has been marked as invoiced.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}`
+ body: `Your quote has been marked as invoiced.\n\nSite ID: ${quote.site_id}\nInvoice Number: ${nextInvoiceNumber}\nTotal: $${quote.total.toFixed(2)}`
  }).then(() => ({ email: quote.created_by, success: true }))
  .catch(err => ({ email: quote.created_by, success: false }))
  ] : [])
@@ -1415,9 +1445,10 @@ function QuoteDetailsContent() {
  {quote.status === "ho_approved_invoice_required" && (isAdmin || isApprover) && (
  <>
  <Button 
- onClick={handleMarkInvoiced}
+ onClick={() => setInvoiceDialogMode("mark")}
  disabled={updateMutation.isPending}
  className="bg-indigo-600 hover:bg-indigo-700"
+ data-mark-invoiced
  >
  <Receipt className="w-4 h-4 mr-2" />
  Mark as Invoiced
@@ -1735,6 +1766,34 @@ function QuoteDetailsContent() {
  <div>
  <p className="text-sm text-muted-foreground">Case Number</p>
  <p className="font-medium text-foreground"><CaseNumberLink caseNumber={quote.case_number} className="font-medium" /></p>
+ </div>
+ </div>
+ )}
+ {showsInvoiceNumber(quote) && (
+ <div data-enquote-share-target={`quote:${quote.id}:invoice-number`} data-enquote-share-label={`Invoice Number ${quote.invoice_number || ""}`.trim()} className="flex items-center gap-3">
+ <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
+ <Receipt className="w-4 h-4 text-muted-foreground" />
+ </div>
+ <div>
+ <div className="flex items-center gap-2">
+ <p className="text-sm text-muted-foreground">Invoice Number</p>
+ {canEditQuote && (
+ <Button
+ type="button"
+ variant="ghost"
+ size="sm"
+ className="h-7 px-2 text-xs text-blue-600 hover:text-blue-700"
+ onClick={() => setInvoiceDialogMode("edit")}
+ disabled={updateMutation.isPending}
+ aria-label="Edit invoice number"
+ data-edit-invoice-number
+ >
+ <Pencil className="mr-1 h-3.5 w-3.5" />
+ Edit
+ </Button>
+ )}
+ </div>
+ <p className="font-medium text-foreground" data-invoice-number>{quote.invoice_number || "Not recorded"}</p>
  </div>
  </div>
  )}
@@ -2362,6 +2421,16 @@ function QuoteDetailsContent() {
  </DialogFooter>
  </DialogContent>
  </Dialog>
+
+ {/* Mark as Invoiced (collects the invoice number) and invoice-number corrections. */}
+ <InvoiceNumberDialog
+ open={invoiceDialogMode !== null}
+ mode={invoiceDialogMode || "edit"}
+ initialValue={quote.invoice_number || ""}
+ isSaving={updateMutation.isPending}
+ onSubmit={(value) => (invoiceDialogMode === "mark" ? handleMarkInvoiced(value) : handleEditInvoiceNumber(value))}
+ onOpenChange={(open) => { if (!open) setInvoiceDialogMode(null); }}
+ />
 
  {/* Correct an already-recorded payment date without changing payment identifiers or status. */}
  <Dialog open={showEditPaidDateDialog} onOpenChange={setShowEditPaidDateDialog}>

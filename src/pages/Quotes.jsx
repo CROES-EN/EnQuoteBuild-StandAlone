@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from "react";
-import {bulkUpdateQuotes, createLocalRecord, getQuotes, listLocalCollection} from "@/api/dataClient";
+import {bulkUpdateQuotes, createLocalRecord, getQuotes, listLocalCollection, updateQuote} from "@/api/dataClient";
 import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
@@ -11,6 +11,9 @@ import {listGeneratedDrafts} from "@/features/autoDrafter/autoDrafterDraftsStore
 import {goldenQuoteEvaluations} from "@/features/goldenQuotes/goldenQuotes";
 import {cn} from "@/lib/utils";
 import QuoteCard from "@/components/quotes/QuoteCard";
+import InvoiceNumberDialog from "@/components/quotes/InvoiceNumberDialog";
+import LogFollowUpDialog from "@/components/quotes/LogFollowUpDialog";
+import {buildInvoiceNumberEdit, canEditQuoteRecord} from "@/features/quotes/invoiceNumber";
 import QuoteStatusSnapshot from "@/components/quotes/QuoteStatusSnapshot";
 import StatusAlerts from "@/components/dashboard/StatusAlerts";
 import {selectQuoteAlerts} from "@/features/quotes/quoteAlertSelection";
@@ -77,7 +80,7 @@ function QuotesContent() {
   }, [search, statusFilter, coordinatorFilter, sortBy, myQuotesOnly, selectedSubmitter]);
 
   const downloadCSV = () => {
-    const headers = ["Quote Number", "Site ID", "Case Number", "Agent", "Status", "Total", "Stripe Transaction ID", "Stripe Invoice ID", "Paid At Date", "Created Date", "Last Modified Date"];
+    const headers = ["Quote Number", "Site ID", "Case Number", "Agent", "Status", "Total", "Invoice Number", "Stripe Transaction ID", "Stripe Invoice ID", "Paid At Date", "Created Date", "Last Modified Date"];
     const rows = filteredQuotes.map(q => [
       q.quote_number || "",
       q.site_id || "",
@@ -85,6 +88,7 @@ function QuotesContent() {
       q.owner_email || q.created_by || "",
       q.status || "",
       q.total != null ? q.total.toFixed(2) : "",
+      q.invoice_number || "",
       q.stripe_transaction_id || "",
       q.stripe_invoice_id || "",
       q.paid_at_date ? new Date(q.paid_at_date).toLocaleString() : "",
@@ -178,6 +182,27 @@ function QuotesContent() {
     .filter(([, evaluation]) => evaluation.golden).map(([id]) => id));
   const isGoldenQuote = (quote) => goldenQuoteIds.has(String(quote.id));
 
+  const [invoiceEditQuote, setInvoiceEditQuote] = useState(null);
+  const [logQuote, setLogQuote] = useState(null);
+  const invoiceNumberMutation = useMutation({
+    mutationFn: ({ id, data }) => updateQuote(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["quote", invoiceEditQuote?.id] });
+      toast({ title: "Invoice number updated." });
+      setInvoiceEditQuote(null);
+    },
+    onError: (error) => toast({ title: "Could not update the invoice number.", description: error?.message, variant: "destructive" })
+  });
+  const saveInvoiceNumber = (value) => {
+    const data = buildInvoiceNumberEdit(invoiceEditQuote, value, user?.email);
+    if (!data) {
+      setInvoiceEditQuote(null);
+      return;
+    }
+    invoiceNumberMutation.mutate({ id: invoiceEditQuote.id, data });
+  };
+
   const dismissAlertMutation = useMutation({
     mutationFn: async (quoteId) => {
       await createLocalRecord("statusAlertDismissals", { quote_id: quoteId });
@@ -221,7 +246,8 @@ function QuotesContent() {
       quote.site_id?.toLowerCase().includes(search.toLowerCase()) ||
       quote.case_number?.toLowerCase().includes(search.toLowerCase()) ||
       quote.client_name?.toLowerCase().includes(search.toLowerCase()) ||
-      quote.quote_number?.toLowerCase().includes(search.toLowerCase());
+      quote.quote_number?.toLowerCase().includes(search.toLowerCase()) ||
+      (quote.invoice_number != null && String(quote.invoice_number).toLowerCase().includes(search.trim().toLowerCase()));
     const matchesStatus = statusFilter === "all" || quote.status === statusFilter;
     const matchesCoordinator = coordinatorFilter === "all" || effectiveOwner === coordinatorFilter;
     const matchesMyQuotes = !myQuotesOnly || effectiveOwner === user?.email;
@@ -402,7 +428,7 @@ function QuotesContent() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search by Site ID, Case Number, or Client Name..."
+                  placeholder="Search by Site ID, Case Number, Client Name, or Invoice Number..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="pl-9"
@@ -587,6 +613,8 @@ function QuotesContent() {
                   mentionedBy={mention?.mentioned_by}
                   onClearAlert={(quoteId) => dismissAlertMutation.mutate(quoteId)}
                   golden={isGoldenQuote(quote)}
+                  onEditInvoiceNumber={!bulkMode && canEditQuoteRecord(quote, user, { isApprover, isAdmin }) ? setInvoiceEditQuote : undefined}
+                  onLogFollowUp={!bulkMode && canEditQuoteRecord(quote, user, { isApprover, isAdmin }) ? setLogQuote : undefined}
                 />
               );
             })}
@@ -601,6 +629,25 @@ function QuotesContent() {
                 : "Create your first quote to get started"}
             </p>
           </Card>
+        )}
+
+        <InvoiceNumberDialog
+          open={Boolean(invoiceEditQuote)}
+          mode="edit"
+          initialValue={invoiceEditQuote?.invoice_number || ""}
+          quoteLabel={invoiceEditQuote?.quote_number || invoiceEditQuote?.site_id || ""}
+          isSaving={invoiceNumberMutation.isPending}
+          onSubmit={saveInvoiceNumber}
+          onOpenChange={(open) => { if (!open) setInvoiceEditQuote(null); }}
+        />
+
+        {logQuote && (
+          <LogFollowUpDialog
+            quote={logQuote}
+            open={Boolean(logQuote)}
+            onOpenChange={(open) => { if (!open) setLogQuote(null); }}
+            onLogged={() => queryClient.invalidateQueries({ queryKey: ["quote", logQuote.id] })}
+          />
         )}
 
         {/* Bulk action bar */}

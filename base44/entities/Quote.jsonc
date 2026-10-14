@@ -260,6 +260,10 @@
       "type": "string",
       "description": "Stripe transaction ID recorded when the quote is paid"
     },
+    "invoice_number": {
+      "type": "string",
+      "description": "Invoice number entered when the quote is marked as invoiced (separate from Stripe IDs)"
+    },
     "stripe_invoice_id": {
       "type": "string",
       "description": "Stripe invoice ID recorded when the quote is paid"
