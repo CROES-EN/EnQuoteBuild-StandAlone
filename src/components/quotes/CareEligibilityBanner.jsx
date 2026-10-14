@@ -20,10 +20,12 @@ import {getEligibilityForSiteId} from "@/features/supervisorDashboard/careEligib
  * report hasn't been re-imported recently, or this site was never a Care customer), so
  * showing a banner for it would be misleading rather than informative.
  */
-export default function CareEligibilityBanner({ siteId }) {
-  const [eligibility, setEligibility] = useState(null);
+export default function CareEligibilityBanner({ siteId, eligibility: suppliedEligibility }) {
+  const [loadedEligibility, setEligibility] = useState(null);
+  const eligibility = suppliedEligibility === undefined ? loadedEligibility : suppliedEligibility;
 
   useEffect(() => {
+    if (suppliedEligibility !== undefined) return;
     let cancelled = false;
     async function loadEligibility() {
       if (!siteId) { if (!cancelled) setEligibility(null); return; }
@@ -38,7 +40,7 @@ export default function CareEligibilityBanner({ siteId }) {
     }
     loadEligibility();
     return () => { cancelled = true; };
-  }, [siteId]);
+  }, [siteId, suppliedEligibility]);
 
   if (!eligibility || eligibility.status === "NOT_FOUND") return null;
 

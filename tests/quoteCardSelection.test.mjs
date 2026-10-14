@@ -10,11 +10,13 @@ async function loadQuoteCard() {
   let navigate;
   const mocks = {
     "@/components/ui/card": {Card: "article"},
+    "@/components/ui/badge": {Badge: "badge"},
     "date-fns": {format: (date) => String(date)},
     "lucide-react": {
       Calendar: "calendar",
       FileText: "file-text",
       ShieldCheck: "shield",
+      Sparkles: "sparkles",
       User: "user"
     },
     "react-router-dom": {useNavigate: () => navigate},

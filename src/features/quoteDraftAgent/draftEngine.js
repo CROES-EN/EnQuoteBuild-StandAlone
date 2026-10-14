@@ -15,6 +15,7 @@
 // items and labor/travel figures.
 
 import {PRODUCT_CATALOG} from "./productCatalog";
+import {isMicroinverterMention, mentionsCompetingMicroinverterBrand, isAffirmative, indicatesActiveWarrantyOrRma} from "./requestDeviceEvidence.js";
 import {findLearnedCorrection} from "./learnedCorrections";
 import {findProductAlias} from "./productAliases";
 import {
@@ -25,6 +26,7 @@ import {
 import {evaluateCompatibility} from "../compatibility/compatibilityEngine";
 import {getGeneralizedDependencyAdvisories} from "../compatibility/generalizedDependencyAdvisories";
 import {checkMaterialSizeConsistency} from "./materialSizeConsistency";
+import {describeRangeResolution, needsRangeReview, resolveRangeNumber, resolveRangeValue} from "./rangeValues.js";
 // --- Bundle aliases ---------------------------------------------------------
 //
 // Some requested items are shorthand for a KNOWN GROUP of catalog parts, not a
@@ -508,19 +510,24 @@ const CATEGORY_KEYWORDS = [
   { category: "Critter Guard", keywords: ["critter", "rodent", "animal", "chew", "pest"] },
   { category: "Wiring & Cable Management", keywords: ["wire", "cable", "connector", "splice", "conductor", "awg"] },
   { category: "Microinverters", keywords: ["microinverter", "micro inverter", "iq7", "iq8"] },
+  { category: "Mounting / Racking", keywords: ["bolt", "rail", "racking", "nut", "washer", "screw", "lag", "hardware", "bracket"] },
   { category: "Roof Mounting & Sealing", keywords: ["roof", "flashing", "sealant", "seal", "clamp", "mount"] },
   { category: "Breakers", keywords: ["breaker", "fuse"] },
   { category: "Junction Box", keywords: ["junction", "box", "enclosure", "disconnect"] },
   { category: "Conduit & Raceway", keywords: ["conduit", "raceway", "emt", "pvc"] },
   { category: "Rental Equipment", keywords: ["rental", "ladder", "lift", "truck"] }
 ];
+// Device categories are priced per device, so a note such as "for microinverter mounting"
+// must never make a bolt inherit a microinverter's price.
+const NAME_ONLY_CATEGORIES = new Set(["Microinverters", "Rental Equipment"]);
 
-function guessCategoryFromText(text) {
+function guessCategoryFromText(text, {allowDeviceCategories = true} = {}) {
   const lower = String(text || "").toLowerCase();
   for (const entry of CATEGORY_KEYWORDS) {
-    if (entry.keywords.some((kw) => lower.includes(kw))) return entry.category;
+    if (!allowDeviceCategories && NAME_ONLY_CATEGORIES.has(entry.category)) continue;
+    if (entry.keywords.some((kw) => new RegExp(`\\b${kw}`).test(lower))) return entry.category;
   }
-  return "Wiring & Cable Management"; // safest general default for solar repair parts
+  return null;
 }
 
 // Matches a single requested line (product, service, or additional
@@ -550,8 +557,8 @@ function matchLineItem(requestedName, requestedQuantity, requestedUnit, notes, c
   // confidently resolve on its own (see learnedCorrections.js). This lets a real
   // mismatch, once identified and confirmed, be fixed permanently with zero risk of
   // ever being mis-matched the same way again -- entirely local, no AI/API involved.
-  if (!isService) {
-    const correctedName = findLearnedCorrection(requestedName) || findProductAlias(requestedName);
+  {
+    const correctedName = findLearnedCorrection(requestedName) || (!isService ? findProductAlias(requestedName) : null);
     if (correctedName) {
       const correctedItem = PRODUCT_CATALOG.find((item) => item.name === correctedName);
       if (correctedItem) {
@@ -712,8 +719,9 @@ function matchLineItem(requestedName, requestedQuantity, requestedUnit, notes, c
   // linear quantity by a flat "per each" average price would produce a
   // wildly inflated total, so quantity is capped to 1 and the item is
   // flagged for manual review instead.
-  const searchText = `${requestedName} ${notes || ""}`;
-  const guessedCategory = guessCategoryFromText(searchText) || categoryHint || "Wiring & Cable Management";
+  const guessedCategory = guessCategoryFromText(requestedName)
+    || guessCategoryFromText(notes, {allowDeviceCategories: false})
+    || categoryHint || "Wiring & Cable Management";
   const averagePrice = CATEGORY_AVERAGES[guessedCategory] || 25;
   const fallbackTaxCategory = PRODUCT_CATALOG.find((i) => i.category === guessedCategory)?.tax_category
     || "GENERAL_ELECTRICAL_EQUIPMENT";
@@ -750,45 +758,20 @@ function matchLineItem(requestedName, requestedQuantity, requestedUnit, notes, c
   };
 }
 
-// FIX (confirmed real bug: "20-40 ft" of Trunk Cable was billed as 2040 ft): the old
-// strip-non-digits parsing (`str.replace(/[^\d.]/g, "")`) turned a range like "20-40"
-// into the string "2040" by deleting the hyphen and concatenating the two numbers. A
-// genuine two-number range is now detected FIRST -- "20-40", "20 - 40", or "20 to 40" --
-// and resolved to its UPPER bound (safer for a materials quantity than the lower bound
-// or an average, since under-quoting cable/wire risks a return trip). Anything that is
-// NOT a range (a plain number, "Unknown", empty, etc.) falls through to the exact same
-// strip-and-parse behavior as before, completely unchanged.
-const RANGE_PATTERN = /^\s*(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)/i;
-
-function parseRangeOrNull(rawQuantity) {
-  if (rawQuantity === null || rawQuantity === undefined) return null;
-  const str = String(rawQuantity).trim();
-  const match = str.match(RANGE_PATTERN);
-  if (!match) return null;
-  const low = parseFloat(match[1]);
-  const high = parseFloat(match[2]);
-  if (isNaN(low) || isNaN(high) || high <= 0) return null;
-  return { quantity: high, rawText: str };
-}
-
+// Item quantities share the same range rule as labor, travel and mileage (rangeValues.js):
+// a range bills at its upper bound and digits are never concatenated ("20-40" was once billed
+// as 2040 ft). Unknown, empty or non-positive quantities default to 1.
 function normalizeQuantity(rawQuantity) {
-  if (rawQuantity === null || rawQuantity === undefined) return 1;
-  const range = parseRangeOrNull(rawQuantity);
-  if (range) return range.quantity;
-  const str = String(rawQuantity).trim();
-  if (!str || /^unknown$/i.test(str)) return 1;
-  const num = parseFloat(str.replace(/[^\d.]/g, ""));
-  return isNaN(num) || num <= 0 ? 1 : num;
+  const value = resolveRangeNumber(rawQuantity);
+  return value === null || value <= 0 ? 1 : value;
 }
 
-// Same corrected parsing as normalizeQuantity(), but also reports WHETHER a range was
-// detected and the original raw text -- used by resolveBilledQuantity() so a range can be
-// surfaced as a visible review note on the priced line item, instead of just silently
-// picking a number with no trace a range was ever involved.
+// Also reports whether the quantity needs review (range or alternative numbers) so the
+// priced line item carries a visible note instead of silently picking a number.
 function normalizeQuantityWithRangeInfo(rawQuantity) {
-  const range = parseRangeOrNull(rawQuantity);
-  if (range) return { quantity: range.quantity, wasRange: true, rawText: range.rawText };
-  return { quantity: normalizeQuantity(rawQuantity), wasRange: false, rawText: null };
+  const resolved = resolveRangeValue(rawQuantity);
+  const wasRange = Boolean(resolved.value > 0 && (resolved.range || resolved.ambiguous));
+  return { quantity: normalizeQuantity(rawQuantity), wasRange, rawText: wasRange ? resolved.raw : null };
 }
 
 // Turns matchLineItem()'s internal matched/match_confidence/zero_priced_service signals
@@ -857,16 +840,8 @@ const MILEAGE_RATE = 0.73;
 const DEFAULT_PICKLIST = "On-Demand";
 const DEFAULT_OM_STATUS = "Quote Requested";
 
-function resolveWorstCase(value) {
-  if (value === null || value === undefined) return null;
-  const str = String(value).trim();
-  if (!str || /^unknown$/i.test(str)) return null;
-  const rangeMatch = str.match(/([\d.]+)\s*(?:-|to)\s*([\d.]+)/i);
-  if (rangeMatch) {
-    return Math.max(parseFloat(rangeMatch[1]), parseFloat(rangeMatch[2]));
-  }
-  const singleMatch = str.match(/[\d.]+/);
-  return singleMatch ? parseFloat(singleMatch[0]) : null;
+export function resolveWorstCase(value, options) {
+  return resolveRangeNumber(value, options);
 }
 
 // --- Scope of work generation (template-based, no LLM) ---------------------
@@ -918,12 +893,13 @@ function generateScopeOfWork(request) {
 }
 
 // --- Assumption / notes generation ----------------------------------------
-function generateAssumptions(request, { fstCount, laborHours, usedWorstCase, unmatchedItems, conversionNotes, zeroPricedServiceNames }) {
+function generateAssumptions(request, { fstCount, laborHours, usedWorstCase, rangeNotes = [], unmatchedItems, conversionNotes, zeroPricedServiceNames }) {
   const notes = [];
 
   if (usedWorstCase) {
     notes.push("Worst-case labor estimate used per request guidance (a range was provided).");
   }
+  if (rangeNotes.length) notes.push(`Ranges resolved: ${rangeNotes.join(" ")}`);
   notes.push(`${fstCount} technician${fstCount === 1 ? "" : "s"} assigned.`);
   notes.push(`Estimated onsite labor hours: ${laborHours} hour${laborHours === 1 ? "" : "s"}.`);
   notes.push(`Labor rate assumed at $${DEFAULT_LABOR_RATE.toFixed(2)}/hour (organization default -- no rate was specified in the request).`);
@@ -1033,25 +1009,6 @@ function mentionsNonEnphasePanelOrModule(text) {
   return PANEL_MODULE_PHRASE_PATTERN.test(lower);
 }
 
-const NON_ENPHASE_MICROINVERTER_BRANDS = [
-  "solarbridge", "enecsys", "abb", "tigo", "solaredge", "chilicon", "apsystems", "sma"
-];
-function isMicroinverterMention(text) {
-  return /microinverter|micro\s*inverter/i.test(String(text || ""));
-}
-function mentionsCompetingMicroinverterBrand(text) {
-  const lower = String(text || "").toLowerCase();
-  return NON_ENPHASE_MICROINVERTER_BRANDS.some((brand) => lower.includes(brand));
-}
-
-function isAffirmative(value) {
-  return /^\s*(yes|true|approved|confirmed)\s*$/i.test(String(value || ""));
-}
-function indicatesActiveWarrantyOrRma(rmaRequired, warrantyStatus) {
-  if (isAffirmative(rmaRequired)) return true;
-  return /under\s*warranty|active|in\s*warranty|approved/i.test(String(warrantyStatus || ""));
-}
-
 // Scans a parsed Quote Request (see quoteRequestTextParser.js) for the two invalid-quote
 // patterns above. Returns an array of { type, itemName, reason } issues -- an empty array
 // means no concerns were detected. Does NOT modify the request or throw; purely read-only.
@@ -1129,14 +1086,19 @@ export function detectQuoteBlockingIssues(request) {
 //   hasUnknownFields: boolean
 // }
 export function generateQuoteDraft(request) {
-  const fstCount = Math.round(resolveWorstCase(request.technicianCount) || 1);
-  const laborHours = resolveWorstCase(request.onsiteLaborHours)
-    ?? resolveWorstCase(request.totalLaborHours)
-    ?? 0;
-  const usedWorstCase = /(-|to)/i.test(String(request.onsiteLaborHours || request.totalLaborHours || ""));
+  const fstCount = Math.max(1, Math.ceil(resolveRangeNumber(request.technicianCount) || 1));
+  const laborSource = resolveRangeNumber(request.onsiteLaborHours, {unit: "hours"}) !== null ? request.onsiteLaborHours : request.totalLaborHours;
+  const laborHours = resolveRangeNumber(laborSource, {unit: "hours"}) ?? 0;
+  const usedWorstCase = needsRangeReview(laborSource, {unit: "hours"});
+  const rangeNotes = [
+    describeRangeResolution("Technician count", request.technicianCount),
+    describeRangeResolution("Onsite labor hours", laborSource, {unit: "hours"}),
+    describeRangeResolution("Drive hours", request.driveHours, {unit: "hours"}),
+    describeRangeResolution("Drive miles", request.driveMiles)
+  ].filter(Boolean);
 
-  const travelHours = resolveWorstCase(request.driveHours) || 0;
-  const milesTraveled = resolveWorstCase(request.driveMiles) || 0;
+  const travelHours = resolveRangeNumber(request.driveHours, {unit: "hours"}) || 0;
+  const milesTraveled = resolveRangeNumber(request.driveMiles) || 0;
 
   let items = [];
   const unmatchedItems = [];
@@ -1201,8 +1163,10 @@ export function generateQuoteDraft(request) {
       continue;
     }
 
-    const categoryHint = isService ? "Services" : guessCategoryFromText(`${line.name} ${line.notes || ""}`);
+    const categoryHint = isService ? "Services" : guessCategoryFromText(line.name)
+      || guessCategoryFromText(line.notes, {allowDeviceCategories: false}) || "Wiring & Cable Management";
     const lineItem = matchLineItem(line.name, line.quantity, line.unit, line.notes, categoryHint, isService);
+    lineItem.source_line = {kind: line.kind, name: line.name, quantity: line.quantity ?? null, unit: line.unit || "", notes: line.notes || ""};
     if (mentionsQuoteOption(line.notes)) {
       lineItem.is_alternate_option = true;
     }
@@ -1211,17 +1175,20 @@ export function generateQuoteDraft(request) {
     // catalog service that happens to be $0) represent labor already
     // covered by the FST's hourly on-site labor charge -- skip adding a
     // duplicate $0 line for those specifically, to avoid clutter. This is
-    // distinct from the zero_priced_service fallback below, which we DO
-    // want to show (it carries the requested service's own descriptive
-    // name, e.g. "Critter Guard Installation", not a generic catalog name).
+    // distinct from the zero_priced_service fallback below, which is also
+    // omitted as a line item and only listed in the draft notes.
     if (line.kind === "service" && lineItem.matched && lineItem.unit_price === 0) {
       continue;
     }
 
-    items.push(lineItem);
+    // Unpriced services are descriptive only; the quote's service type and labor hours cover them.
     if (lineItem.zero_priced_service) {
       zeroPricedServiceNames.push(lineItem.name);
-    } else if (!lineItem.matched) {
+      continue;
+    }
+
+    items.push(lineItem);
+    if (!lineItem.matched) {
       unmatchedItems.push(line.name);
     }
     if (lineItem.conversion_note) conversionNotes.push(lineItem.conversion_note);
@@ -1329,7 +1296,7 @@ export function generateQuoteDraft(request) {
 
   const scopeOfWork = generateScopeOfWork(request);
   const notes = generateAssumptions(request, {
-    fstCount, laborHours, usedWorstCase, unmatchedItems, conversionNotes, zeroPricedServiceNames
+    fstCount, laborHours, usedWorstCase, rangeNotes, unmatchedItems, conversionNotes, zeroPricedServiceNames
   });
   const riskStatement = generateRiskStatement(request, {
     hasUnknowns: Boolean(request.hasUnknownFields),
@@ -1363,7 +1330,9 @@ export function generateQuoteDraft(request) {
       taxable: item.taxable,
       tax_code: item.tax_code,
       confidence: categorizeConfidence(item),
-      confidence_reason: getConfidenceReason(item)
+      confidence_reason: getConfidenceReason(item),
+      requested_name: item.requested_name || null,
+      source_line: item.source_line || null
     })),
     notes: [notes, riskStatement].filter(Boolean).join("\n\n"),
     unmatched_count: unmatchedItems.length,
@@ -1374,4 +1343,12 @@ export function generateQuoteDraft(request) {
   };
 }
 
-export { findBestCatalogMatch, matchLineItem, CATEGORY_AVERAGES, TAX_CODES };
+// Category-average price an unmatched (placeholder) product line would get today.
+const DEVICE_CATEGORY_AVERAGES = Object.fromEntries([...NAME_ONLY_CATEGORIES].map((category) => [category, CATEGORY_AVERAGES[category]]));
+function placeholderUnitPrice(requestedName, notes) {
+  const category = guessCategoryFromText(requestedName)
+    || guessCategoryFromText(notes, {allowDeviceCategories: false}) || "Wiring & Cable Management";
+  return {category, unitPrice: CATEGORY_AVERAGES[category] || 25, section: CATEGORY_TO_SECTION[category] || "Electrical Materials"};
+}
+
+export { findBestCatalogMatch, matchLineItem, placeholderUnitPrice, CATEGORY_AVERAGES, DEVICE_CATEGORY_AVERAGES, TAX_CODES };

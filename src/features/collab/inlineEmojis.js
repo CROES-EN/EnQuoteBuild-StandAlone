@@ -1,5 +1,5 @@
 import {validCustomEmojiId, validCustomEmojiName} from "../../../shared/customEmojiRules.js";
-export {splitInlineEmojis, inlineEmojiPreview} from "../../../shared/inlineEmojiRules.cjs";
+export {splitInlineEmojis, inlineEmojiPreview} from "../../../shared/inlineEmojiRules.js";
 
 export function customEmojiToken(emoji) {
   if (!validCustomEmojiId(emoji.id) || !validCustomEmojiName(emoji.name)) {

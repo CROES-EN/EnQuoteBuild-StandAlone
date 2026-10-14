@@ -1,5 +1,6 @@
 ﻿import {useMemo, useState} from "react";
-import {createLocalRecord, getCurrentUser, getUsers, listLocalCollection, updateLocalRecord} from "@/api/dataClient";
+import {createLocalRecord, getUsers, listLocalCollection, updateLocalRecord} from "@/api/dataClient";
+import {saveRmaRecord} from "@/features/rma/rmaRecords";
 import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
@@ -36,7 +37,7 @@ function PVPanelRMAsContent() {
  const [showForm, setShowForm] = useState(false);
  const [editingRma, setEditingRma] = useState(null);
 
- const { data: rmas = [], isLoading } = useQuery({
+ const { data: rmas = [], isLoading, error: rmasError, refetch: reloadRmas } = useQuery({
  queryKey: ["pvPanelRMAs"],
  queryFn: async () => {
  return listLocalCollection("rmas");
@@ -59,10 +60,8 @@ function PVPanelRMAsContent() {
  return rmas.filter(rma => {
  const q = search.toLowerCase();
  const matchesSearch = !q ||
- rma.site_id?.toLowerCase().includes(q) ||
- rma.case_id?.toLowerCase().includes(q) ||
- rma.case_owner?.toLowerCase().includes(q) ||
- rma.panel_manufacturer?.toLowerCase().includes(q);
+ [rma.site_id, rma.case_id, rma.case_owner, rma.panel_manufacturer, rma.panel_model,
+   rma.manufacturer_rma_number, rma.serial_numbers, rma.source_quote_number].some(value => String(value ?? "").toLowerCase().includes(q));
  if (!matchesSearch) return false;
  switch (quickFilter) {
  case "my_cases": return rma.case_owner === currentUser?.email;
@@ -80,35 +79,15 @@ function PVPanelRMAsContent() {
 
  const saveMutation = useMutation({
  mutationFn: async ({ formData, existingRma }) => {
- const mfrExists = manufacturers.some(m => m.name === formData.panel_manufacturer);
- if (formData.panel_manufacturer && !mfrExists) {
- await createLocalRecord("pvManufacturers", { name: formData.panel_manufacturer });
- }
-
- let statusHistory = existingRma?.status_history || [];
- const oldStatus = existingRma?.current_status;
- if (formData.current_status !== oldStatus) {
- const user = await getCurrentUser();
- statusHistory = [...statusHistory, {
- previous_status: oldStatus || null,
- new_status: formData.current_status,
- changed_by: user.email,
- changed_at: new Date().toISOString()
- }];
- }
-
- const data = { ...formData, status_history: statusHistory };
- if (existingRma) {
- return updateLocalRecord("rmas", existingRma.id, data);
- }
- return createLocalRecord("rmas", data);
+ return saveRmaRecord({formData, existingRma, email: currentUser?.email},
+   {list: listLocalCollection, create: createLocalRecord, update: updateLocalRecord});
  },
  onSuccess: (_, variables) => {
  queryClient.invalidateQueries({ queryKey: ["pvPanelRMAs"] });
  queryClient.invalidateQueries({ queryKey: ["pvManufacturers"] });
  setShowForm(false);
  setEditingRma(null);
- toast.success(variables.existingRma ? "RMA updated successfully" : "RMA created successfully");
+ toast.success(variables.existingRma ? "RMA updated; shared after desktop sync." : "RMA created; shared after desktop sync.");
  },
  onError: (error) => toast.error(error.message || "Failed to save RMA")
  });
@@ -127,6 +106,8 @@ function PVPanelRMAsContent() {
  const data = useFiltered ? filteredRmas : rmas;
  const headers = [
  "Case Owner", "Site ID", "Case ID", "Panel Manufacturer",
+ "Panel Model", "Panel Quantity", "Serial Numbers", "Manufacturer RMA Number",
+ "Linked Quote Number", "Linked Quote ID",
  "Current Status", "Days in Current Status", "Days Open",
  "Last Updated", "RMA URL", "Notes"
  ];
@@ -135,6 +116,8 @@ function PVPanelRMAsContent() {
  r.site_id || "",
  r.case_id || "",
  r.panel_manufacturer || "",
+ r.panel_model || "", r.panel_quantity ?? "", r.serial_numbers || "", r.manufacturer_rma_number || "",
+ r.source_quote_number || "", r.source_quote_id || "",
  r.current_status || "",
  getDaysInCurrentStatus(r),
  getDaysOpen(r),
@@ -161,7 +144,7 @@ function PVPanelRMAsContent() {
  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
  <div>
  <h1 className="text-2xl lg:text-3xl font-bold text-foreground">PV Panel RMA Tracker</h1>
- <p className="text-muted-foreground mt-1">Track and manage PV panel RMA cases across the team</p>
+ <p className="text-muted-foreground mt-1">Track and manage PV panel RMA cases across the team. Saves are stored locally and shared after desktop sync.</p>
  </div>
  <div className="flex flex-wrap items-center gap-3">
  <div className="relative flex-1 lg:flex-none">
@@ -224,6 +207,7 @@ function PVPanelRMAsContent() {
  List View
  </TabsTrigger>
  </TabsList>
+ {rmasError && <p role="alert">Could not load Panel RMAs: {rmasError.message} <button className="underline" onClick={() => reloadRmas()}>Retry</button></p>}
  <TabsContent value="dashboard" className="mt-4">
  <RMADashboard rmas={filteredRmas} />
  </TabsContent>
@@ -236,7 +220,7 @@ function PVPanelRMAsContent() {
  <Dialog
  open={showForm}
  onOpenChange={(open) => {
- if (!open) {
+ if (!open && !saveMutation.isPending) {
  setShowForm(false);
  setEditingRma(null);
  }

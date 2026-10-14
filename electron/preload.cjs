@@ -75,7 +75,9 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
   collections: {
     list: name => invoke("collections:list", name),
     create: (name, record) => invoke("collections:create", name, record),
-    update: (name, id, changes) => invoke("collections:update", name, id, changes),
+    update: (name, id, changes, options) => options === undefined
+      ? invoke("collections:update", name, id, changes)
+      : invoke("collections:update", name, id, changes, options),
     delete: (name, id) => invoke("collections:delete", name, id)
   },
     auth: {
@@ -269,6 +271,12 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
     act: (payload) => invoke("retroGames:act", payload),
     scores: () => invoke("retroGames:scores"),
     score: (payload) => invoke("retroGames:score", payload)
+  },
+  quoteBacklog: {
+    get: (date) => invoke("quoteBacklog:get", date)
+  },
+  panelRmaForms: {
+    open: (url) => invoke("panelRmaForms:open", url)
   },
   retroMail: {
     list: (folder) => invoke("retroMail:list", folder),

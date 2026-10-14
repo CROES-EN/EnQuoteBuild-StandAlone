@@ -1483,7 +1483,7 @@ let then = whenReady().then(async () => {
         void supervisorSync.recordSaved(name, result);
         return result;
     });
-    ipcMain.handle("collections:update", async (_event, name, id, changes) => {
+    ipcMain.handle("collections:update", async (_event, name, id, changes, options) => {
         // Notifications are purely local and never need to sync to Base44 - skipping
         // the immediate outbound flush here avoids a slow network round-trip for
         // every single notification marked read (e.g. "mark all as read" looping
@@ -1495,7 +1495,7 @@ let then = whenReady().then(async () => {
                 return result;
             }
             : ownWrite(quoteRepository.updateCollectionRecord);
-        const result = await diagnosticIpcWrap("collections:update", writeFn)(name, id, changes);
+        const result = await diagnosticIpcWrap("collections:update", writeFn)(name, id, changes, ...(options === undefined ? [] : [options]));
         void supervisorSync.recordSaved(name, result);
         return result;
     });

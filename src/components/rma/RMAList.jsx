@@ -13,12 +13,19 @@ import {ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Columns3, ExternalLin
 import {format} from "date-fns";
 import {cn} from "@/lib/utils";
 import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
+import {Link} from "react-router-dom";
+import {quoteDetailsPath} from "../../../shared/appLinkRules.js";
 
 const COLUMNS = [
   { key: "case_owner", label: "Case Owner", visible: true },
   { key: "site_id", label: "Site ID", visible: true },
   { key: "case_id", label: "Case ID", visible: true },
   { key: "panel_manufacturer", label: "Manufacturer", visible: true },
+  { key: "panel_model", label: "Panel Model", visible: true },
+  { key: "panel_quantity", label: "Panel Qty", visible: true },
+  { key: "manufacturer_rma_number", label: "Manufacturer RMA #", visible: true },
+  { key: "serial_numbers", label: "Serial Numbers", visible: false },
+  { key: "source_quote_number", label: "Linked Quote", visible: true },
   { key: "current_status", label: "Status", visible: true },
   { key: "days_in_current_status", label: "Days in Status", visible: true },
   { key: "days_open", label: "Days Open", visible: true },
@@ -101,6 +108,11 @@ export default function RMAList({ rmas, onEdit, isLoading }) {
         return <SiteIdLink siteId={rma.site_id} fallback="—" />;
       case "case_id":
         return <CaseNumberLink caseNumber={rma.case_id} fallback="—" />;
+      case "source_quote_number":
+        return rma.source_quote_id ? <Link className="text-primary underline"
+          to={quoteDetailsPath(rma.source_quote_id, rma.source_quote_number ? `Quote ${rma.source_quote_number}` : "")}>
+          {rma.source_quote_number || "Open quote"}
+        </Link> : "—";
       default:
         return rma[key] || "—";
     }

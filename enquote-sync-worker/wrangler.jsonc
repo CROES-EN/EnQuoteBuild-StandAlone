@@ -3,6 +3,9 @@
   "name": "enquote-sync",
   "main": "src/index.js",
   "compatibility_date": "2026-09-25",
+  "triggers": {
+    "crons": ["* * * * *"]
+  },
   // Set Worker secrets with `npx wrangler secret put <NAME>`:
   // ALLOWED_EMAILS_LIST, OUTBOUND_TOKEN, SNAPSHOT_TOKEN,
   // CF_ACCESS_CLIENT_ID, CF_ACCESS_CLIENT_SECRET, and REFUND_INGEST_TOKEN.

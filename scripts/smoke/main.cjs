@@ -24,7 +24,7 @@ function pageNames() {
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function run() {
-  if (!fs.existsSync(distIndex)) throw new Error("dist/index.html is missing - run the build first.");
+  if (!process.env.ENQUOTE_SMOKE_URL && !fs.existsSync(distIndex)) throw new Error("dist/index.html is missing - run the build first.");
   app.setPath("userData", process.env.ENQUOTE_SMOKE_DATA_DIR || fs.mkdtempSync(path.join(os.tmpdir(), "enquote-smoke-")));
 
   const win = new BrowserWindow({
@@ -45,11 +45,12 @@ async function run() {
   });
   win.webContents.on("render-process-gone", (_event, details) => consoleErrors.push(`renderer process gone: ${details.reason}`));
 
-  await win.loadFile(distIndex);
+  if (process.env.ENQUOTE_SMOKE_URL) await win.loadURL(process.env.ENQUOTE_SMOKE_URL);
+  else await win.loadFile(distIndex);
   await sleep(PAGE_SETTLE_MS);
 
   const failures = [];
-  const pages = process.argv.includes("--chat-composer-only") || process.argv.includes("--quote-links-only") || process.argv.includes("--case-work-only") || process.argv.includes("--stability-only") || process.argv.includes("--sop-sections-only") || process.argv.includes("--retro-only") || process.argv.includes("--arcade-only") || process.argv.includes("--console-only") || process.argv.includes("--theme-contrast-only") || process.argv.includes("--sop-links-only") ? [] : ["Dashboard", ...pageNames().filter((name) => name !== "Dashboard")];
+  const pages = process.argv.includes("--backlog-rma-only") || process.argv.includes("--chat-composer-only") || process.argv.includes("--quote-links-only") || process.argv.includes("--case-work-only") || process.argv.includes("--stability-only") || process.argv.includes("--sop-sections-only") || process.argv.includes("--retro-only") || process.argv.includes("--arcade-only") || process.argv.includes("--console-only") || process.argv.includes("--theme-contrast-only") || process.argv.includes("--sop-links-only") ? [] : ["Dashboard", ...pageNames().filter((name) => name !== "Dashboard")];
   for (const page of pages) {
     consoleErrors.length = 0;
     await win.webContents.executeJavaScript(`window.__smokeErrors.length = 0; location.hash = "#/${page}"; true`);
@@ -82,6 +83,11 @@ async function run() {
   }
 
   if (pages.length) console.log(`\n${pages.length - failures.length}/${pages.length} pages rendered cleanly.`);
+  if (!failures.length && process.argv.includes("--backlog-rma-only")) {
+    await require("./backlog-rma.cjs").runBacklogRma(win);
+    await require("./panel-rma-window.cjs").runPanelRmaWindow(win);
+    if (consoleErrors.length) throw new Error(`Backlog/RMA console errors: ${[...new Set(consoleErrors)].join(" | ")}`);
+  }
   if (!failures.length && process.argv.includes("--chat-composer-only")) {
     await require("./chat-composer.cjs").runChatComposer(win);
     if (consoleErrors.length) throw new Error(`Chat composer console errors: ${[...new Set(consoleErrors)].join(" | ")}`);

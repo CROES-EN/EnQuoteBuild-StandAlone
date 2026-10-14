@@ -1,4 +1,4 @@
-import {useState} from "react";
+import {useEffect, useState} from "react";
 import {Button} from "@/components/ui/button";
 import {
     Dialog,
@@ -9,10 +9,19 @@ import {
     DialogTitle
 } from "@/components/ui/dialog";
 import {Textarea} from "@/components/ui/textarea";
-import {AlertTriangle, Check, ExternalLink, Sparkles} from "lucide-react";
+import {AlertTriangle, ArrowLeftRight, Check, ExternalLink, Plus, Sparkles, Trash2} from "lucide-react";
 import {toast} from "sonner";
-import {hasQuoteRequestEvidence, parseQuoteRequestOutput} from "./quoteRequestTextParser";
+import {hasQuoteRequestEvidence} from "./quoteRequestTextParser";
+import {parseQuoteRequestCase} from "@/features/autoDrafter/parseQuoteRequestCase";
+import {classifyQuoteRequest} from "@/features/autoDrafter/requestClassification";
+import {getRequestRoutingFlags} from "@/features/autoDrafter/requestRoutingFlags";
+import {itemRequestedPhrase} from "@/features/autoDrafter/sourceLineExcerpt";
+import {alternateRequestType} from "@/features/quoteRequestIntake/quoteRequestComment";
+import CatalogPickerDialog from "@/components/autoDrafter/CatalogPickerDialog";
+import {CompatibilityFlagRow, EnphaseSpecLine, draftReviewFlags} from "@/components/autoDrafter/DraftReviewFlags";
+import {getCurrentUser} from "@/api/dataClient";
 import {detectQuoteBlockingIssues, generateQuoteDraft} from "./draftEngine";
+import {loadLearnedSwaps, saveLearnedSwap} from "./learnedSwapsStore";
 import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
 
 // Quote Draft Agent (Step 2) -- LOCAL, in-app replacement.
@@ -78,6 +87,22 @@ function getMissingRequiredFields(draft) {
   return missing;
 }
 
+const NEW_ITEM = "new";
+
+// Same checks the Auto-Drafter applies before drafting (prepareAutomaticDraft): alternate requests
+// and multiple quote options are held for review, with "Draft Anyway" still available.
+function reviewIssues(rawText, request) {
+  const issues = [];
+  const alternate = alternateRequestType(rawText);
+  if (alternate) issues.push({reason: `${alternate.label} request (${alternate.heading}), not a quote request. The Auto-Drafter lists these under Alternate Requests.`});
+  if (request.multipleQuoteOptions) issues.push({reason: "Multiple quote options requested. Split the alternatives before pricing; do not combine their quantities."});
+  return issues;
+}
+
+function lineTotal(item) {
+  return Math.round((parseFloat(item.quantity) || 1) * (Number(item.unit_price) || 0) * 100) / 100;
+}
+
 export default function QuoteDraftButton({ quote, products, onApply }) {
   const [open, setOpen] = useState(false);
   const [rawOutput, setRawOutput] = useState("");
@@ -86,6 +111,9 @@ export default function QuoteDraftButton({ quote, products, onApply }) {
   const [notStep1Warning, setNotStep1Warning] = useState(false);
   const [blockingIssues, setBlockingIssues] = useState([]);
   const [pendingRequest, setPendingRequest] = useState(null);
+  const [review, setReview] = useState({parseWarnings: [], classification: null, routingFlags: []});
+  const [pickerIndex, setPickerIndex] = useState(null);
+  useEffect(() => { if (open) loadLearnedSwaps(); }, [open]);
 
   const closeDialog = () => {
     setOpen(false);
@@ -95,6 +123,8 @@ export default function QuoteDraftButton({ quote, products, onApply }) {
     setNotStep1Warning(false);
     setBlockingIssues([]);
     setPendingRequest(null);
+    setReview({parseWarnings: [], classification: null, routingFlags: []});
+    setPickerIndex(null);
   };
 
   const handlePreview = () => {
@@ -107,8 +137,15 @@ export default function QuoteDraftButton({ quote, products, onApply }) {
         setPreview(null);
         return;
       }
-      const parsedRequest = parseQuoteRequestOutput(rawOutput);
-      const issues = detectQuoteBlockingIssues(parsedRequest);
+      // Same parser, warnings, classification and routing flags as the Auto-Drafter.
+      const {request: parsedRequest, parseWarnings} = parseQuoteRequestCase(rawOutput);
+      setReview({
+        // Pasted Step 1 output often has no Salesforce comment heading, so that warning is not useful here.
+        parseWarnings: parseWarnings.filter((warning) => !/quote-request heading|Multiple quote options/i.test(warning)),
+        classification: classifyQuoteRequest(rawOutput),
+        routingFlags: getRequestRoutingFlags(rawOutput, null)
+      });
+      const issues = [...reviewIssues(rawOutput, parsedRequest), ...detectQuoteBlockingIssues(parsedRequest)];
       if (issues.length > 0) {
         setPendingRequest(parsedRequest);
         setBlockingIssues(issues);
@@ -130,6 +167,48 @@ export default function QuoteDraftButton({ quote, products, onApply }) {
     setPreview(draft);
   };
 
+  const updatePreviewItems = (update) => {
+    setPreview((prev) => {
+      const items = update([...(prev.items || [])]);
+      return {...prev, items,
+        unmatched_items: (prev.unmatched_items || []).filter((name) => items.some((item) => item.name === name)),
+        unmatched_count: (prev.unmatched_items || []).filter((name) => items.some((item) => item.name === name)).length};
+    });
+  };
+
+  const handleCatalogSelect = async (product, remember) => {
+    const index = pickerIndex;
+    if (index === NEW_ITEM) {
+      updatePreviewItems((items) => [...items, {
+        name: product.name, sku: product.sku || "", quantity: 1, unit: product.unit || "each",
+        unit_price: Number(product.unit_price) || 0, total: Math.round((Number(product.unit_price) || 0) * 100) / 100,
+        taxable: true, tax_code: product.tax_code, confidence: "high", confidence_reason: "Added from the catalog by reviewer."
+      }]);
+      return;
+    }
+    const original = preview?.items?.[index];
+    if (!original) return;
+    const phrase = itemRequestedPhrase(original);
+    updatePreviewItems((items) => {
+      const item = {...items[index], name: product.name, unit_price: Number(product.unit_price) || 0,
+        unit: product.unit || items[index].unit || "each", tax_code: product.tax_code || items[index].tax_code, confidence: "high",
+        confidence_reason: remember ? `Swapped by reviewer. Future drafts use this item when a request says "${phrase}".` : "Manually matched to a real catalog item by reviewer."};
+      if (!item.requested_name && phrase) item.requested_name = phrase;
+      item.total = lineTotal(item);
+      items[index] = item;
+      return items;
+    });
+    if (!remember || !phrase) return;
+    try {
+      const user = await getCurrentUser().catch(() => null);
+      await saveLearnedSwap({phrase, catalogName: product.name, previousName: original.name, taughtBy: user?.email, caseNumber: preview.case_number});
+      toast.success(`EnQuote learned: "${phrase}" → ${product.name}`);
+    } catch (err) {
+      console.error("Failed to save learned swap:", err);
+      toast.error("The item was swapped, but the swap could not be remembered.");
+    }
+  };
+
   const handleApply = () => {
     if (!preview) return;
     const updates = toFormUpdates(preview);
@@ -147,6 +226,8 @@ export default function QuoteDraftButton({ quote, products, onApply }) {
   };
 
   const missingFields = preview ? getMissingRequiredFields(preview) : [];
+  const reviewFlags = preview ? draftReviewFlags({...preview, dependency_advisories: []}, rawOutput) : [];
+  const pickerItem = typeof pickerIndex === "number" ? preview?.items?.[pickerIndex] : null;
 
   return (
     <>
@@ -299,19 +380,22 @@ export default function QuoteDraftButton({ quote, products, onApply }) {
                 <div><span className="font-semibold">Miles Traveled:</span> {preview.miles_traveled || MANUAL_INPUT_PLACEHOLDER}</div>
               </div>
 
-              {preview.legacy_warnings && preview.legacy_warnings.length > 0 && (
-                <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-1">
-                  <p className="font-medium flex items-center gap-1">
-                    <AlertTriangle className="w-4 h-4" />
-                    Legacy component compatibility review needed
-                  </p>
-                  <ul className="list-disc list-inside space-y-1">
-                    {preview.legacy_warnings.map((warning, idx) => (
-                      <li key={idx}>
-                        <span className="font-medium">{warning.triggerItem}:</span> {warning.message}
-                      </li>
-                    ))}
-                  </ul>
+              {(review.classification || review.routingFlags.length > 0 || review.parseWarnings.length > 0) && (
+                <div data-agent-review className="space-y-2 rounded-lg border border-border p-3">
+                  {review.classification && (
+                    <p className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold">Request type:</span>
+                      <span data-agent-classification={review.classification.type} className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium">{review.classification.label}</span>
+                      <span className="text-xs text-muted-foreground">{review.classification.reason}</span>
+                    </p>
+                  )}
+                  {(review.classification?.reviewNotes || []).map((note) => <p key={note} className="text-xs text-amber-700">{note}</p>)}
+                  {review.routingFlags.map((flag) => (
+                    <p key={flag.code} data-agent-routing={flag.code} className="text-xs"><span className="font-medium">{flag.label}:</span> {flag.reason}</p>
+                  ))}
+                  {review.parseWarnings.map((warning) => (
+                    <p key={warning} className="flex items-start gap-1 text-xs text-amber-700"><AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />{warning}</p>
+                  ))}
                 </div>
               )}
 
@@ -321,7 +405,12 @@ export default function QuoteDraftButton({ quote, products, onApply }) {
               </div>
 
               <div>
-                <p className="font-semibold text-foreground">Quote Items ({preview.items.length})</p>
+                <div className="flex items-center justify-between">
+                  <p className="font-semibold text-foreground">Quote Items ({preview.items.length})</p>
+                  <Button type="button" size="sm" variant="outline" data-agent-add-item onClick={() => setPickerIndex(NEW_ITEM)}>
+                    <Plus className="mr-1 h-3.5 w-3.5" />Add Item
+                  </Button>
+                </div>
                 <ul className="space-y-1 text-muted-foreground">
                   {preview.items.map((item, index) => {
                     const confidence = item.confidence || "medium";
@@ -330,21 +419,36 @@ export default function QuoteDraftButton({ quote, products, onApply }) {
                       confidence === "low" ? "bg-red-100 text-red-700" :
                       "bg-amber-100 text-amber-700";
                     return (
-                      <li key={index} className="flex items-center gap-2">
+                      <li key={index} data-agent-item={index} className="flex items-start gap-2">
                         <span
                           className={`inline-block shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium capitalize ${badgeClass}`}
                           title={item.confidence_reason || "Quote Draft Agent match confidence -- please double-check Low confidence items"}
                         >
                           {confidence}
                         </span>
-                        <span>
-                          {item.quantity} x {item.name} -- ${item.unit_price} ({item.tax_code || "no tax code"})
-                        </span>
+                        <div className="min-w-0 flex-1">
+                          <span>{item.quantity} x {item.name} -- ${item.unit_price} ({item.tax_code || "no tax code"})</span>
+                          <EnphaseSpecLine item={item} />
+                        </div>
+                        <Button type="button" size="sm" variant="ghost" className="h-6 shrink-0 px-1.5 text-xs" title="Find in Catalog" onClick={() => setPickerIndex(index)}>
+                          <ArrowLeftRight className="mr-1 h-3 w-3" />Find in Catalog
+                        </Button>
+                        <Button type="button" size="sm" variant="ghost" className="h-6 shrink-0 px-1.5 text-rose-600" aria-label={`Remove ${item.name}`}
+                          onClick={() => updatePreviewItems((items) => items.filter((_, i) => i !== index))}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
                       </li>
                     );
                   })}
                 </ul>
               </div>
+
+              {reviewFlags.length > 0 && (
+                <div data-agent-flags className="space-y-2">
+                  <p className="font-semibold text-foreground">Compatibility &amp; Enphase data sheet checks</p>
+                  {reviewFlags.map((flag, idx) => <CompatibilityFlagRow key={idx} flag={flag} />)}
+                </div>
+              )}
 
               {preview.dependency_advisories && preview.dependency_advisories.length > 0 && (
                 <div className="text-sm text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg p-3 space-y-2">
@@ -399,6 +503,15 @@ export default function QuoteDraftButton({ quote, products, onApply }) {
               </>
             )}
           </DialogFooter>
+
+          <CatalogPickerDialog
+            open={pickerIndex !== null}
+            onOpenChange={(next) => { if (!next) setPickerIndex(null); }}
+            onSelect={handleCatalogSelect}
+            learnPhrase={pickerItem ? itemRequestedPhrase(pickerItem) : ""}
+            caseNumber={preview?.case_number}
+            mode={pickerIndex === NEW_ITEM ? "add" : "swap"}
+          />
         </DialogContent>
       </Dialog>
     </>

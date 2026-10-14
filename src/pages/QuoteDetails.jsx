@@ -28,6 +28,7 @@ import {Textarea} from "@/components/ui/textarea";
 import {Input} from "@/components/ui/input";
 import {Label} from "@/components/ui/label";
 import {toast} from "sonner";
+import PanelRmaRequestDialog from "@/components/rma/PanelRmaRequestDialog";
 import {
     Dialog,
     DialogContent,
@@ -134,6 +135,7 @@ function QuoteDetailsContent() {
  const quoteNumber = urlParams.get("quoteNumber");
 
  const [showRejectDialog, setShowRejectDialog] = useState(false);
+ const [showPanelRma, setShowPanelRma] = useState(false);
  const [rejectionReason, setRejectionReason] = useState("");
  const [showApproveDialog, setShowApproveDialog] = useState(false);
  const [approveNote, setApproveNote] = useState("");
@@ -1336,6 +1338,12 @@ function QuoteDetailsContent() {
  </SelectContent>
  </Select>
  )}
+ {canEditQuote && <Button variant="outline" disabled={!quote.case_number} onClick={() => setShowPanelRma(true)}>
+ Submit / edit Panel RMA
+ </Button>}
+ {showPanelRma && <PanelRmaRequestDialog target={{caseNumber: quote.case_number, siteId: quote.site_id,
+   quoteId: quote.id, quoteNumber: quote.quote_number, notes: quote.scope_of_work || ""}}
+   onClose={() => setShowPanelRma(false)} />}
  {quote.status === "approved" && canEditQuote && (
  <>
  <Button 

@@ -1,11 +1,11 @@
 import { json } from "./util.js";
 import { broadcastMessage } from "./realtime.js";
 
-// Shared store for the Supervisor Dashboard's imported data, so every signed-in manager
-// sees the same records. Last-writer-wins per record, ordered by the client-supplied
+// Shared store for supervisor data, Panel RMAs and manufacturers. Last-writer-wins
+// per record, ordered by the client-supplied
 // `updatedAt` stamp (the record's own updated_date). Deletes leave a tombstone so they
 // propagate to machines that still hold the record.
-const COLLECTIONS = new Set(["supervisorDailyMetrics", "supervisorReportTables"]);
+const COLLECTIONS = new Set(["supervisorDailyMetrics", "supervisorReportTables", "rmas", "pvManufacturers"]);
 
 // D1 caps a single row at 2 MB, and large report tables (e.g. Workload) exceed 1 MB, so each
 // record's JSON is split across several chunk rows.

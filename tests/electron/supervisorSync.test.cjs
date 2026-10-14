@@ -65,12 +65,41 @@ const save = async (machine, collection, record) => {
   return created;
 };
 
-test("UI-only improper reviews sync between PCs and survive imports and clearing generated drafts", async () => {
+test("Panel RMA records and manufacturers share between PCs, including existing records and offline edits", async () => {
   const cluster = await createCluster();
   try {
     const a = await cluster.addMachine();
     const b = await cluster.addMachine();
-    const {activeImproperRequests} = await import("../../src/features/autoDrafter/improperQuoteRequests.js");
+    await a.repository.createCollectionRecord("rmas", {
+      id: "legacy-rma", case_id: "00123", site_id: "100", panel_manufacturer: "Manufacturer",
+      panel_model: "P400", panel_quantity: 2, serial_numbers: "A\nB", current_status: "New"
+    });
+    await a.repository.createCollectionRecord("pvManufacturers", {id: "legacy-mfr", name: "Manufacturer"});
+    await a.sync.reconcile();
+    await b.sync.reconcile();
+    const shared = await b.repository.listCollection("rmas");
+    assert.equal(shared.length, 1);
+    assert.equal(shared[0].serial_numbers, "A\nB");
+    assert.equal((await b.repository.listCollection("pvManufacturers"))[0].name, "Manufacturer");
+    b.offline = true;
+    const updated = await b.repository.updateCollectionRecord("rmas", "legacy-rma", {manufacturer_rma_number: "M-123"});
+    await b.sync.recordSaved("rmas", updated);
+    assert.equal((await a.repository.listCollection("rmas"))[0].manufacturer_rma_number, undefined, "Offline edit has not reached another PC yet");
+    b.offline = false;
+    await b.sync.reconcile();
+    await a.sync.reconcile();
+    assert.equal((await a.repository.listCollection("rmas"))[0].manufacturer_rma_number, "M-123");
+    assert.equal((await a.repository.listCollection("supervisorReportTables")).length, 0, "RMA never writes report-table events");
+  } finally {
+    await cluster.cleanup();
+  }
+});
+
+test("retired improper review events still sync between PCs and survive imports and clearing generated drafts", async () => {
+  const cluster = await createCluster();
+  try {
+    const a = await cluster.addMachine();
+    const b = await cluster.addMachine();
     const review = (id, number) => ({
       id: `quote-request-review:${id}`, reportType: `quote-request-review:${id}`,
       kind: "quote_request_review", version: 1, action: "mark", caseNumber: number,
@@ -87,7 +116,6 @@ test("UI-only improper reviews sync between PCs and survive imports and clearing
     await a.sync.reconcile();
     let events = await a.repository.listCollection("supervisorReportTables");
     assert.equal(events.length, 2);
-    assert.equal(activeImproperRequests(events).get("00123").activeMarkIds.length, 2);
 
     await save(a, "supervisorReportTables", {id: "quoteRequestCases", reportType: "quoteRequestCases", rows: [{case: "00123"}]});
     await a.repository.deleteCollectionRecord("supervisorReportTables", "quoteRequestCases");
@@ -97,7 +125,6 @@ test("UI-only improper reviews sync between PCs and survive imports and clearing
     await b.sync.reconcile();
     events = await b.repository.listCollection("supervisorReportTables");
     assert.equal(events.length, 2);
-    assert.equal(activeImproperRequests(events).size, 1);
 
     await save(b, "supervisorReportTables", {
       ...review("undo", "00123"), action: "undo", markIds: [first.id, concurrent.id]
@@ -105,7 +132,6 @@ test("UI-only improper reviews sync between PCs and survive imports and clearing
     await a.sync.reconcile();
     events = await a.repository.listCollection("supervisorReportTables");
     assert.equal(events.length, 3);
-    assert.equal(activeImproperRequests(events).size, 0);
   } finally {
     await cluster.cleanup();
   }

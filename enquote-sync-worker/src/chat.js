@@ -7,6 +7,7 @@ import {CHAT_REACTIONS} from "../../shared/chatReactionRules.js";
 import {validAppLink} from "../../shared/appLinkRules.js";
 import {validCustomEmojiId, customEmojiIdFromReaction} from "../../shared/customEmojiRules.js";
 import {getCustomEmoji} from "./custom-emojis.js";
+import {inlineEmojiPreview} from "../../shared/inlineEmojiRules.js";
 
 function nowIso() { return new Date().toISOString(); }
 function invalidId(id) { return typeof id !== "string" || !id || id.length > 100; }
@@ -477,7 +478,7 @@ export async function handleChatMessageSend(request, env) {
     }), caseTask.recipient)
   ] : [];
   const emojiAttachment = attachments.find(item => ["custom_emoji", "builtin_emoji"].includes(item.type));
-  const preview = text ? text.slice(0, 200) : (emojiAttachment ? `:${emojiAttachment.name}:` : attachments.some(item => item.type === "image") ? "Screenshot" : attachments.some((item) => item.type === "gif") ? "GIF" : attachments.some(item => item.type === "app_link") ? "EnQuote link" : "");
+  const preview = text ? inlineEmojiPreview(text).slice(0, 200) : (emojiAttachment ? `:${emojiAttachment.name}:` : attachments.some(item => item.type === "image") ? "Screenshot" : attachments.some((item) => item.type === "gif") ? "GIF" : attachments.some(item => item.type === "app_link") ? "EnQuote link" : "");
   await env.DB.batch([
     env.DB.prepare(`INSERT INTO chat_messages (id, conversation_id, sender, body, attachments, created_at) VALUES (?, ?, ?, ?, ?, ?)
       ${caseTask ? "ON CONFLICT(id) DO NOTHING" : ""}`).bind(clientId, conversationId, user.email, text, JSON.stringify(storedAttachments), at),

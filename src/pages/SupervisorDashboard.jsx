@@ -9,6 +9,7 @@ import ImportReportDialog from "@/components/supervisor/ImportReportDialog";
 import DailyMetricsForm from "@/components/supervisor/DailyMetricsForm";
 import DailySnapshotReport from "@/components/supervisor/DailySnapshotReport";
 import DashboardOverview from "@/components/supervisor/DashboardOverview";
+import DataHygieneTabPanel from "@/components/supervisor/DataHygieneTabPanel";
 import NiceRawDataPanel from "@/components/supervisor/NiceRawDataPanel";
 import QuoteDashboard from "@/pages/QuoteDashboard";
 
@@ -31,7 +32,7 @@ import {BookMarked, FileSpreadsheet, Gauge, Grid3x3, HardDrive, Info, LineChart,
 const QUERY_KEY = ["supervisor-daily-metrics"];
 const TAB_VALUES = [
   "dashboard", "quote-dashboard", "nice-raw-data", "report-data", "escalations-tab",
-  "care-subscriptions-tab", "sfdc-quotes-tab", "snapshot-report", "reports"
+  "care-subscriptions-tab", "sfdc-quotes-tab", "snapshot-report", "reports", "data-hygiene"
 ];
 function SupervisorDashboardContent() {
   const queryClient = useQueryClient();
@@ -100,7 +101,7 @@ function SupervisorDashboardContent() {
       toast.error(result?.error || "Couldn't open that file - it may have moved or been renamed.");
     }
   }
-  if (isLoading && activeTab !== "quote-dashboard") {
+  if (isLoading && !["quote-dashboard", "data-hygiene"].includes(activeTab)) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-4 border-border border-t-indigo-600 rounded-full animate-spin" />
@@ -130,7 +131,7 @@ function SupervisorDashboardContent() {
           )}
         </div>
       </div>
-      {metricsError && activeTab !== "quote-dashboard" && (
+      {metricsError && !["quote-dashboard", "data-hygiene"].includes(activeTab) && (
         <Card className="border-destructive/50">
           <CardContent className="p-4 space-y-2" role="alert">
             <p className="font-medium text-destructive">Could not load Supervisor daily metrics.</p>
@@ -166,6 +167,7 @@ function SupervisorDashboardContent() {
         <TabsList className="h-auto flex-wrap justify-start gap-1">
           <TabsTrigger value="dashboard" className="flex items-center gap-1.5"><Gauge className="w-4 h-4" /> Executive Overview</TabsTrigger>
           <TabsTrigger value="quote-dashboard" className="flex items-center gap-1.5"><LineChart className="w-4 h-4" /> Quote Dashboard</TabsTrigger>
+          <TabsTrigger value="data-hygiene" className="flex items-center gap-1.5"><Info className="w-4 h-4" /> Data Hygiene</TabsTrigger>
           <TabsTrigger value="nice-raw-data" className="flex items-center gap-1.5"><Grid3x3 className="w-4 h-4" /> NICE Raw Data</TabsTrigger>
 
           <TabsTrigger value="report-data" className="flex items-center gap-1.5"><Table2 className="w-4 h-4" /> Report Data</TabsTrigger>
@@ -186,6 +188,9 @@ function SupervisorDashboardContent() {
         </TabsContent>
         <TabsContent value="quote-dashboard" className="mt-4">
           <QuoteDashboard embedded />
+        </TabsContent>
+        <TabsContent value="data-hygiene" className="mt-4">
+          <DataHygieneTabPanel />
         </TabsContent>
         <TabsContent value="nice-raw-data" className="mt-4">
           <NiceRawDataPanel />
@@ -208,6 +213,7 @@ function SupervisorDashboardContent() {
             records={records}
             selectedDate={selectedDate}
             completedStatuses={completedStatuses}
+            onSelectedDateChange={setSelectedDate}
             summaryText={summaryDraftsByDate[selectedDate]}
             onSummaryTextChange={(text) => setSummaryDraftsByDate(prev => ({ ...prev, [selectedDate]: text }))}
           />

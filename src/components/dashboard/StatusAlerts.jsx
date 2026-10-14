@@ -13,11 +13,13 @@ import {Button} from "@/components/ui/button";
 import {AlertCircle, CheckCheck, ChevronDown, ChevronUp, Clock, Loader2, MessageSquarePlus, X} from "lucide-react";
 import LogFollowUpDialog from "@/components/quotes/LogFollowUpDialog";
 import {SiteIdLink} from "@/components/links/ExternalIdLinks";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 
 export default function StatusAlerts({ quotes, preselected = false }) {
   const queryClient = useQueryClient();
   const [collapsed, setCollapsed] = useState(false);
   const [logQuote, setLogQuote] = useState(null);
+  const [sort, setSort] = useState("original");
 
   // "Clear All" is restricted to specific authorized users only.
   const ALLOWED_CLEAR_ALL_EMAILS = [
@@ -79,7 +81,9 @@ export default function StatusAlerts({ quotes, preselected = false }) {
   });
 
   const alerts = (preselected ? quotes : selectQuoteAlerts(quotes, dismissals, mentions, currentUser?.email, isAdmin))
-    .map(quote => ({quote, status: quote.status, alert: computeQuoteAlert(quote)}));
+    .map(quote => ({quote, status: quote.status, alert: computeQuoteAlert(quote)}))
+    .sort((a, b) => sort === "original" ? 0 : (sort === "overdue_desc" ? -1 : 1) *
+      ((a.alert?.overdueHours || 0) - (b.alert?.overdueHours || 0)));
 
   if (dismissalsLoading) return null;
   if (dismissalsError) return <p role="alert">Could not load alert dismissals: {dismissalsError.message}</p>;
@@ -100,11 +104,19 @@ export default function StatusAlerts({ quotes, preselected = false }) {
       <div className="flex items-start gap-3">
         <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
         <div className="flex-1">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
             <h3 className="text-sm font-semibold text-amber-900">
               Attention Required: {alerts.length} quote{alerts.length > 1 ? "s" : ""} need attention
             </h3>
             <div className="flex items-center gap-2">
+              <Select value={sort} onValueChange={setSort}>
+                <SelectTrigger aria-label="Sort attention alerts" className="h-7 w-44 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="original">Original order</SelectItem>
+                  <SelectItem value="overdue_desc">Most overdue first</SelectItem>
+                  <SelectItem value="overdue_asc">Least overdue first</SelectItem>
+                </SelectContent>
+              </Select>
               {!collapsed && canClearAll && (
                 <Button
                   size="sm"

@@ -1,4 +1,4 @@
-function splitInlineEmojis(body) {
+export function splitInlineEmojis(body) {
   const parts = [];
   const pattern = /<:([a-z0-9][a-z0-9_-]{0,31}):([a-f0-9]{64})>/g;
   let start = 0;
@@ -11,8 +11,6 @@ function splitInlineEmojis(body) {
   return parts;
 }
 
-function inlineEmojiPreview(body) {
+export function inlineEmojiPreview(body) {
   return splitInlineEmojis(body).map(part => part.id ? `:${part.name}:` : part.text).join("");
 }
-
-module.exports = {splitInlineEmojis, inlineEmojiPreview};

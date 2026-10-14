@@ -148,8 +148,8 @@ export const localAdapter = {
     }
     return results;
   },
-  updateLocalRecord: (name, recordId, data) =>
-    bridge().collections.update(name, recordId, data),
+  updateLocalRecord: (name, recordId, data, options) =>
+    options === undefined ? bridge().collections.update(name, recordId, data) : bridge().collections.update(name, recordId, data, options),
   // Shared FST roster: seeds from the bundled roster and syncs with other installs.
   syncFstRoster: () => bridge().fsts.sync(),
   importFstRoster: (rows) => bridge().fsts.importRows(rows),

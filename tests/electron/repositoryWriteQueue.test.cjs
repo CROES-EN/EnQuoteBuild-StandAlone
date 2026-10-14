@@ -14,6 +14,43 @@ async function withUserData(run) {
   }
 }
 
+test("Panel RMA stale-edit and duplicate-case guards run inside the atomic write queue", async () => {
+  await withUserData(async directory => {
+    const repository = repositoryFor(directory);
+    await repository.list();
+    const first = await repository.createCollectionRecord("rmas", {id:"rma-1",case_id:"123",updated_date:"2026-01-01T00:00:00.000Z"});
+    await repository.createCollectionRecord("rmas", {id:"rma-2",case_id:"456"});
+    const results = await Promise.allSettled([
+      repository.updateCollectionRecord("rmas", first.id, {panel_model:"P400"}, {expectedUpdatedDate:first.updated_date}),
+      repository.updateCollectionRecord("rmas", first.id, {panel_model:"P500"}, {expectedUpdatedDate:first.updated_date})
+    ]);
+    assert.equal(results[0].status, "fulfilled");
+    assert.equal(results[1].status, "rejected");
+    assert.match(results[1].reason.message, /changed while you were editing/);
+    await assert.rejects(repository.updateCollectionRecord("rmas", first.id, {case_id:"456"}), /already has/);
+    assert.equal((await repository.listCollection("rmas")).find(record => record.id === first.id).panel_model, "P400");
+  });
+});
+
+test("automatic drafts atomically preserve existing case drafts and ignore retired improper marks", async () => {
+  await withUserData(async directory => {
+    const repository = repositoryFor(directory);
+    await repository.list();
+    const results = await Promise.allSettled([
+      repository.createCollectionRecord("autoDrafterGeneratedDrafts", {id:"draft-1",caseNumber:" CASE-1 ",draft:{edited:true}}),
+      repository.createCollectionRecord("autoDrafterGeneratedDrafts", {id:"draft-2",caseNumber:"case-1",draft:{edited:false}})
+    ]);
+    assert.equal(results[0].status, "fulfilled");
+    assert.equal(results[1].status, "rejected");
+    assert.match(results[1].reason.message, /already has a saved/);
+    assert.equal((await repository.listCollection("autoDrafterGeneratedDrafts")).length, 1);
+    assert.equal((await repository.listCollection("autoDrafterGeneratedDrafts"))[0].draft.edited, true);
+    await repository.createCollectionRecord("supervisorReportTables", {id:"mark-2",kind:"quote_request_review",action:"mark",caseNumber:"case-2"});
+    await repository.createCollectionRecord("autoDrafterGeneratedDrafts", {id:"draft-3",caseNumber:"case-2"});
+    assert.equal((await repository.listCollection("autoDrafterGeneratedDrafts")).length, 2);
+  });
+});
+
 function withTimeout(promise, label) {
   let timer;
   return Promise.race([

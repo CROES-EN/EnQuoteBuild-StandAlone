@@ -9,13 +9,15 @@ import {toast} from "sonner";
 import StatusBadge from "@/components/quotes/StatusBadge";
 import {calculateQuoteTotals} from "@/utils/quoteCalculations";
 import {parseQuoteRequestCase} from "@/features/autoDrafter/parseQuoteRequestCase";
+import {prepareAutomaticDraft} from "@/features/autoDrafter/automaticDraftGeneration";
 import {generateQuoteDraft} from "@/features/quoteDraftAgent/draftEngine";
+import {loadLearnedSwaps} from "@/features/quoteDraftAgent/learnedSwapsStore";
 import {saveGeneratedDraft} from "@/features/autoDrafter/autoDrafterDraftsStore";
-import {listQuoteRequestReviews} from "@/features/supervisorDashboard/importedTableStore";
-import {assertRequestCanBeDrafted} from "@/features/autoDrafter/improperQuoteRequests";
 import {useCareEligibilityIndex} from "@/features/supervisorDashboard/careEligibilityCache";
 import {getEligibilityFromIndex} from "@/features/supervisorDashboard/careEligibility";
 import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
+import RequestReviewSummary from "@/components/autoDrafter/RequestReviewSummary";
+import {getRequestRoutingFlags} from "@/features/autoDrafter/requestRoutingFlags";
 
 /**
  * AutoDrafterCaseTile - a quote-page-style tile for a single raw Salesforce case row,
@@ -30,13 +32,7 @@ import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
  * in as the SAME best-effort-detected column names already computed in AutoDrafter.jsx
  * via findColumn() - this component does not re-detect columns itself.
  *
- * The single free-text case comment field (commentCol) contains several labeled
- * sub-fields run together (e.g. "...Customer Name: Jane Doe Site Address: 123 Main St...").
- * extractField() below does a best-effort, label-bounded regex pull for a handful of the
- * most useful ones. This is intentionally forgiving: if a label is missing or the export's
- * phrasing shifts slightly, the field just comes back empty and the tile falls back to
- * showing a plain truncated snippet of the raw comment - it never throws and never invents
- * a value that wasn't in the text.
+ * Uses the same comment parser as automatic drafting for tile fields.
  *
  * TWO RENDER MODES:
  *   1. No generated draft saved yet for this case -> the original raw-case view below,
@@ -44,7 +40,7 @@ import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
  *   2. A generated draft IS saved for this case -> renders a tile that looks EXACTLY like
  *      a real QuoteCard.jsx, using the "ai_generated_quote_needs_review" status. Clicking
  *      it calls the `onViewDraft` prop (handled by the parent AutoDrafter.jsx), which
- *      opens a full-page, read-only AutoDrafterDraftDetails view INSIDE the Auto-Drafter
+ *      opens a full-page AutoDrafterDraftDetails view INSIDE the Auto-Drafter
  *      page itself - not a popup dialog, and not a real page navigation, because no real
  *      Quote record is ever created here. Sending a draft to the real Quotes tab is a
  *      deliberate, separate, MANUAL step this component does not perform.
@@ -58,30 +54,6 @@ import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
  * down as the `savedDraftRecord` prop, fetched EXACTLY ONCE by the parent
  * (AutoDrafter.jsx) - this component itself no longer performs any collection reads.
  */
-const FIELD_LABELS = [
-  "Quote Category",
-  "Customer Name",
-  "Site Address",
-  "Root Cause",
-  "Scope Description",
-  "Item Name"
-];
-
-function escapeRegex(str) {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function extractField(text, label) {
-  if (!text) return "";
-  const otherLabels = FIELD_LABELS.filter((l) => l !== label).map(escapeRegex).join("|");
-  const pattern = new RegExp(
-    `${escapeRegex(label)}:\\s*(.*?)(?=\\s*(?:${otherLabels})\\s*:|$)`,
-    "i"
-  );
-  const match = text.match(pattern);
-  return match ? match[1].trim().replace(/\s{2,}/g, " ") : "";
-}
-
 function truncate(text, max = 110) {
   if (!text) return "";
   return text.length > max ? `${text.slice(0, max).trim()}…` : text;
@@ -107,14 +79,21 @@ export default ({
                   savedDraftRecord = null,
                   onDraftSaved,
                   onViewDraft,
-                  onMarkImproper
+                  golden = null,
+                  onPanelRma,
+                  panelRma,
+                  classification,
+                  hygiene,
+                  automaticDrafting = false,
+                  careEligibility
                 }) => {
   const comment = commentCol ? row[commentCol] || "" : "";
 
-  const quoteCategory = extractField(comment, "Quote Category");
-  const customerName = extractField(comment, "Customer Name");
-  const siteAddress = extractField(comment, "Site Address");
-  const scopeDescription = extractField(comment, "Scope Description");
+  const {request: parsedRequest} = parseQuoteRequestCase(comment);
+  const quoteCategory = parsedRequest.quoteCategory;
+  const customerName = parsedRequest.customer;
+  const siteAddress = parsedRequest.siteAddress;
+  const scopeDescription = parsedRequest.scopeDescription;
 
   const caseNumber = caseNumberCol ? row[caseNumberCol] : null;
   const siteId = siteIdCol ? row[siteIdCol] : null;
@@ -124,9 +103,9 @@ export default ({
   const hasParsedFields = Boolean(siteAddress || scopeDescription);
 
   const careIndex = useCareEligibilityIndex();
-  const rawCaseCareEligibility = careIndex ? getEligibilityFromIndex(siteId, careIndex) : null;
+  const rawCaseCareEligibility = careEligibility !== undefined ? careEligibility : careIndex ? getEligibilityFromIndex(siteId, careIndex) : null;
   const hasActiveCareRaw = rawCaseCareEligibility?.status === "ACTIVE_CARE";
-  const savedDraftCareEligibility = careIndex && savedDraftRecord ? getEligibilityFromIndex(savedDraftRecord.siteId, careIndex) : null;
+  const savedDraftCareEligibility = careEligibility !== undefined ? careEligibility : careIndex && savedDraftRecord ? getEligibilityFromIndex(savedDraftRecord.siteId, careIndex) : null;
   const hasActiveCareSavedDraft = savedDraftCareEligibility?.status === "ACTIVE_CARE";
 
   const [isGenerating, setIsGenerating] = useState(false);
@@ -134,14 +113,17 @@ export default ({
   async function handleGenerateDraft() {
     setIsGenerating(true);
     try {
-      assertRequestCanBeDrafted(await listQuoteRequestReviews(), caseNumber);
-      const { request, parseWarnings } = parseQuoteRequestCase(comment);
+      const prepared = prepareAutomaticDraft({caseNumber, siteId, comment});
+      if (prepared.skip) throw new Error(prepared.skip);
+      const {request, parseWarnings} = prepared;
+      await loadLearnedSwaps();
       const draft = generateQuoteDraft(request);
       const record = {
         siteId: siteId || draft.site_id || "",
         quoteNumber: generateDraftReferenceNumber(),
         status: "ai_generated_quote_needs_review",
         draft,
+        sourceComment: comment,
         parseWarnings,
         generatedAt: new Date().toISOString()
       };
@@ -175,11 +157,12 @@ export default ({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: index * 0.03 }}
+        className="flex h-full flex-col"
       >
         <div
           role="button"
           tabIndex={0}
-          className="block w-full text-left"
+          className="flex w-full flex-1 flex-col text-left"
           onClick={() => onViewDraft?.()}
           onKeyDown={(event) => {
             if (event.key === "Enter" || event.key === " ") {
@@ -191,7 +174,11 @@ export default ({
           <Card data-enquote-share-target={caseNumber ? `auto-drafter-case:${caseNumber}` : undefined}
             data-enquote-share-label={`Auto-Drafter quote ${displayReference || caseNumber}`}
             data-enquote-share-route={`/AutoDrafter?shareCase=${encodeURIComponent(caseNumber || "")}`}
-            className="p-5 hover:shadow-lg transition-all duration-300 border-border hover:border-indigo-200 group cursor-pointer h-full flex flex-col">
+            className={`p-5 hover:shadow-lg transition-all duration-300 border-border hover:border-indigo-200 group cursor-pointer flex-1 min-h-[252px] flex flex-col ${golden?.golden ? "golden-quote-card" : ""}`}>
+            {golden?.golden && <div className="mb-3 flex items-center gap-2">
+              <Badge className="golden-quote-badge gap-1"><Sparkles className="w-3.5 h-3.5" /> Golden Quote</Badge>
+              <span className="text-xs text-muted-foreground">SOP followed perfectly</span>
+            </div>}
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center group-hover:bg-indigo-100 transition-colors shrink-0">
@@ -205,11 +192,14 @@ export default ({
                 </div>
               </div>
               <div className="flex flex-col items-end gap-1 shrink-0">
-                <StatusBadge status={isSent ? "draft_without_internal" : "ai_generated_quote_needs_review"} size="small" />
+                <StatusBadge status={isSent ? (golden?.status || "draft_without_internal") : "ai_generated_quote_needs_review"} size="small" />
               </div>
             </div>
 
             <div className="space-y-2 text-sm flex-1">
+              <RequestReviewSummary compact classification={classification} hygiene={hygiene}
+                routingFlags={getRequestRoutingFlags(comment, savedDraftCareEligibility)}
+                sourceWarnings={savedDraftRecord.parseWarnings || []} />
               {/* CARE_SHIELD_ABOVE_TOTAL: positioned directly above the divider line and the
                   dollar total below it, right-aligned so it sits visually right above the $
                   figure - per explicit request, moved here from next to the Site ID title. */}
@@ -242,7 +232,8 @@ export default ({
             </div>
           </Card>
         </div>
-        {onMarkImproper && <Button variant="outline" size="sm" className="mt-2 w-full" disabled={!String(caseNumber ?? "").trim()} onClick={onMarkImproper}>Mark Improper Request</Button>}
+        {onPanelRma && <Button variant="outline" size="sm" className="mt-2 w-full" disabled={!String(caseNumber ?? "").trim()} onClick={onPanelRma}>
+          {panelRma ? `Panel RMA: ${panelRma.current_status}` : "Submit Panel RMA"}</Button>}
       </motion.div>
     );
   }
@@ -253,11 +244,12 @@ export default ({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.03 }}
+      className="flex h-full flex-col"
     >
       <Card data-enquote-share-target={caseNumber ? `auto-drafter-case:${caseNumber}` : undefined}
         data-enquote-share-label={`Auto-Drafter case ${caseNumber}`}
         data-enquote-share-route={`/AutoDrafter?shareCase=${encodeURIComponent(caseNumber || "")}`}
-        className="p-5 hover:shadow-lg transition-all duration-300 border-border hover:border-violet-200 group h-full flex flex-col">
+        className="p-5 hover:shadow-lg transition-all duration-300 border-border hover:border-violet-200 group flex-1 min-h-[252px] flex flex-col">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-violet-50 flex items-center justify-center group-hover:bg-violet-100 transition-colors shrink-0">
@@ -290,23 +282,25 @@ export default ({
         </div>
 
         <div className="space-y-2 text-sm flex-1">
+          <RequestReviewSummary compact classification={classification} hygiene={hygiene}
+            routingFlags={getRequestRoutingFlags(comment, rawCaseCareEligibility)} />
           {hasParsedFields ? (
             <>
               {siteAddress && (
                 <div className="flex items-start gap-2 text-muted-foreground">
                   <MapPin className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span>{truncate(siteAddress, 80)}</span>
+                  <span className="line-clamp-1" title={siteAddress}>{truncate(siteAddress, 80)}</span>
                 </div>
               )}
               {scopeDescription && (
                 <div className="flex items-start gap-2 text-muted-foreground">
                   <ClipboardList className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span>{truncate(scopeDescription, 110)}</span>
+                  <span className="line-clamp-2" title={scopeDescription}>{truncate(scopeDescription, 110)}</span>
                 </div>
               )}
             </>
           ) : comment ? (
-            <p className="text-muted-foreground">{truncate(comment, 160)}</p>
+            <p className="text-muted-foreground line-clamp-2" title={comment}>{truncate(comment, 160)}</p>
           ) : (
             <p className="text-muted-foreground italic">No case comment text found.</p>
           )}
@@ -322,7 +316,7 @@ export default ({
           )}
         </div>
 
-        <div className="mt-3">
+        {!automaticDrafting && <div className="mt-3">
           <Button
             size="sm"
             variant="outline"
@@ -337,9 +331,10 @@ export default ({
             )}
             Generate Draft
           </Button>
-          {onMarkImproper && <Button size="sm" variant="outline" className="mt-2 w-full" disabled={isGenerating || !String(caseNumber ?? "").trim()} onClick={onMarkImproper}>Mark Improper Request</Button>}
-        </div>
+        </div>}
       </Card>
+      {onPanelRma && <Button size="sm" variant="outline" className="mt-2 w-full" disabled={isGenerating || !String(caseNumber ?? "").trim()} onClick={onPanelRma}>
+        {panelRma ? `Panel RMA: ${panelRma.current_status}` : "Submit Panel RMA"}</Button>}
     </motion.div>
   );
 }

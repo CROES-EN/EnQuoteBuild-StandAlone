@@ -48,7 +48,7 @@ const updateSchema = z.object({ id: z.string().min(1), changes: z.record(z.unkno
 // "supervisorDailyMetrics" backs the Supervisor Dashboard (Calls/AHT, Emails Worked,
 // Quotes Drafted, Staffing). That dashboard is intentionally independent of Base44, so
 // this collection has no Base44 entity counterpart - it is only ever read/written locally.
-const collectionNames = ["reviews", "activities", "followUps", "users", "siteFlags", "deletionRequests", "materialOrders", "rmas", "svCancels", "supportInteractions", "pdfTemplates", "priceReviews", "followUpConfigs", "pvManufacturers", "supervisorDailyMetrics", "supervisorReportTables", "autoImportSettings", "statusAlertDismissals", "quoteAlerts", "appErrorLog", "appNotifications", "autoDrafterGeneratedDrafts", "fsts"];
+const collectionNames = ["reviews", "activities", "followUps", "users", "siteFlags", "deletionRequests", "materialOrders", "rmas", "svCancels", "supportInteractions", "pdfTemplates", "priceReviews", "followUpConfigs", "pvManufacturers", "supervisorDailyMetrics", "supervisorReportTables", "autoImportSettings", "statusAlertDismissals", "quoteAlerts", "appErrorLog", "appNotifications", "autoDrafterGeneratedDrafts", "fsts", "autoDrafterLearnedSwaps", "quoteRequestHygieneDaily", "autoDrafterCustomProducts"];
 const collectionDefaults = {
   reviews: [],
   activities: [],
@@ -1043,6 +1043,12 @@ function repositoryFor(userDataPath) {
         // SAME change as collectionNames above, per this file's own documented history of a
         // silent-data-wipe bug when a collection is added to collectionNames but not here.
         fsts: z.array(z.record(z.unknown())).optional(),
+        // autoDrafterLearnedSwaps: reviewer-taught line-item swaps (learnedSwapsStore.js).
+        autoDrafterLearnedSwaps: z.array(z.record(z.unknown())).optional(),
+        // quoteRequestHygieneDaily: one Data Hygiene summary per report date (hygieneHistoryStore.js).
+        quoteRequestHygieneDaily: z.array(z.record(z.unknown())).optional(),
+        // autoDrafterCustomProducts: reviewer-added catalog products (customProductsStore.js).
+        autoDrafterCustomProducts: z.array(z.record(z.unknown())).optional(),
         userCredentials: z.record(z.unknown()).optional(),
         outboundQueue: z.array(z.record(z.unknown())).optional(),
         outboundDeleteQueue: z.array(z.record(z.unknown())).optional(),
@@ -1256,6 +1262,17 @@ function repositoryFor(userDataPath) {
       if (!collectionNames.includes(name)) throw new Error(`Unsupported local collection: ${name}`);
       return serializedWrite(async () => {
         const data = await read();
+        if (name === "autoDrafterGeneratedDrafts") {
+          const caseNumber = String(record.caseNumber || record.id || "").trim().toLowerCase();
+          if (!caseNumber) throw new Error("A case number is required for an Auto-Drafter quote.");
+          if (data[name].some(item => String(item.caseNumber || item.id || "").trim().toLowerCase() === caseNumber)) {
+            throw new Error("This case already has a saved Auto-Drafter quote.");
+          }
+        }
+        if (name === "rmas" && data.rmas.some(item =>
+          String(item.case_id || "").trim().toLowerCase() === String(record.case_id || "").trim().toLowerCase())) {
+          throw new Error("This case already has a Panel RMA. Open its tracker entry instead of creating a duplicate.");
+        }
         const now = new Date().toISOString();
         const item = {
           created_date: now,
@@ -1393,12 +1410,20 @@ function repositoryFor(userDataPath) {
       await write(data);
       return { updated };
     },
-    async updateCollectionRecord(name, id, changes) {
+    async updateCollectionRecord(name, id, changes, options) {
       if (!collectionNames.includes(name)) throw new Error(`Unsupported local collection: ${name}`);
       return serializedWrite(async () => {
         const data = await read();
         const index = data[name].findIndex(item => item.id === id);
         if (index < 0) throw new Error(`${name} record not found.`);
+        if (name === "rmas" && options && Object.hasOwn(options, "expectedUpdatedDate") &&
+            data[name][index].updated_date !== options.expectedUpdatedDate) {
+          throw new Error("This RMA changed while you were editing. Reopen it before saving.");
+        }
+        if (name === "rmas" && Object.hasOwn(changes, "case_id") && data.rmas.some(item =>
+          item.id !== id && String(item.case_id || "").trim().toLowerCase() === String(changes.case_id || "").trim().toLowerCase())) {
+          throw new Error("This case already has a Panel RMA. Open its tracker entry instead of creating a duplicate.");
+        }
         data[name][index] = {
           ...data[name][index],
           updated_date: new Date().toISOString(),

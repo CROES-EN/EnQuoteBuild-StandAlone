@@ -1,7 +1,8 @@
 import React from "react";
 import {Card} from "@/components/ui/card";
 import {format} from "date-fns";
-import {Calendar, FileText, ShieldCheck, User} from "lucide-react";
+import {Calendar, FileText, ShieldCheck, Sparkles, User} from "lucide-react";
+import {Badge} from "@/components/ui/badge";
 import {useNavigate} from "react-router-dom";
 import {createPageUrl} from "@/utils";
 import {calculateQuoteTotals} from "@/utils/quoteCalculations";
@@ -14,7 +15,7 @@ import {useCareEligibilityIndex} from "@/features/supervisorDashboard/careEligib
 import {getEligibilityFromIndex} from "@/features/supervisorDashboard/careEligibility";
 import {SiteIdLink} from "@/components/links/ExternalIdLinks";
 
-export default function QuoteCard({ quote, index = 0, selectable = false, isSelected = false, onToggleSelect, alert = null, hasMention = false, mentionPriority, mentionMessage, mentionedBy, onClearAlert }) {
+export default function QuoteCard({ quote, index = 0, selectable = false, isSelected = false, onToggleSelect, alert = null, hasMention = false, mentionPriority, mentionMessage, mentionedBy, onClearAlert, golden = false }) {
   const navigate = useNavigate();
   const { total: calculatedTotal } = calculateQuoteTotals(quote);
   const effectiveLevel = getEffectiveLevel(alert, hasMention, mentionPriority);
@@ -46,8 +47,10 @@ export default function QuoteCard({ quote, index = 0, selectable = false, isSele
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05 }}
+      className="h-full"
     >
       <div
+        className="h-full"
         role={selectable ? "checkbox" : "link"}
         data-enquote-share-target={`quote:${quote.id}`}
         data-enquote-share-route={createPageUrl(`QuoteDetails?id=${encodeURIComponent(quote.id)}${quote.quote_number ? `&quoteNumber=${encodeURIComponent(quote.quote_number)}` : ""}`)}
@@ -64,7 +67,11 @@ export default function QuoteCard({ quote, index = 0, selectable = false, isSele
           }
         }}
       >
-        <Card className={`p-5 hover:shadow-lg transition-all duration-300 border-border hover:border-indigo-200 group cursor-pointer ${stripeClass} ${isSelected ? "ring-2 ring-indigo-400 border-indigo-400" : ""}`}>
+        <Card className={`h-full flex flex-col p-5 hover:shadow-lg transition-all duration-300 border-border hover:border-indigo-200 group cursor-pointer ${stripeClass} ${isSelected ? "ring-2 ring-indigo-400 border-indigo-400" : ""} ${golden ? "golden-quote-card" : ""}`}>
+          {golden && <div className="mb-3 flex items-center gap-2">
+            <Badge className="golden-quote-badge gap-1"><Sparkles className="w-3.5 h-3.5" /> Golden Quote</Badge>
+            <span className="text-xs text-muted-foreground">SOP followed perfectly</span>
+          </div>}
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-3">
               {selectable && (
@@ -102,7 +109,7 @@ export default function QuoteCard({ quote, index = 0, selectable = false, isSele
             </div>
           </div>
           
-          <div className="space-y-2 text-sm">
+          <div className="space-y-2 text-sm flex-1">
             {/* CARE_SHIELD_ABOVE_TOTAL: positioned directly above the divider line and the
                 dollar total below it, right-aligned so it sits visually right above the $
                 figure - per explicit request, moved here from next to the Site ID title. */}

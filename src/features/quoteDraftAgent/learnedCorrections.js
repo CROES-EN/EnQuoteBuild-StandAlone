@@ -25,13 +25,26 @@ export const LEARNED_CORRECTIONS = {
 
 // Normalizes a phrase the same way every key above is normalized, so lookups are
 // consistent regardless of casing/spacing in the actual requested text.
-function normalizeForLookup(text) {
+export function normalizeForLookup(text) {
   return String(text || "").toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+// Reviewer-taught swaps saved from Auto-Drafter (learnedSwapsStore.js); these win over the static list.
+let runtimeCorrections = new Map();
+
+export function setRuntimeLearnedCorrections(records = []) {
+  runtimeCorrections = new Map(records
+    .filter(record => record && !record.is_deleted && record.phrase && record.catalogName)
+    .map(record => [normalizeForLookup(record.phrase), record.catalogName]));
 }
 
 // Returns the corrected catalog item NAME (a string) if this exact requested phrase
 // has a known correction, or null if there is no entry for it.
 export function findLearnedCorrection(requestedName) {
   const key = normalizeForLookup(requestedName);
-  return LEARNED_CORRECTIONS[key] || null;
+  return runtimeCorrections.get(key) || LEARNED_CORRECTIONS[key] || null;
+}
+
+export function isReviewerLearnedCorrection(requestedName) {
+  return runtimeCorrections.has(normalizeForLookup(requestedName));
 }

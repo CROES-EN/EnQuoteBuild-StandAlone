@@ -51,6 +51,8 @@ async function runSopSections(win) {
     return evaluate("window.enquoteLocal.sops.list()");
   }
 
+  // Panel RMA fixtures (backlog-rma) are legacy category pages that would add a third section.
+  await evaluate(`window.enquoteLocal.sops.list().then((docs) => { window.__smokeSopDocs = docs.filter((doc) => doc.category !== "Panel-Module RMA"); return true; })`);
   await evaluate(`location.hash = "#/SOPLibrary"; true`);
   await sleep(700);
   await evaluate(`window.prompt = () => { throw new Error("Native prompts must not be used"); }; true`);

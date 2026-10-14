@@ -7,6 +7,7 @@ import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/c
 import {RMA_STATUSES} from "@/components/rma/rmaUtils";
 import {format} from "date-fns";
 import {History, Plus, X} from "lucide-react";
+import RmaSopAssistant from "./RmaSopAssistant";
 
 export default function RMAForm({ rma, users, manufacturers, defaultOwner, onSave, onCancel, isLoading }) {
   const [formData, setFormData] = useState({
@@ -14,12 +15,28 @@ export default function RMAForm({ rma, users, manufacturers, defaultOwner, onSav
     site_id: rma?.site_id || "",
     case_id: rma?.case_id || "",
     panel_manufacturer: rma?.panel_manufacturer || "",
+    panel_model: rma?.panel_model || "",
+    panel_quantity: rma?.panel_quantity ?? "",
+    serial_numbers: rma?.serial_numbers || "",
+    manufacturer_rma_number: rma?.manufacturer_rma_number || "",
     current_status: rma?.current_status || "New",
     rma_url: rma?.rma_url || "",
-    notes: rma?.notes || ""
+    notes: rma?.notes || "",
+    submission_preparation: rma?.submission_preparation || {}
   });
   const [showNewMfr, setShowNewMfr] = useState(false);
   const [newMfr, setNewMfr] = useState("");
+  const [step, setStep] = useState(0);
+  const [configSaving, setConfigSaving] = useState(false);
+  const steps = ["Manufacturer & case", "Panel details", "Forms & evidence", "Review & save"];
+  function next() {
+    if (step === 0 && (!formData.case_id.trim() || !formData.site_id.trim() || !formData.panel_manufacturer.trim())) {
+      document.getElementById("rma-case")?.closest("form")?.reportValidity();
+      return;
+    }
+    if (step === 1 && !document.getElementById("rma-quantity")?.reportValidity()) return;
+    setStep(value => Math.min(value + 1, 3));
+  }
 
   const handleChange = (field, value) => setFormData(prev => ({ ...prev, [field]: value }));
 
@@ -33,11 +50,17 @@ export default function RMAForm({ rma, users, manufacturers, defaultOwner, onSav
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (isLoading) return;
+    if (step !== 3) {next(); return;}
     onSave(formData);
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
+      <fieldset disabled={isLoading || configSaving} className="space-y-5">
+      <p role="status" className="font-semibold">Step {step + 1} of 4: {steps[step]}</p>
+      <p className="text-xs text-muted-foreground">Your entries stay in this wizard while manufacturer forms are open. Save at the final step to keep them in the shared tracker.</p>
+      <div hidden={step !== 0} className="space-y-5">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <Label>Case Owner</Label>
@@ -53,22 +76,22 @@ export default function RMAForm({ rma, users, manufacturers, defaultOwner, onSav
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label>Site ID *</Label>
-          <Input value={formData.site_id} onChange={e => handleChange("site_id", e.target.value)} required />
+          <Label htmlFor="rma-site">Site ID *</Label>
+          <Input id="rma-site" value={formData.site_id} onChange={e => handleChange("site_id", e.target.value)} required />
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <Label>Case ID *</Label>
-          <Input value={formData.case_id} onChange={e => handleChange("case_id", e.target.value)} required />
+          <Label htmlFor="rma-case">Case ID *</Label>
+          <Input id="rma-case" value={formData.case_id} onChange={e => handleChange("case_id", e.target.value)} required />
         </div>
         <div className="space-y-1.5">
           <Label>Panel Manufacturer *</Label>
           {!showNewMfr ? (
             <div className="flex gap-2">
               <Select value={formData.panel_manufacturer} onValueChange={v => handleChange("panel_manufacturer", v)}>
-                <SelectTrigger><SelectValue placeholder="Select manufacturer" /></SelectTrigger>
+                <SelectTrigger aria-label="Panel Manufacturer"><SelectValue placeholder="Select manufacturer" /></SelectTrigger>
                 <SelectContent>
                   {manufacturers.map(m => (
                     <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>
@@ -85,6 +108,7 @@ export default function RMAForm({ rma, users, manufacturers, defaultOwner, onSav
                 value={newMfr}
                 onChange={e => setNewMfr(e.target.value)}
                 placeholder="Enter manufacturer name"
+                aria-label="New manufacturer name"
                 autoFocus
               />
               <Button type="button" size="sm" onClick={handleAddManufacturer}>Add</Button>
@@ -96,6 +120,22 @@ export default function RMAForm({ rma, users, manufacturers, defaultOwner, onSav
         </div>
       </div>
 
+      </div>
+      <div hidden={step !== 1} className="space-y-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-1.5"><Label htmlFor="rma-model">Panel Model</Label>
+          <Input id="rma-model" value={formData.panel_model} onChange={e => handleChange("panel_model", e.target.value)} /></div>
+        <div className="space-y-1.5"><Label htmlFor="rma-quantity">Panel Quantity</Label>
+          <Input id="rma-quantity" type="number" min={1} max={10000} step={1} value={formData.panel_quantity}
+            onChange={e => handleChange("panel_quantity", e.target.value)} /></div>
+        <div className="space-y-1.5"><Label htmlFor="rma-number">Manufacturer RMA Number</Label>
+          <Input id="rma-number" value={formData.manufacturer_rma_number} onChange={e => handleChange("manufacturer_rma_number", e.target.value)} /></div>
+        <div className="space-y-1.5"><Label htmlFor="rma-serials">Serial Numbers</Label>
+          <Textarea id="rma-serials" rows={3} value={formData.serial_numbers} onChange={e => handleChange("serial_numbers", e.target.value)}
+            placeholder="One panel serial number per line" /></div>
+      </div>
+      </div>
+      <div hidden={step !== 3} className="space-y-5">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <Label>Current Status</Label>
@@ -128,8 +168,21 @@ export default function RMAForm({ rma, users, manufacturers, defaultOwner, onSav
           placeholder="Add notes, ongoing updates, and details about this RMA..."
         />
       </div>
+      </div>
 
-      {rma?.status_history?.length > 0 && (
+      <div hidden={step !== 2}>
+      <RmaSopAssistant data={formData} preparation={formData.submission_preparation}
+        onChange={value => handleChange("submission_preparation", value)} onBusyChange={setConfigSaving} />
+      </div>
+
+      {step === 3 && <div className="rounded border border-border p-3 text-sm">
+        <h3 className="font-semibold">Review before saving</h3>
+        <p>Case {formData.case_id} · Site {formData.site_id} · {formData.panel_manufacturer}</p>
+        <p>Model: {formData.panel_model || "Not provided"} · Quantity: {formData.panel_quantity || "Not provided"}</p>
+        <p>Serial numbers: {formData.serial_numbers || "Not provided"}</p>
+        <p>Saving tracks your request only. It does not submit the manufacturer form or confirm warranty eligibility.</p>
+      </div>}
+      {step === 3 && rma?.status_history?.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-sm font-medium text-foreground">
             <History className="w-4 h-4" />
@@ -155,10 +208,13 @@ export default function RMAForm({ rma, users, manufacturers, defaultOwner, onSav
 
       <div className="flex justify-end gap-3 pt-4 border-t border-border">
         <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
-        <Button type="submit" disabled={isLoading}>
-          {isLoading ? "Saving..." : (rma ? "Update RMA" : "Create RMA")}
-        </Button>
+        {step > 0 && <Button type="button" variant="outline" onClick={() => setStep(value => value - 1)}>Back</Button>}
+        {step < 3 ? <Button type="button" onClick={next}
+          disabled={step === 0 && (!formData.case_id.trim() || !formData.site_id.trim() || !formData.panel_manufacturer.trim())}>Next</Button> : <Button type="submit" disabled={isLoading}>
+          {isLoading ? "Saving..." : (rma?.id ? "Update RMA" : "Create RMA")}
+        </Button>}
       </div>
+      </fieldset>
     </form>
   );
 }

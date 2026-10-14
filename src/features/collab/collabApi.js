@@ -119,6 +119,7 @@ export const refundRequestsApi = {
 
 export const sopsApi = {
   list: async () => list(await call("sops.list"), "sops"),
+  refresh: () => call("sops.sync"),
   sync: () => call("sops.sync").catch(() => null),
   save: (record, options) => call("sops.save", record, options),
   delete: (id) => call("sops.delete", id),

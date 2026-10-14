@@ -31,39 +31,488 @@ verification details). Both remain visible for review; generalized advice does
 not add priced items. This renderer-only fix can ship through the signed UI
 update without changing Electron or the installed app version.
 
-### Auto-Drafter: Improper Quote Requests
+### Auto-Drafter: Imported cases
 
-Use **Mark Improper Request** on a raw case or saved-draft tile, optionally enter
-a reason, and confirm. The request leaves **Awaiting Draft** and cannot be
-generated or sent to Quotes while marked. Existing saved drafts are retained.
-**Improper Requests** provides a searchable, sortable team review list with case
-and site links, marking time, reviewer, reason, and **Undo mark**. Undo restores
-drafting eligibility only if the case still meets the normal intake criteria and
-has no real quote. Marking does not update Salesforce or a real quote's status.
+Auto-Drafter no longer has intake filters. Every case in the imported report is
+listed, including closed cases, cases in any O&M Status, cases without a
+recognized request comment, and cases that already have a real quote. Comment
+rows still collapse to one tile per case; search and the case-category filter
+only change what is displayed. Automatic drafting still skips cases that already
+have a real quote and comments without usable structured scope.
+Recognized headings are matched fuzzily at the start of a comment line:
+**O&M_QUOTE**, **O&M_QUOTE_REQUEST** and typed variants such as
+`O&M Quote Request`, `O & M QUOTE`, `OM-QUOTE`, `O&M_QUOTE_REQ`,
+`**O&M_QUOTE_REQUEST**` or `[O&M_QUOTE]`, plus **Quote Request(s)**, including
+dated author prefixes such as `10/9 - PS:`. A mention later in a sentence (for
+example "asked about the O&M quote") is not a heading.
+Structured scope/quote fields can also identify a request without the marker.
+For each case, an actual request is preferred over a later ordinary note, then
+the newest request revision. Case keys are normalized before deduplication.
 
-Executive Overview's **Improper Quote Requests** tile counts unique cases marked
-during the selected reporting period, including requests whose marks were later
-undone. Repeated marks count once per case for Period Total. Daily Average counts
-unique cases per local calendar day divided by every day in the period (including
-zero-activity days); Latest Day uses the selected period's end. **View contributing
-records** shows one sortable row per contributing case, first/last marking times
-in the period, latest reviewer/reason, marking-event count, and current state.
+**Export Excel (n)** (Quote Requests view) downloads exactly the cases currently
+shown, so the case category and search filters apply. The file is named
+`auto-drafter-<category|all>-<date>.xlsx`. The *Quote Requests* sheet has a
+frozen teal header row with filter drop-downs on every column, banded rows,
+columns sized to their contents (long text columns are capped) and no text
+wrapping. Each row has: Case Number, Site ID, O&M Status, comment created date,
+requester, case category, panel request (Yes/No), draft status (Not drafted,
+Draft ready, Sent to Quotes), quote number, line-item count, draft total, draft
+generated time, whether a quote already exists in EnQuote, Golden Quote (sent
+drafts only), Care status, Panel RMA status, hygiene flag count and findings,
+review notes, why automatic drafting skipped the case, and the full request
+comment. Status cells are color-coded: draft status (green sent, amber ready,
+grey not drafted), Golden Quote (gold), Care (green active, red no active Care,
+amber unverified) and hygiene flags (green 0, amber 1–2, red 3+). Every case
+stays on one row: multi-line comments are joined with ` | `. Case and Site IDs
+stay text (leading zeros kept) and link to Salesforce and Enlighten; dates,
+counts and totals are real Excel values, so they sort and filter correctly.
+The export reads the saved drafts at the moment you click it (the button shows
+*Loading drafts…* until they are available), so draft status, quote number,
+totals and Golden Quote are never blank because the page was still loading.
 
-Review events are append-only version-1 records with reserved
-`quote-request-review:` IDs in the existing shared `supervisorReportTables`
-collection, excluded from imported-report listings. Each mark has its own ID;
-undo references known active mark IDs rather than rewriting a shared report.
-Concurrent unseen marks remain active until reviewed. Reimports, Clear Data,
-and Clear Generated Drafts do not erase reviews. Reviewer email is attributed
-from the signed-in UI account, not a separately server-verified audit identity.
+### Panel request badges and Data Hygiene
 
-This uses the released desktop collection bridge and Supervisor sync: no new
-installer, Worker endpoint, or database migration is required. Saving confirms
-local persistence, not delivery to every PC; marks and undo become team-visible
-after desktop sync, including queued offline changes. A PC that has not received
-a remote mark can still draft until sync arrives. Browser development stores
-reviews only in local storage and does not provide team sync. Review-load errors
-pause drafting rather than treating the queue as unmarked.
+Auto-Drafter automatically classifies the retained comment on every request.
+The **Case category** filter separates exactly seven mutually exclusive groups:
+**Panel RMA**, **Panel RMA + On-Demand**, **Enphase RMA**,
+**Enphase RMA + On-Demand**, **LPUP/TPUP**, **On-Demand only**, and
+**Unclassified** (no recognizable request). Every case appears in exactly one.
+Mixed categories mean an RMA request plus separately quoted work; they do not
+approve billing or coverage. Uncertainty no longer creates a separate group:
+an unconfirmed panel RMA, panel plus other-device RMAs, or a device RMA from an
+unestablished manufacturer is placed in its closest category with an amber
+**review note** on the tile.
+Classification updates on each new import;
+there is no manual classification button or override. Electrical/service panels
+are not treated as PV panels. Classification uses the **requested scope, panel
+parts and Warranty Replacements**, not incidental panel mentions in findings,
+installed equipment or technician access instructions. Panel leads, clips and
+cabling, or removing/reinstalling existing panels to reach wiring, do not by
+themselves constitute a panel request.
+**Panel RMA + On-Demand** requires a panel RMA signal plus separate quoted work;
+uncertain panel replacements carry a review note. A warranty
+panel can be listed only under Warranty Replacements and need not be a priced
+line item. Panel-RMA handling labor alone is not separate paid scope.
+These are text-based suggestions, not definitive claim eligibility decisions.
+They do not block drafting or submit an RMA.
+The **View** dropdown switches between **Quote Requests**, **Golden Quotes**,
+**Panel RMA Requests** and **Alternate Requests**, with counts. Within Quote Requests, case categories are
+ordered from largest to smallest count (before search); All request types
+remains at the top.
+
+**Alternate Requests** holds comments headed **O&M_CARE_CANCELLATION**,
+**O&M_ESCALATION** or **O&M_RETURN** (typed variants such as `O & M Escalation`,
+`OM-CARE-CANCELATION` or a leading date are recognized). These are not quote
+requests: they never appear as quote tiles, are never auto-drafted and are not
+counted in Data Hygiene. Filter by **Care Cancellation**, **Escalation** or
+**Return**, and expand **Show comment** to read the request. A case that also has
+a real quote request stays in Quote Requests and appears in both views.
+
+### Ranges in quote requests
+
+Every quote input follows one range rule: labor hours, travel time, mileage,
+FST count and item quantities. A range (`16-24`, `16–24`, `16 to 24`,
+`between 16 and 24`) resolves to its **upper bound**. Several numbers
+(`1 technician if…; 2 technicians if…`) resolve to the **largest**. Travel
+written only in minutes is converted to hours (`30-45 minutes` = 0.75 h). Model
+numbers such as IQ8A are ignored. Each resolved range is listed under the
+draft's assumptions ("Ranges resolved: …").
+If a saved draft's FST count, labor hours, travel hours or miles exceed what
+the request allows (for example a draft that read `16-24` as 1624 hours), the
+opened draft shows an amber warning. **Apply request values** saves the
+corrected values in one click.
+Unsent drafts that no reviewer has edited are corrected automatically when the
+Auto-Drafter opens, and the change is listed in the draft's warnings. The same
+pass lowers "Not in Catalog" lines that took a microinverter or rental price
+from their notes (for example rail bolts "for microinverter mounting") to the
+average price for their own category. Unmatched items are categorized by their
+name first; notes are only used when the name gives no clue.
+
+Open **Supervisor Dashboard > Data Hygiene** for the full intake review subtab.
+The Executive Overview hygiene tile links there. The tab provides request-case,
+flagged-case, author and flagged-rate summaries, top-10 author and issue-category
+bar charts, an author filter, and searchable source-comment details. You can
+import or refresh the shared Quote Request Cases report directly there.
+Auto-Drafter also offers a **Data Hygiene** review shortcut and intake-review
+badges. This review uses the latest report independently of existing quotes or the Executive Overview date range.
+Tiles show just the category and flag count by default. Expand **Details** to
+read classification evidence, routing reasons, the comment author and specific
+intake/source issues; expansion does not open the quote. Long issue lists can
+also be expanded rather than relying on hover text. Opened drafts group request
+type, routing reasons and source/intake checks
+in **Request review**, directly below the quote header and Care banner. Panel RMA
+and Data Hygiene actions stay inside that group; Edit/Send remain in the header.
+Routing badges stay visible in that group; expand **Why these routing flags?**
+for full explanations. Longer intake/source lists expand in place. Repeated
+Site ID/Case Number mismatch warnings are counted once, and those mismatches are
+shown before less critical template issues.
+**PV Module rule:** any quoted line item containing `PV Module` (case-insensitive,
+including longer names such as Compatible Replacement PV Module) routes to
+**Panel RMA**, even when RMA Required is unknown or says No. If other non-PV-Module
+quoted items also exist, including materials or services, it routes to
+**Panel RMA + On-Demand**. This rule checks imported items and saved/edited draft
+items; it is a workflow-routing rule, not confirmation of manufacturer eligibility
+or warranty coverage. Incidental PV Module mentions outside line items do not
+trigger this rule.
+When a saved quote has line items, those determine whether additional quoted
+items exist; removing an extra item is reflected in its category. An imported
+PV Module request still retains panel routing if the RMA panel is not priced
+in the saved quote. Changed source comments are explicitly flagged; saved quote
+contents are not automatically regenerated.
+
+Checks compare the comment to the supported Quote Request Agent output structure:
+the standardized header/sections, core site/case/customer/address/issue/scope
+fields, matching site/case IDs, quantities for listed items, and current O&M
+Status. Recognized later quote-workflow stages are observations, not automatic
+intake violations. An issue-category chart counts each case once per category;
+categories can overlap. One request per case is retained, preferring structured
+requests over later ordinary notes, then the newest request revision.
+
+Names come from **Case Comment Created By**, never Case Owner. Unknown authors
+remain explicit. The author may not be the requesting FST: verify attribution
+before coaching or escalation. Flags identify evidence to review, not misconduct
+or proof the agent was not used. Photos, actual agent usage, factual accuracy and
+measurements require verification in Salesforce. A structurally complete request
+means **no detectable intake issues**, not fully verified SOP compliance.
+No historical compliance record or automatic personnel escalation is created.
+
+### Find in Catalog, added products and Enphase data sheets
+
+**Find in Catalog** (the search icon while editing a draft, or **Swap** on a source
+line) searches the price list by name or SKU. It has two extra parts:
+
+- **Enphase reference (not in price list)**: Enphase products from the built-in
+  knowledge base (`src/features/quoteDraftAgent/enphaseKnowledgeBase.js`) that
+  match the search but have no price. Each result shows the key specs and links
+  to the official enphase.com data sheet it came from.
+- **Add product**: use **Add** on a reference, or **Can't find it? Add "…"**, then
+  enter a name, optional SKU, unit price, category and unit. **Add and use**
+  saves the product, puts it on the current line, and (with "Remember this swap")
+  teaches the learn feature. Every later draft can match and price it.
+
+Products added this way show an **Added by reviewer** badge and can be removed
+with the trash icon. They are stored in the local `autoDrafterCustomProducts`
+collection; built-in catalog names always win over an added product with the same
+name. An app that was running before this update must be fully restarted before
+it accepts the new collection. Until then, added products are kept in browser
+storage and moved into the collection automatically after the restart.
+
+The knowledge base covers IQ8 / IQ8X / IQ7 / IQ7+ / IQ7A microinverters, IQ Cable
+and accessories, and the IQ Gateway. Each entry cites a data sheet revision in
+`ENPHASE_SOURCES`; when Enphase publishes a new revision, update the entry and its
+source together. Line items that match a reference show a one-line spec summary
+with a **Data sheet** link. The **Compatibility & Dependency Flags** card adds
+sourced notes (blue) for:
+
+- microinverter quantities above the data sheet's maximum per 20 A branch circuit;
+- IQ8 joining an IQ7 site (allowed only for the documented configurations) and IQ7
+  added to an IQ8 site (not supported);
+- Enphase products on the draft that are not in the price list.
+
+These notes are informational and never change prices or quantities.
+
+The **+** button next to the search box opens the Add product form directly,
+pre-filled with whatever was typed. **Add Item** on a draft (and in the Quote
+Draft Agent preview) no longer adds a blank free-text line: it opens the same
+picker titled *Add Item from Catalog*, and the chosen or newly added product
+becomes the new line with its catalog price, unit and tax code.
+
+### Quote Draft Agent: same review as the Auto-Drafter
+
+The Quote Draft Agent (Step 2 on the quote form) uses the Auto-Drafter's parser
+(`parseQuoteRequestCase`), so ranges and pricing are identical. Its preview also
+shows the Auto-Drafter's request type, routing flags (LPUP/TPUP, RMA, Gateway
+warranty, Care/Inside Sales) and parse warnings, the data sheet line under
+Enphase items, and the shared **Compatibility & Enphase data sheet checks**
+(`src/components/autoDrafter/DraftReviewFlags.jsx`, also used by the draft page).
+Alternate requests (Care Cancellation/Escalation/Return) and multiple quote
+options are held for review with **Draft Anyway**. Each item has **Find in
+Catalog** (with Remember this swap) and a remove button, and **Add Item** adds
+from the catalog, so the preview can be corrected before **Apply to Quote**.
+
+On Quote Details the status dropdown is now first in the action bar, followed by
+**Submit / edit Panel RMA**.
+
+### Automatic drafts and warranty-service routing
+
+Eligible imported requests automatically generate saved **review drafts** while
+Auto-Drafter is open. Drafts are generated sequentially, not all at once. Existing
+saved/edited drafts are never overwritten; real Quotes are never created or sent
+automatically. Search and request-type selections only change what is displayed.
+Cases that already have a real quote are never drafted automatically.
+Requests without a case number or a usable structured scope/line items remain
+visible with an explicit preparation message instead of an empty generated quote.
+Generation errors identify the case and provide **Retry automatic drafts**.
+Clearing generated drafts pauses automatic generation on that page until the
+next import or **Resume automatic drafting**; clearing report data does not
+remove real quotes. Local atomic guards prevent duplicate case drafts.
+Labor ranges are preserved: `3-4` hours uses the existing worst-case estimate of
+4 hours, not 34. Multiple explicit quote options remain visible for review and
+are not automatically combined into a priced draft. Older saved drafts remain
+unchanged, with warnings when labor exceeds the source range or alternatives may
+have been combined; review and edit them before sending.
+
+Descriptive $0 service lines (for example "Microinverter Replacement", "ATS
+Replacement", "Array Removal and Reinstallation") are no longer added as line
+items; the service type and the assumptions note describe the work. Older unsent
+drafts are cleaned when loaded; sent quotes are unchanged.
+
+Collapsed quote tiles share one size; a tile grows only when its Details dropdown
+is expanded.
+
+**View in O&M request**: line items that are Not in Catalog or not high
+confidence show the original request text they came from, highlighted in the
+comment. **Swap item** replaces the item with a catalog product. With
+**Remember this swap** checked (default), future drafts use that catalog item
+whenever a request uses the exact same wording (case and spacing ignored). These
+items show a **Learned swap** badge; **Forget** removes the rule. Learned swaps
+are saved in this computer's EnQuote data. A swap marks the draft as edited, so
+it can no longer qualify as a Golden Quote.
+
+Routing badges are automatic advisories, not automatic submissions or messages:
+- **LPUP/TPUP**: microinverter purchases/upgrades, including recognized IQ/M models
+  and explicit competitor-to-Enphase purchases.
+- **Microinverter RMA review**: warranty/RMA or possible failed-device replacement
+  scope, not a confirmed purchase. Such requests do not get LPUP/TPUP merely
+  because they mention microinverters. Verify manufacturer and warranty first.
+- **Enphase warranty replacement**: replacement-only Enphase device scope,
+  without additional non-device materials or upgrade work. Collect serials and
+  verify device dates under the team's 20-25 year serial-device review rule.
+- **Gateway/Envoy: check warranty**: always check these separately; do not apply
+  the 20-25 year assumption.
+- **Enphase Care**: the site's latest real imported subscription is ACTIVE.
+- **Inside Sales: Care upsell**: its recorded subscription is not active.
+- **Verify Care / Inside Sales review**: subscription data is missing or cannot
+  be verified. Confirm absence before referring for an upsell.
+
+Care routing uses the existing subscription eligibility rules (newest real
+record; excludes test/internal records). An active subscription does not prove
+the device warranty or approve a replacement. Routing is based on the imported
+snapshot; no request is automatically sent to Inside Sales.
+The opened Auto-Drafter quote reuses the Quotes Care banner and the already
+verified Site ID lookup. Missing records do not mean inactive coverage; lookup
+errors are explicit and offer retry. No labor/travel fees are automatically waived.
+Data Hygiene charts display case counts at the end of every bar. Issue labels
+state the specific missing/incorrect information, with per-case evidence below.
+The Executive Overview also shows **Most Common Data Hygiene Flags**: the top 10
+intake flags in the latest imported request report, with flagged-case counts and
+their share of all request cases (a case can have several flags). It does not
+follow the dashboard date range.
+
+### Supervisor Dashboard: reporting insights
+
+- **Quote Backlog tile with no saved snapshot.** Backlog snapshots are saved every
+  minute by the sync service, with history starting 10/13/2026. If the selected
+  date has no snapshot (for example any day before 10/13/2026), the tile shows
+  today's live backlog with an amber note naming the missing date, and the
+  records dialog opens the same live list.
+- **Export Excel (Data Hygiene).** On the Data Hygiene review, *Export Excel (n)*
+  downloads exactly the request cases currently shown: the selected comment
+  author plus the search and *Flagged only* filters. The file is named
+  `data-hygiene-<author>-<date>.xlsx` and has three sheets:
+  - **Data Hygiene:** a title and filter summary, a frozen header with filter
+    buttons, banded rows, and wrapped bullet lists of findings and notes. Flag
+    counts are color coded (green none, amber 1–2, red 3+). Case # opens the case
+    in Salesforce (or a Salesforce search when the Case ID is unknown), and Site ID
+    opens the Enlighten site. IDs stay as text so leading zeros are kept, and
+    comment dates are real Excel dates. The last column is a one-line preview of
+    the source comment.
+  - **Summary:** case counts by flag type, most common first.
+  - **Source Comments:** the full original comment for each case.
+- **Data freshness on tiles.** Every Executive Overview tile has a caption saying
+  where its number comes from and how current it is: *Live from EnQuote* (blue
+  dot), *Imported/Auto-imported <time> · <report>* (green), or *<source> through
+  <date>* for manually entered daily data. A tile turns amber and reads **Stale**
+  when its source is older than the prior business day (weekends skipped). For
+  tiles fed by several reports, the oldest import counts. "Not imported" means the
+  report has never been loaded.
+- **Quote Backlog Flow** (Executive Overview). For the 14 days ending on the
+  selected period's end date: new quotes that entered the backlog, quotes that
+  left it (completed, moved past the backlog statuses or deleted), and the closing
+  and overdue counts. Each day is compared with the previous day that has a
+  stored snapshot, so missed days roll into the next captured day. Hover a day to
+  see the quote numbers that came in and went out.
+- **Auto-Drafter Accuracy** (Executive Overview). Across all saved drafts on this
+  computer: the share of drafts sent to Quotes without edits, how many line items
+  matched the catalog confidently, need review or were not in the catalog, the
+  requested wording that most often fails to match, and recently learned swaps.
+- **Panel RMA Cycle Time** (Executive Overview). By manufacturer: open/closed
+  counts, average days to close, average age of open RMAs, days from creation to
+  *RMA Submitted*, and days from submission to a manufacturer decision. Also
+  lists the oldest open RMAs and the average days spent in each status. Older
+  RMAs without status history are timed from their creation date.
+- **Flags by person** (Data Hygiene tab). A heatmap of each requester's flagged
+  cases by flag type; darker cells mean more cases. Click a name to filter the tab
+  to that person.
+- **Hygiene trend** (Data Hygiene tab). The flagged-case rate and the four most
+  common flags per day. One point is saved per day from that day's latest
+  imported report. History starts with this version, so the line appears once
+  reports from two different days have been imported.
+- **Daily Snapshot summary.** The drafted Executive Summary adds up to four extra
+  bullets: that day's Quote Backlog flow, that day's hygiene results, Auto-Drafter
+  accuracy and open Panel RMAs (oldest first). Use *Regenerate* to pick up data
+  that loaded after you opened the snapshot; edited text is never overwritten.
+- **Daily Snapshot report (Copy/Download Markdown, Export PDF).** Pick the report
+  day with the date picker in the report header (◀/▶ step one day, *Latest*
+  jumps to the most recent recorded day; future dates are blocked). The picked
+  day is shared with the other Supervisor tabs, and each day keeps its own edited
+  Executive Summary. The report body
+  is built from the same reports as the Executive Overview, for the selected day:
+  - **Quotes** (live EnQuote): created, worked, Quote Backlog with overdue count,
+    invoices paid and paid total.
+  - **Quote Requests:** *Quote Requested* count from SFDC-Quotes, plus request
+    cases reviewed, flagged rate and top three flags from Data Hygiene.
+  - **Case Work** (Salesforce Case History): worked, closed, transferred out and
+    events.
+  - **Calls** (Incorta EODB): total, handled, abandoned, abandonment rate, average
+    wait and talk time.
+  - **Team Staffing** (Boise O&M Staffing Report): headcount, utilization,
+    contacts, talk/ACW time, refusals, held-party abandons and transfers.
+  - **Email** (Incorta O&M Email Report): emails, handle time, open backlog by age
+    and oldest open case.
+
+  The Executive Summary comes first. Each section names its source and how fresh
+  it is. Sections only appear when their report is imported; a closing *Data
+  Notes* list names stale and not-imported reports, and the *Report Sources* card
+  shows the same information on screen. Values a report doesn't cover read
+  "N/A"; nothing is estimated.
+
+### Golden Quotes
+
+Improper Quote Requests (marking, undo, the review list and the Executive
+Overview tile) has been removed. Previously recorded marks remain in shared
+storage but are ignored and no longer block drafting.
+
+A **Golden Quote** is an Auto-Drafter quote created by following the SOP
+perfectly. It must meet all of the following:
+- The source request had **zero Data Hygiene flags** when the draft was sent.
+- The draft was sent to Quotes **without edits** (no Save Changes before Send,
+  and no later quote versions or content changes).
+- The quote was **approved** (or reached a later stage) and was **never
+  rejected** internally. Homeowner rejection does not disqualify it.
+- The category is **On-Demand only**, **Panel RMA + On-Demand** or
+  **Enphase RMA + On-Demand**. Pure Panel RMA, pure Enphase RMA (microinverter
+  or IQ Gateway/Envoy replacements under Enphase Care), LPUP/TPUP and
+  Unclassified are excluded.
+
+Golden Quotes are shown as gold, shiny tiles in Auto-Drafter (**View > Golden
+Quotes**) and on the Quotes page, where **Golden Quotes** toggles a filter.
+Quotes sent before this feature have their SOP check captured from the current
+imported report the next time Auto-Drafter opens; if the case is not in that
+report, it cannot become Golden. Older sends are assumed unedited before send.
+Photos and actual agent usage cannot be verified, so Golden status reflects the
+report-based checks only.
+
+### Panel RMA intake and shared tracker
+
+Panel RMA requests are a separate workflow. Use
+**Submit Panel RMA** on Auto-Drafter case/draft tiles, or **Submit / edit Panel RMA** on editable Quote Details. The form opens
+before saving and prefills the case, site, owner and available notes. Saving
+creates a tracker entry only, not a submission to the manufacturer or a change
+to Salesforce. Wiring/catalog-material quotes remain available.
+
+The **PV Panel RMA Tracker** supports panel model, quantity, serial numbers and
+manufacturer RMA number, plus existing owner, status/history, URL and notes.
+Quote Details intake also links the originating quote in the tracker. A case
+with an existing entry opens that entry instead of creating another. Duplicate
+case IDs and stale edits detected locally show errors; reopen the entry to
+review the latest data before saving.
+
+RMA records and manufacturer choices use the existing team collection sync,
+including existing local entries; no manual migration or deletion is required.
+Saves confirm local persistence, and are shared after desktop sync. Offline
+edits retry when connectivity returns. As with the existing shared collections,
+concurrent cross-device edits are timestamp-based last-write-wins, not a locking
+workflow. Sync before editing shared cases and avoid simultaneous edits.
+Concurrent offline creations can produce duplicate case entries; the intake
+dialog reports those explicitly rather than choosing or overwriting one.
+Browser development remains local-only. This expansion needs the updated
+desktop and Worker deployed together; the old Worker does not accept these
+collections.
+
+### SOP-guided Panel RMA preparation
+
+The Panel RMA form is a four-step wizard: **Manufacturer & case**, **Panel details**,
+**Forms & evidence**, and **Review & save**. Choose an existing manufacturer or add
+a new one at step 1. Step 3 finds HTTPS links in that manufacturer's SOP pages or
+matching rows in the manufacturer directory. Links are identified by their SOP
+source; verify whether each is a claim form, portal or reference before using it.
+If no link exists, enter the manufacturer's HTTPS form URL.
+
+Use **Add manufacturer form** at step 3 to name and save a reusable portal/form
+link or upload a blank PDF/Word (.docx) form (maximum 20 MB). Forms are stored in
+the shared SOP Library under a manufacturer-specific Panel RMA Forms page,
+independent of the case. Future requests show direct Open buttons and saved
+document previews. Do not upload completed customer claims or passwords into
+this shared template library. Existing forms can be maintained in SOP Library.
+One-time links remain available in a collapsed section.
+
+If the form window reports a missing handler, close all EnQuote windows, stop
+the `desktop:dev` terminal with Ctrl+C, and run `npm run desktop:dev` again.
+A UI reload cannot register new main-process handlers; installed copies need
+the full desktop update. The wizard now shows these instructions instead of
+the raw IPC error.
+
+**Open** launches a separate EnQuote manufacturer window with no desktop bridge
+or Node access. Complete forms and sign in manually there, then return to the
+wizard; opening a website neither submits nor saves the tracker record. The
+wizard's entries remain intact when moving Back/Next. Some manufacturer sites
+may reject embedded browsers and require the normal browser instead. Downloaded
+PDF/Word forms may require an external editor; EnQuote does not fill them
+automatically. A full desktop restart/update is required for the new window bridge.
+
+Every Panel RMA form includes **SOP-guided submission preparation**. It searches
+the cached library's panel/module pages, including child pages, prioritizes the
+selected manufacturer's pages, and keeps no-RMA warnings available. Identical
+imported copies are collapsed; differing instructions remain separate so users
+can review conflicts. The original SOP content, links, and attached forms can be
+read in the form or opened in SOP Library.
+Use **Refresh SOP guidance** to fetch the latest shared library. A refresh failure
+is shown explicitly while cached instructions remain available.
+
+Choose a page and **Add suggested checklist** to turn relevant written
+instructions into user-confirmed preparation items. Conditional instructions
+remain conditional; these suggestions are not manufacturer eligibility rules.
+The page title, ID and revision are recorded as a reference. Changed or missing
+references show a review warning. PDF/image/Word attachments can be opened but
+are not automatically interpreted or added to a claim.
+Use **Add item** to include instructions from attached forms in your checklist.
+
+Record installation details, installer information, diagnosis and test results.
+**Preview submission draft** and **Copy submission draft** combine those details
+with the case/site, manufacturer, model, quantity, serials, notes, checklist and
+SOP references. Missing information is explicitly marked for review. Save the
+RMA to persist and share preparation details; copying alone does not save them.
+Complete the manufacturer's current form, attach actual evidence files, and
+submit manually using the original instructions. EnQuote does not send emails
+or submit manufacturer claims.
+
+### Executive Overview: daily Quote Backlog and overdue sorting
+
+**Quote Backlog** now uses shared daily observations from the sync service,
+independent of whether any desktop is open. Today stays live; previous Mountain
+Time calendar days (`America/Denver`, including daylight saving) retain their
+last saved observation. Changing today's quote status no longer recalculates
+yesterday's stored count or rows. The tile shows the selected reporting period's
+closing date, a status breakdown, capture time, and live/frozen state. Its record
+view supports status filtering and numeric overdue-hours sorting.
+
+The service samples once per minute. The frozen value is the last successful
+observation that day, not a guaranteed exact-midnight transaction, and reflects
+the quotes received by server sync at capture time. Source-sync delay or missed
+captures can affect that timestamp. History begins when this service update is
+deployed; dates without an observation show **N/A**, not a reconstructed count.
+Yesterday's original count cannot be restored if it was never saved.
+
+This tile retains its SLA-alert definition: current, reportable, non-held quotes
+with an SLA alert, without user-specific mention/dismissal filtering. It differs
+from Quote Operations' generic nonterminal start/end backlog. Warning alerts
+and alerts without a timed deadline have zero overdue hours. **Alerts** remains
+available; its list and the Quotes sort menu offer most/least overdue ordering.
+
+Deployment requires database migration `0015_quote_backlog.sql`, the updated
+Worker with its scheduled trigger, and the desktop's new backlog bridge. A
+UI-only publication cannot enable the shared-history bridge.
 
 ### Quote edits and outbound identity
 

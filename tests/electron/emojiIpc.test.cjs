@@ -12,6 +12,9 @@ test("fresh Electron startup registers every emoji preload method before authent
   const mocks = {
     "../shared/refundFeature.json": {enabled: true},
     "electron": {},
+    "./panelRmaFormWindow.cjs": {createPanelRmaFormWindow: () => ({
+      open: async url => ({ok:true, url}), close() {}
+    })},
     "./refundSubmission.cjs": {createRefundSubmission: () => ({
       status: async () => ({ok: true}), select: async () => ({ok: true}),
       submit: async () => ({ok: true}), retry: async () => ({ok: true})
@@ -63,6 +66,8 @@ test("fresh Electron startup registers every emoji preload method before authent
     assert.ok(handlers.has(`chat:${method}`));
   }
   assert.deepEqual(await globals.enquoteLocal.chat.emojis(), {ok: true, emojis: []});
+  assert.deepEqual(await globals.enquoteLocal.panelRmaForms.open("https://manufacturer.example/claim"),
+    {ok:true,url:"https://manufacturer.example/claim"});
   for (const method of [
     "list", "submit", "update", "csvStatus", "selectCsv", "submitNative", "retryCsv",
     "sourceStatus", "selectSource", "syncSource", "onSourceChanged",

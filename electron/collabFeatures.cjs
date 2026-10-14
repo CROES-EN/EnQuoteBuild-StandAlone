@@ -9,6 +9,7 @@ const { setupAdminFeatures } = require("./adminFeatures.cjs");
 const {createOneNoteImport} = require("./oneNoteImport.cjs");
 const {createRefundWorkbook} = require("./refundWorkbook.cjs");
 const {createRefundFormWindow} = require("./refundFormWindow.cjs");
+const {createPanelRmaFormWindow} = require("./panelRmaFormWindow.cjs");
 const {createRefundCsv} = require("./refundCsv.cjs");
 const {createRefundCsvSource} = require("./refundCsvSource.cjs");
 const {createRefundSubmission} = require("./refundSubmission.cjs");
@@ -55,6 +56,8 @@ function setupCollabFeatures({
     getUserToken: () => userToken,
     getAccessHeaders
   });
+  const panelRmaForms = createPanelRmaFormWindow({BrowserWindow, session, getMainWindow, getEmail});
+  handle("panelRmaForms:open", url => panelRmaForms.open(url));
   const refundWorkbook = createRefundWorkbook({ storageDir, dialog, getMainWindow, getEmail, client, logger });
   const refundSubmission = createRefundSubmission({storageDir, getEmail, client, workbook: refundWorkbook});
   const refundCsv = createRefundCsv({storageDir, dialog, getMainWindow, getEmail, client});
@@ -235,6 +238,10 @@ function setupCollabFeatures({
   handle("sops:cancelOneNote", (sessionId) => oneNoteImport.cancel(sessionId));
 
   handle("chat:me", () => ({ ok: true, ...chat.me(), unreadTotal: chat.getUnreadTotal(), ready: client.isReady() }));
+  handle("quoteBacklog:get", (date) => {
+    if (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("Select a valid backlog date.");
+    return client.get("/api/quote-backlog", {date});
+  });
   handle("chat:directory", (options) => chat.directory(options || {}));
   handle("chat:conversations", () => chat.conversations());
   handle("chat:openDm", (email) => chat.openDm(email));
@@ -344,6 +351,7 @@ function setupCollabFeatures({
   }
 
   function stop() {
+    panelRmaForms.close();
     refundCsvSource.stop();
     refundForm.close();
     started = false;

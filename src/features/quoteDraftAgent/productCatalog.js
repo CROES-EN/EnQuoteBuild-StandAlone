@@ -216,3 +216,25 @@ export const PRODUCT_CATALOG = [
 // Alias only -- does NOT replace or modify PRODUCT_CATALOG above. Exists so future code
 // can refer to "the Legacy Catalog" by name; nothing currently imports this.
 export const LEGACY_PRODUCT_CATALOG = PRODUCT_CATALOG;
+
+// Reviewer-added products (customProductsStore.js) join the same array at runtime, so matching,
+// learned swaps and Find in Catalog all see them. Built-in items always win on a name clash.
+export const CUSTOM_PRODUCT_CATEGORIES = [...new Set(PRODUCT_CATALOG.map((item) => item.category))].filter((category) => category !== "Services");
+
+export function setRuntimeCustomProducts(records = []) {
+  for (let index = PRODUCT_CATALOG.length - 1; index >= 0; index -= 1) {
+    if (PRODUCT_CATALOG[index].custom) PRODUCT_CATALOG.splice(index, 1);
+  }
+  const builtInNames = new Set(PRODUCT_CATALOG.map((item) => item.name.toLowerCase()));
+  for (const record of records) {
+    if (!record?.name || record.is_deleted || builtInNames.has(record.name.toLowerCase())) continue;
+    const template = PRODUCT_CATALOG.find((item) => item.category === record.category) || {};
+    PRODUCT_CATALOG.push({
+      name: record.name, category: record.category || template.category || "Wiring & Cable Management",
+      unit_price: Number(record.unit_price) || 0, unit: record.unit || "each",
+      tax_category: template.tax_category || "GENERAL_ELECTRICAL_EQUIPMENT", tax_code: template.tax_code || "TTR152589",
+      ...(record.sku ? {sku: record.sku} : {}), custom: true, addedBy: record.addedBy || ""
+    });
+    builtInNames.add(record.name.toLowerCase());
+  }
+}

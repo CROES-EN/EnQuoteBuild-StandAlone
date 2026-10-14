@@ -6,7 +6,9 @@ import {Button} from "@/components/ui/button";
 import {Card} from "@/components/ui/card";
 import {Link, useLocation} from "react-router-dom";
 import {createPageUrl} from "@/utils";
-import {AlertCircle, ChevronDown, ChevronUp, Download, FileText, ListChecks, Plus, Search, User} from "lucide-react";
+import {AlertCircle, ChevronDown, ChevronUp, Download, FileText, ListChecks, Plus, Search, Sparkles, User} from "lucide-react";
+import {listGeneratedDrafts} from "@/features/autoDrafter/autoDrafterDraftsStore";
+import {goldenQuoteEvaluations} from "@/features/goldenQuotes/goldenQuotes";
 import {cn} from "@/lib/utils";
 import QuoteCard from "@/components/quotes/QuoteCard";
 import QuoteStatusSnapshot from "@/components/quotes/QuoteStatusSnapshot";
@@ -68,6 +70,7 @@ function QuotesContent() {
   const [snapshotExpanded, setSnapshotExpanded] = useState(true);
   const [alertsOnly, setAlertsOnly] = useState(false);
   const [duplicatesOnly, setDuplicatesOnly] = useState(false);
+  const [goldenOnly, setGoldenOnly] = useState(false);
 
   useEffect(() => {
     localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify({ search, statusFilter, coordinatorFilter, sortBy, myQuotesOnly, selectedSubmitter }));
@@ -167,6 +170,14 @@ function QuotesContent() {
 
   const dismissedQuoteIds = new Set(dismissals.map((d) => d.quote_id));
 
+  const { data: autoDrafterRecords = [] } = useQuery({
+    queryKey: ["autoDrafterGeneratedDrafts", "golden"],
+    queryFn: listGeneratedDrafts,
+  });
+  const goldenQuoteIds = new Set([...goldenQuoteEvaluations(autoDrafterRecords, quotes).byQuoteId.entries()]
+    .filter(([, evaluation]) => evaluation.golden).map(([id]) => id));
+  const isGoldenQuote = (quote) => goldenQuoteIds.has(String(quote.id));
+
   const dismissAlertMutation = useMutation({
     mutationFn: async (quoteId) => {
       await createLocalRecord("statusAlertDismissals", { quote_id: quoteId });
@@ -221,6 +232,8 @@ function QuotesContent() {
     if (sortBy === "date_asc") return new Date(a.created_date) - new Date(b.created_date);
     if (sortBy === "amount_desc") return (b.total || 0) - (a.total || 0);
     if (sortBy === "amount_asc") return (a.total || 0) - (b.total || 0);
+    if (sortBy === "overdue_desc") return (computeQuoteAlert(b)?.overdueHours || 0) - (computeQuoteAlert(a)?.overdueHours || 0);
+    if (sortBy === "overdue_asc") return (computeQuoteAlert(a)?.overdueHours || 0) - (computeQuoteAlert(b)?.overdueHours || 0);
     return 0;
   });
 
@@ -229,9 +242,11 @@ function QuotesContent() {
   const alertsFilteredQuotes = alertsOnly
     ? baseFilteredQuotes.filter(quote => alertQuoteIds.has(quote.id)) : baseFilteredQuotes;
 
-  const filteredQuotes = duplicatesOnly
+  const duplicateFilteredQuotes = duplicatesOnly
     ? alertsFilteredQuotes.filter((q) => duplicateSiteIds.has(q.site_id))
     : alertsFilteredQuotes;
+  const filteredQuotes = goldenOnly ? duplicateFilteredQuotes.filter(isGoldenQuote) : duplicateFilteredQuotes;
+  const goldenCount = quotes.filter(isGoldenQuote).length;
 
   const alertCount = alertQuotes.length;
 
@@ -357,6 +372,16 @@ function QuotesContent() {
               <AlertCircle className="w-4 h-4 mr-2" />
               Show Duplicates{quotes.filter((q) => duplicateSiteIds.has(q.site_id)).length > 0 ? ` (${quotes.filter((q) => duplicateSiteIds.has(q.site_id)).length})` : ""}
             </Button>
+            <Button
+              variant="outline"
+              aria-pressed={goldenOnly}
+              onClick={() => setGoldenOnly((prev) => !prev)}
+              className={goldenOnly ? "golden-quote-badge hover:opacity-90" : "border-amber-400 text-amber-700 hover:bg-amber-50"}
+              title="Approved Auto-Drafter quotes created by following the SOP perfectly"
+            >
+              <Sparkles className="w-4 h-4 mr-2" />
+              Golden Quotes{goldenCount > 0 ? ` (${goldenCount})` : ""}
+            </Button>
             <Button variant="outline" onClick={downloadCSV} className="border-slate-300">
               <Download className="w-4 h-4 mr-2" />
               Export CSV
@@ -392,6 +417,8 @@ function QuotesContent() {
                   <SelectItem value="date_asc">Oldest First</SelectItem>
                   <SelectItem value="amount_desc">Amount: High to Low</SelectItem>
                   <SelectItem value="amount_asc">Amount: Low to High</SelectItem>
+                  <SelectItem value="overdue_desc">Alerts: Most Overdue First</SelectItem>
+                  <SelectItem value="overdue_asc">Alerts: Least Overdue First</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={coordinatorFilter} onValueChange={setCoordinatorFilter}>
@@ -483,11 +510,11 @@ function QuotesContent() {
         </Card>
 
         {/* Active filter warning */}
-        {(statusFilter !== "all" || coordinatorFilter !== "all" || search || myQuotesOnly || selectedSubmitter !== "all" || alertsOnly) && (
+        {(statusFilter !== "all" || coordinatorFilter !== "all" || search || myQuotesOnly || selectedSubmitter !== "all" || alertsOnly || goldenOnly) && (
           <div className="flex items-center gap-2 mb-4 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
             <span>Filters are active - some quotes may be hidden.</span>
             <button
-              onClick={() => { setSearch(""); setStatusFilter("all"); setCoordinatorFilter("all"); setMyQuotesOnly(false); setSelectedSubmitter("all"); setAlertsOnly(false); }}
+              onClick={() => { setSearch(""); setStatusFilter("all"); setCoordinatorFilter("all"); setMyQuotesOnly(false); setSelectedSubmitter("all"); setGoldenOnly(false); setAlertsOnly(false); }}
               className="ml-auto font-medium underline hover:no-underline"
             >
               Clear all filters
@@ -559,6 +586,7 @@ function QuotesContent() {
                   mentionMessage={mention?.message}
                   mentionedBy={mention?.mentioned_by}
                   onClearAlert={(quoteId) => dismissAlertMutation.mutate(quoteId)}
+                  golden={isGoldenQuote(quote)}
                 />
               );
             })}
@@ -568,7 +596,7 @@ function QuotesContent() {
             <FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-foreground mb-2">No quotes found</h3>
             <p className="text-muted-foreground">
-              {search || statusFilter !== "all" || coordinatorFilter !== "all" || myQuotesOnly || selectedSubmitter !== "all" || duplicatesOnly
+              {search || statusFilter !== "all" || coordinatorFilter !== "all" || myQuotesOnly || selectedSubmitter !== "all" || duplicatesOnly || goldenOnly
                 ? "Try adjusting your filters" 
                 : "Create your first quote to get started"}
             </p>

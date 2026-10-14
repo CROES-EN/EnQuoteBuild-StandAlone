@@ -77,10 +77,15 @@ import { handleStatus } from "./status.js";
 import { pushToBase44 } from "./pusher.js";
 import { markOutboundStatus } from "./repository.js";
 import { json } from "./util.js";
+import {captureQuoteBacklog, handleQuoteBacklog} from "./quote-backlog.js";
 
 export default {
+  async scheduled(_event, env) {
+    await captureQuoteBacklog(env);
+  },
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname === "/api/quote-backlog" && request.method === "GET") return handleQuoteBacklog(request, env);
     if (url.pathname === "/api/retro-games" && ["GET", "POST"].includes(request.method)) return handleRetroGames(request, env);
     if (url.pathname === "/api/retro-scores" && ["GET", "POST"].includes(request.method)) return handleRetroScores(request, env);
     if (url.pathname === "/api/Base44_DTO" && ["GET", "POST", "DELETE"].includes(request.method)) return handleRetro(request, env);

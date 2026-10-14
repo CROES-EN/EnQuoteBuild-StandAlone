@@ -166,10 +166,10 @@ test("dashboard grid attaches whole-tile targets and exact reporting routes to d
 test("dashboard recipients use the shared period immediately and reveal hidden linked tiles without saving preferences", async () => {
   const saved = {preset: "single_day", start: "2026-09-01", end: "2026-09-01"};
   const range = {preset: "custom_range", start: "2026-10-01", end: "2026-10-07"};
-  const route = sharedDashboardTilePath("improper_quote_requests", range, "latest_day");
+  const route = sharedDashboardTilePath("quote_request_hygiene", range, "latest_day");
   let params = new URL(route, "https://local.invalid").searchParams;
   let displayedRange, grid, saves = 0;
-  globalThis.window = {localStorage: {getItem: () => JSON.stringify({hidden: ["improper_quote_requests"]})}};
+  globalThis.window = {localStorage: {getItem: () => JSON.stringify({hidden: ["quote_request_hygiene"]})}};
   try {
     const Page = await load("src\\components\\supervisor\\DashboardOverview.jsx", {
       "@/components/supervisor/CaseWorkTiles": Object.assign(() => null, {
@@ -190,13 +190,13 @@ test("dashboard recipients use the shared period immediately and reveal hidden l
     });
     renderToStaticMarkup(React.createElement(Page));
     assert.deepEqual(displayedRange, range);
-    assert.ok(grid.tiles.some(tile => tile.id === "improper_quote_requests"));
-    assert.equal(readSharedDashboardPeriod(new URL(grid.sharePath("improper_quote_requests"), "https://local.invalid").searchParams).mode, "latest_day");
+    assert.ok(grid.tiles.some(tile => tile.id === "quote_request_hygiene"));
+    assert.equal(readSharedDashboardPeriod(new URL(grid.sharePath("quote_request_hygiene"), "https://local.invalid").searchParams).mode, "latest_day");
     assert.equal(saves, 0, "merely opening the link cannot change a user's saved period");
     params = new URLSearchParams();
     renderToStaticMarkup(React.createElement(Page));
     assert.deepEqual(displayedRange, saved);
-    assert.ok(!grid.tiles.some(tile => tile.id === "improper_quote_requests"), "normal tile visibility is unchanged");
+    assert.ok(!grid.tiles.some(tile => tile.id === "quote_request_hygiene"), "normal tile visibility is unchanged");
   } finally {delete globalThis.window;}
 });
 

@@ -3,6 +3,7 @@
 // Parses the plain-text output printed by the Quote Request Agent (Step 1)
 // into a structured object consumed by draftEngine.js. Pure text parsing --
 // no API calls, no LLM.
+import {normalizeQuoteRequestComment, QUOTE_REQUEST_SECTION_HEADERS, quoteRequestCommentEvidence} from "../quoteRequestIntake/quoteRequestComment.js";
 
 function cleanLine(line) {
   return line
@@ -13,8 +14,7 @@ function cleanLine(line) {
 }
 
 function toLines(rawText) {
-  return rawText
-    .replace(/\r\n/g, "\n")
+  return normalizeQuoteRequestComment(rawText)
     .split("\n")
     .map((l) => cleanLine(l))
     .filter((l) => l.length > 0);
@@ -26,10 +26,18 @@ function isUnknown(value) {
 }
 
 function extractField(lines, label) {
-  const re = new RegExp("^" + label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ":\\s*(.+)$", "i");
-  for (const line of lines) {
+  const re = new RegExp("^" + label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ":\\s*(.*)$", "i");
+  for (const [index, line] of lines.entries()) {
     const match = line.match(re);
-    if (match) return match[1].trim();
+    if (match) {
+      const values = [match[1].trim()].filter(Boolean);
+      for (let i = index + 1; i < lines.length; i++) {
+        if ((/^[A-Za-z][A-Za-z0-9 /&'()]*?:/.test(lines[i]) && !/^(?:quote\s+)?option\s*\d+\s*:/i.test(lines[i])) ||
+            QUOTE_REQUEST_SECTION_HEADERS.some(section => section.toLowerCase() === lines[i].toLowerCase())) break;
+        values.push(lines[i]);
+      }
+      return values.join("\n").trim() || null;
+    }
   }
   return null;
 }
@@ -42,7 +50,8 @@ function extractFieldOrSection(lines, labels, nextHeadings = []) {
     const start = findSectionIndex(lines, label);
     if (start === -1) continue;
 
-    const sectionLines = sliceSection(lines, label, nextHeadings.length ? nextHeadings : ["Quote Summary", "Materials", "Labor & Travel", "Scope of Work"]);
+    const sectionLines = sliceSection(lines, label, [...QUOTE_REQUEST_SECTION_HEADERS,
+      ...nextHeadings, "Quote Summary", "Materials", "Labor & Travel", "Scope of Work"]);
     const combined = sectionLines.join(" ").trim();
     if (combined) return combined;
   }
@@ -58,7 +67,7 @@ function sliceSection(lines, heading, nextHeadings) {
   if (start === -1) return [];
   let end = lines.length;
   for (let i = start + 1; i < lines.length; i++) {
-    if (nextHeadings.some((h) => lines[i].toLowerCase() === h.toLowerCase())) {
+    if ([...QUOTE_REQUEST_SECTION_HEADERS, ...nextHeadings].some((h) => lines[i].toLowerCase() === h.toLowerCase())) {
       end = i;
       break;
     }
@@ -203,6 +212,5 @@ export function hasQuoteRequestEvidence(rawText) {
     /technician count:/i,
     /diagnostic findings:/i
   ];
-  return markers.filter((m) => m.test(text)).length >= 2;
+  return quoteRequestCommentEvidence(text).hasRequest && markers.filter((m) => m.test(text)).length >= 2;
 }
-

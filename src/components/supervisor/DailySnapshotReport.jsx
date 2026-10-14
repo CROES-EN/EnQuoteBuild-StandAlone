@@ -1,95 +1,56 @@
-﻿import {useEffect, useMemo, useState} from "react";
+import {useEffect, useMemo, useState} from "react";
 import {useQuery} from "@tanstack/react-query";
 import {toast} from "sonner";
-import {ClipboardCopy, Download, FileDown, RefreshCw, Sparkles} from "lucide-react";
+import {ChevronLeft, ChevronRight, ClipboardCopy, Download, FileDown, RefreshCw, Sparkles} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
 import {Textarea} from "@/components/ui/textarea";
 import {Badge} from "@/components/ui/badge";
-import {getQuotes} from "@/api/dataClient";
+import {getAllQuoteActivities, getQuotes} from "@/api/dataClient";
+import {buildQuoteLifecycleReport} from "@/features/quoteDashboard/quoteLifecycle";
+import {formatDateLabel} from "@/features/supervisorDashboard/format";
 import {
-    formatDateLabel,
-    formatNumber,
-    formatOrFallback,
-    formatRate,
-    formatSecondsAsClock
-} from "@/features/supervisorDashboard/format";
-import {
-    computeAbandonRate,
     computeBacklogReconciliationVariance,
     computeExpectedEndingBacklog,
-    computeHandleRate,
-    computeNetBacklogChange,
-    computeStaffingAvailabilityRate,
-    deriveManualInputsUsed,
-    deriveReconciliationExceptions,
-    deriveUnavailableMetrics,
     draftExecutiveSummaryBullets,
     resolveReportingTimeZone
 } from "@/features/supervisorDashboard/omSnapshotCalculations";
-import {
-    computeQuoteIntakeGap,
-    computeQuoteOpsMetrics,
-    DEFAULT_COMPLETED_STATUSES
-} from "@/features/supervisorDashboard/quoteOpsMetrics";
+import {computeQuoteOpsMetrics, DEFAULT_COMPLETED_STATUSES} from "@/features/supervisorDashboard/quoteOpsMetrics";
 import {
     buildSnapshotMarkdown,
     copySnapshotMarkdown,
     downloadSnapshotMarkdown,
     downloadSnapshotPDF
 } from "@/features/supervisorDashboard/omSnapshotExport";
-
-// A source's data is flagged "stale" only when it was recorded more than 5 calendar days after
-// the reporting date it's attached to - a conservative threshold that doesn't flag the feature's
-// normal workflow (entering yesterday's numbers this morning), only clearly old/forgotten data.
-const STALE_THRESHOLD_MS = 5 * 24 * 60 * 60 * 1000;
-
-function num(value) {
-  return formatOrFallback(value, formatNumber, null);
-}
-
-function rate(value) {
-  return value === null || value === undefined ? null : formatRate(value);
-}
-
-function clock(value) {
-  return formatOrFallback(value, formatSecondsAsClock, null);
-}
-
-function formatTimestamp(iso, timeZone) {
-  if (!iso) return null;
-  const parsed = new Date(iso);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed.toLocaleString("en-US", { timeZone, dateStyle: "medium", timeStyle: "short" });
-}
-
-function latestSourceTimestamp(record, tags, timeZone) {
-  const timestamps = tags.map(tag => record?.sources?.[tag]?.imported_at).filter(Boolean).sort();
-  return timestamps.length ? formatTimestamp(timestamps[timestamps.length - 1], timeZone) : null;
-}
-
-function staleSourceLabels(record, sectionsWithTags) {
-  const reportMs = record?.date ? new Date(`${record.date}T00:00:00`).getTime() : null;
-  if (reportMs === null || Number.isNaN(reportMs)) return [];
-
-  return sectionsWithTags
-    .filter(({ tags }) => tags.some(tag => {
-      const iso = record?.sources?.[tag]?.imported_at;
-      if (!iso) return false;
-      const importedMs = new Date(iso).getTime();
-      return Number.isFinite(importedMs) && importedMs - reportMs > STALE_THRESHOLD_MS;
-    }))
-    .map(({ label }) => label);
-}
+import {buildDailySourceSections} from "@/features/supervisorDashboard/dailySnapshotSources";
+import {listReportTables} from "@/features/supervisorDashboard/importedTableStore";
+import {useQuoteBacklog} from "@/features/supervisorDashboard/useQuoteBacklog";
+import {draftInsightBullets} from "@/features/supervisorDashboard/supervisorInsights";
+import {useAutoDrafterAccuracy, useBacklogFlow, usePanelRmaCycle} from "@/features/supervisorDashboard/useSupervisorInsights";
+import {useQuoteRequestHygieneHistory, useQuoteRequestHygieneReport} from "@/features/autoDrafter/useQuoteRequestHygieneReport";
+import {readCaseWorkTeam} from "@/components/supervisor/CaseWorkTiles";
 
 /**
- * Composes every Supervisor Dashboard tab's data for `selectedDate` into the O&M Daily
- * Operations Snapshot's exact `REQUIRED OUTPUT` structure, with guarded calculations (never a
- * fabricated number), an auto-drafted/editable Executive Summary, and Markdown/PDF export.
+ * O&M Daily Operations Snapshot for `selectedDate`. The report body is built from the same
+ * imported reports (EODB, Staffing, Email, SFDC-Quotes, Quote Request Cases, Case History) and
+ * live EnQuote data as the Executive Overview, so Copy/Download Markdown and the PDF match what
+ * the team already reviews. Missing reports are listed rather than filled with invented numbers.
  */
+function shiftIsoDate(isoDate, days) {
+  const [year, month, day] = String(isoDate).split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + days));
+  return date.toISOString().slice(0, 10);
+}
+
+function localIsoToday() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
 export default function DailySnapshotReport({
   records = [],
   selectedDate,
+  onSelectedDateChange,
   completedStatuses = DEFAULT_COMPLETED_STATUSES,
   summaryText: controlledSummaryText,
   onSummaryTextChange
@@ -99,10 +60,14 @@ export default function DailySnapshotReport({
   const current = currentIndex >= 0 ? sortedRecords[currentIndex] : { date: selectedDate };
   const previous = currentIndex > 0 ? sortedRecords[currentIndex - 1] : null;
 
-  const { data: allQuotes = [] } = useQuery({
-    queryKey: ["quotes-all-for-ops-metrics"],
-    queryFn: getQuotes
-  });
+  const quotesQuery = useQuery({queryKey: ["quotes-all-for-ops-metrics"], queryFn: getQuotes});
+  const allQuotes = quotesQuery.data || [];
+  const activitiesQuery = useQuery({queryKey: ["quoteActivity", "lifecycle"], queryFn: getAllQuoteActivities});
+  const reportTablesQuery = useQuery({queryKey: ["report-tables-for-ops-overview"], queryFn: listReportTables});
+  const backlogQuery = useQuoteBacklog(selectedDate);
+  const hygieneHistoryQuery = useQuoteRequestHygieneHistory();
+  // Mounting the report records today's hygiene summary into the history read below.
+  useQuoteRequestHygieneReport();
 
   const quoteOps = useMemo(
     () => computeQuoteOpsMetrics(allQuotes, selectedDate, { completedStatuses }),
@@ -111,203 +76,71 @@ export default function DailySnapshotReport({
 
   const timeZoneInfo = useMemo(() => resolveReportingTimeZone(), []);
 
+  const hygieneSnapshot = useMemo(
+    () => (hygieneHistoryQuery.data || []).find(snapshot => snapshot?.date === selectedDate && !snapshot.is_deleted) || null,
+    [hygieneHistoryQuery.data, selectedDate]
+  );
+
+  const sources = useMemo(() => {
+    if (!selectedDate) return {sections: [], missingReports: []};
+    const lifecycle = quotesQuery.data && activitiesQuery.data
+      ? buildQuoteLifecycleReport(quotesQuery.data, {range: {start: selectedDate, end: selectedDate}, activities: activitiesQuery.data})
+      : null;
+    const backlog = backlogQuery.isError ? {error: backlogQuery.error?.message || "Could not load the quote backlog."}
+      : backlogQuery.data || null;
+    return buildDailySourceSections({
+      date: selectedDate,
+      reportTables: reportTablesQuery.data || {},
+      quotes: quotesQuery.data || null,
+      lifecycle,
+      backlog,
+      hygiene: hygieneSnapshot,
+      caseWorkTeam: readCaseWorkTeam()
+    });
+  }, [selectedDate, quotesQuery.data, activitiesQuery.data, reportTablesQuery.data, backlogQuery.data,
+    backlogQuery.isError, backlogQuery.error, hygieneSnapshot]);
+
   const reportData = useMemo(() => {
-    const r = current || {};
-
-    // --- Contact Center ---
-    const abandonRate = computeAbandonRate(r.calls_abandoned, r.calls_offered);
-    const handleRate = computeHandleRate(r.calls, r.calls_offered);
-    const contactCenterEntries = [
-      { label: "Calls Offered", value: r.calls_offered },
-      { label: "Calls Handled", value: r.calls },
-      { label: "Calls Abandoned", value: r.calls_abandoned },
-      { label: "Average Handle Time", value: r.aht_seconds },
-      { label: "Average Wait Time", value: r.avg_wait_seconds },
-      { label: "Emails Received", value: r.emails_received },
-      { label: "Emails Worked or Handled", value: r.emails_worked },
-      { label: "Email Backlog at Start", value: r.email_backlog_start },
-      { label: "Email Backlog at End", value: r.email_backlog_end }
-    ];
-    const contactCenter = {
-      callsOffered: num(r.calls_offered),
-      callsHandled: num(r.calls),
-      callsAbandoned: num(r.calls_abandoned),
-      abandonRate: rate(abandonRate),
-      handleRate: rate(handleRate),
-      aht: clock(r.aht_seconds),
-      avgWait: clock(r.avg_wait_seconds),
-      emailsReceived: num(r.emails_received),
-      emailsWorked: num(r.emails_worked),
-      emailBacklogStart: num(r.email_backlog_start),
-      emailBacklogEnd: num(r.email_backlog_end),
-      sourceRefreshTime: latestSourceTimestamp(r, ["cxone", "manual"], timeZoneInfo.timeZone)
-    };
-
-    // --- Staffing ---
-    const staffingAvailabilityRate = computeStaffingAvailabilityRate(r.staffing_present, r.staffing_scheduled);
-    const staffingEntries = [
-      { label: "Team Headcount", value: r.team_headcount },
-      { label: "Scheduled Staff", value: r.staffing_scheduled },
-      { label: "Available Staff", value: r.staffing_present },
-      { label: "Full-Day Absences", value: r.full_day_absences },
-      { label: "Partial-Day Absences", value: r.partial_day_absences },
-      { label: "Training/Meeting Capacity Loss", value: r.training_capacity_loss },
-      { label: "Scheduled Productive Hours", value: r.scheduled_productive_hours },
-      { label: "Actual Productive Hours", value: r.actual_productive_hours }
-    ];
-    const staffing = {
-      teamHeadcount: num(r.team_headcount),
-      scheduledStaff: num(r.staffing_scheduled),
-      availableStaff: num(r.staffing_present),
-      fullDayAbsences: num(r.full_day_absences),
-      partialDayAbsences: num(r.partial_day_absences),
-      trainingCapacityLoss: num(r.training_capacity_loss),
-      scheduledProductiveHours: num(r.scheduled_productive_hours),
-      actualProductiveHours: num(r.actual_productive_hours),
-      staffingAvailabilityRate: rate(staffingAvailabilityRate),
-      sourceRefreshTime: latestSourceTimestamp(r, ["manual"], timeZoneInfo.timeZone)
-    };
-
-    // --- Quote Operations (Drafted/Completed/Backlog are live-computed, never stored) ---
-    const intakeGap = computeQuoteIntakeGap(r.sf_quotes_received, quoteOps.quotesDrafted);
-    const quoteExpectedEnding = computeExpectedEndingBacklog(quoteOps.backlogStart, quoteOps.quotesDrafted, quoteOps.quotesCompleted);
-    const quoteBacklogVariance = computeBacklogReconciliationVariance(quoteOps.backlogEnd, quoteExpectedEnding);
-    const quoteOpsEntries = [
-      { label: "Salesforce Quotes Received", value: r.sf_quotes_received },
-      { label: "EnQuote Quotes Drafted", value: quoteOps.quotesDrafted },
-      { label: "EnQuote Quotes Completed", value: quoteOps.quotesCompleted },
-      { label: "Quote Backlog at Start", value: quoteOps.backlogStart },
-      { label: "Quote Backlog at End", value: quoteOps.backlogEnd }
-    ];
-    const quoteOpsData = {
-      sfQuotesReceived: num(r.sf_quotes_received),
-      quotesDrafted: num(quoteOps.quotesDrafted),
-      quotesCompleted: num(quoteOps.quotesCompleted),
-      completedStatusesLabel: completedStatuses.join(", ") || "none selected",
-      unreconciledQuoteRequests: num(intakeGap),
-      backlogStart: num(quoteOps.backlogStart),
-      backlogEnd: num(quoteOps.backlogEnd),
-      sourceRefreshTime: `EnQuote data live as of now; Salesforce Received ${latestSourceTimestamp(r, ["manual"], timeZoneInfo.timeZone) || "N/A - Source unavailable"}`
-    };
-
-    // --- O&M Case Backlog ---
-    const expectedEndingBacklog = computeExpectedEndingBacklog(r.case_backlog_start, r.new_cases_received, r.cases_completed);
-    const netBacklogChange = computeNetBacklogChange(r.case_backlog_start, r.case_backlog_end);
-    const reconciliationVariance = computeBacklogReconciliationVariance(r.case_backlog_end, expectedEndingBacklog);
-    const caseBacklogEntries = [
-      { label: "Backlog at Start", value: r.case_backlog_start },
-      { label: "New Cases Received", value: r.new_cases_received },
-      { label: "Cases Completed", value: r.cases_completed },
-      { label: "Backlog at End", value: r.case_backlog_end }
-    ];
-    const caseBacklog = {
-      backlogStart: num(r.case_backlog_start),
-      newCasesReceived: num(r.new_cases_received),
-      casesCompleted: num(r.cases_completed),
-      backlogEnd: num(r.case_backlog_end),
-      netBacklogChange: num(netBacklogChange),
-      reconciliationVariance: num(reconciliationVariance),
-      sourceRefreshTime: latestSourceTimestamp(r, ["manual"], timeZoneInfo.timeZone)
-    };
-
-    // --- Enphase Care ---
-    const careEntries = [
-      { label: "Care Appointment Cancellations", value: r.care_appt_cancellations },
-      { label: "Care Plan Cancellation Requests", value: r.care_plan_cancellation_requests },
-      { label: "Care Cancellations Completed", value: r.care_cancellations_completed },
-      { label: "Care Refunds Initiated", value: r.care_refunds_initiated }
-    ];
-    const care = {
-      apptCancellations: num(r.care_appt_cancellations),
-      planCancellationRequests: num(r.care_plan_cancellation_requests),
-      cancellationsCompleted: num(r.care_cancellations_completed),
-      refundsInitiated: num(r.care_refunds_initiated)
-    };
-
-    // --- Blockers & Escalations ---
-    const escalationEntries = [
-      { label: "New S1 Escalations", value: r.new_s1 },
-      { label: "New S2 Escalations", value: r.new_s2 },
-      { label: "New S3 Escalations", value: r.new_s3 },
-      { label: "Open Critical Escalations", value: r.open_critical_escalations },
-      { label: "Overdue Follow-Ups", value: r.overdue_follow_ups }
-    ];
-    const blockerText = [r.major_blockers, r.travel_field_blockers].filter(Boolean).join(" | ") || null;
-    const escalations = {
-      newS1: num(r.new_s1),
-      newS2: num(r.new_s2),
-      newS3: num(r.new_s3),
-      openCritical: num(r.open_critical_escalations),
-      majorBlockers: blockerText,
-      leadershipActionRequired: r.leadership_action_required || null,
-      overdueFollowUps: num(r.overdue_follow_ups)
-    };
-
-    // --- Data Quality & Exceptions ---
-    const unavailableMetrics = deriveUnavailableMetrics([
-      ...contactCenterEntries, ...staffingEntries, ...quoteOpsEntries, ...caseBacklogEntries, ...careEntries, ...escalationEntries
-    ]);
-    const reconciliationExceptions = deriveReconciliationExceptions([
-      { label: "O&M Case Backlog reconciliation variance", value: reconciliationVariance },
-      { label: "Quote Backlog reconciliation variance", value: quoteBacklogVariance },
-      { label: "Quote Intake Gap", value: intakeGap }
-    ]);
-    const staleSources = staleSourceLabels(r, [
-      { label: "Contact Center", tags: ["cxone", "manual"] },
-      { label: "Staffing", tags: ["manual"] },
-      { label: "O&M Case Backlog", tags: ["manual"] },
-      { label: "Enphase Care", tags: ["manual"] },
-      { label: "Blockers & Escalations", tags: ["manual"] }
-    ]);
-    const filterTimezoneConcerns = timeZoneInfo.isFallback
-      ? [`Could not resolve the system timezone - defaulted to ${timeZoneInfo.timeZone} (Mountain Time).`]
-      : [];
-
-    const dataQuality = {
-      unavailableMetrics,
-      staleSources,
-      filterTimezoneConcerns,
-      duplicateOrMalformed: [],
-      reconciliationExceptions,
-      manualInputsUsed: deriveManualInputsUsed(r)
-    };
-
+    const notes = [];
+    if (reportTablesQuery.isError) notes.push(`Imported reports could not be loaded: ${reportTablesQuery.error?.message || "unknown error"}`);
+    if (quotesQuery.isError) notes.push(`EnQuote quotes could not be loaded: ${quotesQuery.error?.message || "unknown error"}`);
+    if (timeZoneInfo.isFallback) notes.push(`Could not resolve the system timezone - defaulted to ${timeZoneInfo.timeZone} (Mountain Time).`);
     return {
       reportingDate: formatDateLabel(selectedDate),
+      reportingDateIso: selectedDate || null,
       reportingWindowLabel: selectedDate
         ? `${formatDateLabel(selectedDate)}, 12:00 AM-11:59 PM (${timeZoneInfo.timeZone}${timeZoneInfo.isFallback ? " - fallback" : ""})`
         : null,
       preparedAt: new Date().toLocaleString("en-US", { timeZone: timeZoneInfo.timeZone, dateStyle: "medium", timeStyle: "short" }),
-      contactCenter,
-      staffing,
-      quoteOps: quoteOpsData,
-      caseBacklog,
-      care,
-      escalations,
-      dataQuality,
-      // Internal-only: raw O&M Case Backlog variance, fed to the executive-summary drafter
-      // below (not part of the exported report shape - omSnapshotExport.js's buildSections
-      // only reads the named keys above and ignores this).
-      _draftInputs: { reconciliationVariance }
+      sections: sources.sections,
+      missingReports: sources.missingReports,
+      notes
     };
-  }, [current, quoteOps, completedStatuses, selectedDate, timeZoneInfo]);
+  }, [selectedDate, sources, timeZoneInfo, reportTablesQuery.isError, reportTablesQuery.error, quotesQuery.isError, quotesQuery.error]);
+
+  const caseBacklogVariance = useMemo(() => computeBacklogReconciliationVariance(
+    current?.case_backlog_end,
+    computeExpectedEndingBacklog(current?.case_backlog_start, current?.new_cases_received, current?.cases_completed)
+  ), [current]);
+
+  const backlogFlowQuery = useBacklogFlow(selectedDate, 1);
+  const drafterQuery = useAutoDrafterAccuracy();
+  const rmaCycle = usePanelRmaCycle();
+  const insightBullets = useMemo(() => draftInsightBullets({
+    backlogFlow: backlogFlowQuery.data?.at(-1)?.date === selectedDate ? backlogFlowQuery.data.at(-1) : null,
+    hygiene: hygieneSnapshot,
+    drafter: drafterQuery.data || null,
+    rma: rmaCycle.metrics
+  }), [backlogFlowQuery.data, hygieneSnapshot, drafterQuery.data, rmaCycle.metrics, selectedDate]);
 
   const draftBullets = useMemo(
-    () => draftExecutiveSummaryBullets({
-      current,
-      previous,
-      quoteOps,
-      caseBacklogVariance: reportData._draftInputs.reconciliationVariance
-    }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [current, previous, quoteOps]
+    () => draftExecutiveSummaryBullets({ current, previous, quoteOps, caseBacklogVariance, insightBullets }),
+    [current, previous, quoteOps, caseBacklogVariance, insightBullets]
   );
 
   // Executive Summary text is lifted to the parent page (keyed by date) whenever
   // `onSummaryTextChange` is supplied, so it survives Radix Tabs unmounting this component when
-  // the user switches to a different tab and back (this component otherwise has no Save button
-  // for this field, unlike every other form in this feature). Falls back to local-only state
-  // (matching the original behavior) if used without a controlling parent.
+  // the user switches tabs. Falls back to local-only state without a controlling parent.
   const isControlled = typeof onSummaryTextChange === "function";
   const [localSummaryText, setLocalSummaryText] = useState(() => draftBullets.join("\n"));
 
@@ -328,8 +161,10 @@ export default function DailySnapshotReport({
     else setLocalSummaryText(text);
   }
 
-  const executiveSummaryBullets = summaryText.split("\n").map(line => line.trim()).filter(Boolean);
-  const finalReportData = { ...reportData, executiveSummaryBullets };
+  const finalReportData = useMemo(() => ({
+    ...reportData,
+    executiveSummaryBullets: summaryText.split("\n").map(line => line.trim()).filter(Boolean)
+  }), [reportData, summaryText]);
 
   function handleRegenerateDraft() {
     setSummaryText(draftBullets.join("\n"));
@@ -358,9 +193,10 @@ export default function DailySnapshotReport({
   }
 
   const markdownPreview = useMemo(() => buildSnapshotMarkdown(finalReportData), [finalReportData]);
+  const loading = reportTablesQuery.isLoading || quotesQuery.isLoading;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-daily-snapshot>
       <Card className="border-border">
         <CardHeader className="pb-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -370,22 +206,47 @@ export default function DailySnapshotReport({
                 {finalReportData.reportingWindowLabel || "Select a date to build a report."}
               </p>
             </div>
-            <Badge variant="outline" className="border-border text-muted-foreground">
-              Prepared {finalReportData.preparedAt}
-            </Badge>
+            <div className="flex flex-wrap items-center gap-2">
+              {onSelectedDateChange && (
+                <div className="flex items-center gap-1" data-snapshot-date-picker>
+                  <Button variant="outline" size="icon" className="h-8 w-8" title="Previous day" aria-label="Previous day"
+                    disabled={!selectedDate} onClick={() => onSelectedDateChange(shiftIsoDate(selectedDate, -1))}>
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <input type="date" aria-label="Report date" data-snapshot-date
+                    className="h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground"
+                    value={selectedDate || ""} max={localIsoToday()}
+                    onChange={event => event.target.value && onSelectedDateChange(event.target.value)} />
+                  <Button variant="outline" size="icon" className="h-8 w-8" title="Next day" aria-label="Next day"
+                    disabled={!selectedDate || selectedDate >= localIsoToday()}
+                    onClick={() => onSelectedDateChange(shiftIsoDate(selectedDate, 1))}>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  {sortedRecords.length > 0 && selectedDate !== sortedRecords.at(-1).date && (
+                    <Button variant="ghost" size="sm" className="h-8" title="Jump to the most recent recorded day"
+                      onClick={() => onSelectedDateChange(sortedRecords.at(-1).date)}>
+                      Latest
+                    </Button>
+                  )}
+                </div>
+              )}
+              <Badge variant="outline" className="border-border text-muted-foreground">
+                Prepared {finalReportData.preparedAt}
+              </Badge>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={handleCopyMarkdown}>
+            <Button variant="outline" size="sm" onClick={handleCopyMarkdown} disabled={loading} data-snapshot-copy-markdown>
               <ClipboardCopy className="mr-2 h-4 w-4" />
               Copy Markdown
             </Button>
-            <Button variant="outline" size="sm" onClick={handleDownloadMarkdown}>
+            <Button variant="outline" size="sm" onClick={handleDownloadMarkdown} disabled={loading}>
               <Download className="mr-2 h-4 w-4" />
               Download Markdown
             </Button>
-            <Button variant="outline" size="sm" onClick={handleDownloadPDF}>
+            <Button variant="outline" size="sm" onClick={handleDownloadPDF} disabled={loading}>
               <FileDown className="mr-2 h-4 w-4" />
               Export PDF
             </Button>
@@ -422,15 +283,25 @@ export default function DailySnapshotReport({
 
       <Card className="border-border">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Data Quality &amp; Exceptions</CardTitle>
+          <CardTitle className="text-base">Report Sources</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-3 text-sm sm:grid-cols-2">
-          <div><span className="font-medium text-foreground">Unavailable Metrics:</span> <span className="text-muted-foreground">{finalReportData.dataQuality.unavailableMetrics.join("; ") || "None"}</span></div>
-          <div><span className="font-medium text-foreground">Stale Sources:</span> <span className="text-muted-foreground">{finalReportData.dataQuality.staleSources.join("; ") || "None"}</span></div>
-          <div><span className="font-medium text-foreground">Filter/Timezone Concerns:</span> <span className="text-muted-foreground">{finalReportData.dataQuality.filterTimezoneConcerns.join("; ") || "None"}</span></div>
-          <div><span className="font-medium text-foreground">Duplicate/Malformed Records:</span> <span className="text-muted-foreground">None recorded for this date</span></div>
-          <div><span className="font-medium text-foreground">Reconciliation Exceptions:</span> <span className="text-muted-foreground">{finalReportData.dataQuality.reconciliationExceptions.join("; ") || "None"}</span></div>
-          <div><span className="font-medium text-foreground">Manual Inputs Used:</span> <span className="text-muted-foreground">{finalReportData.dataQuality.manualInputsUsed.join("; ") || "None"}</span></div>
+        <CardContent className="space-y-2 text-sm">
+          {finalReportData.sections.map(section => (
+            <div key={section.title} className="flex flex-wrap items-baseline justify-between gap-2">
+              <span className="font-medium text-foreground">{section.title} <span className="font-normal text-muted-foreground">· {section.source}</span></span>
+              <span className={String(section.freshness || "").startsWith("Stale") ? "text-amber-600" : "text-muted-foreground"}>
+                {section.freshness || "Freshness unknown"}
+              </span>
+            </div>
+          ))}
+          {!finalReportData.sections.length && !loading && (
+            <p className="text-muted-foreground">No report data is available for this date yet.</p>
+          )}
+          {finalReportData.missingReports.length > 0 && (
+            <p className="text-muted-foreground" data-snapshot-missing-reports>
+              <span className="font-medium text-foreground">Not imported:</span> {finalReportData.missingReports.join("; ")}
+            </p>
+          )}
         </CardContent>
       </Card>
 
@@ -439,7 +310,7 @@ export default function DailySnapshotReport({
           <CardTitle className="text-base">Full Report Preview</CardTitle>
         </CardHeader>
         <CardContent>
-          <pre className="max-h-[36rem] overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-secondary p-4 text-xs text-foreground">
+          <pre className="max-h-[36rem] overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-secondary p-4 text-xs text-foreground" data-snapshot-preview>
             {markdownPreview}
           </pre>
         </CardContent>

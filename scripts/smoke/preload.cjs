@@ -5,7 +5,14 @@
 const IDENTITY = { email: "smoke.test@enphaseenergy.com" };
 const USERS = [{ id: "smoke-user", email: IDENTITY.email, full_name: "Smoke Test", display_name: "Smoke Test", app_role: "admin", additional_roles: [] }];
 if (process.argv.includes("--console-only")) USERS[0].app_role = "super_admin";
+// Suites may replace the SOP fixture with window.__smokeSopDocs; every SOP mock reads and writes the same list.
+const sopDocs = () => window.__smokeSopDocs || SOPS;
 const SOPS = [
+  {id:"panel-forms-smoke", title:"Smoke Panels RMA", category:"Panel-Module RMA",
+    content_html:'<p><a href="https://manufacturer.example/claim">Claim form</a></p>', files:[], updated_date:"2026-10-13T00:00:00Z"},
+  {id:"panel-rma-smoke", title:"Standard RMA Submission Steps", category:"Panel-Module RMA",
+    content_html:"<ol><li>Gather panel model and serial numbers.</li><li>Attach clear photos in JPG or PNG.</li><li>Proof of purchase (if required).</li></ol>",
+    files:[], updated_date:"2026-10-13T00:00:00Z"},
   {id: "smoke-section", kind: "section", title: "General", order: 0},
   {id: "workbook-legacy", kind: "workbook", title: "Legacy workbook", order: 1},
   {id: "smoke-legacy-section", kind: "section", title: "O&M Marketplace", workbook_id: "workbook-legacy", order: 0},
@@ -17,6 +24,10 @@ function respond(path, args) {
   const key = path.join(".");
   window.__smokeCalls[key] = (window.__smokeCalls[key] || 0) + 1;
   const last = path[path.length - 1];
+  if (key === "panelRmaForms.open") {
+    if (window.__smokeMissingPanelFormHandler) return Promise.reject(new Error("No handler registered for 'panelRmaForms:open'"));
+    return Promise.resolve({ok:true});
+  }
   if (key.startsWith("retroGames.")) {
     const games = window.__smokeGames ||= [];
     const scores = window.__smokeArcadeScores ||= {};
@@ -95,17 +106,19 @@ function respond(path, args) {
   if (key === "sops.save") {
     if (window.__smokeSopSaveError) return Promise.resolve({ok: false, error: window.__smokeSopSaveError});
     const record = {...args[0], id: args[0].id || crypto.randomUUID(), deleted: false};
-    const index = SOPS.findIndex((doc) => doc.id === record.id);
-    if (index < 0) SOPS.push(record);
-    else SOPS[index] = record;
-    sopListeners.forEach((listener) => listener([...SOPS]));
+    const docs = window.__smokeSopDocs || SOPS;
+    const index = docs.findIndex((doc) => doc.id === record.id);
+    if (index < 0) docs.push(record);
+    else docs[index] = record;
+    sopListeners.forEach((listener) => listener([...docs]));
     return Promise.resolve({ok: true, record});
   }
+  if (key === "sops.uploadFile") return Promise.resolve({ok:true,file:{fileId:"uploaded-blank-form",name:args[0].name,type:args[0].type,size:args[0].bytes.length}});
   if (key === "sops.delete") {
-    const record = SOPS.find((doc) => doc.id === args[0]);
+    const record = sopDocs().find((doc) => doc.id === args[0]);
     if (!record) return Promise.resolve({ok: false, reason: "not_found"});
     record.deleted = true;
-    sopListeners.forEach((listener) => listener([...SOPS]));
+    sopListeners.forEach((listener) => listener([...sopDocs()]));
     return Promise.resolve({ok: true});
   }
   if (key === "sops.prepareOneNote") {
@@ -126,15 +139,58 @@ function respond(path, args) {
     const title = n ? "Second OneNote section" : "OneNote imported section";
     const sectionId = args[0].sectionId || `smoke-imported-section${n}`;
     const parentPageId = args[0].sectionId ? `smoke-import-parent${n}` : null;
-    if (!args[0].sectionId) SOPS.push({id: sectionId, kind: "section", title, workbook_id: "workbook-sop-library"});
-    else SOPS.push({id: parentPageId, title, section_id: sectionId, parent_id: null, files: []});
-    SOPS.push({id: `smoke-imported-page${n}`, title: n ? "Second imported page" : "Imported parent", section_id: sectionId, parent_id: parentPageId, files: [], content_html: "<p>Imported rich text</p>"});
-    sopListeners.forEach((listener) => listener([...SOPS]));
+    if (!args[0].sectionId) sopDocs().push({id: sectionId, kind: "section", title, workbook_id: "workbook-sop-library"});
+    else sopDocs().push({id: parentPageId, title, section_id: sectionId, parent_id: null, files: []});
+    sopDocs().push({id: `smoke-imported-page${n}`, title: n ? "Second imported page" : "Imported parent", section_id: sectionId, parent_id: parentPageId, files: [], content_html: "<p>Imported rich text</p>"});
+    sopListeners.forEach((listener) => listener([...sopDocs()]));
     return Promise.resolve({ok: true, sectionId, parentPageId, imported: 1});
   }
   if (/^on[A-Z]/.test(last)) return () => {};
   if (key === "auth.getVerifiedIdentity") return Promise.resolve(IDENTITY);
   if (key === "auth.hasAccount") return Promise.resolve(true);
+  if (key === "quoteBacklog.get") return Promise.resolve(window.__smokeBacklog?.[args[0]] || {ok: true, live: false, snapshot: null});
+  if (key === "collections.create" && args[0] === "autoDrafterGeneratedDrafts") {
+    const records = (window.__smokeCollections ||= {}).autoDrafterGeneratedDrafts ||= [];
+    if (records.some(record => record.caseNumber === args[1].caseNumber)) return Promise.reject(new Error("This case already has a saved Auto-Drafter quote."));
+    records.push(structuredClone(args[1]));
+    return Promise.resolve(structuredClone(args[1]));
+  }
+  if (key === "collections.update" && args[0] === "autoDrafterGeneratedDrafts") {
+    const records = window.__smokeCollections?.autoDrafterGeneratedDrafts || [];
+    const index = records.findIndex(record => record.id === args[1]);
+    if (index < 0) return Promise.reject(new Error("Record not found"));
+    records[index] = structuredClone(args[2]);
+    return Promise.resolve(structuredClone(args[2]));
+  }
+  if (key === "collections.delete" && args[0] === "autoDrafterGeneratedDrafts") {
+    const records = window.__smokeCollections?.autoDrafterGeneratedDrafts || [];
+    window.__smokeCollections.autoDrafterGeneratedDrafts = records.filter(record => record.id !== args[1]);
+    return Promise.resolve({ok:true});
+  }
+  if (key.startsWith("collections.") && args[0] === "autoDrafterCustomProducts" && key !== "collections.list") {
+    const collections = window.__smokeCollections ||= {};
+    const rows = (collections.autoDrafterCustomProducts ||= []).filter(row => row.id !== (key === "collections.create" ? args[1].id : args[1]));
+    if (key !== "collections.delete") rows.push(structuredClone(key === "collections.create" ? args[1] : args[2]));
+    collections.autoDrafterCustomProducts = rows;
+    return Promise.resolve(key === "collections.delete" ? {ok:true} : structuredClone(rows[rows.length - 1]));
+  }
+  if (["collections.create", "collections.update"].includes(key) && ["rmas", "pvManufacturers"].includes(args[0])) {
+    const collections = window.__smokeCollections ||= {};
+    const rows = collections[args[0]] ||= [];
+    if (key === "collections.create") {
+      const saved = {...args[1], id: args[1]?.id || `smoke-${rows.length}`, updated_date: new Date().toISOString()};
+      rows.push(saved);
+      return Promise.resolve(structuredClone(saved));
+    }
+    const index = rows.findIndex(row => row.id === args[1]);
+    if (index < 0) return Promise.reject(new Error("Record not found"));
+    if (args[3] && Object.hasOwn(args[3], "expectedUpdatedDate") && rows[index].updated_date !== args[3].expectedUpdatedDate) {
+      return Promise.reject(new Error("This RMA changed while you were editing. Reopen it before saving."));
+    }
+    rows[index] = {...rows[index], ...args[2], updated_date: new Date().toISOString()};
+    return Promise.resolve(structuredClone(rows[index]));
+  }
+  if (key === "collections.list" && window.__smokeCollections?.[args[0]]) return Promise.resolve(structuredClone(window.__smokeCollections[args[0]]));
   if (key === "collections.list") return Promise.resolve(args[0] === "users" ? USERS :
     args[0] === "supervisorReportTables" ? window.__smokeWorkTables || [] : []);
   if (key === "quotes.list") return Promise.resolve(window.__smokePaidQuotes || []);
@@ -149,7 +205,8 @@ function respond(path, args) {
       resolve(structuredClone(record));
     }, window.__smokeQuoteSaveDelay || 0);
   });
-  if (key === "largeTables.get" || key === "updater.getState") return Promise.resolve(null);
+  if (key === "largeTables.get") return Promise.resolve(window.__smokeLargeTables?.[args[0]] || null);
+  if (key === "updater.getState") return Promise.resolve(null);
   if (key === "ui.getInfo") return Promise.resolve({ appVersion: "smoke", uiVersion: null });
   if (key === "remoteSync.checkStatus") return Promise.resolve({ ok: true });
   const teammateProfile = {email: "teammate@example.invalid", name: "Retro Teammate", mood: "Testing", html: "<h1>Teammate profile</h1>", css: ""};
@@ -190,7 +247,8 @@ function respond(path, args) {
     window.__smokeUploadedAvatar = {type: args[0].type, bytes: Array.from(args[0].bytes)};
     return Promise.resolve({ok: true, avatarId: "a".repeat(64)});
   }
-  if (key === "sops.list") return Promise.resolve([...SOPS]);
+  if (key === "sops.sync" && window.__smokeRmaSopRefreshFail) return Promise.resolve({ok:false,error:"SOP refresh unavailable"});
+  if (key === "sops.list") return Promise.resolve([...(window.__smokeSopDocs || SOPS)]);
   if (/^(list|filter|getAll|getUsers)/.test(last) || key.endsWith(".list")) return Promise.resolve([]);
   if (/^get/.test(last)) return Promise.resolve(null);
   return Promise.resolve({ ok: true });

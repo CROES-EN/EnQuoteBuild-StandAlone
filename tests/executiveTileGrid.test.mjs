@@ -27,9 +27,13 @@ test("Executive grid applies equal sizing to every tile and preserves reorder be
   );
   let reordered;
   const tiles = ["a", "b", "c", "d", "e"].map(id => ({id, render: () => React.createElement("div", null, id)}));
-  const html = renderToStaticMarkup(React.createElement(module.exports.default, {tiles, onReorder: ids => { reordered = ids; }}));
+  const freshness = {a: {text: "Live from EnQuote", stale: false, tone: "live"}, b: {text: "Imported May 1 · Staffing", stale: true, tone: "stale"}};
+  const html = renderToStaticMarkup(React.createElement(module.exports.default, {tiles, onReorder: ids => { reordered = ids; }, freshnessFor: id => freshness[id]}));
   assert.match(html, /grid auto-rows-fr grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4/);
-  assert.equal((html.match(/\[&amp;&gt;div\]:h-full/g) || []).length, 5);
+  // Wrapper stretches the tile + caption column, and the column stretches the tile itself.
+  assert.equal((html.match(/\[&amp;&gt;div\]:h-full/g) || []).length, 10);
+  assert.equal((html.match(/data-tile-freshness=/g) || []).length, 2);
+  assert.match(html, /data-tile-freshness="stale"[^>]*>.*Stale · Imported May 1 · Staffing/);
   onDragEnd({source: {index: 0}, destination: {index: 4}});
   assert.deepEqual(reordered, ["b", "c", "d", "e", "a"]);
   assert.deepEqual(tiles.map(tile => tile.id), ["a", "b", "c", "d", "e"]);

@@ -18,6 +18,7 @@
  */
 
 import {retryBridgeCall} from "@/features/supervisorDashboard/retryBridgeCall";
+import {reviewCaseKey} from "@/features/autoDrafter/caseKey";
 
 const COLLECTION = "autoDrafterGeneratedDrafts";
 const BROWSER_STORAGE_KEY = "enquote_autodrafter_generated_drafts_v1";
@@ -34,20 +35,16 @@ export function isElectronBacked() {
 }
 
 function readBrowserStorage() {
-  try {
-    const raw = globalThis.window?.localStorage?.getItem(BROWSER_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
+  const raw = globalThis.window?.localStorage?.getItem(BROWSER_STORAGE_KEY);
+  const records = raw ? JSON.parse(raw) : [];
+  if (!Array.isArray(records)) throw new Error("Saved Auto-Drafter quote storage is invalid.");
+  return records;
 }
 
 function writeBrowserStorage(records) {
-  try {
-    globalThis.window?.localStorage?.setItem(BROWSER_STORAGE_KEY, JSON.stringify(records));
-  } catch {
-    // Best-effort only, matching importedTableStore.js's same non-throwing convention.
-  }
+  const storage = globalThis.window?.localStorage;
+  if (!storage) throw new Error("Saved Auto-Drafter quote storage is unavailable.");
+  storage.setItem(BROWSER_STORAGE_KEY, JSON.stringify(records));
 }
 
 async function listLocalOnly() {
@@ -56,11 +53,46 @@ async function listLocalOnly() {
   return readBrowserStorage();
 }
 
+const DESCRIPTIVE_SERVICE_REASON = "Installation/service labor already covered by the FST's on-site labor hours";
+
+function isDescriptiveServiceItem(item) {
+  return Number(item?.unit_price) === 0 && Number(item?.total || 0) === 0 &&
+    String(item?.confidence_reason || "").startsWith(DESCRIPTIVE_SERVICE_REASON);
+}
+
+// Older unsent drafts carried $0 descriptive service lines; sent drafts stay untouched.
+export function withoutDescriptiveServiceItems(record) {
+  const items = record?.draft?.items;
+  if (record?.sentToQuotes || !Array.isArray(items) || !items.some(isDescriptiveServiceItem)) return record;
+  return {...record, draft: {...record.draft, items: items.filter(item => !isDescriptiveServiceItem(item))}};
+}
+
 /**
  * Returns every saved Auto-Drafter generated draft record.
  */
 export async function listGeneratedDrafts() {
-  return listLocalOnly();
+  return (await listLocalOnly()).map(withoutDescriptiveServiceItems);
+}
+
+export async function createGeneratedDraftIfMissing(caseNumber, payload) {
+  const existing = await listLocalOnly();
+  const match = existing.find(record => reviewCaseKey(record.caseNumber ?? record.id) === reviewCaseKey(caseNumber));
+  if (match) return {record: match, created: false};
+  const record = {id: String(caseNumber), caseNumber: String(caseNumber), ...payload};
+  const bridge = localBridge();
+  if (bridge) {
+    try {
+      await retryBridgeCall("collections:create (autoDrafterGeneratedDrafts)", () => bridge.create(COLLECTION, record));
+    } catch (error) {
+      if (!String(error.message).includes("This case already has a saved Auto-Drafter quote.")) throw error;
+      const saved = (await listLocalOnly()).find(item => reviewCaseKey(item.caseNumber ?? item.id) === reviewCaseKey(caseNumber));
+      if (!saved) throw error;
+      return {record: saved, created: false};
+    }
+  } else {
+    writeBrowserStorage([...existing, record]);
+  }
+  return {record, created: true};
 }
 
 /**
@@ -69,7 +101,7 @@ export async function listGeneratedDrafts() {
 export async function getGeneratedDraftForCase(caseNumber) {
   if (!caseNumber) return null;
   const all = await listLocalOnly();
-  return all.find((item) => item.id === String(caseNumber)) || null;
+  return withoutDescriptiveServiceItems(all.find((item) => item.id === String(caseNumber)) || null);
 }
 
 /**

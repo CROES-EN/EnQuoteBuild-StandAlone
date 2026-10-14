@@ -114,6 +114,66 @@
   box-shadow: 0 0 20px 6px hsl(var(--primary) / 0.4);
 }
 
+/* Golden Quotes: gold tile with a periodic shine sweep. */
+.golden-quote-card {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid #d4a017 !important;
+  background: linear-gradient(135deg, #fff8d6 0%, #fde68a 35%, #fbbf24 60%, #fef3c7 100%) !important;
+  color: #3b2a00;
+  box-shadow: 0 0 0 1px rgba(212, 160, 23, 0.35), 0 8px 24px -8px rgba(180, 120, 0, 0.55);
+}
+
+.golden-quote-card::after {
+  content: "";
+  position: absolute;
+  inset: -50% auto -50% -60%;
+  width: 45%;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 0%, rgba(255, 255, 255, 0.75) 50%, transparent 100%);
+  transform: skewX(-20deg);
+  animation: golden-quote-shine 3.5s ease-in-out infinite;
+}
+
+.golden-quote-card > * {
+  position: relative;
+  z-index: 2;
+}
+
+.golden-quote-card .text-foreground,
+.golden-quote-card .text-muted-foreground {
+  color: #4a3500 !important;
+}
+
+.dark .golden-quote-card {
+  border-color: #f5c542 !important;
+  background: linear-gradient(135deg, #4a3500 0%, #8a6400 40%, #c99a14 65%, #5c4300 100%) !important;
+  color: #fff7d6;
+}
+
+.dark .golden-quote-card .text-foreground,
+.dark .golden-quote-card .text-muted-foreground {
+  color: #fff3c4 !important;
+}
+
+.golden-quote-badge {
+  background: linear-gradient(135deg, #b7791f, #f6c945, #b7791f);
+  color: #2b1d00;
+  border: 1px solid #a16207;
+  font-weight: 600;
+}
+
+@keyframes golden-quote-shine {
+  0%, 55% { left: -60%; }
+  100% { left: 130%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .golden-quote-card::after { animation: none; display: none; }
+}
+
 .quote-detail-fields {
   display: flex;
   flex-direction: column;

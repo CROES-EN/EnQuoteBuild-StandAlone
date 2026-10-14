@@ -4,139 +4,44 @@ import {Button} from "@/components/ui/button";
 import {Card} from "@/components/ui/card";
 import {Input} from "@/components/ui/input";
 import {Textarea} from "@/components/ui/textarea";
-import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import StatusBadge from "@/components/quotes/StatusBadge";
+import CareEligibilityBanner from "@/components/quotes/CareEligibilityBanner";
+import {parseQuoteRequestCase} from "@/features/autoDrafter/parseQuoteRequestCase";
+import {getRequestRoutingFlags} from "@/features/autoDrafter/requestRoutingFlags";
+import {classifyQuoteRequest} from "@/features/autoDrafter/requestClassification";
+import {applySourceInputCorrections, exceededSourceInputs} from "@/features/autoDrafter/sourceInputCorrections";
+import RequestReviewSummary from "./RequestReviewSummary";
 import {calculateQuoteTotals} from "@/utils/quoteCalculations";
 import {createQuote, getCurrentUser} from "@/api/dataClient";
 import {saveGeneratedDraft} from "@/features/autoDrafter/autoDrafterDraftsStore";
-import {listQuoteRequestReviews} from "@/features/supervisorDashboard/importedTableStore";
-import {assertRequestCanBeDrafted} from "@/features/autoDrafter/improperQuoteRequests";
+import {quoteContentSignature, requestSnapshot} from "@/features/goldenQuotes/goldenQuotes";
 import {createPageUrl} from "@/utils";
-import {PRODUCT_CATALOG} from "@/features/quoteDraftAgent/productCatalog";
+import CatalogPickerDialog from "./CatalogPickerDialog";
+import {CompatibilityFlagRow, EnphaseSpecLine, draftReviewFlags} from "./DraftReviewFlags";
+import {forgetLearnedSwap, saveLearnedSwap} from "@/features/quoteDraftAgent/learnedSwapsStore";
+import {isReviewerLearnedCorrection} from "@/features/quoteDraftAgent/learnedCorrections";
+import {findSourceExcerpt, itemRequestedPhrase} from "@/features/autoDrafter/sourceLineExcerpt";
 import {toast} from "sonner";
 import {format} from "date-fns";
 import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
 import {
-    AlertTriangle,
     ArrowLeft,
+    ArrowLeftRight,
     Calendar,
     ExternalLink,
     FileText,
     Hash,
-    Info,
     Loader2,
     MapPin,
     Pencil,
     Plus,
     Search,
     Send,
-    ShieldAlert,
     ShieldCheck,
     Trash2,
     User,
     Users
 } from "lucide-react";
-
-// FIX (per explicit request: "properly use this type of search to add items" in
-// Auto-Drafter, matching the manual Quotes page): the SAME fuzzy, tolerant matching
-// logic just built and tested for QuoteItemSelector.jsx (the manual quote item picker),
-// kept as its own local, self-contained copy here rather than a shared import -- Auto-
-// Drafter's AUTOMATIC line-item matching (draftEngine.js's findBestCatalogMatch()) is
-// deliberately kept strict (whole-word, ordered phrase matching) to avoid the exact
-// false-positive risk already fixed once tonight (the ZNSHINE/"Solar Panel Clips" bug).
-// This fuzzy picker is ONLY ever used as a MANUAL, human-initiated action -- a reviewer
-// explicitly searching to replace an unmatched or low-confidence item -- never as part
-// of automatic matching, so the tolerance/risk tradeoff here is appropriate.
-function normalizeSizeNotation(text) {
-  let result = String(text || "");
-  result = result.replace(
-    /(\d+)\s*\/\s*(\d+)\s*[-]?\s*(?:inch(?:es)?|in\.?|")/gi,
-    (match, num, denom) => `${num}over${denom}in`
-  );
-  result = result.replace(
-    /(\d+(?:\.\d+)?)\s*[-]?\s*(?:inch(?:es)?|in\.?|")/gi,
-    (match, num) => `${num.replace(".", "p")}in`
-  );
-  return result;
-}
-
-function normalizeForSearch(text) {
-  return normalizeSizeNotation(text)
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function tokenizeForSearch(text) {
-  return normalizeForSearch(text).split(" ").filter(Boolean);
-}
-
-function fuzzyMatches(name, description, searchTerm) {
-  const searchTokens = tokenizeForSearch(searchTerm);
-  if (searchTokens.length === 0) return true;
-  const haystackTokens = [...tokenizeForSearch(name), ...tokenizeForSearch(description || "")];
-  return searchTokens.every((searchToken) =>
-    haystackTokens.some((token) => token.includes(searchToken))
-  );
-}
-
-// Lets a reviewer manually search the real product catalog and replace an unmatched or
-// low-confidence line item with a genuine, priced catalog entry -- opened via the new
-// "Find in Catalog" button next to each line item while editing. Purely a manual,
-// human-initiated lookup; never called automatically.
-function CatalogPickerDialog({ open, onOpenChange, onSelect }) {
-  const [searchTerm, setSearchTerm] = useState("");
-  const results = searchTerm.trim().length > 0
-    ? PRODUCT_CATALOG.filter((p) => fuzzyMatches(p.name, "", searchTerm)).slice(0, 30)
-    : [];
-
-  function handleSelect(product) {
-    onSelect(product);
-    onOpenChange(false);
-    setSearchTerm("");
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) setSearchTerm(""); }}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Find in Catalog</DialogTitle>
-          <DialogDescription>
-            Search the real product catalog to replace this line item with a genuine, priced match.
-          </DialogDescription>
-        </DialogHeader>
-        <Input
-          autoFocus
-          placeholder="Search catalog..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-        <div className="max-h-72 overflow-y-auto space-y-1 mt-2">
-          {results.map((product, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => handleSelect(product)}
-              className="w-full text-left p-2 rounded-lg hover:bg-secondary flex items-center justify-between gap-2"
-            >
-              <div className="min-w-0">
-                <p className="font-medium text-foreground truncate text-sm">{product.name}</p>
-                <p className="text-xs text-muted-foreground">{product.category}</p>
-              </div>
-              <span className="text-sm font-medium text-foreground shrink-0">
-                ${product.unit_price?.toFixed(2)}
-              </span>
-            </button>
-          ))}
-          {searchTerm.trim().length > 0 && results.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-4">No matches found.</p>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 /**
  * AutoDrafterDraftDetails - a full-page view of a single saved Auto-Drafter generated
@@ -186,30 +91,53 @@ function ConfidenceBadge({ confidence }) {
     low: "Not in Catalog"
   };
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${styles[confidence] || "bg-slate-100 text-slate-700"}`}>
+    <span className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium leading-5 ${styles[confidence] || "bg-slate-100 text-slate-700"}`}>
       {labels[confidence] || confidence || "unknown"}
     </span>
   );
 }
 
-function CompatibilityFlagRow({ flag }) {
-  const config = {
-    blocked: { icon: ShieldAlert, className: "border-rose-200 bg-rose-50 text-rose-800" },
-    review_required: { icon: AlertTriangle, className: "border-amber-200 bg-amber-50 text-amber-800" },
-    verified_compatible: { icon: ShieldCheck, className: "border-emerald-200 bg-emerald-50 text-emerald-800" }
-  }[flag.status] || { icon: Info, className: "border-slate-200 bg-slate-50 text-slate-700" };
-  const Icon = config.icon;
-
+// Shows the O&M request text a low-confidence or unmatched line item came from.
+function SourceLineReview({ item, source, open, onToggle, canSwap, onSwap, onForget }) {
+  const phrase = itemRequestedPhrase(item);
+  const learned = isReviewerLearnedCorrection(phrase);
+  const excerpt = open ? findSourceExcerpt(source, item) : null;
+  const line = item.source_line;
   return (
-    <div className={`flex items-start gap-2 rounded-lg border p-3 text-sm ${config.className}`}>
-      <Icon className="mt-0.5 h-4 w-4 shrink-0" />
-      <div>
-        <p className="font-medium">{flag.triggerItem}</p>
-        <p>{flag.reason}</p>
+    <div className="mt-1">
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" className="text-xs font-medium text-indigo-600 hover:underline" onClick={onToggle} aria-expanded={open}>
+          {open ? "Hide O&M request" : "View in O&M request"}
+        </button>
+        {canSwap && <button type="button" className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:underline" onClick={onSwap}>
+          <ArrowLeftRight className="h-3 w-3" /> Swap item
+        </button>}
+        {learned && <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-xs text-indigo-700">
+          Learned swap
+          <button type="button" className="underline" onClick={() => onForget(phrase)}>Forget</button>
+        </span>}
       </div>
+      {open && (
+        <div data-source-line-review className="mt-2 rounded-lg border border-border bg-secondary/40 p-3 text-xs">
+          {(phrase || line) && <p className="mb-2 text-foreground">
+            <span className="font-medium">Requested:</span> {phrase || item.name}
+            {line?.quantity != null && line.quantity !== "" ? ` · Qty ${line.quantity}${line.unit ? ` ${line.unit}` : ""}` : ""}
+            {line?.notes ? ` · Notes: ${line.notes}` : ""}
+          </p>}
+          {excerpt ? (
+            <pre className="whitespace-pre-wrap font-sans text-muted-foreground">{excerpt.lines.map((text, i) => (
+              <span key={i} className={i === excerpt.matchIndex ? "block rounded bg-amber-100 px-1 font-medium text-amber-900" : "block px-1"}>{text || " "}</span>
+            ))}</pre>
+          ) : (
+            <p className="italic text-muted-foreground">This item&rsquo;s text was not found in the current O&M request comment.</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
+
+const NEW_ITEM = "new";
 
 // Generates a real quote number in the EXACT SAME format/logic CreateQuote.jsx uses.
 function generateRealQuoteNumber() {
@@ -218,17 +146,33 @@ function generateRealQuoteNumber() {
   return `Q-${ts}${rand}`;
 }
 
-export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, onRecordUpdated }) {
+export default function AutoDrafterDraftDetails({
+  record, caseNumber, sourceComment, classification, hygiene, careEligibility, careError,
+  onRetryCare, onPanelRma, onHygieneReview, onBack, onRecordUpdated
+}) {
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [editedDraft, setEditedDraft] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [pickerIndexOpen, setPickerIndexOpen] = useState(null);
+  const [sourceOpen, setSourceOpen] = useState(() => new Set());
+  const [, setLearnedVersion] = useState(0);
 
   if (!record) return null;
 
   const draft = isEditing ? editedDraft : (record.draft || {});
+  const source = sourceComment ?? record.sourceComment ?? "";
+  const sourceRequest = parseQuoteRequestCase(source).request;
+  const exceededInputs = exceededSourceInputs(draft, source);
+  const routingFlags = getRequestRoutingFlags(source, careEligibility);
+  const sourceWarnings = [...new Set([
+    ...(record.parseWarnings || []),
+    ...(record.sourceComment && source.trim() !== record.sourceComment.trim()
+      ? ["The request comment changed after this draft was generated. Review the saved scope and quantities; existing quote contents and edits have not been overwritten."] : []),
+    ...(sourceRequest.multipleQuoteOptions ? ["Separate quote options before sending: the source requests alternatives. Review each option and its quantities; this saved draft may combine them."] : []),
+    ...exceededInputs.map(check => `Saved ${check.label.toLowerCase()} exceed the request: source "${check.raw}" allows up to ${check.value}; saved ${draft[check.field]}. Review before sending, or use "Apply request values".`)
+  ])];
   const draftWithItems = { ...draft, items: draft.items || [] };
   const {
     itemsSubtotal,
@@ -249,20 +193,7 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
     ? format(new Date(record.generatedAt), "MMM d, yyyy 'at' h:mm a")
     : "Unknown";
 
-  const allFlags = [
-    ...(draft.compatibility_flags || []),
-    ...(draft.legacy_warnings || []).map((w) => ({ status: "review_required", ...w })),
-    ...(draft.dependency_advisories || []).map((a) => ({
-      status: "review_required",
-      triggerItem: a.triggerItem,
-      reason: a.note || a.reason || "Advisory accessory suggestion -- review before finalizing."
-    })),
-    ...(draft.material_size_flags || []).map((f) => ({
-      status: "review_required",
-      triggerItem: f.type === "size_mismatch" ? "Conduit Size" : "Conduit Material",
-      reason: f.reason
-    }))
-  ];
+  const allFlags = draftReviewFlags(draft, sourceComment || record.sourceComment || "");
 
   function startEditing() {
     // Deep-clone the draft so edits never mutate the saved record until "Save Changes"
@@ -295,29 +226,94 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
   // Replaces a line item with a genuine, priced catalog match selected via
   // CatalogPickerDialog -- sets confidence to "high" with a reason noting this was a
   // manual reviewer match, so it no longer shows "Item not found in Catalog" once saved.
-  function applyCatalogMatch(index, product) {
-    setEditedDraft((prev) => {
-      const items = [...(prev.items || [])];
-      const item = { ...items[index] };
-      const qty = parseFloat(item.quantity) || 1;
-      item.name = product.name;
-      item.unit_price = product.unit_price;
-      item.unit = product.unit || item.unit || "each";
-      item.tax_code = product.tax_code || item.tax_code;
-      item.confidence = "high";
-      item.confidence_reason = "Manually matched to a real catalog item by reviewer.";
-      item.total = Math.round(qty * item.unit_price * 100) / 100;
-      items[index] = item;
-      return { ...prev, items };
+  function swappedItem(original, product, remembered) {
+    const item = { ...original };
+    const qty = parseFloat(item.quantity) || 1;
+    const phrase = itemRequestedPhrase(original);
+    if (!item.requested_name && phrase) item.requested_name = phrase;
+    item.name = product.name;
+    item.unit_price = product.unit_price;
+    item.unit = product.unit || item.unit || "each";
+    item.tax_code = product.tax_code || item.tax_code;
+    item.confidence = "high";
+    item.confidence_reason = remembered
+      ? `Swapped by reviewer. Future drafts use this item when a request says "${phrase}".`
+      : "Manually matched to a real catalog item by reviewer.";
+    item.total = Math.round(qty * item.unit_price * 100) / 100;
+    return item;
+  }
+
+  async function rememberSwap(original, product) {
+    const phrase = itemRequestedPhrase(original);
+    try {
+      const user = await getCurrentUser().catch(() => null);
+      await saveLearnedSwap({ phrase, catalogName: product.name, previousName: original.name, taughtBy: user?.email, caseNumber });
+      setLearnedVersion((value) => value + 1);
+      toast.success(`EnQuote learned: "${phrase}" → ${product.name}`);
+    } catch (error) {
+      console.error("Failed to save learned swap:", error);
+      toast.error("The item was swapped, but the swap could not be remembered.");
+    }
+  }
+
+  async function applyCatalogMatch(index, product, remember = false) {
+    const original = (draft.items || [])[index];
+    if (!original) return;
+    if (isEditing) {
+      setEditedDraft((prev) => {
+        const items = [...(prev.items || [])];
+        items[index] = swappedItem(items[index], product, remember);
+        return { ...prev, items };
+      });
+    } else {
+      const items = [...(record.draft?.items || [])];
+      items[index] = swappedItem(items[index], product, remember);
+      const updatedRecord = { ...record, draft: { ...record.draft, items }, editedBeforeSend: true };
+      try {
+        await saveGeneratedDraft(caseNumber, updatedRecord);
+        onRecordUpdated?.(updatedRecord);
+      } catch (error) {
+        console.error("Failed to save swapped item:", error);
+        toast.error("Could not save the swapped item -- see console for details.");
+        return;
+      }
+    }
+    if (remember) await rememberSwap(original, product);
+  }
+
+  async function handleForgetSwap(phrase) {
+    try {
+      await forgetLearnedSwap(phrase);
+      setLearnedVersion((value) => value + 1);
+      toast.success(`EnQuote will no longer auto-swap "${phrase}".`);
+    } catch (error) {
+      console.error("Failed to forget learned swap:", error);
+      toast.error("Could not remove the learned swap.");
+    }
+  }
+
+  function toggleSource(index) {
+    setSourceOpen((previous) => {
+      const next = new Set(previous);
+      if (next.has(index)) next.delete(index); else next.add(index);
+      return next;
     });
   }
 
+  // New lines always come from the catalog (or a product the reviewer adds to it in the picker).
   function addItem() {
+    setPickerIndexOpen(NEW_ITEM);
+  }
+
+  function addCatalogItem(product) {
+    const unitPrice = Number(product.unit_price) || 0;
     setEditedDraft((prev) => ({
       ...prev,
       items: [
         ...(prev.items || []),
-        { name: "New Item", quantity: 1, unit: "each", unit_price: 0, total: 0, taxable: true, confidence: "low" }
+        { name: product.name, sku: product.sku || "", quantity: 1, unit: product.unit || "each", unit_price: unitPrice,
+          total: Math.round(unitPrice * 100) / 100, taxable: true, tax_code: product.tax_code, confidence: "high",
+          confidence_reason: "Added from the catalog by reviewer." }
       ]
     }));
   }
@@ -329,10 +325,26 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
     }));
   }
 
+  async function handleApplySourceInputs() {
+    if (isEditing) {
+      setEditedDraft(prev => applySourceInputCorrections(prev, exceededInputs));
+      return;
+    }
+    const updatedRecord = { ...record, draft: applySourceInputCorrections(record.draft, exceededInputs), editedBeforeSend: true };
+    try {
+      await saveGeneratedDraft(caseNumber, updatedRecord);
+      onRecordUpdated?.(updatedRecord);
+      toast.success(`Applied request values: ${exceededInputs.map(check => `${check.label} ${check.value}`).join(", ")}.`);
+    } catch (error) {
+      console.error("Failed to apply request values:", error);
+      toast.error("Could not save the corrected values -- see console for details.");
+    }
+  }
+
   async function handleSaveChanges() {
     setIsSaving(true);
     try {
-      const updatedRecord = { ...record, draft: editedDraft };
+      const updatedRecord = { ...record, draft: editedDraft, editedBeforeSend: true };
       await saveGeneratedDraft(caseNumber, updatedRecord);
       onRecordUpdated?.(updatedRecord);
       setIsEditing(false);
@@ -349,14 +361,13 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
   async function handleSendToQuotes() {
     setIsSending(true);
     try {
-      assertRequestCanBeDrafted(await listQuoteRequestReviews(), caseNumber);
       const user = await getCurrentUser();
       const realQuoteNumber = generateRealQuoteNumber();
       const now = new Date().toISOString();
 
       const draftTotals = calculateQuoteTotals({ ...draft, items: draft.items || [] });
 
-      const newQuote = await createQuote({
+      const quotePayload = {
         site_id: draft.site_id || record.siteId || "",
         case_number: draft.case_number || caseNumber || "",
         customer: draft.customer || "",
@@ -392,14 +403,17 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
           changed_at: now,
           reason: `Sent from Auto-Drafter (originally ${record.quoteNumber || "no reference"})`
         }]
-      });
+      };
+      const newQuote = await createQuote(quotePayload);
 
       const updatedRecord = {
         ...record,
         sentToQuotes: true,
         realQuoteId: newQuote.id,
         realQuoteNumber: realQuoteNumber,
-        sentAt: now
+        sentAt: now,
+        sentSignature: quoteContentSignature(quotePayload),
+        requestSnapshot: requestSnapshot(classification, hygiene)
       };
       await saveGeneratedDraft(caseNumber, updatedRecord);
       onRecordUpdated?.(updatedRecord);
@@ -486,18 +500,22 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
         </Card>
       )}
 
-      {!isSent && record.parseWarnings && record.parseWarnings.length > 0 && (
-        <Card className="p-4 mb-6 bg-amber-50 border-amber-200">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="font-medium text-amber-800">Some fields could not be parsed from this case</p>
-              <ul className="list-disc pl-5 mt-1 text-sm text-amber-700">
-                {record.parseWarnings.map((w, i) => (
-                  <li key={i}>{w}</li>
-                ))}
-              </ul>
-            </div>
+      <CareEligibilityBanner siteId={record.siteId || draft.site_id} eligibility={careEligibility} />
+      <RequestReviewSummary classification={isEditing ? classifyQuoteRequest(source, draft.items || []) :
+        classification || classifyQuoteRequest(source, draft.items || [])} hygiene={hygiene}
+        routingFlags={routingFlags} sourceWarnings={sourceWarnings}
+        careError={careError} onRetryCare={onRetryCare} onPanelRma={onPanelRma} onHygieneReview={onHygieneReview} />
+
+      {!isSent && exceededInputs.length > 0 && (
+        <Card className="p-4 mb-6 border-amber-300 bg-amber-50" data-source-input-mismatch>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-amber-900">
+              Saved values are higher than the request allows:{" "}
+              {exceededInputs.map(check => `${check.label} ${draft[check.field]} → ${check.value}`).join(" · ")}
+            </p>
+            <Button size="sm" variant="outline" onClick={handleApplySourceInputs} data-apply-source-inputs>
+              Apply request values
+            </Button>
           </div>
         </Card>
       )}
@@ -652,7 +670,7 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
                   <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">Item</th>
                   <th className="text-right py-3 px-2 text-sm font-medium text-muted-foreground">Qty</th>
                   <th className="text-right py-3 px-2 text-sm font-medium text-muted-foreground">Unit Price</th>
-                  {!isEditing && <th className="text-right py-3 px-2 text-sm font-medium text-muted-foreground">Confidence</th>}
+                  {!isEditing && <th className="text-center py-3 px-2 text-sm font-medium text-muted-foreground">Confidence</th>}
                   <th className="text-right py-3 px-2 text-sm font-medium text-muted-foreground">Total</th>
                   {isEditing && <th className="py-3 px-2"></th>}
                 </tr>
@@ -669,8 +687,14 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
                       ) : (
                         <>
                           <p className="font-medium text-foreground">{item.name}</p>
+                          <EnphaseSpecLine item={item} />
                           {item.confidence_reason && (
                             <p className="text-sm text-muted-foreground">{item.confidence_reason}</p>
+                          )}
+                          {(item.confidence !== "high" || isReviewerLearnedCorrection(itemRequestedPhrase(item))) && (
+                            <SourceLineReview item={item} source={source} open={sourceOpen.has(index)}
+                              onToggle={() => toggleSource(index)} canSwap={!isSent}
+                              onSwap={() => setPickerIndexOpen(index)} onForget={handleForgetSwap} />
                           )}
                         </>
                       )}
@@ -704,7 +728,7 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
                       )}
                     </td>
                     {!isEditing && (
-                      <td className="py-3 px-2 text-right">
+                      <td className="py-3 px-2 text-center align-middle whitespace-nowrap">
                         <ConfidenceBadge confidence={item.confidence} />
                       </td>
                     )}
@@ -790,8 +814,13 @@ export default function AutoDrafterDraftDetails({ record, caseNumber, onBack, on
 
       <CatalogPickerDialog
         open={pickerIndexOpen !== null}
+        mode={pickerIndexOpen === NEW_ITEM ? "add" : "swap"}
         onOpenChange={(open) => { if (!open) setPickerIndexOpen(null); }}
-        onSelect={(product) => applyCatalogMatch(pickerIndexOpen, product)}
+        onSelect={(product, remember) => (pickerIndexOpen === NEW_ITEM
+          ? addCatalogItem(product)
+          : applyCatalogMatch(pickerIndexOpen, product, remember))}
+        learnPhrase={pickerIndexOpen !== null && pickerIndexOpen !== NEW_ITEM ? itemRequestedPhrase((draft.items || [])[pickerIndexOpen]) : ""}
+        caseNumber={caseNumber}
       />
 
       {/* Scope of Work */}

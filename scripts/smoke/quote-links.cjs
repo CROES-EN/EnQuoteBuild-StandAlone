@@ -69,7 +69,42 @@ async function runQuoteLinks(win) {
   await waitFor(`window.__smokePaidQuotes[0].status==="draft_without_internal"`, "manual status saved");
   assert.equal(await evaluate(`window.__smokePaidQuotes[0].items[0].product_id`), "existing-part");
   assert.equal(await evaluate(`window.__smokePaidQuotes[0].scope_of_work`), "Saved after navigation");
+  assert.equal(await evaluate(`(() => {
+    const bar = document.querySelector('[aria-label="Quote actions"]');
+    const order = [...bar.querySelectorAll('[role="combobox"], button')].map(node => node.getAttribute("role") === "combobox" ? "status" : node.textContent.trim());
+    return order.indexOf("status") === 0 && order.indexOf("Submit / edit Panel RMA") > 0;
+  })()`), true, "status dropdown comes before Submit / edit Panel RMA");
   console.log("ok   Quote saves: delayed persistence survives immediate navigation and reopening.");
+
+  await evaluate(`location.hash="#/EditQuote?id=old-version"`);
+  await waitFor(`[...document.querySelectorAll('button')].some(button=>button.textContent.trim()==="Quote Draft Agent")`, "Quote Draft Agent button");
+  await evaluate(`[...document.querySelectorAll('button')].find(button=>button.textContent.trim()==="Quote Draft Agent").click()`);
+  await waitFor(`Boolean(document.querySelector('[role="dialog"] textarea'))`, "agent paste box");
+  await evaluate(`(() => {
+    const field=document.querySelector('[role="dialog"] textarea');
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value").set.call(field,
+      "O&M_QUOTE_REQUEST\\nSite Information\\nSite ID: 2397768\\nCase Number: 19837621\\nRecommended Scope of Work\\nScope Description: Replace one IQ8A microinverter on the existing IQ7 system and repair wiring.\\nLabor\\nEstimated Onsite Labor Hours: 2-3\\nProducts\\nItem Name: IQ8A\\nQuantity: 1\\nAdditional Materials\\nItem Name: Mystery widget\\nQuantity: 1");
+    field.dispatchEvent(new Event("input",{bubbles:true}));
+  })()`);
+  await evaluate(`[...document.querySelectorAll('[role="dialog"] button')].find(button=>button.textContent.trim()==="Parse Output").click()`);
+  await waitFor(`Boolean(document.querySelector('[data-agent-review] [data-agent-classification]'))`, "agent request classification");
+  assert.ok(await evaluate(`Boolean(document.querySelector('[role="dialog"] [data-enphase-spec="iq8a"]'))`), "agent shows the IQ8A data sheet line");
+  assert.ok(await evaluate(`Boolean(document.querySelector('[data-agent-flags] [data-flag-status="spec_reference"]'))`), "agent shows the IQ8-with-IQ7 data sheet check");
+  const agentItems = await evaluate(`document.querySelectorAll('[data-agent-item]').length`);
+  await evaluate(`document.querySelector('[data-agent-add-item]').click()`);
+  await waitFor(`[...document.querySelectorAll('[role="dialog"][data-state="open"]')].some(node=>node.innerText.includes("Add Item from Catalog"))`, "agent Add Item opens the catalog");
+  await evaluate(`(() => {
+    const input=[...document.querySelectorAll('[role="dialog"] input[placeholder="Search by name or SKU..."]')].pop();
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value").set.call(input,"IQ8A");
+    input.dispatchEvent(new Event("input",{bubbles:true}));
+  })()`);
+  await waitFor(`Boolean(document.querySelector('[data-catalog-result]'))`, "catalog results");
+  await evaluate(`document.querySelector('[data-catalog-result]').click()`);
+  await waitFor(`document.querySelectorAll('[data-agent-item]').length===${agentItems + 1}`, "agent Add Item appends a catalog line");
+  assert.ok(await evaluate(`Boolean(document.querySelector('[data-agent-review]'))`), "agent dialog stays open after the catalog picker closes");
+  await evaluate(`[...document.querySelectorAll('[role="dialog"] button')].find(button=>button.textContent.trim()==="Apply to Quote").click()`);
+  await waitFor(`!document.querySelector('[data-agent-review]')`, "agent applies and closes");
+  console.log("ok   Quote Draft Agent: Auto-Drafter classification, data sheet checks and catalog Add Item; status dropdown before Panel RMA.");
   console.log("ok   Quote links: current version recovery, explicit duplicate selection, and historical ID navigation.");
 }
 

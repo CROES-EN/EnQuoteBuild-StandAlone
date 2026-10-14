@@ -32,7 +32,7 @@ import {Checkbox} from "@/components/ui/checkbox";
 import {getAllQuoteActivities, getQuotes} from "@/api/dataClient";
 import {buildQuoteLifecycleReport} from "@/features/quoteDashboard/quoteLifecycle";
 import QuotePeriodActivityTile from "@/components/supervisor/QuotePeriodActivityTile";
-import ImproperQuoteRequestsTile from "@/components/supervisor/ImproperQuoteRequestsTile";
+import QuoteRequestHygieneTile from "@/components/supervisor/QuoteRequestHygieneTile";
 import QuoteContributingRecordsDialog from "@/components/supervisor/QuoteContributingRecordsDialog";
 import NiceCallRecordsTable from "@/components/supervisor/NiceCallRecordsTable";
 import SortableRecordHeaders from "@/components/supervisor/SortableRecordHeaders";
@@ -62,6 +62,10 @@ import {
     isReportableQuote
 } from "@/features/supervisorDashboard/quoteOpsMetrics";
 import {computeQuoteAlert} from "@/utils/quoteSLA";
+import {useQuoteBacklog} from "@/features/supervisorDashboard/useQuoteBacklog";
+import QuoteBacklogCard from "@/components/supervisor/QuoteBacklogCard";
+import {backlogDate} from "../../../shared/quoteBacklog.js";
+import {getStatusLabel} from "@/constants/quoteStatuses";
 import {listReportTables} from "@/features/supervisorDashboard/importedTableStore";
 import {
     computeStaffingTeamTotalsV2,
@@ -82,6 +86,11 @@ import {readSharedDashboardPeriod, sharedDashboardTilePath, SHARED_PERIOD_QUERY,
 import QuoteExceptionsPanel from "@/components/supervisor/QuoteExceptionsPanel";
 import DrillDownDrawer from "@/components/supervisor/DrillDownDrawer";
 import HourlyWaitTimeChart from "@/components/supervisor/HourlyWaitTimeChart";
+import HygieneFlagsChart from "@/components/supervisor/HygieneFlagsChart";
+import BacklogFlowChart from "@/components/supervisor/BacklogFlowChart";
+import AutoDrafterAccuracyPanel from "@/components/supervisor/AutoDrafterAccuracyPanel";
+import PanelRmaCyclePanel from "@/components/supervisor/PanelRmaCyclePanel";
+import {describeFreshness, importFreshnessSource} from "@/features/supervisorDashboard/supervisorInsights";
 import TileGrid from "@/components/supervisor/TileGrid";
 import CaseWorkTile, {CaseWorkSettings, readCaseWorkTeam} from "@/components/supervisor/CaseWorkTiles";
 import {buildCaseWorkReport, caseWorkDisplay, parseHistoryDate} from "@/features/supervisorDashboard/caseWorkMetrics";
@@ -436,12 +445,14 @@ const QUOTE_BACKLOG_ALERT_COLUMNS = [
   { key: "status", label: "Status", sortValue: ({ quote }) => quote.status || "" },
   { key: "alertName", label: "Alert", sortValue: ({ alert }) => alert.name || "" },
   { key: "level", label: "Level", sortValue: ({ alert }) => alert.level || "" },
-  { key: "timeInStatus", label: "Time in Status", sortValue: ({ alert }) => alert.timeLabel || "" }
+  { key: "timeInStatus", label: "Time in Status", sortValue: ({ alert }) => alert.hoursInStatus ?? 0 },
+  { key: "overdueHours", label: "Hours overdue", sortValue: ({ alert }) => alert.overdueHours ?? 0 }
 ];
 
-function QuoteBacklogAlertDialog({ open, onOpenChange, rows }) {
-  const [sortKey, setSortKey] = useState(null);
-  const [sortDir, setSortDir] = useState("asc");
+function QuoteBacklogAlertDialog({ open, onOpenChange, rows, date, live }) {
+  const [sortKey, setSortKey] = useState("overdueHours");
+  const [sortDir, setSortDir] = useState("desc");
+  const [status, setStatus] = useState("all");
 
   function handleHeaderClick(column) {
     if (sortKey === column.key) {
@@ -452,10 +463,11 @@ function QuoteBacklogAlertDialog({ open, onOpenChange, rows }) {
     }
   }
 
+  const visibleRows = rows.filter(row => status === "all" || row.quote.status === status);
   const activeColumn = QUOTE_BACKLOG_ALERT_COLUMNS.find((c) => c.key === sortKey);
   const sortedRows = activeColumn
-    ? [...rows].sort((a, b) => compareDialogValues(activeColumn.sortValue(a), activeColumn.sortValue(b), sortDir))
-    : rows;
+    ? [...visibleRows].sort((a, b) => compareDialogValues(activeColumn.sortValue(a), activeColumn.sortValue(b), sortDir))
+    : visibleRows;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -464,9 +476,15 @@ function QuoteBacklogAlertDialog({ open, onOpenChange, rows }) {
           <DialogTitle>Quote Backlog - Quotes with an Active Alert</DialogTitle>
         </DialogHeader>
         <p className="mb-2 text-xs text-muted-foreground">
-          {rows.length} quote{rows.length === 1 ? "" : "s"} currently have an active Alert (yellow or red),
-          per the same Alert logic shown on individual quote cards. Live from EnQuote - not an imported report. Select any column header to sort.
+          {rows.length} quotes with an active SLA Alert on {date}. {live ? "Live today." : "Frozen daily snapshot; later edits do not change this list."} Select a column header to sort numerically by hours overdue.
         </p>
+        <Select value={status} onValueChange={setStatus}>
+          <SelectTrigger aria-label="Backlog status"><SelectValue /></SelectTrigger>
+          <SelectContent><SelectItem value="all">All statuses ({rows.length})</SelectItem>
+            {[...new Set(rows.map(row => row.quote.status))].map(value =>
+              <SelectItem key={value} value={value}>{getStatusLabel(value) || value} ({rows.filter(row => row.quote.status === value).length})</SelectItem>)}
+          </SelectContent>
+        </Select>
         <Table>
           <TableHeader>
             <TableRow>
@@ -484,17 +502,18 @@ function QuoteBacklogAlertDialog({ open, onOpenChange, rows }) {
             {sortedRows.map(({ quote, alert }) => (
               <TableRow key={quote.id}>
                 <TableCell><SiteIdLink siteId={quote.site_id} fallback={BLANK_DISPLAY} /></TableCell>
-                <TableCell>{quote.status || BLANK_DISPLAY}</TableCell>
+                <TableCell>{getStatusLabel(quote.status) || quote.status || BLANK_DISPLAY}</TableCell>
                 <TableCell>{alert.name || BLANK_DISPLAY}</TableCell>
                 <TableCell className={alert.level === "red" ? "text-rose-600 font-semibold" : "text-amber-600 font-semibold"}>
                   {alert.level ? alert.level.toUpperCase() : BLANK_DISPLAY}
                 </TableCell>
                 <TableCell>{alert.timeLabel || BLANK_DISPLAY}</TableCell>
+                <TableCell>{Math.round(alert.overdueHours || 0)}</TableCell>
               </TableRow>
             ))}
             {sortedRows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="py-6 text-center text-muted-foreground">No quotes currently have an active Alert.</TableCell>
+                <TableCell colSpan={6} className="py-6 text-center text-muted-foreground">No quotes match this status.</TableCell>
               </TableRow>
             )}
           </TableBody>
@@ -1245,6 +1264,16 @@ export default function DashboardOverview({
       .map(quote => ({ quote, alert: computeQuoteAlert(quote) }))
       .filter(entry => entry.alert !== null);
   }, [allQuotes, quotesLoading, quotesError]);
+  const requestedBacklogQuery = useQuoteBacklog(activeRange?.end);
+  // Past days are only available once a snapshot was captured that day; when none exists,
+  // show today's live backlog (clearly labeled) rather than an empty tile.
+  const backlogToday = backlogDate();
+  const backlogMissing = Boolean(activeRange?.end) && activeRange.end < backlogToday &&
+    requestedBacklogQuery.isSuccess && requestedBacklogQuery.data?.snapshot === null;
+  const liveBacklogFallbackQuery = useQuoteBacklog(backlogMissing ? backlogToday : null);
+  const backlogQuery = backlogMissing ? liveBacklogFallbackQuery : requestedBacklogQuery;
+  const backlogShownDate = backlogMissing ? backlogToday : activeRange?.end;
+  const backlogSnapshotRows = backlogQuery.data?.snapshot?.rows || [];
   // "Call Interactions" - live from Incorta-O&M-Input, respects the selected Reporting Period.
   // Classification uses Incorta's OWN pre-computed "Handled"/"Abandons" columns directly
   // (confirmed from a real imported row: Handled="1" XOR Abandons="1") - no guessing. Uses a
@@ -1476,10 +1505,10 @@ export default function DashboardOverview({
       });
     }
     tiles.push({
-      id: "improper_quote_requests",
-      label: "Improper Quote Requests",
-      category: "Live from EnQuote",
-      render: () => <ImproperQuoteRequestsTile range={activeRange} mode={kpiMode} />
+      id: "quote_request_hygiene",
+      label: "Quote Request Data Hygiene",
+      category: "Salesforce import",
+      render: () => <QuoteRequestHygieneTile />
     });
     primaryResults.forEach(({ def, result }) => {
       tiles.push({
@@ -1519,12 +1548,10 @@ export default function DashboardOverview({
       label: "Quote Backlog",
       category: "Live from EnQuote",
       render: () => (
-        <LiveCountCard
-          label="Quote Backlog"
-          icon={Layers}
-          iconClass="bg-fuchsia-50 text-fuchsia-600"
-          count={quoteBacklogAlertRows.length}
-          sourceLabel="Live from EnQuote - quotes with an active Alert"
+        <QuoteBacklogCard
+          query={backlogQuery}
+          date={backlogShownDate}
+          missingDate={backlogMissing ? activeRange?.end : null}
           onViewRecords={() => setQuoteBacklogDialogOpen(true)}
         />
       )
@@ -1602,8 +1629,6 @@ export default function DashboardOverview({
             value={formatNumber(eodbTotalInteractions)}
             sourceLabel="Total Call Volume (Handled + Abandoned) - EODB Dashboard"
             onViewRecords={() => openEodbRecords("Total Interactions", rangedEodbTotalCallVolume, null, eodbTotalInteractions)}
-            importedAt={reportTables?.eodb_total_call_volume?.importedAt}
-            importMethod={reportTables?.eodb_total_call_volume?.importMethod}
           />
         )
       });
@@ -1621,8 +1646,6 @@ export default function DashboardOverview({
             value={formatNumber(eodbHandled)}
             sourceLabel="Total Interactions minus Abandoned - EODB Dashboard"
             onViewRecords={() => openEodbRecords("Handled (Total - Abandoned)", eodbHandledRecords, "Handled", computeEodbWidgetTotal(eodbHandledRecords))}
-            importedAt={reportTables?.eodb_total_call_volume?.importedAt}
-            importMethod={reportTables?.eodb_total_call_volume?.importMethod}
           />
         )
       });
@@ -1640,8 +1663,6 @@ export default function DashboardOverview({
             value={formatNumber(eodbAbandoned)}
             sourceLabel="# Abandoned Calls - EODB Dashboard"
             onViewRecords={() => openEodbRecords("Abandoned", rangedEodbAbandonedCalls, "Abandoned", eodbAbandoned)}
-            importedAt={reportTables?.eodb_abandoned_calls?.importedAt}
-            importMethod={reportTables?.eodb_abandoned_calls?.importMethod}
           />
         )
       });
@@ -1659,8 +1680,6 @@ export default function DashboardOverview({
             value={`${eodbAbandonmentRate}%`}
             sourceLabel="Abandoned / Total Interactions - EODB Dashboard"
             onViewRecords={() => openEodbRecords("Abandonment Rate (Abandoned / Total)", rangedEodbAbandonedCalls, "Abandoned", eodbAbandoned)}
-            importedAt={reportTables?.eodb_abandonment_rate?.importedAt}
-            importMethod={reportTables?.eodb_abandonment_rate?.importMethod}
           />
         )
       });
@@ -1678,8 +1697,6 @@ export default function DashboardOverview({
             value={formatSecondsAsClock(eodbAvgWaitSeconds)}
             sourceLabel="Daily Wait Time Summary, avg/day - EODB Dashboard"
             onViewRecords={() => openEodbRecords("Wait Time Summary", rangedEodbDailyWaitTime, null, eodbTotalInteractions)}
-            importedAt={reportTables?.eodb_daily_wait_time?.importedAt}
-            importMethod={reportTables?.eodb_daily_wait_time?.importMethod}
           />
         )
       });
@@ -1697,8 +1714,6 @@ export default function DashboardOverview({
             value={formatSecondsAsClock(eodbAvgTalkSeconds)}
             sourceLabel="Average Talk Time(Phone), avg/day - EODB Dashboard"
             onViewRecords={() => openEodbRecords("Avg Talk Time", rangedEodbAvgTalkTime, "Handled", eodbTotalInteractions !== null && eodbAbandoned !== null ? eodbTotalInteractions - eodbAbandoned : null)}
-            importedAt={reportTables?.eodb_avg_talk_time?.importedAt}
-            importMethod={reportTables?.eodb_avg_talk_time?.importMethod}
           />
         )
       });
@@ -1911,7 +1926,43 @@ export default function DashboardOverview({
         date: kpiMode === AGGREGATION_MODES.LATEST_DAY ? source[source.length - 1]?.date : null
       })};
     });
-  }, [caseWorkReport, paymentReport, reportTablesQuery.isLoading, reportTablesQuery.error, reportTablesQuery.refetch, primaryResults, secondaryResults, compareEnabled, previousRange, rangedRecords, quoteBacklogAlertRows, sfdcQuotesTable, quotesRequestedRows, caseBacklog, interactionStats, staffingTeamTotals, activeRange, rangedEmailDailyRecords, emailBacklogTotals, emailCaseRecords, openEmailCases, quoteActivityReport, quotesLoading, quotesQuery.isError, quotesQuery.error, quotesQuery.refetch, activityQuery.isLoading, activityQuery.isError, activityQuery.error, activityQuery.refetch, niceCalls, reportTables, eodbTotalInteractions, eodbAbandoned, rangedEodbTotalCallVolume, rangedEodbAbandonedCalls, rangedEodbDailyWaitTime, rangedEodbAvgTalkTime, eodbAbandonmentRate, eodbAvgWaitSeconds, eodbAvgTalkSeconds, kpiMode, rangedStaffingRecords, eodbHandled, eodbHandledRecords]);
+  }, [backlogQuery, backlogShownDate, backlogMissing, caseWorkReport, paymentReport, reportTablesQuery.isLoading, reportTablesQuery.error, reportTablesQuery.refetch, primaryResults, secondaryResults, compareEnabled, previousRange, rangedRecords, quoteBacklogAlertRows, sfdcQuotesTable, quotesRequestedRows, caseBacklog, interactionStats, staffingTeamTotals, activeRange, rangedEmailDailyRecords, emailBacklogTotals, emailCaseRecords, openEmailCases, quoteActivityReport, quotesLoading, quotesQuery.isError, quotesQuery.error, quotesQuery.refetch, activityQuery.isLoading, activityQuery.isError, activityQuery.error, activityQuery.refetch, niceCalls, reportTables, eodbTotalInteractions, eodbAbandoned, rangedEodbTotalCallVolume, rangedEodbAbandonedCalls, rangedEodbDailyWaitTime, rangedEodbAvgTalkTime, eodbAbandonmentRate, eodbAvgWaitSeconds, eodbAvgTalkSeconds, kpiMode, rangedStaffingRecords, eodbHandled, eodbHandledRecords]);
+
+  const tileFreshness = useMemo(() => {
+    const now = new Date();
+    const imported = (types, name) => importFreshnessSource(reportTables, types, name);
+    const dailyField = (fieldKey, name) => {
+      let latestDate = null;
+      for (const record of records || []) {
+        const value = fieldKey ? record?.[fieldKey] : true;
+        if (record?.date && value !== null && value !== undefined && value !== "" && (!latestDate || record.date > latestDate)) latestDate = record.date;
+      }
+      return {kind: "daily", name, latestDate};
+    };
+    const allDefs = [...primaryResults, ...secondaryResults].map(r => r.def);
+    const sourceFor = (tile) => {
+      const id = tile.id;
+      if (id.startsWith("case_work_")) return imported(["case_history"], "Case history");
+      if (id.startsWith("invoice_payments_") || /^quotes_.*_period$/.test(id) || id === "quote_backlog") return {kind: "live"};
+      if (id === "quote_request_hygiene") return imported(["quoteRequestCases"], "Quote request report");
+      if (id === "quotes_requested") return imported(["sfdc_quotes"], "SFDC-Quotes");
+      if (id === "eodb_total_interactions") return imported(["eodb_total_call_volume"], "EODB call volume");
+      if (id === "eodb_handled") return imported(["eodb_total_call_volume", "eodb_abandoned_calls"], "EODB calls");
+      if (id === "eodb_abandoned") return imported(["eodb_abandoned_calls"], "EODB abandoned calls");
+      if (id === "eodb_abandonment_rate") return imported(["eodb_abandonment_rate"], "EODB abandonment rate");
+      if (id === "eodb_wait_time") return imported(["eodb_daily_wait_time"], "EODB wait time");
+      if (id === "eodb_avg_talk_time") return imported(["eodb_avg_talk_time"], "EODB talk time");
+      if (id.startsWith("staffing_")) return imported(["staffing"], "Staffing");
+      if (id === "email_total_emails" || id === "email_avg_handle_time") return imported(["email_daily"], "Email daily");
+      if (id === "email_open_backlog" || id === "email_oldest_open_case") return imported(["email_cases"], "Email cases");
+      if (id === "om_case_backlog") return dailyField(null, "Case Backlog");
+      const def = allDefs.find(d => d.key === id);
+      if (def?.sourceLabel === "Live from EnQuote") return {kind: "live"};
+      if (def?.kind === "field") return dailyField(def.fieldKey, def.sourceLabel);
+      return null;
+    };
+    return new Map(allTiles.map(tile => [tile.id, describeFreshness(sourceFor(tile), now)]));
+  }, [allTiles, reportTables, records, primaryResults, secondaryResults]);
 
   const tileCategories = useMemo(() => Array.from(new Set(allTiles.map((t) => t.category))), [allTiles]);
 
@@ -2002,11 +2053,27 @@ export default function DashboardOverview({
         </Card>
       ) : (
         <TileGrid tiles={visibleOrderedTiles} onReorder={handleReorderTiles}
-          sharePath={id => sharedDashboardTilePath(id, activeRange, kpiMode)} />
+          sharePath={id => sharedDashboardTilePath(id, activeRange, kpiMode)} freshnessFor={id => tileFreshness.get(id)} />
       )}
       <div>
         <h3 className="mb-3 text-lg font-semibold text-foreground">Hourly Wait Time Summary</h3>
         <HourlyWaitTimeChart rows={reportTables?.eodb_hourly_wait_time?.rows} />
+      </div>
+      <div>
+        <h3 className="mb-3 text-lg font-semibold text-foreground">Most Common Data Hygiene Flags</h3>
+        <HygieneFlagsChart />
+      </div>
+      <div>
+        <h3 className="mb-3 text-lg font-semibold text-foreground">Quote Backlog Flow</h3>
+        <BacklogFlowChart endDate={activeRange?.end} />
+      </div>
+      <div>
+        <h3 className="mb-3 text-lg font-semibold text-foreground">Auto-Drafter Accuracy</h3>
+        <AutoDrafterAccuracyPanel />
+      </div>
+      <div>
+        <h3 className="mb-3 text-lg font-semibold text-foreground">Panel RMA Cycle Time</h3>
+        <PanelRmaCyclePanel />
       </div>
       <QuoteExceptionsPanel
         report={quoteActivityReport}
@@ -2031,7 +2098,9 @@ export default function DashboardOverview({
       <QuoteBacklogAlertDialog
         open={quoteBacklogDialogOpen}
         onOpenChange={setQuoteBacklogDialogOpen}
-        rows={quoteBacklogAlertRows}
+        rows={backlogSnapshotRows}
+        date={backlogShownDate}
+        live={backlogQuery.data?.live}
       />
       <InteractionsDialog
         open={interactionsDialogRows !== null}

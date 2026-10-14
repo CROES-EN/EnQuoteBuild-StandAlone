@@ -127,7 +127,7 @@ export function deriveManualInputsUsed(record) {
  * starting point, not a final authored summary, and is never persisted (regenerated fresh
  * every time the report is viewed).
  */
-export function draftExecutiveSummaryBullets({ current, previous, quoteOps, caseBacklogVariance }) {
+export function draftExecutiveSummaryBullets({ current, previous, quoteOps, caseBacklogVariance, insightBullets = [] }) {
   const bullets = [];
   const record = current || {};
   const prior = previous || null;
@@ -136,7 +136,7 @@ export function draftExecutiveSummaryBullets({ current, previous, quoteOps, case
   if (escalationCount > 0) {
     bullets.push(
       `${escalationCount} new escalation${escalationCount === 1 ? "" : "s"} today` +
-      (record.new_s1 ? ` (${record.new_s1} S1)` : "") + " - see Blockers & Escalations for detail."
+      (record.new_s1 ? ` (${record.new_s1} S1)` : "") + "."
     );
   }
 
@@ -155,7 +155,7 @@ export function draftExecutiveSummaryBullets({ current, previous, quoteOps, case
   }
 
   if (isFiniteNumber(caseBacklogVariance) && caseBacklogVariance !== 0) {
-    bullets.push(`O&M case backlog reconciliation variance of ${caseBacklogVariance > 0 ? "+" : ""}${caseBacklogVariance} - see Data Quality & Exceptions.`);
+    bullets.push(`O&M case backlog reconciliation variance of ${caseBacklogVariance > 0 ? "+" : ""}${caseBacklogVariance}.`);
   }
 
   const staffingDelta = computeDelta(record.staffing_present, prior?.staffing_present, "neutral");
@@ -167,9 +167,11 @@ export function draftExecutiveSummaryBullets({ current, previous, quoteOps, case
     bullets.push(`EnQuote drafted ${quoteOps.quotesDrafted} quote${quoteOps.quotesDrafted === 1 ? "" : "s"} and completed ${quoteOps.quotesCompleted ?? 0} today.`);
   }
 
-  if (bullets.length === 0) {
+  const extra = (insightBullets || []).filter(Boolean);
+  if (bullets.length === 0 && extra.length === 0) {
     bullets.push("No notable day-over-day changes or new escalations to report.");
   }
 
-  return bullets.slice(0, 5);
+  // Core day-over-day bullets keep their 5-line budget; backlog/hygiene/drafter/RMA insights follow.
+  return [...bullets.slice(0, 5), ...extra].slice(0, 8);
 }
