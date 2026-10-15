@@ -9,6 +9,7 @@ import {salesforceAdapter} from "./adapters/salesforceAdapter";
 
 import {salesforceMockAdapter} from "./adapters/salesforceMockAdapter";
 import {isReadonlyViewing} from "@/features/admin/readonlyViewing";
+import {hydrateInvoiceNumbers} from "@/features/quotes/invoiceNumber";
 
 const DATA_SOURCE =
   isReadonlyViewing() ? "local" : (import.meta.env.VITE_DATA_SOURCE || "local");
@@ -42,6 +43,10 @@ const call = (methodName, args) => {
   return method(...args);
 };
 
+// Base44 strips invoice_number on sync; restore it from status_history on every read.
+const withInvoiceNumbers = (result) =>
+  result && typeof result.then === "function" ? result.then(hydrateInvoiceNumbers) : hydrateInvoiceNumbers(result);
+
 export const getDataSource = () => DATA_SOURCE;
 
 export const isBase44DataSource =
@@ -67,22 +72,22 @@ export const getCurrentUser =
   (...args) => call("getCurrentUser", args);
 
 export const getQuotes =
-  (...args) => call("getQuotes", args);
+  (...args) => withInvoiceNumbers(call("getQuotes", args));
 
 export const getQuoteById =
-  (...args) => call("getQuoteById", args);
+  (...args) => withInvoiceNumbers(call("getQuoteById", args));
 
 export const listRecentQuotes =
-  (...args) => call("listRecentQuotes", args);
+  (...args) => withInvoiceNumbers(call("listRecentQuotes", args));
 
 export const filterQuotes =
-  (...args) => call("filterQuotes", args);
+  (...args) => withInvoiceNumbers(call("filterQuotes", args));
 
 export const createQuote =
   (...args) => call("createQuote", args);
 
 export const updateQuote =
-  (...args) => call("updateQuote", args);
+  (...args) => withInvoiceNumbers(call("updateQuote", args));
 
 export const deleteQuote =
   (...args) => call("deleteQuote", args);
