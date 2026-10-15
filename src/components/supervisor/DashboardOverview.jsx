@@ -30,6 +30,8 @@ import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import {Checkbox} from "@/components/ui/checkbox";
 import {getAllQuoteActivities, getQuotes} from "@/api/dataClient";
+import {listGeneratedDrafts} from "@/features/autoDrafter/autoDrafterDraftsStore";
+import {withAutoDrafterActivity} from "@/features/autoDrafter/autoDrafterActivity";
 import {buildQuoteLifecycleReport} from "@/features/quoteDashboard/quoteLifecycle";
 import QuotePeriodActivityTile from "@/components/supervisor/QuotePeriodActivityTile";
 import QuoteRequestHygieneTile from "@/components/supervisor/QuoteRequestHygieneTile";
@@ -1161,10 +1163,13 @@ export default function DashboardOverview({
       return activities;
     }
   });
+  // Auto-Drafter drafts count as created and case removals as worked.
+  const autoDrafterQuery = useQuery({queryKey: ["autoDrafterGeneratedDrafts", "activity"], queryFn: listGeneratedDrafts});
   const quoteActivityReport = useMemo(() => {
     if (quotesQuery.isLoading || quotesQuery.isError || activityQuery.isLoading || activityQuery.isError) return null;
-    return buildQuoteLifecycleReport(allQuotes, {range: activeRange, activities: activityQuery.data || []});
-  }, [allQuotes, activeRange, quotesQuery.isLoading, quotesQuery.isError, activityQuery.data, activityQuery.isLoading, activityQuery.isError]);
+    return withAutoDrafterActivity(buildQuoteLifecycleReport(allQuotes, {range: activeRange, activities: activityQuery.data || []}),
+      autoDrafterQuery.data || [], {quotes: allQuotes, range: activeRange});
+  }, [allQuotes, activeRange, quotesQuery.isLoading, quotesQuery.isError, activityQuery.data, activityQuery.isLoading, activityQuery.isError, autoDrafterQuery.data]);
 
   // Report Data Tables (SFDC-Quotes, Escalations, etc.) - a separate store from the date-ranged
   // daily metrics above. Read-only here; nothing on this page writes to it. Refetches whenever

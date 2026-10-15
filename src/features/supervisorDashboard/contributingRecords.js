@@ -1,10 +1,11 @@
 import {parseIncortaRawDate} from "./callVolumeRawOverrides.js";
 import {filterRecordsInRange} from "./dateRanges.js";
+import {isWorkedEvent} from "../quoteDashboard/quoteLifecycle.js";
 
 export function quoteContributingRecords(report, metric) {
   const grouped = new Map();
   for (const event of report.activity) {
-    if (metric === "created" ? event.kind !== "created" : !["transition", "follow_up"].includes(event.kind)) continue;
+    if (metric === "created" ? event.kind !== "created" : !isWorkedEvent(event)) continue;
     if (!grouped.has(event.quote.id)) grouped.set(event.quote.id, {quote: event.quote, events: []});
     grouped.get(event.quote.id).events.push(event);
   }

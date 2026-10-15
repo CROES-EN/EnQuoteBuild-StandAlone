@@ -166,6 +166,11 @@ async function runBacklogRma(win) {
     "quote_not_needed", "Removal reason is saved");
   await selectView("Removed Cases");
   assert.match(await evaluate(`document.querySelector('[data-removed-case="filter-marker"]')?.innerText || ""`), /Quote not needed[\s\S]*Customer declined/);
+  await selectView("Request Outcomes");
+  assert.match(await evaluate(`document.querySelector('[data-outcome-case="filter-marker"][data-outcome="removed"]')?.innerText || ""`),
+    /Removed[\s\S]*Quote not needed[\s\S]*Customer declined/, "Request Outcomes shows where a removed case went, with its note");
+  assert.ok(await evaluate(`document.querySelectorAll('[data-outcome="awaiting"]').length >= 1`), "Request Outcomes lists drafts awaiting review");
+  await selectView("Removed Cases");
   await evaluate(`document.querySelector('[data-restore-case="filter-marker"]').click(); true`);
   await sleep(600);
   assert.equal(await evaluate(`window.__smokeCollections.autoDrafterGeneratedDrafts.some(record => record.caseNumber === "filter-marker")`), false, "Restoring an undrafted case drops its placeholder");

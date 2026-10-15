@@ -1,6 +1,9 @@
 import {getStatusLabel} from "../../constants/quoteStatuses.js";
 import {toDateStr} from "../supervisorDashboard/dateRanges.js";
 
+/** Events that count toward Quotes Worked (Auto-Drafter removals included). */
+export const isWorkedEvent = event => ["transition", "follow_up", "auto_drafter_removed"].includes(event?.kind);
+
 export function statusLabel(status) {
   return getStatusLabel(status) || status || "Unknown";
 }
@@ -211,7 +214,7 @@ export function buildQuoteLifecycleReport(quotes, {range = {}, status = "all", s
     timelines, activity, transitions, durations,
     newQuotes: activity.filter(event => event.kind === "created").length,
     workedQuotes: new Set(activity
-      .filter(event => event.kind === "transition" || event.kind === "follow_up")
+      .filter(isWorkedEvent)
       .map(event => event.quote.id)).size,
     changedQuotes: new Set(transitions.map(event => event.quote.id)).size,
     issues: timelines.filter(timeline => timeline.issues.length),

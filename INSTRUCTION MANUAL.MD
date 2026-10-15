@@ -256,7 +256,7 @@ Catalog** (with Remember this swap) and a remove button, and **Add Item** adds
 from the catalog, so the preview can be corrected before **Apply to Quote**.
 
 On Quote Details the status dropdown is now first in the action bar, followed by
-**Submit / edit Panel RMA**.
+**Submit / Edit Panel RMA**.
 
 ### Automatic drafts and warranty-service routing
 
@@ -438,7 +438,7 @@ report-based checks only.
 ### Panel RMA intake and shared tracker
 
 Panel RMA requests are a separate workflow. Use
-**Submit Panel RMA** on Auto-Drafter case/draft tiles, or **Submit / edit Panel RMA** on editable Quote Details. The form opens
+**Submit Panel RMA** on Auto-Drafter case/draft tiles, or **Submit / Edit Panel RMA** on editable Quote Details. The form opens
 before saving and prefills the case, site, owner and available notes. Saving
 creates a tracker entry only, not a submission to the manufacturer or a change
 to Salesforce. Wiring/catalog-material quotes remain available.

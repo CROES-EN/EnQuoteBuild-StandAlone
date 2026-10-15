@@ -47,7 +47,7 @@ export default function RequestReviewSummary({
     {!compact && <div className="flex flex-wrap items-center justify-between gap-3">
       <h2 className="font-semibold text-foreground">Request review</h2>
       <div className="flex flex-wrap gap-2">
-        {onPanelRma && <Button variant="outline" size="sm" onClick={onPanelRma}>Submit / edit Panel RMA</Button>}
+        {onPanelRma && <Button variant="outline" size="sm" onClick={onPanelRma}>Submit / Edit Panel RMA</Button>}
         {onHygieneReview && <Button variant="outline" size="sm" onClick={onHygieneReview}>Data Hygiene</Button>}
       </div>
     </div>}

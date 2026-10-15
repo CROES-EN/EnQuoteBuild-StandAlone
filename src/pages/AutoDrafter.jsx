@@ -60,6 +60,8 @@ import {
 import AutoDrafterCaseTile from "@/components/autoDrafter/AutoDrafterCaseTile";
 import AutoDrafterDraftDetails from "@/components/autoDrafter/AutoDrafterDraftDetails";
 import CategoryCorrectionDialog from "@/components/autoDrafter/CategoryCorrectionDialog";
+import AutoDrafterOutcomesView from "@/components/autoDrafter/AutoDrafterOutcomesView";
+import {autoDrafterOutcomes} from "@/features/autoDrafter/autoDrafterActivity";
 import {getQuotes, listLocalCollection} from "@/api/dataClient";
 
 // Case numbers match even when a spreadsheet dropped leading zeros or a "#" prefix.
@@ -85,6 +87,7 @@ export const AutoDrafter = () => {
     const showGolden = view === "golden";
     const showAlternate = view === "alternate";
     const showRemoved = view === "removed";
+    const showOutcomes = view === "outcomes";
     const [removeTarget, setRemoveTarget] = useState(null);
     const [categoryTarget, setCategoryTarget] = useState(null);
     const [removeReason, setRemoveReason] = useState("quote_not_needed");
@@ -393,6 +396,7 @@ export const AutoDrafter = () => {
     const removedRecords = useMemo(() => Object.values(generatedDraftsByCase).filter(record => record.removedFromAutoDrafter)
         .sort((a, b) => String(b.removedFromAutoDrafter.removedAt || "").localeCompare(String(a.removedFromAutoDrafter.removedAt || ""))),
     [generatedDraftsByCase]);
+    const outcomes = useMemo(() => autoDrafterOutcomes(Object.values(generatedDraftsByCase), allQuotes), [generatedDraftsByCase, allQuotes]);
     const awaitingRows = useMemo(() => {
         const removedCaseKeys = new Set(removedRecords.map(record => quoteCaseKey(record.caseNumber ?? record.id)));
         return caseNumberCol ? dedupedQualifyingRows.filter(row => !hasRealQuote(row) &&
@@ -735,6 +739,7 @@ export const AutoDrafter = () => {
                                     <SelectItem value="panel-rmas">Panel RMA Requests ({panelRmas.length})</SelectItem>
                                     <SelectItem value="alternate">Alternate Requests ({alternateEntries.length})</SelectItem>
                                     <SelectItem value="removed">Removed Cases ({removedRecords.length})</SelectItem>
+                                    <SelectItem value="outcomes">Request Outcomes ({outcomes.length})</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -785,7 +790,9 @@ export const AutoDrafter = () => {
                     <button className="underline ml-2" onClick={() => careQuery.refetch()}>Retry Care verification</button>
                 </p>}
                 {panelRmasQuery.isError && <p role="alert" className="mb-3 text-destructive">Could not load Panel RMA links: {panelRmasQuery.error.message} <button className="underline" onClick={() => panelRmasQuery.refetch()}>Retry</button></p>}
-                {showRemoved ? (
+                {showOutcomes ? (
+                    <AutoDrafterOutcomesView outcomes={outcomes} search={term} />
+                ) : showRemoved ? (
                     <div className="space-y-3">
                         <p className="text-sm text-muted-foreground">Cases moved out of Auto-Drafter are not drafted automatically. Restore a case to bring it back to Quote Requests.</p>
                         {(() => {

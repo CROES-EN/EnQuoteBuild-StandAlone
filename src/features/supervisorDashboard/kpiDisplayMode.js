@@ -1,5 +1,6 @@
 import {addDays, diffDays, filterRecordsInRange, toDateStr} from "./dateRanges.js";
 import {aggregateMetric, AGGREGATION_MODES} from "./periodAggregation.js";
+import {isWorkedEvent} from "../quoteDashboard/quoteLifecycle.js";
 
 export function displayModeRecords(records, range, mode) {
   const ranged = filterRecordsInRange(records, range);
@@ -19,7 +20,7 @@ export function dailyCountValue(total, records, mode) {
 }
 
 export function quoteDisplayMetric(report, metric, range, mode) {
-  const events = report.activity.filter(event => metric === "created" ? event.kind === "created" : ["transition", "follow_up"].includes(event.kind));
+  const events = report.activity.filter(event => metric === "created" ? event.kind === "created" : isWorkedEvent(event));
   const date = range.end;
   const contributing = mode === AGGREGATION_MODES.LATEST_DAY
     ? events.filter(event => toDateStr(new Date(event.at)) === date) : events;

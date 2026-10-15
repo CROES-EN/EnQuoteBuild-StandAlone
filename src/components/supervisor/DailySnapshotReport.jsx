@@ -8,6 +8,8 @@ import {Textarea} from "@/components/ui/textarea";
 import {Badge} from "@/components/ui/badge";
 import {getAllQuoteActivities, getQuotes} from "@/api/dataClient";
 import {buildQuoteLifecycleReport} from "@/features/quoteDashboard/quoteLifecycle";
+import {listGeneratedDrafts} from "@/features/autoDrafter/autoDrafterDraftsStore";
+import {withAutoDrafterActivity} from "@/features/autoDrafter/autoDrafterActivity";
 import {formatDateLabel} from "@/features/supervisorDashboard/format";
 import {
     computeBacklogReconciliationVariance,
@@ -64,6 +66,7 @@ export default function DailySnapshotReport({
   const allQuotes = quotesQuery.data || [];
   const activitiesQuery = useQuery({queryKey: ["quoteActivity", "lifecycle"], queryFn: getAllQuoteActivities});
   const reportTablesQuery = useQuery({queryKey: ["report-tables-for-ops-overview"], queryFn: listReportTables});
+  const autoDrafterQuery = useQuery({queryKey: ["autoDrafterGeneratedDrafts", "activity"], queryFn: listGeneratedDrafts});
   const backlogQuery = useQuoteBacklog(selectedDate);
   const hygieneHistoryQuery = useQuoteRequestHygieneHistory();
   // Mounting the report records today's hygiene summary into the history read below.
@@ -84,7 +87,8 @@ export default function DailySnapshotReport({
   const sources = useMemo(() => {
     if (!selectedDate) return {sections: [], missingReports: []};
     const lifecycle = quotesQuery.data && activitiesQuery.data
-      ? buildQuoteLifecycleReport(quotesQuery.data, {range: {start: selectedDate, end: selectedDate}, activities: activitiesQuery.data})
+      ? withAutoDrafterActivity(buildQuoteLifecycleReport(quotesQuery.data, {range: {start: selectedDate, end: selectedDate}, activities: activitiesQuery.data}),
+        autoDrafterQuery.data || [], {quotes: quotesQuery.data, range: {start: selectedDate, end: selectedDate}})
       : null;
     const backlog = backlogQuery.isError ? {error: backlogQuery.error?.message || "Could not load the quote backlog."}
       : backlogQuery.data || null;
@@ -97,7 +101,7 @@ export default function DailySnapshotReport({
       hygiene: hygieneSnapshot,
       caseWorkTeam: readCaseWorkTeam()
     });
-  }, [selectedDate, quotesQuery.data, activitiesQuery.data, reportTablesQuery.data, backlogQuery.data,
+  }, [selectedDate, quotesQuery.data, activitiesQuery.data, autoDrafterQuery.data, reportTablesQuery.data, backlogQuery.data,
     backlogQuery.isError, backlogQuery.error, hygieneSnapshot]);
 
   const reportData = useMemo(() => {

@@ -72,8 +72,8 @@ async function runQuoteLinks(win) {
   assert.equal(await evaluate(`(() => {
     const bar = document.querySelector('[aria-label="Quote actions"]');
     const order = [...bar.querySelectorAll('[role="combobox"], button')].map(node => node.getAttribute("role") === "combobox" ? "status" : node.textContent.trim());
-    return order.indexOf("status") === 0 && order.indexOf("Submit / edit Panel RMA") > 0;
-  })()`), true, "status dropdown comes before Submit / edit Panel RMA");
+    return order.indexOf("status") === 0 && order.indexOf("Submit / Edit Panel RMA") > 0;
+  })()`), true, "status dropdown comes before Submit / Edit Panel RMA");
   console.log("ok   Quote saves: delayed persistence survives immediate navigation and reopening.");
 
   await evaluate(`location.hash="#/EditQuote?id=old-version"`);

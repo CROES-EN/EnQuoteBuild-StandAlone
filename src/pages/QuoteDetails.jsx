@@ -1369,7 +1369,7 @@ function QuoteDetailsContent() {
  </Select>
  )}
  {canEditQuote && <Button variant="outline" disabled={!quote.case_number} onClick={() => setShowPanelRma(true)}>
- Submit / edit Panel RMA
+ Submit / Edit Panel RMA
  </Button>}
  {showPanelRma && <PanelRmaRequestDialog target={{caseNumber: quote.case_number, siteId: quote.site_id,
    quoteId: quote.id, quoteNumber: quote.quote_number, notes: quote.scope_of_work || ""}}
