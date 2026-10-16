@@ -161,14 +161,17 @@ test("Supervisor tab URLs open the requested panel and unknown tabs use Executiv
 });
 
 test("Manager navigation is consolidated and uses Supervisor permissions", async () => {
-  const [app, layout] = await Promise.all([
+  const [app, layout, navigation] = await Promise.all([
     readFile(new URL("../src/App.jsx", import.meta.url), "utf8"),
-    readFile(new URL("../src/Layout.jsx", import.meta.url), "utf8")
+    readFile(new URL("../src/Layout.jsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/navigationItems.js", import.meta.url), "utf8")
   ]);
   assert.match(app, /path="\/ManagerDashboard" element=\{\s*<Navigate to="\/SupervisorDashboard\?tab=quote-dashboard" replace \/>/);
   assert.match(app, /path="\/QuoteDashboard" element=\{\s*<Navigate to="\/SupervisorDashboard\?tab=quote-dashboard" replace \/>/);
   assert.ok(!layout.includes('page: "ManagerDashboard"'));
-  assert.ok(layout.includes('page: "SupervisorDashboard"'));
+  assert.match(layout, /navItems = navigationItems/);
+  assert.ok(navigation.includes('page: "SupervisorDashboard"'));
+  assert.ok(!navigation.includes('page: "ManagerDashboard"'));
   assert.ok(!ALL_PAGES.includes("ManagerDashboard"));
   assert.equal(canAccessPage({
     app_role: "submitter", allow_pages: ["SupervisorDashboard"], deny_pages: ["ManagerDashboard"]

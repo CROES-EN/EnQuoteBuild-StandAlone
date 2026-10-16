@@ -29,6 +29,7 @@ async function loadQuoteCard() {
     "@/components/ui/checkbox": {Checkbox: "checkbox"},
     "@/features/supervisorDashboard/careEligibilityCache": {useCareEligibilityIndex: () => null},
     "@/features/supervisorDashboard/careEligibility": {getEligibilityFromIndex: () => null},
+    "@/components/rma/PanelRmaBadge": {default: "panel-rma-badge"},
     "@/components/links/ExternalIdLinks": {SiteIdLink: "site-link"}
   };
   const output = await build({
