@@ -87,7 +87,7 @@ export default function RefundRequestForm() {
         <CardTitle>Enphase Care Cancel/Refund Request Tracking</CardTitle>
         <CardDescription>
           Use this form to record and track Enphase Care refund requests. Before submitting,
-          have the customer and case details, reason for the request, and supporting context ready.
+          have the customer and case details, refund amount, reason for the request, and supporting context ready.
         </CardDescription>
         <p className="text-sm text-muted-foreground">
           Your EnQuote account records the requester identity{user?.email ? ` (${user.email})` : ""}.
@@ -142,7 +142,8 @@ export default function RefundRequestForm() {
                       {React.createElement(question.type === "textarea" ? Textarea : Input, {
                         id: `native-refund-${question.key}`, required: true, maxLength: question.max,
                         ...(question.type !== "textarea" ? {type: question.type || "text"} : {}),
-                        value: answers[question.key] || "",
+                        ...(question.type === "number" ? {min: question.min, max: question.maxValue, step: question.step} : {}),
+                        value: answers[question.key] ?? "",
                         onChange: (event) => setAnswers((previous) => ({...previous, [question.key]: event.target.value}))
                       })}
                     </>

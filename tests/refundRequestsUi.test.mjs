@@ -171,7 +171,7 @@ test("Refund Requests renders the operational queue and writes edits back with e
   assert.match(notices.at(-1), /Saved to EnQuote, but Excel sync is pending: Workbook locked/);
 });
 
-test("Enphase Care hides refund features and ignores stale refund deep links", async () => {
+test("Enphase Care provides browser tracker access without activating native services", async () => {
   const previousWindow = globalThis.window;
   globalThis.window = {
     enquoteLocal: {
@@ -183,8 +183,10 @@ test("Enphase Care hides refund features and ignores stale refund deep links", a
       }
     }
   };
+  let requestedTab = "refund-requests";
   const mocks = {
-    "react-router-dom": {useSearchParams: () => [new URLSearchParams("tab=refund-requests"), () => {}]},
+    "lucide-react": {ExternalLink: dom("svg")},
+    "react-router-dom": {useSearchParams: () => [new URLSearchParams(`tab=${requestedTab}`), () => {}]},
     "@/components/ui/tabs": {
       Tabs: ({value, children}) => React.createElement("div", {"data-active-tab": value}, children),
       TabsContent: ({children}) => React.createElement("section", null, children),
@@ -205,14 +207,30 @@ test("Enphase Care hides refund features and ignores stale refund deep links", a
       getActiveCareTable: async () => ({rows: []})
     },
     "@/components/enphaseCare/RefundRequests": () => React.createElement("div", null, "Refund queue"),
-    "@/components/enphaseCare/RefundRequestForm": () => React.createElement("div", null, "Request form")
+    "@/components/enphaseCare/RefundRequestForm": () => React.createElement("div", null, "Request form"),
+    "@/components/ui/button": {Button: ({children}) => children}
   };
   try {
     const Component = await loadComponent("pages/EnphaseCare.jsx", mocks);
-    const html = renderToStaticMarkup(React.createElement(Component));
-    assert.match(html, /Active Subscriptions/);
-    assert.doesNotMatch(html, /Submit Request|Refund Requests|Refund queue|Request form/);
-    assert.match(html, /data-active-tab="subscriptions"/);
+    for (const tab of ["refund-requests", "refund-submit", "subscriptions", "unknown"]) {
+      requestedTab = tab;
+      const html = renderToStaticMarkup(React.createElement(Component));
+      assert.match(html, /Active Subscriptions/);
+      assert.match(html, /Submit Request/);
+      assert.match(html, /Refund Requests/);
+      assert.match(html, /Open Microsoft request form/);
+      assert.match(html, /Open SharePoint refund tracker/);
+      assert.match(html, /Forms-to-tracker automation is not activated/);
+      assert.match(html, /will not automatically appear/);
+      assert.match(html, /Native EnQuote sync: awaiting IT setup and integration/);
+      assert.match(html, /target="_blank" rel="noopener noreferrer"/);
+      assert.match(html, /forms\.cloud\.microsoft\/Pages\/ResponsePage\.aspx/);
+      assert.match(html, /enphase\.sharepoint\.com/);
+      assert.doesNotMatch(html, /DesignPage|ISOLATED|M1kzV0FLSzZDMFI5M1VVTEoyUlZVRFJIMi4u/);
+      assert.doesNotMatch(html, /Refund queue|Request form/);
+      const expectedTab = tab === "unknown" ? "subscriptions" : tab;
+      assert.ok(html.includes(`data-active-tab="${expectedTab}"`));
+    }
   } finally {
     if (previousWindow === undefined) delete globalThis.window;
     else globalThis.window = previousWindow;
@@ -223,6 +241,8 @@ test("Enphase Care preserves refund UI behavior when explicitly re-enabled", asy
   const previousWindow = globalThis.window;
   delete globalThis.window;
   const mocks = {
+    "lucide-react": {ExternalLink: dom("svg")},
+    "@/components/ui/button": {Button: ({children}) => children},
     "../../shared/refundFeature.json": {enabled: true},
     "react-router-dom": {useSearchParams: () => [new URLSearchParams("tab=refund-requests"), () => {}]},
     "@/components/ui/tabs": {
@@ -258,6 +278,31 @@ test("Enphase Care preserves refund UI behavior when explicitly re-enabled", asy
     assert.match(html, /Request form/);
   } finally {
     if (previousWindow !== undefined) globalThis.window = previousWindow;
+  }
+});
+
+test("browser access uses production response/view URLs and keeps intake status separate from native sync", async () => {
+  const settings = require("../shared/refundSharePoint.json");
+  for (const enabled of [false, true]) {
+    const Component = await loadComponent("components/enphaseCare/RefundBrowserAccess.jsx", {
+      "lucide-react": {ExternalLink: dom("svg")},
+      "@/components/ui/button": {Button: ({children}) => children},
+      "@/components/ui/card": {
+        Card: dom("section"), CardContent: dom("div"), CardHeader: dom("header"), CardTitle: dom("h2")
+      },
+      "../../../shared/refundSharePoint.json": {
+        ...settings, browser: {...settings.browser, formsIntakeEnabled: enabled}
+      }
+    });
+    for (const submission of [false, true]) {
+      const html = renderToStaticMarkup(React.createElement(Component, {submission}));
+      assert.ok(html.includes(`href="${settings.browser.formResponseUrl}"`));
+      assert.ok(html.includes(`href="${settings.browser.trackerUrl}"`));
+      assert.match(html, /Native EnQuote sync: awaiting IT setup and integration/);
+      assert.match(html, /Excel writeback remain disabled/);
+      assert.equal(html.includes("Forms-to-tracker automation is not activated"), !enabled);
+      assert.equal(html.includes('role="status"'), !enabled);
+    }
   }
 });
 
@@ -352,15 +397,16 @@ test("native form preserves branching and reconnects automatically without brows
       find(render(), (node) => node.props.name === name && node.props.value === value).props.onChange();
     };
     choose("refundChoice", "Full refund");
-    assert.match(renderToStaticMarkup(render()), /Services completed/);
+    assert.match(renderToStaticMarkup(render()), /Were any Enphase Care services completed/);
+    assert.match(renderToStaticMarkup(render()), /Refund amount requested/);
     assert.doesNotMatch(renderToStaticMarkup(render()), /Customer email address/);
     choose("servicesCompleted", "Yes");
     assert.match(renderToStaticMarkup(render()), /Customer email address/);
     choose("refundReason", "Other");
-    assert.match(renderToStaticMarkup(render()), /Add reason if the &quot;Other&quot; is selected/);
+    assert.match(renderToStaticMarkup(render()), /Specify the cancellation\/refund reason/);
     assert.match(renderToStaticMarkup(render()), /Detailed explanation of the refund request/);
     choose("refundChoice", "No refund");
-    assert.doesNotMatch(renderToStaticMarkup(render()), /Services completed/);
+    assert.doesNotMatch(renderToStaticMarkup(render()), /Were any Enphase Care services completed|Refund amount requested/);
     assert.doesNotMatch(renderToStaticMarkup(render()), /Leadership Approval|Requestor Department|Refund amount \(USD\)/);
     assert.deepEqual(errors, []);
     globalThis.setInterval = (callback, interval) => {poll = callback; pollInterval = interval; return 123;};

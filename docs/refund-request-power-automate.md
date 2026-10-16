@@ -1,8 +1,14 @@
 # Enphase Care refund tracker synchronization
 
-**Refund features are currently disabled in the desktop release pending IT approval.**
-Active Subscriptions remains available. The workflows below describe the retained
-implementation, not currently enabled desktop functionality.
+**Native refund features remain disabled pending IT approval.**
+Local source now provides browser links under Enphase Care to the existing Microsoft
+Form and the new SharePoint List. These links use existing Microsoft access; they do not
+sync records into EnQuote or activate Forms intake. Production Forms-to-List automation
+remains Off and the tabs warn that Form responses will not automatically reach the List.
+This UI change has not been published. Active Subscriptions remains available.
+The workflows below describe the retained Excel implementation, not enabled functionality.
+See the [IT runbook](enphase-care-refunds-it-handoff.md#13-browser-access-and-post-approval-code-preparation)
+for current browser access and the dormant native SharePoint preparation.
 
 For the cloud flow using Virginia's tracker as the authoritative source, see
 [Virginia tracker Power Automate setup](refund-tracker-power-automate.md). That flow is
@@ -59,7 +65,7 @@ This remains local-file coordination, not a distributed SharePoint lock.
 ## Native request form
 
 **Submit Request** now uses an EnQuote-native form matching the live Microsoft Forms
-questions and branching inspected on October 9, 2026. It does not submit to Microsoft Forms
+questions and branching inspected on October 16, 2026. It does not submit to Microsoft Forms
 and needs no Microsoft sign-in window. EnQuote authenticates the requester using its verified
 account, ignoring requester identity supplied by the renderer.
 
@@ -67,13 +73,21 @@ The renderer imports the shared CommonJS question schema using the `enquote-refu
 Vite alias, explicitly prebundled for development. After changing Vite configuration,
 restart `npm run desktop:dev` so the development server reloads its dependency configuration.
 
-The form asks cancellation timing and refund choice first. A refund requires answering
-**Services completed** before the remaining questions appear; **No refund** skips that
-question. Customer escalation, site/subscription IDs, customer name/email, case number,
+The form asks cancellation timing and refund choice first. A refund requires a nonnegative
+**Refund amount requested** in USD with at most two decimal places and an answer to
+**Services completed** before submission; **No refund** skips both questions and discards
+their stale values. Zero is a valid amount. Customer escalation, site/subscription IDs, customer name/email, case number,
 and primary reason are required. **Other** reveals its required explanation. Selecting any
 reason reveals the required detailed explanation. All eight original reason choices are
-retained. The live form has no refund-amount, department, site-visit, or leadership-approval
-questions; these EnQuote-only values remain missing rather than being invented.
+retained. The live form has no department, site-visit, or leadership-approval questions;
+these EnQuote-only values remain missing rather than being invented.
+
+The separate SharePoint List integration is being prepared as described in
+[the replacement preparation notes](refund-tracker-power-automate.md#sharepoint-list-replacement-preparation-october-16-2026).
+The native form still uses the retained Excel-backed service and remains disabled pending
+approval; adding the amount question does not activate or switch its submission destination.
+Enphase Care keeps the **Submit Request** and **Refund Requests** tabs visible while disabled,
+with paused-integration notices rather than active forms, queue queries, or workbook writes.
 
 Pending submissions are saved per verified EnQuote account on this PC. If Excel fails after
 the server save, EnQuote reports **saved to EnQuote, Excel pending**. Close Excel, wait for

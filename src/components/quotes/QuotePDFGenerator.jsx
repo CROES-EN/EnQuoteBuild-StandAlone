@@ -3,6 +3,7 @@ import {format} from "date-fns";
 import {base44} from "@/api/base44Client";
 import {listLocalCollection} from "@/api/dataClient";
 import {calculateQuoteTotals} from "@/utils/quoteCalculations";
+import {customerScopeSummary} from "@/features/quotes/customerScopeSummary";
 
 function formatCurrency(value) {
   return "$" + (value || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -392,6 +393,10 @@ export async function generateQuotePDF(quote, versionHistory = []) {
 }
 
 export async function generateCustomerQuotePDF(quote) {
+  return (await generateCustomerQuoteDocument(quote)).pdf;
+}
+
+export async function generateCustomerQuoteDocument(quote) {
   let template = {
     company_name: "QuotePro",
     primary_color: "#4f46e5",
@@ -459,23 +464,18 @@ export async function generateCustomerQuotePDF(quote) {
   doc.text(`Site ID: ${quote.site_id || 'N/A'}`, 20, yPos);
   yPos += 10;
 
+  let emailScopeSummary = "";
   // Scope of Work — AI-simplified for customer clarity
   if (quote.scope_of_work) {
     let customerScope = "";
     let usedRawFallback = false;
     try {
-      const llmResponse = await base44.integrations.Core.InvokeLLM({
-        prompt: `You are writing a brief, plain-English summary of solar service work for a homeowner. Rewrite the following scope of work into 2-3 short sentences that a non-technical customer can easily understand. Remove all internal jargon, part numbers, technician notes, internal process references, or anything that could cause confusion or concern. Keep it reassuring and professional. Do not include pricing — just describe what work will be done.\n\nScope of work:\n${quote.scope_of_work}`,
-        response_json_schema: {
-          type: "object",
-          properties: {
-            summary: { type: "string" }
-          }
-        }
-      });
-      customerScope = llmResponse?.summary || "";
+      customerScope = await customerScopeSummary(quote.scope_of_work,
+        request => base44.integrations.Core.InvokeLLM(request));
+      emailScopeSummary = customerScope;
     } catch (error) {
-      console.warn("Could not generate simplified scope, falling back to the raw scope of work");
+      customerScope = "";
+      console.warn("Could not generate customer scope summary; PDF uses raw scope and email omits it:", error);
     }
 
     // Always describe the work being done - fall back to the raw scope of
@@ -596,5 +596,5 @@ export async function generateCustomerQuotePDF(quote) {
     }
   }
 
-  return doc.output('blob');
+  return {pdf: doc.output('blob'), scopeSummary: emailScopeSummary};
 }

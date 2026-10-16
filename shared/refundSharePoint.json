@@ -1,0 +1,17 @@
+{
+  "browser": {
+    "formResponseUrl": "https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=LzX5fevFB0CnI0TAeGBcemFBFqB54EFOo3V5rhDHnAJUOUVaT1hEUFlESUtaV0dMQzlBSUNaRVRaVS4u",
+    "trackerUrl": "https://enphase.sharepoint.com/sites/CustomerFinancingandOMMarketplace/Lists/Care%20Refund%20Requests/Refund%20Processing.aspx",
+    "formsIntakeEnabled": false
+  },
+  "native": {
+    "tenantId": "",
+    "clientId": "",
+    "graphSiteId": "",
+    "testListId": "78a54169-e1dc-4be5-8773-e90e0b78996d",
+    "productionListId": "a3632928-dfa6-4e85-91b8-8d2de6ddc996",
+    "redirectUri": "http://localhost",
+    "scopes": ["https://graph.microsoft.com/Lists.SelectedOperations.Selected"],
+    "refreshIntervalMs": 15000
+  }
+}

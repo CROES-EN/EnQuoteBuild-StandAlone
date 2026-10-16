@@ -8,6 +8,7 @@ import {DEFAULT_SUMMARY_FIELDS} from "@/components/supervisor/CareSubscriptionsT
 import {CARE_ACTIVE_TYPE, getActiveCareTable} from "@/features/supervisorDashboard/importedTableStore";
 import RefundRequests from "@/components/enphaseCare/RefundRequests";
 import RefundRequestForm from "@/components/enphaseCare/RefundRequestForm";
+import RefundBrowserAccess from "@/components/enphaseCare/RefundBrowserAccess";
 import refundFeature from "../../shared/refundFeature.json";
 
 /**
@@ -26,7 +27,7 @@ function EnphaseCareContent() {
     globalThis.window?.enquoteLocal?.refundRequests?.onChanged
   );
   const requestedTab = searchParams.get("tab");
-  const activeTab = refundFeature.enabled && ["refund-requests", "refund-submit"].includes(requestedTab)
+  const activeTab = ["refund-requests", "refund-submit"].includes(requestedTab)
     ? requestedTab
     : "subscriptions";
   const [table, setTable] = useState(null);
@@ -61,9 +62,7 @@ function EnphaseCareContent() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">Enphase Care</h1>
         <p className="text-muted-foreground mt-1">
-          {refundFeature.enabled
-            ? "Manage active Enphase Care subscriptions and review customer refund requests."
-            : "View active Enphase Care subscriptions."}
+          View active Enphase Care subscriptions and access refund request tools.
         </p>
       </div>
 
@@ -79,8 +78,8 @@ function EnphaseCareContent() {
       >
         <TabsList className="h-auto flex-wrap justify-start">
           <TabsTrigger value="subscriptions">Active Subscriptions</TabsTrigger>
-          {refundFeature.enabled && <TabsTrigger value="refund-submit">Submit Request</TabsTrigger>}
-          {refundFeature.enabled && <TabsTrigger value="refund-requests">Refund Requests</TabsTrigger>}
+          <TabsTrigger value="refund-submit">Submit Request</TabsTrigger>
+          <TabsTrigger value="refund-requests">Refund Requests</TabsTrigger>
         </TabsList>
         <TabsContent value="subscriptions">
       <Card>
@@ -110,11 +109,13 @@ function EnphaseCareContent() {
         </CardContent>
       </Card>
         </TabsContent>
-        {refundFeature.enabled && <TabsContent value="refund-submit">
-          <RefundRequestForm />
-        </TabsContent>}
-        {refundFeature.enabled && <TabsContent value="refund-requests">
-          {supportsRefundRequests ? (
+        <TabsContent value="refund-submit">
+          {refundFeature.enabled ? <RefundRequestForm /> : <RefundBrowserAccess submission />}
+        </TabsContent>
+        <TabsContent value="refund-requests">
+          {!refundFeature.enabled ? (
+            <RefundBrowserAccess />
+          ) : supportsRefundRequests ? (
             <RefundRequests />
           ) : (
             <Card>
@@ -126,7 +127,7 @@ function EnphaseCareContent() {
               </CardContent>
             </Card>
           )}
-        </TabsContent>}
+        </TabsContent>
       </Tabs>
     </div>
   );
