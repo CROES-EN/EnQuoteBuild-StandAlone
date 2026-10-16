@@ -4,7 +4,7 @@ export const ALL_PAGES = Object.freeze([
   "Boneyard", "SVCancelTracker", "ResourcePlanner", "SOPLibrary", "SiteFlagManager", "EnphaseCare",
   "InactiveRevenueDashboard", "InactiveCollections", "RevenueAnalytics", "Users", "QuoteDeletionRequests",
   "EmailNotifications", "FollowUpSettings", "PDFTemplateSettings", "SupervisorDashboard",
-  "RejectedQuoteReview", "Base44_DTO"
+  "RejectedQuoteReview", "Base44_DTO", "Settings"
 ]);
 
 // Defaults preserve legacy access except for viewing pages explicitly available to all roles.
@@ -28,7 +28,7 @@ export const DEFAULT_ROLE_PAGES = Object.freeze({
 });
 
 const ADMIN_ROLES = new Set(["admin", "super_admin"]);
-const ALL_ROLE_VIEW_PAGES = new Set(["Boneyard", "InactiveRevenueDashboard", "InactiveCollections", "Base44_DTO"]);
+const ALL_ROLE_VIEW_PAGES = new Set(["Boneyard", "InactiveRevenueDashboard", "InactiveCollections", "Base44_DTO", "Settings"]);
 
 export function toRoleList(value) {
   if (Array.isArray(value)) return value.map((role) => String(role || "").trim()).filter(Boolean);

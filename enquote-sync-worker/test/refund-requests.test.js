@@ -147,7 +147,7 @@ test("EnQuote form submission is saved without a Power Automate dependency", asy
 function nativeAnswers(overrides = {}) {
   return {
     submissionId: crypto.randomUUID(), cancellationTiming: "Immediately",
-    refundChoice: "Partial refund", servicesCompleted: "No", customerEscalated: "Yes",
+    refundChoice: "Partial refund", refundAmountRequested: "129.95", servicesCompleted: "No", customerEscalated: "Yes",
     siteId: "SITE-1", subscriptionId: "SUB-1", customerName: "Customer",
     customerEmail: "customer@example.com", caseNumber: "CASE-1",
     refundReason: "Other", otherReason: "A specific reason", additionalNotes: "Detailed explanation",
@@ -171,8 +171,8 @@ test("Native form persists every live question, identifies the caller and is ide
   assert.equal(saved.otherReason, answers.otherReason);
   assert.equal(saved.servicesCompleted, false);
   assert.equal(saved.customerEscalated, true);
-  assert.equal(saved.refundAmountRequested, null);
-  assert.ok(saved.missingEnQuoteFields.includes("refundAmountRequested"));
+  assert.equal(saved.refundAmountRequested, 129.95);
+  assert.ok(!saved.missingEnQuoteFields.includes("refundAmountRequested"));
   assert.ok(saved.missingEnQuoteFields.includes("requestorDepartment"));
   const repeat = await submit("reader@example.com", answers);
   assert.equal(repeat.status, 200);
@@ -188,7 +188,8 @@ test("Native form rejects missing and invalid conditional answers before saving"
   for (const overrides of [
     {submissionId: "invalid"}, {cancellationTiming: "Later"}, {refundChoice: "Unknown"},
     {customerEmail: "invalid"}, {caseNumber: ""}, {otherReason: ""},
-    {servicesCompleted: null}, {additionalNotes: ""}, {customerEscalated: "Maybe"}
+    {servicesCompleted: null}, {additionalNotes: ""}, {customerEscalated: "Maybe"},
+    {refundAmountRequested: ""}, {refundAmountRequested: -1}, {refundAmountRequested: "1.234"}
   ]) {
     const response = await handleRefundRequestNativeSubmit(await userRequest(
       "/api/refund-requests/submit-native", "reader@example.com", {method: "POST", body: nativeAnswers(overrides)}

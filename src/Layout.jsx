@@ -1,31 +1,9 @@
 import {
   AlertTriangle,
-  Archive,
-  BarChart3,
-  Bell,
-  BookOpen,
-  Briefcase,
   ChevronsLeft,
   ChevronsRight,
-  ClipboardList,
-  FileOutput,
-  FileText,
-  Headset,
-  LayoutDashboard,
-  Mail,
   Menu,
-  MessageSquare,
-  Package,
-  Recycle,
   RefreshCw,
-  Route,
-  ShoppingCart,
-  Siren,
-  Sparkles,
-  Trash2,
-  Users,
-  Wallet,
-  HeartHandshake,
   X,
   ZoomIn,
   ZoomOut
@@ -75,6 +53,10 @@ import {ProfilePicturePicker, UserAvatar} from "@/components/profile/UserAvatar"
 import {isReadonlyViewing} from "@/features/admin/readonlyViewing";
 import {applySidebarOrder, readSidebarOrder, writeSidebarOrder} from "@/lib/sidebarOrder";
 import {userDisplayName} from "@/utils/userDisplayName";
+import {navigationItems} from "@/lib/navigationItems";
+import {filterSidebarItems} from "@/lib/appPreferences";
+import {useAppPreferences} from "@/hooks/useAppPreferences";
+import SalesforceLauncher from "@/components/links/SalesforceLauncher";
 
 const isDemoMode = ["mock", "local", "salesforce-mock"].includes(import.meta.env.VITE_DATA_SOURCE);
 const appVersion = appPackage?.version || "0.0.0";
@@ -142,32 +124,8 @@ export default function Layout({ children, currentPageName }) {
   const { isAdmin, roles, user } = useUserRole();
   const { isAuthenticated, isLocalAuthActive, logout } = useAuth();
 
-  const navItems = [
-    { name: "Dashboard", icon: LayoutDashboard, page: "Dashboard", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "Workload", icon: Briefcase, page: "Workload", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "Tasks", icon: ClipboardList, page: "Tasks", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "Messages", icon: MessageSquare, page: "Messages", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "Quotes", icon: FileText, page: "Quotes", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "Auto-Drafter", icon: Sparkles, page: "AutoDrafter", roles: ["submitter", "approver", "admin", "invoicer"], badge: "beta" },
-    { name: "Products & Services", icon: Package, page: "Products", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "Material Orders", icon: ShoppingCart, page: "MaterialOrders", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "PV Panel RMA Tracker", icon: Recycle, page: "PVPanelRMAs", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "SLA Reporting", icon: BarChart3, page: "SLAReporting", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "Users", icon: Users, page: "Users", roles: ["admin"] },
-    { name: "Deletion Requests", icon: Trash2, page: "QuoteDeletionRequests", roles: ["admin"] },
-    { name: "Email Notifications", icon: Mail, page: "EmailNotifications", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "Follow-Up Settings", icon: Bell, page: "FollowUpSettings", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "PDF Template", icon: FileOutput, page: "PDFTemplateSettings", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "Boneyard", icon: Archive, page: "Boneyard", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "SV Cancel Tracker", icon: AlertTriangle, page: "SVCancelTracker", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "Resource Planner", icon: Route, page: "ResourcePlanner", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "SOP Library", icon: BookOpen, page: "SOPLibrary", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "Site Flags", icon: Siren, page: "SiteFlagManager", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "Rejection Reviews", icon: AlertTriangle, page: "RejectedQuoteReview", roles: ["submitter", "approver", "admin", "invoicer"] },
-    { name: "Supervisor Dashboard", icon: Headset, page: "SupervisorDashboard", roles: ["admin", "approver", "submitter", "invoicer"] },
-    { name: "Enphase Care", icon: HeartHandshake, page: "EnphaseCare", roles: ["admin", "approver", "invoicer", "submitter"] },
-    { name: "Inactive Revenue", icon: Wallet, page: "InactiveRevenueDashboard", roles: ["admin", "approver", "invoicer", "submitter"] }
-  ];
+  const navItems = navigationItems;
+  const preferences = useAppPreferences();
 
   const {policy: accessPolicy} = useAccessPolicy();
   const announcement = accessPolicy?.announcement || null;
@@ -180,7 +138,9 @@ export default function Layout({ children, currentPageName }) {
   }, [user?.email]);
   const orderedNavItems = applySidebarOrder(navItems, sidebarOrder);
   const readonlyViewing = isReadonlyViewing();
-  const visibleNavItems = orderedNavItems.filter(item => canAccessPage(user, item.page, accessPolicy));
+  const visibleNavItems = filterSidebarItems(
+    orderedNavItems.filter(item => canAccessPage(user, item.page, accessPolicy)), preferences
+  );
   const currentPageBlocked = Boolean(currentPageName) && isAuthenticated && !canAccessPage(user, currentPageName, accessPolicy);
 
   // Moves a tab among the visible ones while tabs hidden for this role keep their saved slots,
@@ -895,6 +855,7 @@ export default function Layout({ children, currentPageName }) {
       />}
       {!readonlyViewing && <NotificationBell />}
       {!readonlyViewing && <NewTaskButton />}
+      {!readonlyViewing && isAuthenticated && <SalesforceLauncher />}
       {!readonlyViewing && <UpdateStatusBadge />}
       {!readonlyViewing && <UiUpdateBanner />}
     </div>

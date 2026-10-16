@@ -1,5 +1,156 @@
 # enquote-sync — Final Version (all fixes applied)
 
+## EnQuote personal settings and Salesforce workspace
+
+Open **Settings** in EnQuote to choose Salesforce case-link behavior, show/hide the
+floating Salesforce cloud launcher, and show/hide sidebar tabs. Preferences are saved
+per signed-in EnQuote user on the current device. Settings cannot hide itself; hiding
+other tabs affects desktop/mobile navigation only, not access permissions or direct links.
+Existing drag-to-reorder behavior is preserved.
+
+In the updated desktop app, case links default to a borderless **Salesforce side panel**
+inside EnQuote. Clicking another case opens/navigates the panel. Click the floating cloud
+to slide it out from the right or tuck it away without losing the current Salesforce page.
+Focus view opens wide by default, with a dimmed EnQuote background and a slim toolbar
+above Salesforce. Expand/Restore switches between focus width and your saved narrower
+width without reloading Salesforce. The toolbar also has tuck-away and reload buttons.
+Click the dimmed background or press Escape to tuck the panel away. Other floating
+EnQuote controls sit behind the dimmed layer; the cloud remains accessible.
+Drag the panel's left edge to resize it,
+or focus the resize handle and press Left/Right; your preferred width is saved per user
+on this device and fits the current window. Dragging or keyboard resizing exits expanded
+focus width. Salesforce's own search/navigation controls are left intact. Case links use
+the case record directly when a Salesforce Case ID is known; otherwise they use search.
+The launcher remains accessible beside the panel.
+The floating launcher is available throughout signed-in EnQuote pages/windows, alongside
+Notifications and Tasks. One isolated Salesforce view is reused: opening it in another
+EnQuote window moves the same page there instead of creating another session.
+Salesforce console workspace tabs are managed inside Salesforce; EnQuote does not
+automatically create subtabs or control an existing Microsoft Edge tab.
+
+The workspace requires its own Salesforce login, shared with EnQuote's existing
+report-import session and remembered across restarts until Salesforce expires it or
+you sign out. It does not share Edge cookies. Report imports remain separate and do
+not close the case workspace or capture its downloads. Browser previews and the
+**External browser / new tab** setting use normal external links without replacing
+EnQuote; they do not guarantee reuse of an existing browser tab.
+
+The Workload page's Salesforce import button captures CSV/XLS/XLSX exports from
+its report window and report-owned child windows, without a Save As dialog.
+Unrelated case downloads and PDF attachments retain normal download behavior.
+The existing parsing, validation and save flow must succeed before the report
+window closes; manual Import Report remains available.
+
+After building the UI, `npm run smoke -- --settings-only` checks Settings and the
+floating launcher across pages and two EnQuote windows using an isolated native Salesforce
+view with local fixture content in place of network access.
+Real Salesforce SSO and console behavior still require testing with your account.
+
+### Customer Copy attachments for Salesforce
+
+While the Salesforce drawer is visible, EnQuote scans the visible case about once
+per second, including console tab switches that do not change the URL. After the
+case details settle, a unique matching quote reveals **Generate Quote** beside
+**Prepare Homeowner Quote** in the toolbar. Click **Generate Quote** to create the
+Customer Copy PDF and matching email; scanning alone never generates a document.
+Matching prefers the case number;
+only when there are no case matches does it fall back to the visible Site ID.
+Conflicting case/site data or multiple matches require manual review. If no current
+quote matches either identifier, the toolbar says **No Quote Found**.
+On a detected case change, the previous PDF is cleared before preparing another;
+late generation results are checked against the current case before saving.
+Scanning pauses while the drawer is hidden. Switching Salesforce console tabs clears
+the old PDF and detects the new case's quote, even if the name editor is open.
+The new case still waits for **Generate Quote**. Homeowner overrides reset on case changes.
+Tab monitoring continues during slow document generation, and obsolete results are discarded.
+The PDF is temporary local staging, not a permanent Downloads copy, and is never
+automatically attached, uploaded or sent. Verify the case, homeowner and PDF before use.
+
+The mail button beside the PDF chip (**Copy homeowner email**) copies a plain-text
+subject and message for that prepared quote to the clipboard. Paste into Salesforce
+and review before sending (move the subject line into the email subject field).
+The message uses a conversational Enphase Energy introduction with the signed-in
+user's first name when available. The greeting and subject reuse the exact homeowner
+name selected for the PDF, including a manual override. The subject format is
+`Enphase Energy - On - Demand Quote - Homeowner Name - Site ID`
+(the final segment is omitted if no Site ID is available).
+On-Demand quotes are identified as such in the body. It reuses the customer-friendly
+scope summary generated for that same Customer Copy PDF, without another AI request.
+That explanation draws directly from the quote's scope of work: it describes distinct
+repairs/replacements and any stated testing, retaining quantities, approximate wiring
+lengths, equipment ratings and conditional work. Detailed scopes use roughly 3-5
+plain-English sentences in their own email paragraph; simple scopes stay shorter.
+It must not invent a diagnosis or turn possible work into a definite replacement.
+If that summary is unavailable, the email omits the work description rather than
+copying raw internal scope/notes. It asks the homeowner to reply if they want to proceed
+so an invoice can be sent, without a pricing table, payment deadline or scheduling promise.
+The draft says the quote is attached: attach the PDF before sending. Email content is staged
+with the PDF snapshot and cycles/clears with it; clipboard copying never attaches
+the PDF or sends an email.
+After copying, a brief **Copied to clipboard** popup appears inside the toolbar
+so it remains visible above the native Salesforce content.
+
+The dropdown under **Prepare Homeowner Quote** is only needed to change the homeowner
+name. It shows the detected case/quote, a name input, filename preview, and **Use detected
+name** to undo a manual override. Click **Done** to close it or **Generate Quote** in
+the toolbar to generate using that name. Quote matching and generation do not require
+opening the dropdown. The editor opens above Salesforce, not behind its native view,
+and works from any EnQuote page.
+If Salesforce's contact is unavailable, the saved quote homeowner is used. If neither
+provides a usable name, **Generate Quote** stays clickable and opens/focuses the name
+editor with a visible explanation, rather than becoming an unexplained disabled button.
+A name is still required before a PDF can be generated. Disabled generation controls
+show their loading/stale-case reason in the toolbar and button tooltip.
+Generation creates the existing Customer Copy
+PDF (not the internal standard quote), named `Homeowner Name - Quote - Q-reference.pdf`.
+The name defaults to the quote's client name (`client_name`) or Auto-Drafter customer
+name (`customer`) when available; confirm or enter it rather
+than guessing a homeowner from a site/case ID. Invalid filename characters are removed.
+Existing PDF download actions are unchanged.
+
+The visible drawer automatically reads labeled **Case Number**, **Contact Name** and
+**Enlighten Site ID / Site ID** fields from the visible Salesforce case Details page.
+Case links can initially open search results: open the actual case before reading it.
+Encoded Salesforce quick-link searches are recognized as search pages and are never
+treated as the current case, even if cached case tabs remain in the DOM.
+On a `/lightning/r/Case/500.../view` page, the Salesforce record ID helps scope the
+reader to that record's rendered details; it is not converted into the numeric case
+number. The selected console tab's controlled panel takes precedence over a stale URL.
+Plain labeled text outputs are supported alongside Lightning formatted components.
+While the drawer is visible, Salesforce navigation and completed toolbar reloads rerun
+the lookup automatically, allowing a short wait for Lightning to render its fields.
+Generating requires clicking **Generate Quote**; matching alone only fills the detected state.
+It uses stable field labels/containers rather than generated `lwc-*` attributes or the
+position of numeric fields. Nested Lightning field wrappers and display-contents
+outputs are supported; edit/preview controls are not read as field values.
+Contact record links remain readable even when Salesforce gives them a button role;
+slotted link text is supported and assistive preview text is excluded.
+Open shadow roots are traversed; hidden tabs are ignored.
+The inspection is local and read-only: it does not click, edit or submit Salesforce.
+
+A single current quote with the exact case number is selected automatically, with a
+Site ID consistency check when visible. If no case matches, a unique Site ID match
+can be selected instead. Multiple matches require resolving the ambiguity in EnQuote;
+**Generate Quote** is unavailable until one quote matches.
+The homeowner defaults to the Salesforce contact, then the saved quote name, with a
+manual name override available in the dropdown. Salesforce context is read again
+before generating with its contact name. Missing, conflicting or inaccessible details
+show a message and leave quote/name selection available; there is no guessed contact.
+This depends on the org's rendered case layout and requires live verification; closed
+shadow roots or changed Salesforce markup may require manual entry.
+
+The Salesforce toolbar displays a draggable PDF chip. Open Salesforce's email attachment
+uploader and drag the chip to its file drop area. EnQuote starts a native local-file drag;
+Salesforce must accept the drop and finish uploading it. Verify the correct case,
+recipient, and attachment before sending. EnQuote does not click Attach or Send and does
+not upload through an API. Actual drop support must be verified in your Salesforce org.
+If drops are unsupported, the folder icon reveals the prepared PDF so it can be selected
+through Salesforce's normal paperclip uploader.
+
+Prepared PDFs are temporary local files, restricted to the preparing EnQuote identity,
+replaced when a new PDF is prepared and removed on normal app shutdown. A crash can leave
+the temporary file on disk; do not treat preparation as a permanent download or an upload.
+
 ## Summary of changes
 
 This version includes all fixes from the 2026-09-29 session:

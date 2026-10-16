@@ -23,6 +23,15 @@ const os = require("node:os");
 const fs = require("node:fs");
 
 let salesforceWindow = null;
+const reportContents = new Set();
+let downloadListener = null;
+
+function trackReportWindow(window) {
+  const contents = window.webContents;
+  reportContents.add(contents);
+  contents.once("destroyed", () => reportContents.delete(contents));
+  contents.on("did-create-window", child => trackReportWindow(child));
+}
 
 /**
  * Opens (or re-points/focuses, if already open) the embedded Salesforce report window.
@@ -35,11 +44,13 @@ let salesforceWindow = null;
 function openSalesforceReportWindow(reportUrl, onFileDownloaded) {
   const partitionSession = session.fromPartition("persist:enquote-salesforce");
 
-  // Re-registered every open (removeAllListeners first) rather than once at module load, so a
+  // Re-registered every open rather than once at module load, so a
   // fresh onFileDownloaded callback (tied to the current IPC caller) is always the one that
   // actually fires - avoids accumulating stale listeners across repeated opens.
-  partitionSession.removeAllListeners("will-download");
-  partitionSession.on("will-download", (_event, item) => {
+  if (downloadListener) partitionSession.removeListener("will-download", downloadListener);
+  downloadListener = (_event, item, webContents) => {
+    // The case workspace shares this session, but its downloads are not report imports.
+    if (!salesforceWindow || !reportContents.has(webContents)) return;
     const fileName = item.getFilename();
     const ext = path.extname(fileName).toLowerCase();
     // Only auto-capture the export formats this feature is built for - anything else (e.g. a
@@ -68,7 +79,8 @@ function openSalesforceReportWindow(reportUrl, onFileDownloaded) {
         try { fs.unlinkSync(tempPath); } catch { /* best-effort cleanup only */ }
       }
     });
-  });
+  };
+  partitionSession.on("will-download", downloadListener);
 
   if (salesforceWindow && !salesforceWindow.isDestroyed()) {
     salesforceWindow.focus();
@@ -91,6 +103,7 @@ function openSalesforceReportWindow(reportUrl, onFileDownloaded) {
       sandbox: true
     }
   });
+  trackReportWindow(salesforceWindow);
 
   // Salesforce/SSO login pages can render a blurred, non-interactive overlay when they detect
   // an unrecognized embedded browser (the default UA contains "Electron/x" and the app name,
@@ -119,12 +132,21 @@ function openSalesforceReportWindow(reportUrl, onFileDownloaded) {
   });
 
   salesforceWindow.loadURL(reportUrl);
-  salesforceWindow.on("closed", () => { salesforceWindow = null; });
+  salesforceWindow.on("closed", () => {
+    salesforceWindow = null;
+    reportContents.clear();
+    if (downloadListener) partitionSession.removeListener("will-download", downloadListener);
+    downloadListener = null;
+  });
 }
 
 function closeSalesforceReportWindow() {
   if (salesforceWindow && !salesforceWindow.isDestroyed()) salesforceWindow.close();
   salesforceWindow = null;
+  reportContents.clear();
+  const partitionSession = session.fromPartition("persist:enquote-salesforce");
+  if (downloadListener) partitionSession.removeListener("will-download", downloadListener);
+  downloadListener = null;
 }
 
 module.exports = { openSalesforceReportWindow, closeSalesforceReportWindow };

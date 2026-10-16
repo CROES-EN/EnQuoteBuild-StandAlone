@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, dialog, Notification, net, session, protocol } = require("electron");
+const { app, BrowserWindow, WebContentsView, ipcMain, shell, dialog, Notification, nativeImage, net, session, protocol, clipboard } = require("electron");
 const {createReadonlyPreview, installPreviewIpcGuard} = require("./readonlyPreview.cjs");
 let readonlyPreview = null;
 installPreviewIpcGuard(ipcMain, () => readonlyPreview);
@@ -53,6 +53,17 @@ const { createOutboundSync } = require("./outboundSync.cjs");
 const { startRealtimeSync } = require("./realtimeSync.cjs");
 const { createAdaptivePoller, setRealtimeConnected } = require("./syncCadence.cjs");
 const { openSalesforceReportWindow, closeSalesforceReportWindow } = require("./salesforceImport.cjs");
+const { createSalesforceWorkspace } = require("./salesforceWorkspace.cjs");
+const {createSalesforceAttachment} = require("./salesforceAttachment.cjs");
+const salesforceAttachment = createSalesforceAttachment({nativeImage, shell, clipboard});
+const salesforceWorkspace = createSalesforceWorkspace({
+    WebContentsView, session,
+    onStateChanged: stateFor => appWindows().forEach(window => {
+        window.webContents.send("salesforce:workspace-state", {
+            ...stateFor(window), attachment: salesforceAttachment.state(getVerifiedIdentity()?.email)
+        });
+    })
+});
 const { analyzeAll } = require("./diagnosticReportAnalyzer.cjs");
 const { verifyCloudflareSession, openCloudflareAuthWindow, setVerifiedIdentity, getVerifiedIdentity, clearCloudflareSession, reauthenticate: reauthenticateCloudflare, fetchSyncCredentials } = require("./cloudflareAuth.cjs");
 
@@ -2018,6 +2029,69 @@ let then = whenReady().then(async () => {
         closeSalesforceReportWindow();
         return { ok: true };
     });
+    ipcMain.handle("salesforce:open-workspace", async (_event, url) => {
+        try {
+            salesforceWorkspace.open(url, BrowserWindow.fromWebContents(_event.sender));
+            return {ok: true};
+        } catch (error) {
+            console.error("[salesforce-workspace] Could not open workspace:", error);
+            return {ok: false, error: error.message || "Could not open the Salesforce workspace."};
+        }
+    });
+    ipcMain.handle("salesforce:workspace-action", async (event, action, bounds) => {
+        const window = BrowserWindow.fromWebContents(event.sender);
+        try {
+            if (!window) throw new Error("EnQuote window is unavailable.");
+            if (action === "inspect") return {ok: true, context: await salesforceWorkspace.inspect(window)};
+            if (action === "scan") {
+                try { return {ok: true, context: await salesforceWorkspace.inspect(window, {retry: false})}; }
+                catch (error) { return {ok: false, error: error.message || "Could not read the current Salesforce case."}; }
+            }
+            if (action === "toggle") salesforceWorkspace.toggle(window);
+            else if (action === "hide") salesforceWorkspace.hide(window);
+            else if (action === "bounds") salesforceWorkspace.setBounds(bounds, window);
+            else if (action === "reload") salesforceWorkspace.reload(window);
+            else if (action !== "state") throw new Error("Unknown Salesforce panel action.");
+            return {ok: true, ...salesforceWorkspace.state(window), attachment: salesforceAttachment.state(getVerifiedIdentity()?.email)};
+        } catch (error) {
+            console.error("[salesforce-workspace] Panel action failed:", error);
+            return {ok: false, error: error.message || "Could not update the Salesforce panel."};
+        }
+    });
+    ipcMain.handle("salesforce:attachment", async (event, action, payload) => {
+        try {
+            const owner = requireVerifiedEmail(getVerifiedIdentity());
+            const window = BrowserWindow.fromWebContents(event.sender);
+            if (action === "prepare") {
+                if (payload.context) {
+                    const current = await salesforceWorkspace.inspect(window, {retry: false});
+                    if (["caseNumber", "siteId", "contactName"].some(key => current[key] !== payload.context[key])) {
+                        throw new Error("The Salesforce case changed before the PDF was saved.");
+                    }
+                }
+                const revision = salesforceWorkspace.state(window).pageRevision;
+                const attachment = await salesforceAttachment.prepare(payload, owner, () => !payload.context ||
+                    (salesforceWorkspace.state(window).visible && salesforceWorkspace.state(window).pageRevision === revision));
+                if (payload.context) salesforceWorkspace.notify();
+                else salesforceWorkspace.open(undefined, window);
+                return {ok: true, attachment};
+            }
+            if (action === "clear") {
+                if (!salesforceWorkspace.state(window).visible) throw new Error("Only the active Salesforce panel can clear its quote PDF.");
+                salesforceAttachment.clear(owner);
+                salesforceWorkspace.notify();
+                return {ok: true};
+            }
+            if (action === "drag") salesforceAttachment.drag(event.sender, owner);
+            else if (action === "reveal") salesforceAttachment.reveal(owner);
+            else if (action === "copy-email") await salesforceAttachment.copyEmail(owner);
+            else throw new Error("Unknown quote attachment action.");
+            return {ok: true};
+        } catch (error) {
+            console.error("[salesforce-attachment]", error);
+            return {ok: false, error: error.message || "Could not prepare the quote attachment."};
+        }
+    });
 
     // O&M Reports Inbox - zero-click auto-import (see watchReportsInbox()/processReportsInboxFile()
     // above for the watcher itself). These handlers let the renderer discover/open the watched
@@ -2769,6 +2843,8 @@ const QUIT_FORCE_EXIT_MS = 5000;
 let quitWatchdogArmed = false;
 
 on("before-quit", () => {
+    salesforceAttachment.clear();
+    salesforceWorkspace.close();
     if (!quitWatchdogArmed) {
         quitWatchdogArmed = true;
         setTimeout(() => {

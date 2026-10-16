@@ -157,6 +157,14 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
     get: () => invoke("zoom:get")
   },
   salesforce: {
+    attachment: (action, payload) => invoke("salesforce:attachment", action, payload),
+    openWorkspace: (url) => invoke("salesforce:open-workspace", url),
+    workspaceAction: (action, bounds) => invoke("salesforce:workspace-action", action, bounds),
+    onWorkspaceState: (callback) => {
+      const listener = (_event, state) => callback(state);
+      listen("salesforce:workspace-state", listener);
+      return () => ipcRenderer.removeListener("salesforce:workspace-state", listener);
+    },
     openReport: (reportUrl, userEmail) => invoke("salesforce:open-report", reportUrl, userEmail),
     close: () => invoke("salesforce:close"),
     onFileDownloaded: (callback) => {

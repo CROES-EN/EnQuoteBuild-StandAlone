@@ -24,6 +24,23 @@ function respond(path, args) {
   const key = path.join(".");
   window.__smokeCalls[key] = (window.__smokeCalls[key] || 0) + 1;
   const last = path[path.length - 1];
+  if (key === "salesforce.attachment" && process.argv.includes("--settings-only")) {
+    return require("electron").ipcRenderer.invoke("smoke:salesforce-attachment", ...args);
+  }
+  if (key === "salesforce.onWorkspaceState") {
+    if (!process.argv.includes("--settings-only")) return () => {};
+    const {ipcRenderer} = require("electron");
+    const listener = (_event, state) => args[0](state);
+    ipcRenderer.on("smoke:salesforce-state", listener);
+    return () => ipcRenderer.removeListener("smoke:salesforce-state", listener);
+  }
+  if (key === "salesforce.workspaceAction") {
+    if (!process.argv.includes("--settings-only")) return Promise.resolve({ok: true, visible: false});
+    return require("electron").ipcRenderer.invoke("smoke:salesforce-action", ...args);
+  }
+  if (key === "salesforce.openWorkspace" && process.argv.includes("--settings-only")) {
+    return require("electron").ipcRenderer.invoke("smoke:salesforce-open", ...args);
+  }
   if (key === "panelRmaForms.open") {
     if (window.__smokeMissingPanelFormHandler) return Promise.reject(new Error("No handler registered for 'panelRmaForms:open'"));
     return Promise.resolve({ok:true});
@@ -196,7 +213,19 @@ function respond(path, args) {
     args[0] === "supervisorReportTables" ? window.__smokeWorkTables || [] : []);
   if (key === "quotes.list") return Promise.resolve(window.__smokePaidQuotes || []);
   if (key === "tasks.list") return Promise.resolve(window.__smokeTasks || []);
-  if (key === "quotes.get") return Promise.resolve((window.__smokePaidQuotes || []).find(quote => quote.id === args[0]) || null);
+  if (key === "quotes.get") {
+    const quote = structuredClone((window.__smokePaidQuotes || []).find(quote => quote.id === args[0]) || null);
+    const delay = window.__smokeQuoteReadDelays?.[args[0]] || 0;
+    if (delay) {
+      const pending = window.__smokePendingQuoteReads ||= {};
+      pending[args[0]] = (pending[args[0]] || 0) + 1;
+      return new Promise(resolve => setTimeout(() => {
+        pending[args[0]]--;
+        resolve(quote);
+      }, delay));
+    }
+    return Promise.resolve(quote);
+  }
   if (key === "quotes.update") return new Promise((resolve, reject) => {
     setTimeout(() => {
       if (window.__smokeQuoteSaveFail) {reject(new Error("Could not persist quote")); return;}

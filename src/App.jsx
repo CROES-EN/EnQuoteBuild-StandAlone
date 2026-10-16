@@ -26,6 +26,7 @@ import {AutoDrafter as AutoDrafterPage} from "./pages/AutoDrafter";
 import TasksPage from "./pages/Tasks";
 import SOPLibraryPage from "./pages/SOPLibrary";
 import MessagesPage from "./pages/Messages";
+import SettingsPage from "./pages/Settings";
 import ChatDock from "@/components/messages/ChatDock";
 import AppLinkSharing from "@/components/messages/AppLinkSharing";
 import Base44_DTO from "@/features/Base44_DTO/Base44_DTO";
@@ -169,6 +170,11 @@ const AuthenticatedApp = () => {
       <Route path="/Messages" element={
         <LayoutWrapper currentPageName="Messages">
           <MessagesPage />
+        </LayoutWrapper>
+      } />
+      <Route path="/Settings" element={
+        <LayoutWrapper currentPageName="Settings">
+          <SettingsPage />
         </LayoutWrapper>
       } />
       <Route path="/Base44_DTO" element={<LayoutWrapper currentPageName="Base44_DTO"><Base44_DTO /></LayoutWrapper>} />

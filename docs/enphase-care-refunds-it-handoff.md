@@ -8,6 +8,12 @@
 
 **Audience:** IT, Power Platform administrators, application support, and refund process owners
 
+**Release packaging:** Browser refund access was published in UI update
+`1.4.0+1792183628`. Version 1.4.1 packages that UI together with the dormant native
+SharePoint transport; it does not enable Microsoft Graph authentication or native refund
+sync. Historical "not published" statements below describe the earlier preparation state.
+Production Forms intake remains Off; separate approval and acceptance are still required.
+
 ## 1. Summary
 
 The proposed solution consolidates Enphase Care cancellation/refund requests into a
