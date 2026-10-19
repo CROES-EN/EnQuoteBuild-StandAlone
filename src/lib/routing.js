@@ -18,11 +18,12 @@ const US_STATE_CODES = new Set((
 export function stateFromAddress(address) {
   const text = String(address || "").replace(/[\r\n]+/g, " ");
   const candidates = [
-    ...text.matchAll(/\b([A-Z]{2})\b\.?,?\s*\d{5}(?:-\d{4})?\b/g),
-    ...text.matchAll(/,\s*([A-Z]{2})\.?\s*$/g)
+    ...text.matchAll(/\b([A-Z]{2})\b\.?,?\s*\d{5}(?:-\d{4})?\b/gi),
+    ...text.matchAll(/,\s*([A-Z]{2})\.?\s*$/gi)
   ];
   for (const match of candidates) {
-    if (US_STATE_CODES.has(match[1])) return match[1];
+    const code = match[1].toUpperCase();
+    if (US_STATE_CODES.has(code)) return code;
   }
   return "";
 }

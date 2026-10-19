@@ -147,10 +147,9 @@ export async function rankFsts({ address, startFrom = "home", activeFSTs = [], o
       zipApproximate: zipApprox,
       routeApproximate
     };
-  }).sort((a, b) => {
-    if (a.approximate !== b.approximate) return a.approximate ? 1 : -1;
-    return a.roundTrip.minutes - b.roundTrip.minutes;
-  });
+  // Rank by drive time only. ZIP-only locations (new streets the free geocoders don't know
+  // yet) are labeled approximate in the UI but must not be pushed below farther FSTs.
+  }).sort((a, b) => a.roundTrip.minutes - b.roundTrip.minutes);
 
   return { results, skippedCount: skipped, searchScope: { state: siteState, widened }, sitePoint };
 }
