@@ -1,4 +1,5 @@
 ﻿import {useEffect, useMemo, useState} from "react";
+import {usePageViewState} from "@/hooks/usePageViewState";
 import {useQuery, useQueryClient} from "@tanstack/react-query";
 import {createReview, getCurrentUser, getQuotes, getReviews, getUsers, updateReview} from "@/api/dataClient";
 import {Card, CardContent} from "@/components/ui/card";
@@ -47,12 +48,13 @@ const formatCurrency = (v) => `$${(v || 0).toLocaleString("en-US", { minimumFrac
 export default function RejectedQuoteReview() {
   const [currentUser, setCurrentUser] = useState(null);
   const [canReview, setCanReview] = useState(false);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = usePageViewState("rejection-reviews", "search", "");
+  const [activeTab, setActiveTab] = usePageViewState("rejection-reviews", "tab", "reviews");
   const [selectedQuote, setSelectedQuote] = useState(null);
   const [selectedSite, setSelectedSite] = useState(null);
-  const [statusFilter, setStatusFilter] = useState("all"); // all | pending | in_progress | completed
-  const [hideCompleted, setHideCompleted] = useState(true);
-  const [sortOrder, setSortOrder] = useState("newest"); // newest | oldest
+  const [statusFilter, setStatusFilter] = usePageViewState("rejection-reviews", "status", "all"); // all | pending | in_progress | completed
+  const [hideCompleted, setHideCompleted] = usePageViewState("rejection-reviews", "hide-completed", true);
+  const [sortOrder, setSortOrder] = usePageViewState("rejection-reviews", "sort", "newest"); // newest | oldest
   const [selectedSiteIds, setSelectedSiteIds] = useState(new Set());
   const [bulkClosing, setBulkClosing] = useState(false);
   const queryClient = useQueryClient();
@@ -215,7 +217,7 @@ export default function RejectedQuoteReview() {
         </p>
       </div>
 
-      <Tabs defaultValue="reviews">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="mb-6">
           <TabsTrigger value="reviews" className="flex items-center gap-2">
             <FileText className="w-4 h-4" /> Quote Reviews

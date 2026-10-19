@@ -1,4 +1,5 @@
 ﻿import {useState} from "react";
+import {usePageViewState} from "@/hooks/usePageViewState";
 import {
     createLocalRecord,
     deleteLocalRecord,
@@ -375,9 +376,9 @@ function SupportUploadTab() {
 
 function SiteFlagManagerContent() {
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState("flags");
-  const [filterLevel, setFilterLevel] = useState("all");
-  const [filterResolved, setFilterResolved] = useState("active");
+  const [tab, setTab] = usePageViewState("site-flags", "tab", "flags");
+  const [filterLevel, setFilterLevel] = usePageViewState("site-flags", "level", "all");
+  const [filterResolved, setFilterResolved] = usePageViewState("site-flags", "resolved", "active");
   const [syncing, setSyncing] = useState(false);
 
   const { data: currentUser } = useQuery({ queryKey: ["currentUser"], queryFn: getCurrentUser });
@@ -628,7 +629,7 @@ function SiteFlagManagerContent() {
 }
 
 function SupportInteractionsLog() {
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = usePageViewState("quote-trouble", "search", "");
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 100;
 

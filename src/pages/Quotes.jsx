@@ -1,4 +1,5 @@
 import React, {useEffect, useState} from "react";
+import {usePageViewState} from "@/hooks/usePageViewState";
 import {bulkUpdateQuotes, createLocalRecord, getQuotes, listLocalCollection, updateQuote} from "@/api/dataClient";
 import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 import {Input} from "@/components/ui/input";
@@ -25,17 +26,6 @@ import {useToast} from "@/components/ui/use-toast";
 import RoleGuard, {useUserRole} from "@/components/auth/RoleGuard";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 
-const FILTERS_STORAGE_KEY = "quotes_filters";
-
-function loadSavedFilters() {
-  try {
-    const saved = localStorage.getItem(FILTERS_STORAGE_KEY);
-    return saved ? JSON.parse(saved) : {};
-  } catch {
-    return {};
-  }
-}
-
 const statusFilters = [
   { value: "all", label: "All Quotes" },
   { value: "draft_without_internal", label: "Quote Draft" },
@@ -56,29 +46,29 @@ const statusFilters = [
 ];
 
 function QuotesContent() {
-  const savedFilters = loadSavedFilters();
   const location = useLocation();
   const urlParams = new URLSearchParams(location.search);
-  const rawInitialStatus = urlParams.get("status") || savedFilters.statusFilter || "all";
+  const rawInitialStatus = urlParams.get("status") || "all";
   const validStatusValues = statusFilters.map(f => f.value);
   const initialStatus = validStatusValues.includes(rawInitialStatus) ? rawInitialStatus : "all";
 
   const { user, isApprover, isAdmin } = useUserRole();
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState(savedFilters.search || "");
-  const [statusFilter, setStatusFilter] = useState(initialStatus);
-  const [coordinatorFilter, setCoordinatorFilter] = useState(savedFilters.coordinatorFilter || "all");
-  const [sortBy, setSortBy] = useState(savedFilters.sortBy || "date_desc");
-  const [myQuotesOnly, setMyQuotesOnly] = useState(savedFilters.myQuotesOnly || false);
-  const [selectedSubmitter, setSelectedSubmitter] = useState(savedFilters.selectedSubmitter || "all");
-  const [snapshotExpanded, setSnapshotExpanded] = useState(true);
-  const [alertsOnly, setAlertsOnly] = useState(false);
-  const [duplicatesOnly, setDuplicatesOnly] = useState(false);
-  const [goldenOnly, setGoldenOnly] = useState(false);
+  const [search, setSearch] = usePageViewState("quotes", "search", "");
+  const [statusFilter, setStatusFilter] = usePageViewState("quotes", "status", initialStatus);
+  const [coordinatorFilter, setCoordinatorFilter] = usePageViewState("quotes", "coordinator", "all");
+  const [sortBy, setSortBy] = usePageViewState("quotes", "sort", "date_desc");
+  const [myQuotesOnly, setMyQuotesOnly] = usePageViewState("quotes", "mine", false);
+  const [selectedSubmitter, setSelectedSubmitter] = usePageViewState("quotes", "submitter", "all");
+  const [snapshotExpanded, setSnapshotExpanded] = usePageViewState("quotes", "snapshot", true);
+  const [alertsOnly, setAlertsOnly] = usePageViewState("quotes", "alerts", false);
+  const [duplicatesOnly, setDuplicatesOnly] = usePageViewState("quotes", "duplicates", false);
+  const [goldenOnly, setGoldenOnly] = usePageViewState("quotes", "golden", false);
 
   useEffect(() => {
-    localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify({ search, statusFilter, coordinatorFilter, sortBy, myQuotesOnly, selectedSubmitter }));
-  }, [search, statusFilter, coordinatorFilter, sortBy, myQuotesOnly, selectedSubmitter]);
+    const requestedStatus = new URLSearchParams(location.search).get("status");
+    if (requestedStatus && statusFilters.some(filter => filter.value === requestedStatus)) setStatusFilter(requestedStatus);
+  }, [location.search, location.key, setStatusFilter]);
 
   const downloadCSV = () => {
     const headers = ["Quote Number", "Site ID", "Case Number", "Agent", "Status", "Total", "Invoice Number", "Stripe Transaction ID", "Stripe Invoice ID", "Paid At Date", "Created Date", "Last Modified Date"];
@@ -547,7 +537,7 @@ function QuotesContent() {
           <div className="flex items-center gap-2 mb-4 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
             <span>Filters are active - some quotes may be hidden.</span>
             <button
-              onClick={() => { setSearch(""); setStatusFilter("all"); setCoordinatorFilter("all"); setMyQuotesOnly(false); setSelectedSubmitter("all"); setGoldenOnly(false); setAlertsOnly(false); }}
+              onClick={() => { setSearch(""); setStatusFilter("all"); setCoordinatorFilter("all"); setMyQuotesOnly(false); setSelectedSubmitter("all"); setGoldenOnly(false); setAlertsOnly(false); setDuplicatesOnly(false); }}
               className="ml-auto font-medium underline hover:no-underline"
             >
               Clear all filters

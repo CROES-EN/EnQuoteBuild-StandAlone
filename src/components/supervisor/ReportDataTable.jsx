@@ -1,4 +1,5 @@
 import {useEffect, useMemo, useState} from "react";
+import {usePageViewState} from "@/hooks/usePageViewState";
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
 import {Checkbox} from "@/components/ui/checkbox";
@@ -171,9 +172,9 @@ function SummaryFieldConfigurator({ columns, fields, onSave, onReset }) {
  * this component only displays whatever `table` it's given.
  */
 export default function ReportDataTable({ reportType, table, defaultSummaryFields, defaultHiddenColumns, onReload, isReloading }) {
-  const [search, setSearch] = useState("");
-  const [sortColumn, setSortColumn] = useState(null);
-  const [sortDirection, setSortDirection] = useState("asc");
+  const [search, setSearch] = usePageViewState(`report:${reportType}`, "search", "");
+  const [sortColumn, setSortColumn] = usePageViewState(`report:${reportType}`, "sort-column", null);
+  const [sortDirection, setSortDirection] = usePageViewState(`report:${reportType}`, "sort-direction", "asc");
   const [showColumnPicker, setShowColumnPicker] = useState(false);
   const [showFieldConfig, setShowFieldConfig] = useState(false);
   const [detailsRow, setDetailsRow] = useState(null);

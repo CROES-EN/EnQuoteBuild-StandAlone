@@ -1,4 +1,4 @@
-﻿import {useState} from "react";
+import {usePageViewState} from "@/hooks/usePageViewState";
 import {getQuotes} from "@/api/dataClient";
 import {useQuery} from "@tanstack/react-query";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
@@ -19,7 +19,8 @@ import {Button} from "@/components/ui/button";
 import {exportQuoteSLAToExcel} from "@/utils/quoteSLAExport";
 
 function SLAReportingContent() {
- const [dateRange, setDateRange] = useState("90");
+ const [dateRange, setDateRange] = usePageViewState("sla", "range", "90");
+ const [activeTab, setActiveTab] = usePageViewState("sla", "tab", "sla");
 
  const { data: allQuotes = [], isLoading } = useQuery({
  queryKey: ["quotes-sla"],
@@ -76,7 +77,7 @@ function SLAReportingContent() {
  </div>
  </div>
 
- <Tabs defaultValue="sla">
+ <Tabs value={activeTab} onValueChange={setActiveTab}>
  <TabsList className="mb-6">
  <TabsTrigger value="sla" className="flex items-center gap-2">
  <BarChart3 className="w-4 h-4" /> SLA Performance

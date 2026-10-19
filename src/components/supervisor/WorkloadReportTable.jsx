@@ -1,4 +1,5 @@
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from "react";
+import {usePageViewState} from "@/hooks/usePageViewState";
 import {Link, useLocation} from "react-router-dom";
 import {sharedWorkloadCase} from "@/features/supervisorDashboard/sharedWorkloadCase";
 import {createPageUrl} from "@/utils";
@@ -370,17 +371,19 @@ function ColumnFilterPopover({ column, distinctValues, selectedValues, onApply, 
 export default function WorkloadReportTable({ table, onReload, isReloading }) {
   const location = useLocation();
   const sharedCase = sharedWorkloadCase(location.search);
-  const [search, setSearch] = useState("");
-  const [sortColumn, setSortColumn] = useState(() => getDefaultSortColumn());
-  const [sortDirection, setSortDirection] = useState("asc");
+  const viewOptions = {persist: !sharedCase};
+  const viewPage = sharedCase ? "workload-shared" : "workload";
+  const [search, setSearch] = usePageViewState(viewPage, "search", "", viewOptions);
+  const [sortColumn, setSortColumn] = usePageViewState(viewPage, "sort-column", () => getDefaultSortColumn(), viewOptions);
+  const [sortDirection, setSortDirection] = usePageViewState(viewPage, "sort-direction", "asc", viewOptions);
   const [detailsRow, setDetailsRow] = useState(null);
   const [tagRow, setTagRow] = useState(null);
   const [quoteMatchesForDialog, setQuoteMatchesForDialog] = useState(null);
-  const [activeTileFilter, setActiveTileFilter] = useState(null);
-  const [reviewMeOnly, setReviewMeOnly] = useState(false);
+  const [activeTileFilter, setActiveTileFilter] = usePageViewState(viewPage, "tile", null, viewOptions);
+  const [reviewMeOnly, setReviewMeOnly] = usePageViewState(viewPage, "review", false, viewOptions);
   // Default FALSE = "showing only my own cases" (the default behavior). Set to TRUE by
   // clicking the toggle button to see the entire team's report regardless of Case Owner.
-  const [allCasesMode, setAllCasesMode] = useState(false);
+  const [allCasesMode, setAllCasesMode] = usePageViewState(viewPage, "all-cases", false, viewOptions);
   const [goal, setGoalState] = useState(() => getWorkloadGoal());
   const [editingGoal, setEditingGoal] = useState(false);
   const [goalDraft, setGoalDraft] = useState(() => String(getWorkloadGoal()));
@@ -397,7 +400,7 @@ export default function WorkloadReportTable({ table, onReload, isReloading }) {
   // is deliberate (rather than always storing every column's full value set) so clearing a
   // filter is a simple "delete this key" and the "is any column filtered" check is a cheap
   // "is this map non-empty".
-  const [columnFilters, setColumnFilters] = useState({});
+  const [columnFilters, setColumnFilters] = usePageViewState(viewPage, "columns", {}, viewOptions);
   const [openFilterColumn, setOpenFilterColumn] = useState(null);
   useEffect(() => {
     if (!sharedCase) return;

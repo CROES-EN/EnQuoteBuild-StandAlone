@@ -1,4 +1,5 @@
 ﻿import {useEffect, useState} from "react";
+import {usePageViewState} from "@/hooks/usePageViewState";
 import {useQuery, useQueryClient} from "@tanstack/react-query";
 import {useSearchParams} from "react-router-dom";
 import {Button} from "@/components/ui/button";
@@ -38,8 +39,13 @@ function SupervisorDashboardContent() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedTab = searchParams.get("tab") === "manager-dashboard" ? "quote-dashboard" : searchParams.get("tab");
-  const activeTab = TAB_VALUES.includes(requestedTab) ? requestedTab : "dashboard";
+  const [savedTab, setSavedTab] = usePageViewState("supervisor", "tab", "dashboard");
+  const activeTab = TAB_VALUES.includes(requestedTab) ? requestedTab : TAB_VALUES.includes(savedTab) ? savedTab : "dashboard";
+  useEffect(() => {
+    if (TAB_VALUES.includes(requestedTab)) setSavedTab(requestedTab);
+  }, [requestedTab, setSavedTab]);
   function setActiveTab(tab) {
+    setSavedTab(tab);
     setSearchParams(previous => {
       const next = new URLSearchParams(previous);
       next.set("tab", tab);
@@ -50,8 +56,8 @@ function SupervisorDashboardContent() {
   const [importInitialSource, setImportInitialSource] = useState(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState(null);
-  const [selectedDate, setSelectedDate] = useState(null);
-  const [completedStatuses, setCompletedStatuses] = useState(DEFAULT_COMPLETED_STATUSES);
+  const [selectedDate, setSelectedDate] = usePageViewState("supervisor", "date", null);
+  const [completedStatuses, setCompletedStatuses] = usePageViewState("supervisor", "completed-statuses", DEFAULT_COMPLETED_STATUSES);
   const [lastImportedFile, setLastImportedFileState] = useState(() => getLastImportedFile());
   // Keyed by date so the Daily Snapshot Report tab's Executive Summary edits survive Radix Tabs
   // unmounting that panel when the user switches to a different tab and back (that field has no

@@ -25,6 +25,34 @@ An existing unsigned installation may need one manual replacement to transition.
 
 ## EnQuote personal settings and Salesforce workspace
 
+### Remembered filters and views
+
+Applied filters and view selections are saved per signed-in user on this device,
+so navigating away, reloading the UI, or reopening EnQuote does not reset them.
+Only small view settings are saved: pages still unmount and data still refreshes.
+These settings are not shared team data or synced across devices.
+
+- **Quotes:** search, status, coordinator/submitter, sort, My Quotes, Alerts,
+  Duplicates, Golden Quotes and status-summary expansion.
+- **Workload:** search, sort, My/All Cases, tile/Review Me and all applied column
+  checkbox filters (including an explicitly empty selection). Existing Clear
+  controls remove the saved filters too. Shared-case links temporarily bypass
+  the normal Workload filters without overwriting them.
+- **Supervisor:** selected tab/date and completed statuses; individual imported
+  report tables remember their own search and sort independently.
+- **Quote Dashboard:** period/custom dates, status, search, inclusion toggles and view.
+- **SLA Reporting:** date range and selected tab.
+- **Auto-Drafter, Dashboard, Products, Material Orders, Panel RMAs, Rejection
+  Reviews, Boneyard and Site Flags:** their search/filter/view selections.
+- **Tasks:** selected tab and Show Completed.
+
+Explicit quote-status links still override the remembered status. The old
+unscoped Quotes filter key is not migrated because it may belong to another user.
+Dialogs, unsaved business forms, bulk selections and live data are not cached.
+Storage failures are logged and leave the current screen usable.
+After building, `npm run smoke -- --view-state-only` checks real page navigation,
+Workload column-filter restoration and user isolation.
+
 Open **Settings** in EnQuote to choose Salesforce case-link behavior, show/hide the
 floating Salesforce cloud launcher, and show/hide sidebar tabs. Preferences are saved
 per signed-in EnQuote user on the current device. Settings cannot hide itself; hiding

@@ -1,4 +1,5 @@
 ﻿import {useState} from "react";
+import {usePageViewState} from "@/hooks/usePageViewState";
 import {base44} from "@/api/base44Client";
 import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 import {Input} from "@/components/ui/input";
@@ -31,9 +32,9 @@ import {createProduct, deleteProduct, getProducts, updateProduct} from "@/api/da
 function ProductsContent() {
  const queryClient = useQueryClient();
  const { role, user } = useUserRole();
- const [search, setSearch] = useState("");
- const [myItemsOnly, setMyItemsOnly] = useState(false);
- const [categoryFilter, setCategoryFilter] = useState("all");
+ const [search, setSearch] = usePageViewState("products", "search", "");
+ const [myItemsOnly, setMyItemsOnly] = usePageViewState("products", "mine", false);
+ const [categoryFilter, setCategoryFilter] = usePageViewState("products", "category", "all");
  const [showForm, setShowForm] = useState(false);
  const [editingProduct, setEditingProduct] = useState(null);
  const [showDeleteDialog, setShowDeleteDialog] = useState(false);

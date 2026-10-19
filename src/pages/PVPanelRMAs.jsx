@@ -1,4 +1,5 @@
 ﻿import {useMemo, useState} from "react";
+import {usePageViewState} from "@/hooks/usePageViewState";
 import {createLocalRecord, getUsers, listLocalCollection, updateLocalRecord} from "@/api/dataClient";
 import {saveRmaRecord} from "@/features/rma/rmaRecords";
 import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
@@ -32,9 +33,9 @@ const QUICK_FILTERS = [
 function PVPanelRMAsContent() {
  const queryClient = useQueryClient();
  const { user: currentUser } = useUserRole();
- const [search, setSearch] = useState("");
- const [quickFilter, setQuickFilter] = useState("all");
- const [activeTab, setActiveTab] = useState("dashboard");
+ const [search, setSearch] = usePageViewState("panel-rmas", "search", "");
+ const [quickFilter, setQuickFilter] = usePageViewState("panel-rmas", "filter", "all");
+ const [activeTab, setActiveTab] = usePageViewState("panel-rmas", "tab", "dashboard");
  const [showForm, setShowForm] = useState(false);
  const [editingRma, setEditingRma] = useState(null);
 

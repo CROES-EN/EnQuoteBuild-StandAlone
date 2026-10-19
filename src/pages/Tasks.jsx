@@ -1,4 +1,5 @@
 import {useEffect, useMemo, useState} from "react";
+import {usePageViewState} from "@/hooks/usePageViewState";
 import {Link, useLocation} from "react-router-dom";
 import {quoteDetailsPath} from "../../shared/appLinkRules.js";
 import {
@@ -299,7 +300,8 @@ export default function TasksPage() {
   const highlightedId = new URLSearchParams(location.search).get("task");
   const [now, setNow] = useState(() => new Date());
   const [dialog, setDialog] = useState({ open: false, task: null, initial: null });
-  const [showDone, setShowDone] = useState(false);
+  const [showDone, setShowDone] = usePageViewState("tasks", "show-done", false);
+  const [activeTab, setActiveTab] = usePageViewState("tasks", "tab", "list");
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 30000);
@@ -345,7 +347,7 @@ export default function TasksPage() {
         ))}
       </div>
 
-      <Tabs defaultValue="list">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="h-auto flex-wrap justify-start">
           <TabsTrigger value="list"><ListTodo className="mr-1.5 h-4 w-4" />List</TabsTrigger>
           <TabsTrigger value="calendar"><CalendarDays className="mr-1.5 h-4 w-4" />Calendar</TabsTrigger>

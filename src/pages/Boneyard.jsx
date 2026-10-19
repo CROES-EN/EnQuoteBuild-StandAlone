@@ -1,4 +1,5 @@
 ﻿import {useState} from "react";
+import {usePageViewState} from "@/hooks/usePageViewState";
 import {getCurrentUser, updateQuote} from "@/api/dataClient";
 import {getBoneyardQuotes} from "@/components/inactive-dashboard/inactiveRevenueService";
 import InactiveDataError from "@/components/inactive-dashboard/InactiveDataError";
@@ -26,7 +27,7 @@ import {CaseNumberLink, SiteIdLink} from "@/components/links/ExternalIdLinks";
 
 function BoneyardContent() {
  const queryClient = useQueryClient();
- const [search, setSearch] = useState("");
+ const [search, setSearch] = usePageViewState("boneyard", "search", "");
  const [restoreTarget, setRestoreTarget] = useState(null);
  const [restoreNote, setRestoreNote] = useState("");
 

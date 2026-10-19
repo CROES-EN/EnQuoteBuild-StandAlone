@@ -1,4 +1,5 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from "react";
+import {usePageViewState} from "@/hooks/usePageViewState";
 import {useSearchParams} from "react-router-dom";
 import {APP_LINK_QUERY} from "../../shared/appLinkRules.js";
 import {Button} from "@/components/ui/button";
@@ -80,9 +81,9 @@ export const AutoDrafter = () => {
     const careQuery = useRequestCareEligibility();
     const caseIdIndex = useCaseIdIndex();
     const [exporting, setExporting] = useState(false);
-    const [requestType, setRequestType] = useState("all");
+    const [requestType, setRequestType] = usePageViewState("auto-drafter", "request-type", "all");
     const [hygieneOpen, setHygieneOpen] = useState(false);
-    const [view, setView] = useState("requests");
+    const [view, setView] = usePageViewState("auto-drafter", "view", "requests");
     const showPanelRmas = view === "panel-rmas";
     const showGolden = view === "golden";
     const showAlternate = view === "alternate";
@@ -111,7 +112,7 @@ export const AutoDrafter = () => {
     const [clearing, setClearing] = useState(false);
     const [clearDraftsConfirmOpen, setClearDraftsConfirmOpen] = useState(false);
     const [clearingDrafts, setClearingDrafts] = useState(false);
-    const [search, setSearch] = useState("");
+    const [search, setSearch] = usePageViewState("auto-drafter", "search", "");
     const [generatedDraftsByCase, setGeneratedDraftsByCase] = useState({});
     const [draftsLoading, setDraftsLoading] = useState(true);
     const [draftsError, setDraftsError] = useState("");

@@ -1,4 +1,5 @@
 import {useState} from "react";
+import {usePageViewState} from "@/hooks/usePageViewState";
 import {
     createLocalRecord,
     deleteLocalRecord,
@@ -69,8 +70,8 @@ const statusFilters = [
 function MaterialOrdersContent() {
  const { isAdmin, user } = useUserRole();
  const queryClient = useQueryClient();
- const [search, setSearch] = useState("");
- const [statusFilter, setStatusFilter] = useState("all");
+ const [search, setSearch] = usePageViewState("material-orders", "search", "");
+ const [statusFilter, setStatusFilter] = usePageViewState("material-orders", "status", "all");
  const [showForm, setShowForm] = useState(false);
  const [editingOrder, setEditingOrder] = useState(null);
  const [showAdminActionDialog, setShowAdminActionDialog] = useState(false);

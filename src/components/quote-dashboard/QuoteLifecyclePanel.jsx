@@ -1,4 +1,5 @@
 import {useEffect, useMemo, useState} from "react";
+import {usePageViewState} from "@/hooks/usePageViewState";
 import {Link} from "react-router-dom";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
@@ -49,17 +50,17 @@ export default function QuoteLifecyclePanel({quotes, activities = []}) {
     const timer = setInterval(() => setNow(Date.now()), 60000);
     return () => clearInterval(timer);
   }, []);
-  const [preset, setPreset] = useState(RANGE_PRESETS.LAST_30_DAYS);
-  const [customStart, setCustomStart] = useState("");
-  const [customEnd, setCustomEnd] = useState("");
-  const [status, setStatus] = useState("all");
-  const [search, setSearch] = useState("");
-  const [includeOnHold, setIncludeOnHold] = useState(true);
-  const [includeExcluded, setIncludeExcluded] = useState(true);
+  const [preset, setPreset] = usePageViewState("quote-lifecycle", "period", RANGE_PRESETS.LAST_30_DAYS);
+  const [customStart, setCustomStart] = usePageViewState("quote-lifecycle", "start", "");
+  const [customEnd, setCustomEnd] = usePageViewState("quote-lifecycle", "end", "");
+  const [status, setStatus] = usePageViewState("quote-lifecycle", "status", "all");
+  const [search, setSearch] = usePageViewState("quote-lifecycle", "search", "");
+  const [includeOnHold, setIncludeOnHold] = usePageViewState("quote-lifecycle", "on-hold", true);
+  const [includeExcluded, setIncludeExcluded] = usePageViewState("quote-lifecycle", "excluded", true);
   const [selectedId, setSelectedId] = useState("");
   const [activityPage, setActivityPage] = useState(0);
   const [quotePage, setQuotePage] = useState(0);
-  const [view, setView] = useState("overview");
+  const [view, setView] = usePageViewState("quote-lifecycle", "view", "overview");
   const range = preset === RANGE_PRESETS.ALL_HISTORY ? {start: null, end: null}
     : resolveDateRange({preset, startDate: customStart, endDate: preset === RANGE_PRESETS.CUSTOM_RANGE ? customEnd : todayStr()});
   const invalidRange = preset === RANGE_PRESETS.CUSTOM_RANGE && (!customStart || !customEnd || customStart > customEnd);
