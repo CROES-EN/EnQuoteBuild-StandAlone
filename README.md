@@ -2,10 +2,15 @@
 
 ## macOS installer update recovery
 
-The current macOS workflow builds without a Developer ID certificate.
-Unsigned or ad-hoc-signed installed apps use a **Download update** notice instead
-of automatic native installation. Apps launched from a disk image or macOS
-App Translocation also require manual replacement in Applications.
+The current macOS workflow builds without a Developer ID certificate, so Apple's
+Squirrel.Mac installer (used by electron-updater) cannot install updates. Instead,
+unsigned Macs self-install (`electron/macSelfInstaller.cjs`): electron-updater
+downloads the ZIP and verifies its sha512 from `latest-mac.yml`, EnQuote unpacks
+it, and a detached script waits for EnQuote to exit, swaps the app bundle (rolling
+back if the copy fails), clears quarantine, and relaunches. The installer log is
+`~/Library/Logs/EnQuote/enquote-mac-update.log`. A **Download update** notice is
+shown instead when the app runs from a disk image or App Translocation, or when
+the user cannot modify the installed app.
 For supported automatic installations, installer errors and a 90-second
 installation timeout release the startup gate rather than leaving the splash
 open indefinitely. Update failures remain visible in the app.
@@ -19,9 +24,9 @@ or other EnQuote user-data folders. An IT-managed installation may require IT
 to perform the replacement. Native updater fixes require a full desktop release;
 a UI-only update cannot repair the installed startup code.
 
-Reliable automatic Mac distribution requires configuring Developer ID signing
-and notarization in the release workflow and testing the upgrade on actual Macs.
-An existing unsigned installation may need one manual replacement to transition.
+Installations older than the self-installer (1.4.2 and earlier) need one manual
+replacement to transition. While macOS users are on 1.3.x, `latest-mac.yml` may be
+withheld from a release so their startup update check fails cleanly instead of hanging.
 
 ## EnQuote personal settings and Salesforce workspace
 

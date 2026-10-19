@@ -22,10 +22,13 @@ function manualUpdateReason({platform = process.platform, appPath, executablePat
   } catch (error) {
     return `Automatic Mac installation is unavailable (${error.code || error.status || "signature inspection failed"}). Download the latest Mac app and replace EnQuote in Applications.`;
   }
-  return "This Mac app does not have a Developer ID signature. Download the latest Mac app and replace EnQuote in Applications.";
+  return UNSIGNED_MAC_REASON;
 }
 
+const UNSIGNED_MAC_REASON = "This Mac app does not have a Developer ID signature. Download the latest Mac app and replace EnQuote in Applications.";
+
 function waitForStartupUpdate({updater, controller, setStatus, logger = console,
+  install = () => updater.quitAndInstall(true, true),
   setTimer = setTimeout, clearTimer = clearTimeout,
   checkTimeout = 10000, downloadTimeout = 600000, installTimeout = 90000}) {
   return new Promise(resolve => {
@@ -69,7 +72,7 @@ function waitForStartupUpdate({updater, controller, setStatus, logger = console,
       arm(installTimeout, "The installer did not restart EnQuote. Download the latest installer to update manually.");
       setStatus("Installing update\u2026 EnQuote will close and reopen on its own in about a minute.");
       installTimer = setTimer(() => {
-        try { updater.quitAndInstall(true, true); } catch (error) { finish(error); }
+        try { install(); } catch (error) { finish(error); }
       }, 4000);
     }
     updater.once("update-available", available);
@@ -82,4 +85,4 @@ function waitForStartupUpdate({updater, controller, setStatus, logger = console,
   });
 }
 
-module.exports = {manualUpdateReason, waitForStartupUpdate, RELEASE_URL};
+module.exports = {manualUpdateReason, waitForStartupUpdate, RELEASE_URL, UNSIGNED_MAC_REASON};

@@ -16,9 +16,9 @@
 # platforms end up on one release page together.
 #
 # NOTE ON SIGNING: this build is UNSIGNED (no Apple Developer certificate configured yet).
-# Unsigned/ad-hoc Mac installs use EnQuote's manual download notice, not native
-# automatic installation. Developer ID signing and notarization must be configured
-# and an actual Mac upgrade verified before relying on automatic Mac updates.
+# Unsigned Mac installs update through EnQuote's self-installer (electron/macSelfInstaller.cjs)
+# rather than Squirrel.Mac, which requires Developer ID signing. latest-mac.yml and the
+# arch ZIPs published below are what it downloads, so keep both.
 # Users will see macOS Gatekeeper's "unidentified developer" warning the first time they
 # open it, and will need to right-click -> Open (or run a terminal command) once to bypass
 # it. This is normal/expected for an unsigned app - see the separate instructions given to

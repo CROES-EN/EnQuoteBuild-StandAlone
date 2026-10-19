@@ -23,7 +23,8 @@ const whenReady = app.whenReady.bind(app);
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) quit();
 const { autoUpdater } = require("electron-updater");
-const {manualUpdateReason, waitForStartupUpdate, RELEASE_URL} = require("./installerRecovery.cjs");
+const {manualUpdateReason, waitForStartupUpdate, RELEASE_URL, UNSIGNED_MAC_REASON} = require("./installerRecovery.cjs");
+const {appBundlePath, selfInstallBlockedReason, prepareMacInstall} = require("./macSelfInstaller.cjs");
 const fs = require("node:fs");
 const path = require("node:path");
 const { repositoryFor } = require("./repository.cjs");
@@ -507,11 +508,23 @@ function configureAutoUpdater() {
         });
     }
 
-    const manualReason = manualUpdateReason({appPath: app.getAppPath(), executablePath: process.execPath});
+    let manualReason = manualUpdateReason({appPath: app.getAppPath(), executablePath: process.execPath});
+    // Unsigned Mac builds can't use Squirrel.Mac, so they replace their own app bundle instead.
+    const macSelfInstall = manualReason === UNSIGNED_MAC_REASON;
+    const bundlePath = macSelfInstall ? appBundlePath(process.execPath) : null;
+    if (macSelfInstall) manualReason = selfInstallBlockedReason(bundlePath);
     let installationBlockedReason = manualReason;
     if (manualReason) console.warn("[updater]", manualReason);
     autoUpdater.autoDownload = false;
-    autoUpdater.autoInstallOnAppQuit = !manualReason;
+    autoUpdater.autoInstallOnAppQuit = !manualReason && !macSelfInstall;
+    let downloadedFile = null;
+    let selfInstallStarted = false;
+    function startMacSelfInstall(relaunch) {
+        if (selfInstallStarted) return;
+        const {logPath} = prepareMacInstall({zipPath: downloadedFile, bundlePath, relaunch, logDir: app.getPath("logs")});
+        selfInstallStarted = true;
+        console.log("[updater] Mac update staged; installer log:", logPath);
+    }
     let updaterCheckInProgress = false;
     let updateAvailableOrDownloading = false;
     let startupUpdateCheckActive = false;
@@ -594,7 +607,8 @@ function configureAutoUpdater() {
         scheduleRetry();
     });
 
-    autoUpdater.on("update-downloaded", () => {
+    autoUpdater.on("update-downloaded", (event) => {
+        downloadedFile = event?.downloadedFile || null;
         updateAvailableOrDownloading = false;
         consecutiveFailures = 0;
         if (installationBlockedReason) {
@@ -644,12 +658,26 @@ function configureAutoUpdater() {
         installNow() {
             if (installationBlockedReason || !downloadedInfo) return false;
             try {
-                autoUpdater.quitAndInstall(true, true);
+                if (macSelfInstall) {
+                    startMacSelfInstall(true);
+                    quit();
+                } else {
+                    autoUpdater.quitAndInstall(true, true);
+                }
                 return true;
             } catch (error) {
                 console.error("[updater] Installation failed:", error);
                 controller.installationFailed(error);
                 return false;
+            }
+        },
+        // Matches autoInstallOnAppQuit: a downloaded Mac update installs when EnQuote closes.
+        installOnQuit() {
+            if (!macSelfInstall || installationBlockedReason || !downloadedInfo) return;
+            try {
+                startMacSelfInstall(false);
+            } catch (error) {
+                console.error("[updater] Mac update could not be staged on quit:", error.message);
             }
         },
         getState() {
@@ -784,6 +812,9 @@ async function runStartupUpdateCheck() {
     return waitForStartupUpdate({
         updater: autoUpdater, controller: updateCheckController,
         setStatus: setStartupSplashStatus,
+        install: () => {
+            if (!updateCheckController?.installNow()) throw new Error("EnQuote could not install the update. Download the latest version to update manually.");
+        },
         checkTimeout: STARTUP_UPDATE_CHECK_TIMEOUT_MS,
         downloadTimeout: STARTUP_UPDATE_DOWNLOAD_MAX_MS
     });
@@ -2794,6 +2825,7 @@ const QUIT_FORCE_EXIT_MS = 5000;
 let quitWatchdogArmed = false;
 
 on("before-quit", () => {
+    updateCheckController?.installOnQuit?.();
     salesforceAttachment.clear();
     salesforceWorkspace.close();
     if (!quitWatchdogArmed) {
