@@ -174,7 +174,9 @@ function createSalesforceWorkspace({WebContentsView, session, onStateChanged = (
     const y = Math.max(0, Math.min(contentHeight, Math.round(rectangle.y * zoom)));
     const width = Math.min(Math.round(rectangle.width * zoom), right - x);
     const height = Math.min(Math.round(rectangle.height * zoom), contentHeight - y);
-    view.setBounds({x, y, width, height});
+    const bounds = {x, y, width, height};
+    const current = view.getBounds();
+    if (Object.keys(bounds).some(key => bounds[key] !== current[key])) view.setBounds(bounds);
     view.setVisible(width > 0 && height > 0);
   }
 

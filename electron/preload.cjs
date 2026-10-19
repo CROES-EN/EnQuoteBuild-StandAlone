@@ -339,7 +339,8 @@ try {
     },
     getState: () => __ub_ipcRenderer.invoke("updater:get-state"),
     check: () => __ub_ipcRenderer.invoke("updater:check"),
-    installNow: () => __ub_ipcRenderer.invoke("updater:install-now")
+    installNow: () => __ub_ipcRenderer.invoke("updater:install-now"),
+    openRelease: () => __ub_ipcRenderer.invoke("updater:open-release")
   });
 } catch (error) {
   console.error("Failed to expose enquoteUpdater bridge:", error);

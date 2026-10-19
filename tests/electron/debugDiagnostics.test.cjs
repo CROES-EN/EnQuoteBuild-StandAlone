@@ -6,6 +6,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 const {EventEmitter} = require("node:events");
 const {installationLocation, createUpdateState, inspectRuntime, inspectCareTable} = require("../../electron/debugDiagnostics.cjs");
+const {waitForStartupUpdate} = require("../../electron/installerRecovery.cjs");
 
 test("Mac installation locations distinguish DMG, translocation and Applications", () => {
   assert.equal(installationLocation("/Volumes/EnQuote/EnQuote.app/Contents/Resources/app.asar", "darwin"), "mounted-disk-image");
@@ -73,8 +74,9 @@ test("real installer controller retains a failed check and respects a ready upda
   autoUpdater.quitAndInstall = () => {installed = true;};
   const controller = vm.runInNewContext(`${code}\nconfigureAutoUpdater()`, {
     autoUpdater, isPackaged: true, process: {env: {}}, console: {log() {}, error() {}},
+    manualUpdateReason: () => null, app: {getAppPath: () => "test"},
     sendStatus: (status, details) => state.record(status, details),
-    installerUpdateState: state, setTimeout: () => ({unref() {}})
+    installerUpdateState: state, setTimeout: () => ({unref() {}}), clearTimeout() {}
   });
   assert.equal((await controller.checkForUpdates()).ok, false);
   assert.equal(controller.getState().status, "error");
@@ -86,6 +88,10 @@ test("real installer controller retains a failed check and respects a ready upda
   assert.equal(controller.getState().lastError.message, "feed unavailable");
   assert.equal(controller.installNow(), true);
   assert.equal(installed, true);
+  autoUpdater.emit("error", new Error("native installation failed"));
+  assert.equal(controller.getState().status, "manual-update");
+  assert.equal(controller.installNow(), false, "failed native installs cannot keep offering Restart now");
+  assert.equal(autoUpdater.autoInstallOnAppQuit, false);
 });
 
 test("startup updater removes listeners after no-update, failure or timeout", async () => {
@@ -99,6 +105,9 @@ test("startup updater removes listeners after no-update, failure or timeout", as
     };
     const run = vm.runInNewContext(`${code}\nrunStartupUpdateCheck`, {
       isPackaged: true, autoUpdater: updater,
+      waitForStartupUpdate: options => waitForStartupUpdate({...options,
+        setTimer: callback => {timeout = callback; return 1;}, clearTimer() {},
+        logger: {error() {}}}),
       updateCheckController: {beginStartupCheck() {}, endStartupCheck() {}},
       setTimeout: callback => {timeout = callback; return 1;}, clearTimeout() {},
       STARTUP_UPDATE_CHECK_TIMEOUT_MS: 10, STARTUP_UPDATE_DOWNLOAD_MAX_MS: 100,

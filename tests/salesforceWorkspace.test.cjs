@@ -27,7 +27,8 @@ function fixture() {
       views.push(this);
     }
     setVisible(value) { this.visible = value; }
-    setBounds(value) { this.bounds = value; }
+    getBounds() { return this.bounds || {x: 0, y: 0, width: 0, height: 0}; }
+    setBounds(value) { this.bounds = value; this.boundsUpdates = (this.boundsUpdates || 0) + 1; }
   }
   function owner() {
     const window = new EventEmitter();
@@ -143,6 +144,28 @@ test("hide detaches the native view after the slide animation and show preserves
     workspace.toggle(first);
     assert.equal(views.length, 1);
     assert.equal(first.views.size, 1);
+  } finally {
+    workspace.close();
+  }
+});
+
+test("unchanged layout checks do not resize the native Salesforce view", () => {
+  const {workspace, views, first} = fixture();
+  try {
+    workspace.open(undefined, first);
+    const rectangle = {x: 400, y: 48, width: 500, height: 600};
+    workspace.setBounds(rectangle, first);
+    const view = views[0];
+    const boundsUpdates = view.boundsUpdates;
+    for (let check = 0; check < 10; check++) workspace.setBounds(rectangle, first);
+    assert.equal(view.boundsUpdates, boundsUpdates);
+    first.zoom = 1.25;
+    workspace.setBounds(rectangle, first);
+    assert.equal(view.boundsUpdates, boundsUpdates + 1, "zoom changes still update native bounds");
+    workspace.setBounds({x: 0, y: 0, width: 0, height: 0}, first);
+    assert.equal(view.visible, false);
+    workspace.setBounds(rectangle, first);
+    assert.equal(view.visible, true, "restoring bounds shows the view again");
   } finally {
     workspace.close();
   }

@@ -1,10 +1,54 @@
 import React, {useCallback, useEffect, useLayoutEffect, useRef, useState} from "react";
-import {ChevronsRight, Cloud, FileText, FolderOpen, Mail, Maximize2, Minimize2, RefreshCw} from "lucide-react";
-import {toast} from "sonner";
+import {AlertCircle, AlertTriangle, CheckCircle2, ChevronsRight, Cloud, FileText, FolderOpen, Info, Loader2, Mail, Maximize2, Minimize2, RefreshCw, X} from "lucide-react";
+import {toast, useSonner} from "sonner";
 import {useAppPreferences} from "@/hooks/useAppPreferences";
 import {writeAppPreferences} from "@/lib/appPreferences";
 import PrepareSalesforceQuote from "@/components/quotes/PrepareSalesforceQuote";
 import {useSalesforceAutoQuote} from "@/hooks/useSalesforceAutoQuote";
+
+const NOTICE_STYLES = {
+  success: ["border-emerald-500/50 bg-emerald-50 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100", CheckCircle2],
+  error: ["border-red-500/50 bg-red-50 text-red-900 dark:bg-red-950 dark:text-red-100", AlertCircle],
+  warning: ["border-amber-500/50 bg-amber-50 text-amber-900 dark:bg-amber-950 dark:text-amber-100", AlertTriangle],
+  loading: ["border-border bg-muted text-foreground", Loader2],
+  default: ["border-border bg-muted text-foreground", Info]
+};
+
+function renderable(value) {
+  return typeof value === "function" ? value() : value;
+}
+
+// Salesforce is a native view drawn above all EnQuote HTML, so floating toasts would be covered.
+// While the drawer is open, notifications are shown inside the drawer above the Salesforce page.
+function DrawerNotifications({toasts}) {
+  const shown = toasts.filter(item => !item.dismiss && !item.delete && (item.title || item.description)).slice(0, 3);
+  if (!shown.length) return null;
+  return (
+    <ol aria-label="Notifications" className="mx-2 mb-1 flex shrink-0 flex-col gap-1">
+      {shown.map(item => {
+        const [style, Icon] = NOTICE_STYLES[item.type] || NOTICE_STYLES.default;
+        const title = renderable(item.title), description = renderable(item.description);
+        const text = [title, description].filter(part => typeof part === "string").join(" - ");
+        return (
+          <li key={item.id} role={item.type === "error" ? "alert" : "status"} data-salesforce-notice title={text || undefined}
+            className={`flex min-h-7 items-center gap-2 rounded border px-2 py-1 text-xs ${style}`}>
+            <Icon className={`h-3.5 w-3.5 shrink-0 ${item.type === "loading" ? "animate-spin" : ""}`} />
+            <span className="min-w-0 flex-1 truncate">
+              <span className="font-medium">{title}</span>
+              {description ? <span className="opacity-80">{title ? " - " : ""}{description}</span> : null}
+            </span>
+            {item.action?.label && <button type="button" className="shrink-0 rounded border border-current/30 px-1.5 py-0.5 font-medium hover:bg-black/5"
+              onClick={event => { item.action.onClick?.(event); if (!event.defaultPrevented) toast.dismiss(item.id); }}>
+              {item.action.label}
+            </button>}
+            {item.dismissible !== false && <button type="button" aria-label="Dismiss notification" onClick={() => toast.dismiss(item.id)}
+              className="shrink-0 rounded p-0.5 opacity-70 hover:bg-black/5 hover:opacity-100"><X className="h-3 w-3" /></button>}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
 
 export default function SalesforceLauncher() {
   const preferences = useAppPreferences();
@@ -15,12 +59,14 @@ export default function SalesforceLauncher() {
   const [width, setWidth] = useState(preferences.salesforcePanelWidth);
   const [expanded, setExpanded] = useState(preferences.salesforcePanelExpanded);
   const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
+  const panel = useRef(null);
   const content = useRef(null);
   const drag = useRef(null);
   const boundsError = useRef(false);
   const bridge = globalThis.window?.enquoteLocal?.salesforce;
   const available = Boolean(bridge?.openWorkspace);
   const autoQuote = useSalesforceAutoQuote({visible: workspace.visible, loading: workspace.loading});
+  const {toasts} = useSonner();
 
   useEffect(() => {
     if (!copyNotice) return;
@@ -80,11 +126,13 @@ export default function SalesforceLauncher() {
 
   useLayoutEffect(() => {
     if (!available || !bridge?.workspaceAction || !content.current) return;
-    let active = true, frame;
-    function update() {
-      const rect = content.current?.getBoundingClientRect();
-      if (!rect) return;
-      bridge.workspaceAction("bounds", {x: rect.x, y: rect.y, width: rect.width, height: rect.height})
+    let active = true, frame = 0, last = "";
+    const started = performance.now();
+    function send(bounds, force = false) {
+      const key = JSON.stringify(bounds);
+      if (key === last && !force) return;
+      last = key;
+      bridge.workspaceAction("bounds", bounds)
         .then(result => {
           if (active && !result?.ok && !boundsError.current) {
             boundsError.current = true;
@@ -97,22 +145,43 @@ export default function SalesforceLauncher() {
           }
         });
     }
-    boundsError.current = false;
-    const observer = new ResizeObserver(update);
-    observer.observe(content.current);
-    window.addEventListener("resize", update);
-    // Native content must track each frame of the HTML drawer's slide, not just its final size.
-    const start = performance.now();
-    function animate() {
-      update();
-      if (performance.now() - start < 240) frame = requestAnimationFrame(animate);
+    // The drawer is at rest once its computed slide transform is back to no translation.
+    function atRest() {
+      const element = panel.current;
+      if (!element) return true;
+      const transform = getComputedStyle(element).transform;
+      if (!transform || transform === "none") return true;
+      const match = /^matrix\(([^)]+)\)$/.exec(transform);
+      return Boolean(match) && Math.abs(parseFloat(match[1].split(",")[4])) < 0.5;
     }
-    frame = requestAnimationFrame(animate);
+    // Native views cannot follow CSS transforms smoothly, so Salesforce is hidden while the drawer
+    // slides and placed only once the drawer is settled; a mid-slide position can never stick.
+    function update(force = false) {
+      if (!active) return;
+      cancelAnimationFrame(frame);
+      const hidden = {x: 0, y: 0, width: 0, height: 0};
+      if (!workspace.visible) return send(hidden);
+      if (!atRest() && performance.now() - started < 1500) {
+        send(hidden);
+        frame = requestAnimationFrame(() => update());
+        return;
+      }
+      const rect = content.current?.getBoundingClientRect();
+      if (rect) send({x: rect.x, y: rect.y, width: rect.width, height: rect.height}, force === true);
+    }
+    boundsError.current = false;
+    const observer = new ResizeObserver(() => update());
+    observer.observe(content.current);
+    const onResize = () => update();
+    window.addEventListener("resize", onResize);
+    const watchdog = workspace.visible ? setInterval(() => update(true), 500) : 0;
+    update();
     return () => {
       active = false;
       cancelAnimationFrame(frame);
+      clearInterval(watchdog);
       observer.disconnect();
-      window.removeEventListener("resize", update);
+      window.removeEventListener("resize", onResize);
     };
   }, [available, bridge, width, expanded, workspace.visible, workspace.error, prepareOpen]);
 
@@ -196,11 +265,12 @@ export default function SalesforceLauncher() {
       )}
       {bridge.workspaceAction && (
         <div className="pointer-events-none fixed inset-0 z-[60] overflow-hidden">
+        {workspace.visible && <style>{"[data-sonner-toaster]{visibility:hidden !important}"}</style>}
         <button type="button" aria-label="Return to EnQuote" tabIndex={-1} data-salesforce-backdrop
           disabled={!workspace.visible} onClick={() => action("hide")}
           className="absolute inset-0 bg-black/60 transition-opacity duration-200"
           style={{opacity: workspace.visible ? 1 : 0, pointerEvents: workspace.visible ? "auto" : "none"}} />
-        <section aria-label="Salesforce side panel" aria-hidden={!workspace.visible} data-salesforce-panel
+        <section ref={panel} aria-label="Salesforce side panel" aria-hidden={!workspace.visible} data-salesforce-panel
           data-expanded={expanded}
           className="absolute top-2 bottom-2 right-16 flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl transition-transform duration-200 ease-out"
           style={{width: expanded ? "calc(100vw - 96px)" : width, maxWidth: "calc(100vw - 80px)", transform: workspace.visible ? "translateX(0)" : "translateX(calc(100% + 64px))",
@@ -260,7 +330,8 @@ export default function SalesforceLauncher() {
           </header>
           <PrepareSalesforceQuote open={prepareOpen} onClose={() => setPrepareOpen(false)} quoteState={autoQuote} />
           {workspace.error && <p role="alert" className="px-5 pb-2 text-sm text-destructive">{workspace.error}</p>}
-          <div ref={content} className="mx-2 mb-2 min-h-0 flex-1 bg-white" />
+          {workspace.visible && <DrawerNotifications toasts={toasts} />}
+          <div ref={content} data-salesforce-content className="mx-2 mb-2 min-h-0 flex-1 bg-white" />
           <div role="separator" aria-label="Resize Salesforce panel" aria-orientation="vertical"
             aria-valuemin={Math.max(0, Math.min(320, viewportWidth - 80))} aria-valuemax={Math.max(0, viewportWidth - 80)}
             aria-valuenow={expanded ? Math.max(0, viewportWidth - 96) : clampWidth(width)} tabIndex={workspace.visible ? 0 : -1}

@@ -49,6 +49,30 @@ async function runSettings(win) {
   assert.equal(await evaluate(`Boolean(document.querySelector('[aria-label="Prepare Homeowner Quote"]'))`), false, "detection must not open dropdown");
   assert.equal(await evaluate(`Array.from(document.querySelectorAll('[data-salesforce-panel] header button')).find(button=>button.textContent==="Prepare Homeowner Quote").nextElementSibling.getAttribute("aria-label")`), "Generate Quote");
   const inspectScript = `(${inspectSalesforceCase.toString()})()`;
+  const scanWork = await fixtureContents.executeJavaScript(`(() => {
+    const noise = document.createElement("div");
+    noise.innerHTML = "<span>Unrelated Salesforce content</span>".repeat(2000);
+    document.body.append(noise);
+    const originalStyle = window.getComputedStyle;
+    const originalQuery = document.querySelectorAll;
+    const styled = new Set();
+    let styleCalls = 0, documentQueries = 0;
+    window.getComputedStyle = element => { styleCalls++; styled.add(element); return originalStyle(element); };
+    document.querySelectorAll = function(selector) { documentQueries++; return originalQuery.call(this, selector); };
+    try {
+      const start = performance.now();
+      const context = ${inspectScript};
+      return {context, styleCalls, uniqueStyled: styled.size, documentQueries, durationMs: performance.now() - start};
+    } finally {
+      window.getComputedStyle = originalStyle;
+      document.querySelectorAll = originalQuery;
+      noise.remove();
+    }
+  })()`);
+  assert.equal(scanWork.context.caseNumber, "456", "large pages preserve case identification");
+  assert.equal(scanWork.styleCalls, scanWork.uniqueStyled, "each element's computed style is read at most once per scan");
+  assert.equal(scanWork.documentQueries, 1, "each scan enumerates the document only once");
+  console.log("ok   Salesforce scan work bounded on 2,000 extra elements:", scanWork);
   assert.deepEqual(await fixtureContents.executeJavaScript(inspectScript), {caseNumber: "456", siteId: "123", contactName: "Jane Doe"});
   await fixtureContents.executeJavaScript(`(() => {
     const link=document.querySelector('#fixture-case a[href="/contact"]');
@@ -136,6 +160,18 @@ async function runSettings(win) {
   assert.equal(await evaluate(`Boolean(document.querySelector('[aria-label="Show prepared PDF in folder"]'))`), true);
   await evaluate(`document.querySelector('[aria-label="Copy homeowner email"]').click(); true`);
   await waitFor(`Array.from(document.querySelectorAll('[data-sonner-toast]')).some(item => item.textContent.includes("Homeowner email copied"))`, "copy email success");
+  await waitFor(`Array.from(document.querySelectorAll('[data-salesforce-notice]')).some(item => item.textContent.includes("Homeowner email copied"))`, "notification shown inside the drawer");
+  await sleep(400);
+  const notice = await evaluate(`(() => {
+    const strip=document.querySelector('[aria-label="Notifications"]').getBoundingClientRect();
+    const page=document.querySelector('[data-salesforce-content]').getBoundingClientRect();
+    return {above:strip.bottom<=page.top, floatingHidden:getComputedStyle(document.querySelector('[data-sonner-toaster]')).visibility==="hidden"};
+  })()`);
+  assert.equal(notice.above, true, "drawer notifications sit above the native Salesforce page, never behind it");
+  assert.equal(notice.floatingHidden, true, "floating toasts are hidden while Salesforce would cover them");
+  const noticeBottom = await evaluate(`document.querySelector('[data-salesforce-content]').getBoundingClientRect().top`);
+  assert.ok(win.contentView.children[0].getBounds().y >= Math.round(noticeBottom * win.webContents.getZoomFactor()) - 1,
+    "native Salesforce view moves below the notification strip");
   await waitFor(`document.querySelector('[aria-label="Email clipboard confirmation"]')?.textContent.trim() === "Copied to clipboard"`, "toolbar clipboard popup");
   const confirmation = await evaluate(`(() => {
     const notice=document.querySelector('[aria-label="Email clipboard confirmation"]').getBoundingClientRect();
@@ -273,6 +309,56 @@ async function runSettings(win) {
   await sleep(300);
   const view = win.contentView.children[0];
   assert.ok(view, "Salesforce is an actual native view within EnQuote, not a separate window");
+  async function assertAligned(label) {
+    const deadline = Date.now() + 2500;
+    let last;
+    while (Date.now() < deadline) {
+      const zoom = win.webContents.getZoomFactor();
+      const rect = await evaluate(`(() => {
+        const rect=document.querySelector('[data-salesforce-content]').getBoundingClientRect();
+        return {x:rect.x,y:rect.y,width:rect.width,height:rect.height};
+      })()`);
+      const bounds = view.getBounds();
+      last = {zoom, rect, bounds, visible: view.getVisible()};
+      if (last.visible && Math.abs(bounds.x-Math.round(rect.x*zoom))<=1 && Math.abs(bounds.y-Math.round(rect.y*zoom))<=1 &&
+          Math.abs(bounds.width-Math.round(rect.width*zoom))<=1 && Math.abs(bounds.height-Math.round(rect.height*zoom))<=1) return;
+      await sleep(100);
+    }
+    assert.fail(`Salesforce misaligned after ${label}: ${JSON.stringify(last)}`);
+  }
+  // In-app zoom (the 100% control / Ctrl +/-) while Salesforce stays open.
+  for (const zoom of [0.8, 0.9, 1.1, 1.25, 1.5, 1]) {
+    win.webContents.setZoomFactor(zoom);
+    await assertAligned(`zooming to ${zoom * 100}% while open`);
+  }
+  // Rapid zoom steps, like clicking + several times quickly.
+  for (const zoom of [1.1, 1.2, 1.3, 1.2, 1.1]) { win.webContents.setZoomFactor(zoom); await sleep(30); }
+  await assertAligned("rapid zoom clicks");
+  win.webContents.setZoomFactor(1);
+  // Window resizing while open.
+  const [originalWindowWidth, originalWindowHeight] = win.getSize();
+  for (const [w, h] of [[1100, 760], [1500, 900], [originalWindowWidth, originalWindowHeight]]) {
+    win.setSize(w, h);
+    await assertAligned(`resizing the window to ${w}x${h}`);
+  }
+  for (const zoom of [0.8, 1.25, 1]) {
+    win.webContents.setZoomFactor(zoom);
+    await sleep(300);
+    await evaluate(`document.querySelector('[aria-label="Tuck away Salesforce"]').click(); true`);
+    await waitFor(`document.querySelector('[data-salesforce-panel]').getAttribute("aria-hidden") === "true"`, "hide before alignment check");
+    await sleep(300);
+    await evaluate(`document.querySelector('[data-salesforce-panel]').style.transitionDelay="200ms";
+      document.querySelector('[aria-label="Open Salesforce workspace"]').click(); true`);
+    await waitFor(`document.querySelector('[data-salesforce-panel]').getAttribute("aria-hidden") === "false"`, "reopen with delayed slide");
+    await sleep(100);
+    assert.equal(view.getVisible(), false, "Salesforce stays hidden while the drawer is still sliding");
+    await assertAligned(`reopening at ${zoom * 100}% with a delayed slide`);
+    // Simulate a stale mid-slide position like the 1.4.1 report; the watchdog must snap it back.
+    const stale = view.getBounds();
+    view.setBounds({...stale, x: stale.x + 75, width: Math.max(1, stale.width - 75)});
+    await assertAligned(`a stale offset at ${zoom * 100}%`);
+    await evaluate(`document.querySelector('[data-salesforce-panel]').style.transitionDelay=""; true`);
+  }
   await view.webContents.executeJavaScript(`document.querySelector("input").value="Keep these case notes"; true`);
   const pageId = view.webContents.id;
   assert.equal(view.webContents.getURL(), "https://enphase.lightning.force.com/lightning/r/Case/500fixture/view");

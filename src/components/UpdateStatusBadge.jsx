@@ -1,4 +1,4 @@
-import {useEffect, useState} from "react";
+import React, {useEffect, useState} from "react";
 
 // Small, fixed-position notice for installer updates (electron-updater, relayed through
 // main.cjs -> preload.cjs). Updates download quietly in the background; once one is ready this
@@ -18,7 +18,7 @@ export default function UpdateStatusBadge() {
     const unsubscribe = updater.onUpdateStatus((data) => {
       clearTimeout(hideTimer);
       setState(data);
-      if (data.status === "ready") setDismissed(false);
+      if (data.status === "ready" || data.status === "manual-update") setDismissed(false);
       // "up-to-date" is reassuring but not actionable - hide it after a few seconds.
       if (data.status === "up-to-date") hideTimer = setTimeout(() => setState(null), 4000);
     });
@@ -29,6 +29,24 @@ export default function UpdateStatusBadge() {
   }, []);
 
   if (!state) return null;
+
+  if (state.status === "manual-update") {
+    if (dismissed) return null;
+    return (
+      <div role="alert" className="fixed bottom-4 right-4 z-50 w-80 rounded-lg bg-amber-700 p-3 text-white shadow-lg">
+        <p className="text-sm font-semibold">EnQuote update needs manual installation</p>
+        <p className="mt-1 text-xs">{state.message}</p>
+        <div className="mt-2 flex gap-2">
+          <button type="button" className="rounded bg-white px-2.5 py-1 text-xs font-semibold text-amber-900"
+            onClick={() => window.enquoteUpdater?.openRelease?.().catch(error =>
+              setState(previous => ({...previous, message: `Could not open the download page: ${error.message}`})))}>
+            Download update
+          </button>
+          <button type="button" className="rounded px-2.5 py-1 text-xs" onClick={() => setDismissed(true)}>Later</button>
+        </div>
+      </div>
+    );
+  }
 
   if (state.status === "ready") {
     if (dismissed) return null;

@@ -23,6 +23,7 @@ const whenReady = app.whenReady.bind(app);
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) quit();
 const { autoUpdater } = require("electron-updater");
+const {manualUpdateReason, waitForStartupUpdate, RELEASE_URL} = require("./installerRecovery.cjs");
 const fs = require("node:fs");
 const path = require("node:path");
 const { repositoryFor } = require("./repository.cjs");
@@ -506,8 +507,11 @@ function configureAutoUpdater() {
         });
     }
 
+    const manualReason = manualUpdateReason({appPath: app.getAppPath(), executablePath: process.execPath});
+    let installationBlockedReason = manualReason;
+    if (manualReason) console.warn("[updater]", manualReason);
     autoUpdater.autoDownload = false;
-    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.autoInstallOnAppQuit = !manualReason;
     let updaterCheckInProgress = false;
     let updateAvailableOrDownloading = false;
     let startupUpdateCheckActive = false;
@@ -527,7 +531,7 @@ function configureAutoUpdater() {
 
     function scheduleRetry() {
         // Back off 2, 4, then 6 minutes after a failed check/download, then wait for the normal schedule.
-        if (retryTimer || consecutiveFailures === 0 || consecutiveFailures > 3) return;
+        if (installationBlockedReason || retryTimer || consecutiveFailures === 0 || consecutiveFailures > 3) return;
         retryTimer = setTimeout(() => {
             retryTimer = null;
             controller.checkForUpdates();
@@ -547,6 +551,11 @@ function configureAutoUpdater() {
         pendingInfo = { version: info.version, notes: releaseNotesText(info) };
         console.log("Update available:", info.version);
         sendStatus("available", pendingInfo);
+        if (installationBlockedReason) {
+            updateAvailableOrDownloading = false;
+            sendStatus("manual-update", {...pendingInfo, message: installationBlockedReason});
+            return;
+        }
         // At launch the startup flow below downloads it behind its own splash screen. Otherwise
         // download quietly in the background - no prompt - and offer "Restart now" once it is ready.
         if (startupUpdateCheckActive) return;
@@ -577,6 +586,10 @@ function configureAutoUpdater() {
         updateAvailableOrDownloading = false;
         consecutiveFailures += 1;
         console.error("Auto-update error:", error);
+        if (downloadedInfo) {
+            controller.installationFailed(error);
+            return;
+        }
         sendStatus("error", { message: String(error) });
         scheduleRetry();
     });
@@ -584,12 +597,26 @@ function configureAutoUpdater() {
     autoUpdater.on("update-downloaded", () => {
         updateAvailableOrDownloading = false;
         consecutiveFailures = 0;
+        if (installationBlockedReason) {
+            sendStatus("manual-update", {...pendingInfo, message: installationBlockedReason});
+            return;
+        }
         downloadedInfo = pendingInfo;
         console.log("Update downloaded and ready to install.");
         sendStatus("ready", { ...downloadedInfo });
     });
 
     const controller = {
+        manualReason,
+        installationFailed(error) {
+            installationBlockedReason = error.message;
+            updateAvailableOrDownloading = false;
+            autoUpdater.autoInstallOnAppQuit = false;
+            downloadedInfo = null;
+            if (retryTimer) clearTimeout(retryTimer);
+            retryTimer = null;
+            sendStatus("manual-update", {...pendingInfo, message: error.message});
+        },
         beginStartupCheck() {
             startupUpdateCheckActive = true;
         },
@@ -615,9 +642,15 @@ function configureAutoUpdater() {
             if (Date.now() - lastCheckAt > 5 * 60 * 1000) controller.checkForUpdates();
         },
         installNow() {
-            if (!downloadedInfo) return false;
-            autoUpdater.quitAndInstall(true, true);
-            return true;
+            if (installationBlockedReason || !downloadedInfo) return false;
+            try {
+                autoUpdater.quitAndInstall(true, true);
+                return true;
+            } catch (error) {
+                console.error("[updater] Installation failed:", error);
+                controller.installationFailed(error);
+                return false;
+            }
         },
         getState() {
             const state = installerUpdateState.get();
@@ -747,98 +780,12 @@ const STARTUP_UPDATE_DOWNLOAD_MAX_MS = 10 * 60 * 1000;
 // the specific case that was broken before), a network timeout before hearing back at
 // all, and a stalled download hitting the new long safety cap.
 async function runStartupUpdateCheck() {
-    return new Promise((resolve) => {
-        if (!isPackaged) {
-            resolve();
-            return;
-        }
-
-        let settled = false;
-        let handleDownloadProgress = null;
-        let timeoutId = null;
-        updateCheckController?.beginStartupCheck();
-
-        const clearActiveTimeout = () => {
-            if (timeoutId) {
-                clearTimeout(timeoutId);
-                timeoutId = null;
-            }
-        };
-
-        const finish = () => {
-            if (settled) return;
-            settled = true;
-            updateCheckController?.endStartupCheck();
-            clearActiveTimeout();
-            cleanupStartupListeners();
-            if (typeof handleDownloadProgress === "function") {
-                autoUpdater.removeListener("download-progress", handleDownloadProgress);
-            }
-            // The splash stays up - startup continues (sign-in check, sync) until the main window opens.
-            setStartupSplashStatus("Starting EnQuote\u2026");
-            resolve();
-        };
-
-        // Phase 1: we don't yet know whether an update exists. Bounded by the original
-        // short timeout so an unreachable update server never meaningfully delays opening
-        // the app - identical behavior to before for this case.
-        timeoutId = setTimeout(finish, STARTUP_UPDATE_CHECK_TIMEOUT_MS);
-
-        const handleAvailable = () => {
-            if (settled) return;
-            // Phase 2: an update is now CONFIRMED to exist, so the short "haven't heard back
-            // yet" timeout no longer applies - cancel it and swap in the much longer safety
-            // cap instead. This is the actual fix: the app must now wait for the real
-            // download to finish (however long that takes, up to the safety cap), not bail
-            // out after a fixed 10 seconds regardless of download progress.
-            clearActiveTimeout();
-            timeoutId = setTimeout(finish, STARTUP_UPDATE_DOWNLOAD_MAX_MS);
-
-            showStartupSplash();
-            setStartupSplashStatus("Downloading update\u2026 0%", 0);
-            handleDownloadProgress = (progress) => {
-                const percent = Math.round(progress.percent);
-                setStartupSplashStatus(`Downloading update\u2026 ${percent}%`, percent);
-            };
-            autoUpdater.on("download-progress", handleDownloadProgress);
-            autoUpdater.downloadUpdate().catch((error) => {
-                console.error("[updater] Startup download failed:", error.message);
-                finish();
-            });
-        };
-
-        const handleDownloaded = () => {
-            if (settled) return;
-            settled = true;
-            updateCheckController?.endStartupCheck();
-            clearActiveTimeout();
-            cleanupStartupListeners();
-            // Quits the app and relaunches it automatically on the new version. Passes
-            // (isSilent=true, isForceRunAfter=true) -- WITHOUT these, the underlying NSIS
-            // installer shows its own separate, non-silent wizard (a real "Next/Back/Cancel"
-            // dialog, confirmed happening) even though the splash above already ran
-            // correctly; with them, the install runs invisibly and the app reopens on its
-            // own with no clicks required.
-            // Deliberately NOT resolving this promise, since the app is about to exit and
-            // createWindow() below should never run in this path.
-            // The silent install leaves nothing on screen for up to a minute, so say so first.
-            setStartupSplashStatus("Installing update\u2026 EnQuote will close and reopen on its own in about a minute.");
-            setTimeout(() => autoUpdater.quitAndInstall(true, true), 4000);
-        };
-
-        function cleanupStartupListeners() {
-            autoUpdater.removeListener("update-available", handleAvailable);
-            autoUpdater.removeListener("update-not-available", finish);
-            autoUpdater.removeListener("error", finish);
-            autoUpdater.removeListener("update-downloaded", handleDownloaded);
-            if (handleDownloadProgress) autoUpdater.removeListener("download-progress", handleDownloadProgress);
-        }
-        autoUpdater.once("update-available", handleAvailable);
-        autoUpdater.once("update-not-available", finish);
-        autoUpdater.once("error", finish);
-        autoUpdater.once("update-downloaded", handleDownloaded);
-
-        autoUpdater.checkForUpdates().catch(finish);
+    if (!isPackaged) return;
+    return waitForStartupUpdate({
+        updater: autoUpdater, controller: updateCheckController,
+        setStatus: setStartupSplashStatus,
+        checkTimeout: STARTUP_UPDATE_CHECK_TIMEOUT_MS,
+        downloadTimeout: STARTUP_UPDATE_DOWNLOAD_MAX_MS
     });
 }
 
@@ -1349,6 +1296,10 @@ let then = whenReady().then(async () => {
     ipcMain.handle("updater:get-state", () => updateCheckController?.getState() || null);
     ipcMain.handle("updater:check", () => updateCheckController?.checkForUpdates() || { ok: false, error: "Installer updates are disabled in development." });
     ipcMain.handle("updater:install-now", () => ({ ok: Boolean(updateCheckController?.installNow()) }));
+    ipcMain.handle("updater:open-release", async () => {
+        await shell.openExternal(RELEASE_URL);
+        return {ok: true};
+    });
     on("browser-window-focus", () => updateCheckController?.checkIfStale());
     // Error reports (UI errors forwarded by the window, plus crashes in this process) go to the
     // Worker so problems are seen without waiting for someone to report them. See errorReporter.cjs.

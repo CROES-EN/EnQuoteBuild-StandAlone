@@ -2,9 +2,21 @@
 function inspectSalesforceCase() {
   const normalize = value => String(value || "").replace(/\s+/g, " ").trim();
   const parent = element => element.parentElement || element.getRootNode()?.host || null;
+  // Cache only within this synchronous scan; later scans must read fresh case/tab state.
+  const styles = new WeakMap(), visibility = new WeakMap(), texts = new WeakMap(), trees = new WeakMap();
+  function styleFor(element) {
+    if (!styles.has(element)) styles.set(element, getComputedStyle(element));
+    return styles.get(element);
+  }
   function visible(element) {
+    if (visibility.has(element)) return visibility.get(element);
+    const result = isVisible(element);
+    visibility.set(element, result);
+    return result;
+  }
+  function isVisible(element) {
     for (let current = element; current; current = parent(current)) {
-      const style = getComputedStyle(current);
+      const style = styleFor(current);
       if (current.hidden || current.getAttribute("aria-hidden") === "true" ||
           style.display === "none" || style.visibility === "hidden" || style.visibility === "collapse") return false;
     }
@@ -15,11 +27,16 @@ function inspectSalesforceCase() {
       descendants(element.shadowRoot || element, "*").some(child => child.getClientRects().length && visible(child)));
   }
   function descendants(root, selector) {
-    const found = [...root.querySelectorAll(selector)];
-    for (const element of root.querySelectorAll("*")) {
-      if (element.shadowRoot) found.push(...descendants(element.shadowRoot, selector));
+    if (!trees.has(root)) {
+      const elements = [...root.querySelectorAll("*")];
+      const found = [...elements];
+      for (const element of elements) {
+        if (element.shadowRoot) found.push(...descendants(element.shadowRoot, "*"));
+      }
+      trees.set(root, found);
     }
-    return found;
+    const found = trees.get(root);
+    return selector === "*" ? found : found.filter(element => element.matches(selector));
   }
   const aliases = new Map([
     ["contact name", "contactName"], ["case number", "caseNumber"],
@@ -30,6 +47,10 @@ function inspectSalesforceCase() {
     return false;
   }
   function text(element) {
+    if (!texts.has(element)) texts.set(element, readText(element));
+    return texts.get(element);
+  }
+  function readText(element) {
     if (element.matches("button, [role='button']:not(a), .slds-assistive-text, .assistiveText") || !visible(element)) return "";
     if (element.matches("slot")) {
       const assigned = element.assignedNodes({flatten: true});

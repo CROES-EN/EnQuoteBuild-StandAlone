@@ -1,5 +1,28 @@
 # enquote-sync — Final Version (all fixes applied)
 
+## macOS installer update recovery
+
+The current macOS workflow builds without a Developer ID certificate.
+Unsigned or ad-hoc-signed installed apps use a **Download update** notice instead
+of automatic native installation. Apps launched from a disk image or macOS
+App Translocation also require manual replacement in Applications.
+For supported automatic installations, installer errors and a 90-second
+installation timeout release the startup gate rather than leaving the splash
+open indefinitely. Update failures remain visible in the app.
+
+If an older Mac installation is stuck on **Installing update**, fully quit EnQuote
+(Command-Q, or Force Quit if necessary), download the appropriate Mac DMG from
+[the latest release](https://github.com/CROES-EN/EnQuoteBuild-StandAlone/releases/latest),
+replace EnQuote in Applications, eject the DMG, and open the Applications copy.
+Use arm64 for Apple Silicon or x64 for Intel. Do not delete Application Support
+or other EnQuote user-data folders. An IT-managed installation may require IT
+to perform the replacement. Native updater fixes require a full desktop release;
+a UI-only update cannot repair the installed startup code.
+
+Reliable automatic Mac distribution requires configuring Developer ID signing
+and notarization in the release workflow and testing the upgrade on actual Macs.
+An existing unsigned installation may need one manual replacement to transition.
+
 ## EnQuote personal settings and Salesforce workspace
 
 Open **Settings** in EnQuote to choose Salesforce case-link behavior, show/hide the
@@ -21,6 +44,16 @@ or focus the resize handle and press Left/Right; your preferred width is saved p
 on this device and fits the current window. Dragging or keyboard resizing exits expanded
 focus width. Salesforce's own search/navigation controls are left intact. Case links use
 the case record directly when a Salesforce Case ID is known; otherwise they use search.
+Native Salesforce content is hidden while the drawer slides and placed only once the drawer
+is settled; a background check re-aligns it if the layout or zoom changes, so the toolbar
+and page stay aligned. Because Salesforce is drawn above EnQuote's page, notifications
+that appear while the drawer is open are shown in a compact strip inside the drawer, just
+above Salesforce, instead of floating behind it; they return to the normal corner position
+when the drawer is tucked away.
+Unchanged layout checks do not reapply native Salesforce bounds.
+Case scanning reuses DOM traversal, text and computed-style results within each scan
+to reduce background work while typing; each later scan still reads fresh case details.
+These native performance changes require a full desktop release, not a UI-only update.
 The launcher remains accessible beside the panel.
 The floating launcher is available throughout signed-in EnQuote pages/windows, alongside
 Notifications and Tasks. One isolated Salesforce view is reused: opening it in another
