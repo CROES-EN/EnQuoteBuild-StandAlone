@@ -74,7 +74,7 @@ test("real installer controller retains a failed check and respects a ready upda
   autoUpdater.quitAndInstall = () => {installed = true;};
   const controller = vm.runInNewContext(`${code}\nconfigureAutoUpdater()`, {
     autoUpdater, isPackaged: true, process: {env: {}}, console: {log() {}, error() {}},
-    manualUpdateReason: () => null, app: {getAppPath: () => "test"},
+    manualUpdateReason: () => null, UNSIGNED_MAC_REASON: "unsigned", app: {getAppPath: () => "test"},
     sendStatus: (status, details) => state.record(status, details),
     installerUpdateState: state, setTimeout: () => ({unref() {}}), clearTimeout() {}
   });
