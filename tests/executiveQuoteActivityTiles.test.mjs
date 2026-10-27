@@ -35,7 +35,8 @@ async function loadOverview() {
       state.queries.push(options);
       const key = options.queryKey[0];
       return {
-        data: key === "quotes" ? quotes : key === "quoteActivity" ? [] : state.tables,
+        data: key === "quotes" ? state.quotes || quotes : key === "quoteActivity" ? []
+          : key === "autoDrafterGeneratedDrafts" ? state.drafts || [] : state.tables,
         isLoading: Boolean(state.loading && key === state.loading),
         isError: Boolean(state.error && key === state.error),
         error: state.error === key ? new Error("Source unavailable") : null,
@@ -87,6 +88,36 @@ async function loadOverview() {
 function tileHtml(html, metric) {
   return html.match(new RegExp(`<section data-tile="quotes_${metric}_period">([\\s\\S]*?)</section>`))[1];
 }
+
+test("Quotes Requested tile follows Auto-Drafter, not the SFDC Quotes workbook", async () => {
+  const state = await loadOverview();
+  state.quotes = [{case_number: "00123", status: "rejected"}];
+  state.drafts = [{caseNumber: "456", removedFromAutoDrafter: true}];
+  state.tables = {
+    sfdc_quotes: {columns: ["O&M Status"], rows: [{"O&M Status": "Quote Requested"}]},
+    quoteRequestCases: {columns: ["Case Number", "Comment", "Created Date"], rows: [
+      {"Case Number": "123", Comment: "O&M_QUOTE"},
+      {"Case Number": "456", Comment: "O&M_QUOTE"},
+      {"Case Number": "789", Comment: "O&M_QUOTE", "Created Date": "2026-10-23"},
+      {"Case Number": "789", Comment: "Called homeowner", "Created Date": "2026-10-26"},
+      {"Case Number": "999", Comment: "O&M_RETURN"}
+    ]}
+  };
+  const tile = html => html.match(/<section data-tile="quotes_requested">([\s\S]*?)<\/section>/)[1];
+  assert.match(tile(state.render()), /text-foreground">1</);
+  assert.match(tile(state.render()), /Auto-Drafter Quote Requests/);
+  for (const key of ["quotes", "autoDrafterGeneratedDrafts"]) {
+    state.loading = key;
+    assert.match(tile(state.render()), /Loading Quote Requests/);
+    state.loading = null;
+    state.error = key;
+    const failed = tile(state.render());
+    assert.match(failed, /Could not load Quote Requests/);
+    assert.doesNotMatch(failed, /View contributing records/);
+    assert.doesNotMatch(failed, /text-foreground">\d+</);
+    state.error = null;
+  }
+});
 
 test("Executive tiles use selected-period unique counts and belong to Live from EnQuote", async () => {
   const state = await loadOverview();

@@ -129,6 +129,7 @@ export default function SalesforceLauncher() {
     let active = true, frame = 0, last = "";
     const started = performance.now();
     function send(bounds, force = false) {
+      bounds = {...bounds, viewportWidth: window.innerWidth, viewportHeight: window.innerHeight};
       const key = JSON.stringify(bounds);
       if (key === last && !force) return;
       last = key;
@@ -259,7 +260,7 @@ export default function SalesforceLauncher() {
         <button type="button" aria-label="Open Salesforce workspace" aria-expanded={Boolean(workspace.visible)}
           title={workspace.visible ? "Tuck away Salesforce" : "Show Salesforce panel"}
           disabled={busy} onClick={toggleWorkspace}
-          className="fixed top-28 right-4 z-[70] flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card shadow-lg transition hover:bg-accent disabled:opacity-50">
+          className={`fixed top-28 right-4 flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card shadow-lg transition hover:bg-accent disabled:opacity-50 ${workspace.visible ? "z-[70]" : "z-40"}`}>
           <Cloud className="h-5 w-5 text-sky-500" />
         </button>
       )}

@@ -25,7 +25,6 @@
  * or imported, exactly like a genuinely unrecognized file.
  */
 
-import {readWorkbookFromBytes} from "@/features/supervisorDashboard/reportParsing";
 import {saveReportTableWithRetry} from "@/features/supervisorDashboard/saveReportTableWithRetry";
 
 const EODB_WIDGET_RULES = [
@@ -133,7 +132,9 @@ function enrichHourlyWaitTimeRow(row) {
   return { ...row, "MST Hour": mstHour, "MST Date": mstDate };
 }
 
-function readFirstSheetAsColumnsAndRows(bytes, sheetIndex = 0) {
+async function readFirstSheetAsColumnsAndRows(bytes, sheetIndex = 0) {
+  // Loaded on demand so the spreadsheet parser stays out of the startup bundle.
+  const {readWorkbookFromBytes} = await import("@/features/supervisorDashboard/reportParsing");
   const workbook = readWorkbookFromBytes(bytes);
   const firstSheetName = workbook.sheetNames[sheetIndex];
   if (!firstSheetName) return null;
@@ -176,7 +177,7 @@ async function processEodbEmailInboxFile({ token, name, base64 }, { onImported, 
     // the first sheet ("Pivot") is a spreadsheet-only cross-tab view, not raw rows. Every
     // other report type continues reading sheet index 0, unchanged.
     const sheetIndex = classification.reportType === "eodb_hourly_wait_time" ? 1 : 0;
-    let parsed = readFirstSheetAsColumnsAndRows(bytes, sheetIndex);
+    let parsed = await readFirstSheetAsColumnsAndRows(bytes, sheetIndex);
     if (parsed && classification.reportType === "eodb_hourly_wait_time") {
       parsed = { columns: enrichHourlyWaitTimeColumns(parsed.columns), rows: parsed.rows.map(enrichHourlyWaitTimeRow) };
     }

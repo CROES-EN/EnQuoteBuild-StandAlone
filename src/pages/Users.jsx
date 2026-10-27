@@ -34,6 +34,7 @@ const roleFilters = [
  { value: "submitter", label: "Submitters" },
  { value: "pending", label: "Pending Users" }
 ];
+const usesBase44Invitations = ["base44", "base44-dual"].includes(import.meta.env.VITE_DATA_SOURCE);
 
 function UsersContent() {
  const queryClient = useQueryClient();
@@ -55,14 +56,19 @@ function UsersContent() {
  department: ""
  });
 
- const { data: users = [], isLoading } = useQuery({
+ const { data: users = [], isLoading, error: usersError } = useQuery({
  queryKey: ["users"],
- queryFn: getUsers,
+ queryFn: usesBase44Invitations ? getUsers : async () => {
+ const result = await adminApi.overview();
+ if (!Array.isArray(result.users)) throw new Error("The access service returned an invalid user list.");
+ return result.users;
+ },
  });
 
  const { data: invitations = [] } = useQuery({
  queryKey: ["invitations"],
  queryFn: () => base44.entities.Invitation.filter({ status: "pending" }, "-created_date"),
+ enabled: usesBase44Invitations
  });
 
  const updateMutation = useMutation({
@@ -83,7 +89,7 @@ function UsersContent() {
  } else if (Object.keys(localProfileChanges).length && userId === currentUser?.id) {
  await base44.auth.updateMe(localProfileChanges);
  }
- return adminApi.overview().catch(() => null);
+ return adminApi.overview();
  },
  onSuccess: (overview) => {
  if (overview?.users) queryClient.setQueryData(["users"], overview.users);
@@ -100,6 +106,13 @@ function UsersContent() {
 
  const inviteMutation = useMutation({
  mutationFn: async ({ email, role }) => {
+ email = email.trim().toLowerCase();
+ if (!usesBase44Invitations) {
+ if (users.some(user => user.email?.toLowerCase() === email)) {
+ throw new Error("This user already exists. Use Edit User to change their role.");
+ }
+ return adminApi.setUserOverride({email, app_role: role, additional_roles: [], allow_pages: [], deny_pages: []});
+ }
  // Track the invitation
  await base44.entities.Invitation.create({
  email: email,
@@ -117,10 +130,12 @@ function UsersContent() {
  setShowInviteForm(false);
  setInviteEmail("");
  setInviteRole("submitter");
- toast.success("Invite sent successfully!");
+ setShowCreateUserForm(false);
+ setCreateUserData({email: "", full_name: "", role: "submitter", department: ""});
+ toast.success(usesBase44Invitations ? "Invite sent successfully!" : "User access saved. They can sign in with their company account; no invitation email was sent.");
  },
  onError: (error) => {
- toast.error(error.message || "Failed to send invite");
+ toast.error(error.message || (usesBase44Invitations ? "Failed to send invite" : "Failed to add user"));
  }
  });
 
@@ -229,13 +244,6 @@ function UsersContent() {
  email: createUserData.email.trim(), 
  role: createUserData.role 
  });
- setShowCreateUserForm(false);
- setCreateUserData({
- email: "",
- full_name: "",
- role: "submitter",
- department: ""
- });
  }
  };
 
@@ -266,16 +274,17 @@ function UsersContent() {
  <UserPlus className="w-4 h-4 mr-2" />
  Create User
  </Button>
- <Button 
+ {usesBase44Invitations && <Button
  onClick={() => setShowInviteForm(true)}
  variant="outline"
  className="shadow-sm"
  >
  <Mail className="w-4 h-4 mr-2" />
  Send Invite
- </Button>
+ </Button>}
  </div>
  </div>
+ {usersError && <p role="alert" className="mb-4 text-sm text-destructive">Could not load users: {usersError.message}</p>}
 
  {/* Stats */}
  <div className="grid grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
@@ -405,7 +414,7 @@ function UsersContent() {
  user={user} 
  index={index}
  onEdit={handleEdit}
- onResetPassword={handleResetPassword}
+ onResetPassword={usesBase44Invitations ? handleResetPassword : undefined}
  currentUserEmail={currentUser?.email}
  />
  ))}
@@ -431,17 +440,20 @@ function UsersContent() {
  onSave={handleSave}
  onCancel={() => { setShowForm(false); setEditingUser(null); }}
  isLoading={updateMutation.isPending}
+ editProfile={usesBase44Invitations}
  />
  </SheetContent>
  </Sheet>
 
  {/* Create User Sheet */}
- <Sheet open={showCreateUserForm} onOpenChange={setShowCreateUserForm}>
- <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+ <Sheet open={showCreateUserForm} onOpenChange={open => {if (!inviteMutation.isPending) setShowCreateUserForm(open);}}>
+ <SheetContent closeDisabled={inviteMutation.isPending} className="w-full sm:max-w-lg overflow-y-auto">
  <SheetHeader>
  <SheetTitle>Create New User</SheetTitle>
  <SheetDescription>
- Create a new user account and send them a secure link to set their password
+ {usesBase44Invitations
+ ? "Create a new user account and send them a secure link to set their password"
+ : "Assign EnQuote access by company email. The user signs in through company login; no invitation email is sent."}
  </SheetDescription>
  </SheetHeader>
  
@@ -459,7 +471,7 @@ function UsersContent() {
  />
  </div>
 
- <div>
+ {usesBase44Invitations && <div>
  <Label htmlFor="create_name">Full Name</Label>
  <Input
  id="create_name"
@@ -469,7 +481,7 @@ function UsersContent() {
  placeholder="John Doe"
  className="mt-1.5"
  />
- </div>
+ </div>}
 
  <div>
  <Label htmlFor="create_role">Role *</Label>
@@ -492,7 +504,7 @@ function UsersContent() {
  </p>
  </div>
 
- <div>
+ {usesBase44Invitations && <div>
  <Label htmlFor="create_department">Department</Label>
  <Input
  id="create_department"
@@ -502,16 +514,17 @@ function UsersContent() {
  placeholder="e.g., Sales, Operations"
  className="mt-1.5"
  />
- </div>
+ </div>}
 
  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
  <div className="flex gap-2">
  <Mail className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
  <div>
- <p className="text-sm font-medium text-blue-900">Secure Password Setup</p>
+ <p className="text-sm font-medium text-blue-900">{usesBase44Invitations ? "Secure Password Setup" : "Company Sign-in"}</p>
  <p className="text-xs text-blue-700 mt-1">
- The user will receive an email with a secure link to create their own password. 
- For security, passwords cannot be set by administrators.
+ {usesBase44Invitations
+ ? "The user will receive an email with a secure link to create their own password. For security, passwords cannot be set by administrators."
+ : "This saves their EnQuote role. They still need permission through company login. No password is created and no email is sent."}
  </p>
  </div>
  </div>
@@ -531,12 +544,13 @@ function UsersContent() {
  });
  }}
  className="flex-1"
+ disabled={inviteMutation.isPending}
  >
  Cancel
  </Button>
  <Button 
  type="submit" 
- disabled={inviteMutation.isPending}
+ disabled={inviteMutation.isPending || isLoading || Boolean(usersError)}
  className="flex-1 bg-indigo-600 hover:bg-indigo-700"
  >
  {inviteMutation.isPending ? "Creating..." : "Create User"}

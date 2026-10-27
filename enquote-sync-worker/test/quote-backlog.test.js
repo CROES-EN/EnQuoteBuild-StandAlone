@@ -120,3 +120,27 @@ test("authenticated backlog validates dates and returns missing history without 
   assert.equal(result.snapshot.date, backlogDate());
   assert.equal(result.snapshot.count, 1);
 });
+
+test("today's backlog reuses a recent capture until a quote changes", async () => {
+  const env = {...environment(), ALLOWED_EMAILS_LIST: "user@example.com"};
+  const headers = {Authorization: "Bearer test", "X-EnQuote-User": await signUserToken("user@example.com", env.USER_TOKEN_SECRET)};
+  const url = `https://example/api/quote-backlog?date=${backlogDate()}`;
+  await put(env, {...quote("a"), status_history: [{status: "approved", changed_at: new Date(Date.now() - 72 * 3600000).toISOString()}]});
+  const first = (await (await handleQuoteBacklog(new Request(url, {headers}), env)).json()).snapshot;
+  let quoteReads = 0;
+  const prepare = env.DB.prepare;
+  env.DB.prepare = sql => {
+    if (sql.startsWith("SELECT payload, updated_at FROM quotes")) quoteReads++;
+    return prepare(sql);
+  };
+  const reused = await (await handleQuoteBacklog(new Request(url, {headers}), env)).json();
+  assert.equal(reused.live, true);
+  assert.equal(reused.snapshot.capturedAt, first.capturedAt);
+  assert.equal(quoteReads, 0, "an unchanged backlog is not rebuilt from every quote");
+
+  await env.DB.prepare("INSERT OR REPLACE INTO quotes VALUES (?, ?, ?)")
+    .bind("b", JSON.stringify({...quote("b"), status_history: [{status: "approved", changed_at: new Date(Date.now() - 72 * 3600000).toISOString()}]}), new Date(Date.now() + 1000).toISOString()).run();
+  const changed = (await (await handleQuoteBacklog(new Request(url, {headers}), env)).json()).snapshot;
+  assert.equal(quoteReads, 1, "a newer quote edit forces a fresh capture");
+  assert.equal(changed.count, 2);
+});

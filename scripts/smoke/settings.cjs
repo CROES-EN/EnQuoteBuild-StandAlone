@@ -21,6 +21,17 @@ async function runSettings(win) {
   }
   await evaluate(`location.hash="#/Settings"; true`);
   await waitFor(`Boolean(document.querySelector("#show-Quotes"))`, "Settings page");
+  assert.equal(await evaluate(`(() => {
+    const cloud = document.querySelector('[aria-label="Open Salesforce workspace"]');
+    const rect = cloud.getBoundingClientRect();
+    const dialog = document.createElement("div");
+    dialog.setAttribute("role", "dialog");
+    dialog.style.cssText = "position:fixed;inset:0;z-index:50;background:black";
+    document.body.append(dialog);
+    const covered = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2) === dialog;
+    dialog.remove();
+    return covered;
+  })()`), true, "normal dialogs cover the tucked-away Salesforce launcher");
   await evaluate(`window.__smokePaidQuotes = [{
     id:"attachment-quote",quote_number:"Q-ATTACH",customer:"Jane Doe",site_id:"123",case_number:"456",
     status:"draft",created_date:"2026-10-01T00:00:00Z",items:[],status_history:[],total:0
@@ -313,15 +324,16 @@ async function runSettings(win) {
     const deadline = Date.now() + 2500;
     let last;
     while (Date.now() < deadline) {
-      const zoom = win.webContents.getZoomFactor();
+      const [contentWidth, contentHeight] = win.getContentSize();
       const rect = await evaluate(`(() => {
         const rect=document.querySelector('[data-salesforce-content]').getBoundingClientRect();
-        return {x:rect.x,y:rect.y,width:rect.width,height:rect.height};
+        return {x:rect.x,y:rect.y,width:rect.width,height:rect.height,viewportWidth:innerWidth,viewportHeight:innerHeight};
       })()`);
+      const scaleX = contentWidth / rect.viewportWidth, scaleY = contentHeight / rect.viewportHeight;
       const bounds = view.getBounds();
-      last = {zoom, rect, bounds, visible: view.getVisible()};
-      if (last.visible && Math.abs(bounds.x-Math.round(rect.x*zoom))<=1 && Math.abs(bounds.y-Math.round(rect.y*zoom))<=1 &&
-          Math.abs(bounds.width-Math.round(rect.width*zoom))<=1 && Math.abs(bounds.height-Math.round(rect.height*zoom))<=1) return;
+      last = {scaleX, scaleY, rect, bounds, visible: view.getVisible()};
+      if (last.visible && Math.abs(bounds.x-Math.round(rect.x*scaleX))<=1 && Math.abs(bounds.y-Math.round(rect.y*scaleY))<=1 &&
+          Math.abs(bounds.width-Math.round(rect.width*scaleX))<=1 && Math.abs(bounds.height-Math.round(rect.height*scaleY))<=1) return;
       await sleep(100);
     }
     assert.fail(`Salesforce misaligned after ${label}: ${JSON.stringify(last)}`);
@@ -330,6 +342,15 @@ async function runSettings(win) {
   for (const zoom of [0.8, 0.9, 1.1, 1.25, 1.5, 1]) {
     win.webContents.setZoomFactor(zoom);
     await assertAligned(`zooming to ${zoom * 100}% while open`);
+  }
+  const getZoomFactor = win.webContents.getZoomFactor;
+  try {
+    win.webContents.getZoomFactor = () => 0.8;
+    const stale = view.getBounds();
+    view.setBounds({...stale, x: Math.round(stale.x * 0.8), width: Math.round(stale.width * 0.8)});
+    await assertAligned("a configured zoom that disagrees with the renderer viewport");
+  } finally {
+    win.webContents.getZoomFactor = getZoomFactor;
   }
   // Rapid zoom steps, like clicking + several times quickly.
   for (const zoom of [1.1, 1.2, 1.3, 1.2, 1.1]) { win.webContents.setZoomFactor(zoom); await sleep(30); }

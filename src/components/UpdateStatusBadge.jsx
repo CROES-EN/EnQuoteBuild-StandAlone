@@ -87,7 +87,7 @@ export default function UpdateStatusBadge() {
   const labels = {
     available: `Update v${state.version} available`,
     downloading: `Downloading update${state.version ? ` v${state.version}` : ""}... ${state.percent ?? 0}%`,
-    error: "Update check failed - will retry shortly"
+    error: "App update check failed - will retry shortly. Use Refresh App to check data sync."
   };
 
   return (

@@ -24,6 +24,7 @@ function respond(path, args) {
   const key = path.join(".");
   window.__smokeCalls[key] = (window.__smokeCalls[key] || 0) + 1;
   const last = path[path.length - 1];
+  if (key === "admin.overview") return Promise.resolve({ok: true, users: USERS});
   if (key === "salesforce.attachment" && process.argv.includes("--settings-only")) {
     return require("electron").ipcRenderer.invoke("smoke:salesforce-attachment", ...args);
   }
@@ -110,7 +111,6 @@ function respond(path, args) {
   }
   if (process.argv.includes("--console-only")) {
     if (key === "admin.policy") return Promise.resolve({ok: true, me: USERS[0]});
-    if (key === "admin.overview") return Promise.resolve({ok: true, users: USERS});
     if (key === "viewing.status") {
       if (window.__smokeViewingReady) return Promise.resolve({ok: true, supported: true, ready: true});
       return Promise.reject(new Error("No handler registered for 'viewing:status'"));
@@ -192,7 +192,7 @@ function respond(path, args) {
     collections[args[0]] = rows;
     return Promise.resolve(key === "collections.delete" ? {ok:true} : structuredClone(rows[rows.length - 1]));
   }
-  if (["collections.create", "collections.update"].includes(key) && ["rmas", "pvManufacturers"].includes(args[0])) {
+  if (["collections.create", "collections.update"].includes(key) && ["rmas", "pvManufacturers", "fsts"].includes(args[0])) {
     const collections = window.__smokeCollections ||= {};
     const rows = collections[args[0]] ||= [];
     if (key === "collections.create") {
@@ -235,6 +235,12 @@ function respond(path, args) {
       resolve(structuredClone(record));
     }, window.__smokeQuoteSaveDelay || 0);
   });
+  if (key === "geo.geocode") {
+    // Never reaches a real geocoder; addresses containing "nowhere" are not found.
+    return Promise.resolve(/nowhere/i.test(args[0])
+      ? {ok: false, reason: "not_found"}
+      : {ok: true, lat: 29.42, lng: -98.49, precision: "zip", source: "smoke", matchedAddress: "San Antonio, TX 78205"});
+  }
   if (key === "largeTables.get") return Promise.resolve(window.__smokeLargeTables?.[args[0]] || null);
   if (key === "updater.getState") return Promise.resolve(null);
   if (key === "ui.getInfo") return Promise.resolve({ appVersion: "smoke", uiVersion: null });

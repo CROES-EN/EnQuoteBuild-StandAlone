@@ -15,7 +15,8 @@ import PanelRmaRequestDialog from "@/components/rma/PanelRmaRequestDialog";
 import RMAList from "@/components/rma/RMAList";
 import {buildRmaLookup} from "@/features/rma/rmaRecords";
 import {classifyQuoteRequest, requestCategoryCounts} from "@/features/autoDrafter/requestClassification";
-import {alternateRequestType, preferQuoteRequestComment, quoteRequestCommentEvidence} from "@/features/quoteRequestIntake/quoteRequestComment";
+import {alternateRequestType, preferQuoteRequestComment} from "@/features/quoteRequestIntake/quoteRequestComment";
+import {awaitingQuoteRequestRows, qualifyingQuoteRequestRows, quoteCaseKey} from "@/features/autoDrafter/quoteRequestSelection";
 import AlternateRequestList from "@/components/autoDrafter/AlternateRequestList";
 import {automaticSourceInputCorrection} from "@/features/autoDrafter/sourceInputCorrections";
 import {DEVICE_CATEGORY_AVERAGES, placeholderUnitPrice} from "@/features/quoteDraftAgent/draftEngine";
@@ -64,9 +65,6 @@ import CategoryCorrectionDialog from "@/components/autoDrafter/CategoryCorrectio
 import AutoDrafterOutcomesView from "@/components/autoDrafter/AutoDrafterOutcomesView";
 import {autoDrafterOutcomes} from "@/features/autoDrafter/autoDrafterActivity";
 import {getQuotes, listLocalCollection} from "@/api/dataClient";
-
-// Case numbers match even when a spreadsheet dropped leading zeros or a "#" prefix.
-const quoteCaseKey = value => reviewCaseKey(value).replace(/^#\s*/, "").replace(/^0+(?=\d)/, "");
 
 const REPORT_TYPE = "quoteRequestCases";
 const REPORT_LABEL = "Quote Request Cases";
@@ -330,12 +328,6 @@ export const AutoDrafter = () => {
         const alternateTypeByRow = new Map(commentCol ? rows.map(row => [row, alternateRequestType(row[commentCol])])
             .filter(([, type]) => type) : []);
         const caseKeyOf = row => caseNumberCol ? reviewCaseKey(row[caseNumberCol]) : "";
-        const alternateCaseKeys = new Set([...alternateTypeByRow.keys()].map(caseKeyOf).filter(Boolean));
-        const quoteRequestCaseKeys = new Set(alternateCaseKeys.size && commentCol ? rows
-            .filter(row => !alternateTypeByRow.has(row) && quoteRequestCommentEvidence(row[commentCol]).hasRequest)
-            .map(caseKeyOf).filter(Boolean) : []);
-        const quoteRows = rows.filter(row => !alternateTypeByRow.has(row) &&
-            !(alternateCaseKeys.has(caseKeyOf(row)) && !quoteRequestCaseKeys.has(caseKeyOf(row))));
         const alternateEntries = (() => {
             const byKey = new Map();
             alternateTypeByRow.forEach((type, row) => {
@@ -360,28 +352,7 @@ export const AutoDrafter = () => {
 
         // Salesforce exports one row per comment. Prefer requests over later notes,
         // then the newest request revision.
-        const dedupedQualifyingRows = caseNumberCol
-            ? (() => {
-            const byCaseNumber = new Map();
-            quoteRows.forEach((row, originalIndex) => {
-                const key = reviewCaseKey(row[caseNumberCol]);
-                if (!key) {
-                    // No case number at all -- can't dedupe meaningfully, always keep.
-                    byCaseNumber.set(`__no-case-number-${originalIndex}__`, row);
-                    return;
-                }
-                const existing = byCaseNumber.get(key);
-                if (!existing) {
-                    byCaseNumber.set(key, row);
-                    return;
-                }
-                if (preferQuoteRequestComment(row[commentCol], existing[commentCol], row[createdCol], existing[createdCol])) {
-                    byCaseNumber.set(key, row);
-                }
-            });
-            return Array.from(byCaseNumber.values());
-              })()
-            : quoteRows;
+        const dedupedQualifyingRows = qualifyingQuoteRequestRows({rows, columns});
         const latestRowByCase = new Map();
         for (const row of rows) {
             const key = reviewCaseKey(row[caseNumberCol]);
@@ -398,11 +369,9 @@ export const AutoDrafter = () => {
         .sort((a, b) => String(b.removedFromAutoDrafter.removedAt || "").localeCompare(String(a.removedFromAutoDrafter.removedAt || ""))),
     [generatedDraftsByCase]);
     const outcomes = useMemo(() => autoDrafterOutcomes(Object.values(generatedDraftsByCase), allQuotes), [generatedDraftsByCase, allQuotes]);
-    const awaitingRows = useMemo(() => {
-        const removedCaseKeys = new Set(removedRecords.map(record => quoteCaseKey(record.caseNumber ?? record.id)));
-        return caseNumberCol ? dedupedQualifyingRows.filter(row => !hasRealQuote(row) &&
-            !removedCaseKeys.has(quoteCaseKey(row[caseNumberCol]))) : dedupedQualifyingRows;
-    }, [dedupedQualifyingRows, existingQuoteCaseNumbers, removedRecords, caseNumberCol]); // eslint-disable-line react-hooks/exhaustive-deps
+    const awaitingRows = useMemo(() =>
+        awaitingQuoteRequestRows(dedupedQualifyingRows, caseNumberCol, existingQuoteCaseNumbers, removedRecords),
+    [dedupedQualifyingRows, existingQuoteCaseNumbers, removedRecords, caseNumberCol]);
     const automaticCandidates = useMemo(() => awaitingRows.map(row => ({
         caseNumber: String(row[caseNumberCol] || "").trim(),
         siteId: String(row[siteIdCol] || "").trim(),

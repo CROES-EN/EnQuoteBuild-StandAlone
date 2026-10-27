@@ -40,7 +40,7 @@ export function useAutoDrafterAccuracy() {
       const [drafts, swaps] = await Promise.all([listGeneratedDrafts(), listLearnedSwaps()]);
       return buildAutoDrafterAccuracy(drafts, swaps);
     },
-    refetchInterval: 60000
+    refetchInterval: 5 * 60 * 1000
   });
 }
 

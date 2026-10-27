@@ -149,6 +149,29 @@ test("hide detaches the native view after the slide animation and show preserves
   }
 });
 
+test("measured renderer viewport controls bounds even when reported zoom is stale", () => {
+  const {workspace, views, first} = fixture();
+  try {
+    workspace.open(undefined, first);
+    for (const zoom of [0.8, 1, 1.25]) {
+      first.zoom = 0.8;
+      workspace.setBounds({
+        x: 200, y: 100, width: 500, height: 300,
+        viewportWidth: 1400 / zoom, viewportHeight: 900 / zoom
+      }, first);
+      assert.deepEqual(views[0].bounds, {
+        x: Math.round(200 * zoom), y: Math.round(100 * zoom),
+        width: Math.round(500 * zoom), height: Math.round(300 * zoom)
+      });
+    }
+    assert.throws(() => workspace.setBounds({
+      x: 0, y: 0, width: 500, height: 300, viewportWidth: 0, viewportHeight: 900
+    }, first), /Invalid Salesforce viewport/);
+  } finally {
+    workspace.close();
+  }
+});
+
 test("unchanged layout checks do not resize the native Salesforce view", () => {
   const {workspace, views, first} = fixture();
   try {

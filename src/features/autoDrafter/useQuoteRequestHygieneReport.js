@@ -22,7 +22,8 @@ export function useQuoteRequestHygieneReport() {
       }
       return table;
     },
-    refetchInterval: 60000
+    // Safety net only - imports and remote updates invalidate this query directly.
+    refetchInterval: 5 * 60 * 1000
   });
   useEffect(() => {
     if (!query.data) return;

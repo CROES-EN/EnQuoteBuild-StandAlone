@@ -115,6 +115,10 @@ let supervisorSync;
 let userRolesSync;
 let uiUpdater;
 let loadedUiVersion = null;
+const SYNC_CREDENTIAL_RETRY_MS = 2 * 60 * 1000;
+let syncCredentialsReady = false;
+let syncCredentialAttemptInFlight = false;
+let syncCredentialRetryTimer = null;
 const installerUpdateState = createUpdateState();
 let errorReporter;
 let collabFeatures;
@@ -2594,6 +2598,7 @@ let then = whenReady().then(async () => {
     });
 
     ipcMain.handle("sync:flushOutbound", async () => {
+        if (!outboundSync) return { skipped: "not-configured" };
         const result = await outboundSync.flush();
         markOwnWrite();
         return result;
@@ -2612,7 +2617,7 @@ let then = whenReady().then(async () => {
     });
     ipcMain.handle("sync:outboundStatus", async () => ({
         ...(await quoteRepository.getOutboundQueueStatus()),
-        configured: outboundSync.isConfigured
+        configured: Boolean(outboundSync?.isConfigured)
     }));
 
     await runStartupUpdateCheck();
@@ -2628,6 +2633,8 @@ let then = whenReady().then(async () => {
     // hardcoded fallback. Safe to call multiple times defensively (e.g. re-auth after
     // session expiry) - a prior instance is simply replaced.
     function startOutboundSync(outboundToken) {
+        // A retry after a partially failed startup must not leave the old flush timer running.
+        outboundSync?.stop();
         outboundSync = createOutboundSync({
             repository: quoteRepository, config: {
                 workerUrl: "https://enquote-sync.croeschberger.workers.dev",
@@ -2655,83 +2662,111 @@ let then = whenReady().then(async () => {
         return result;
     }
 
+    function clearSyncCredentialRetry() {
+        if (!syncCredentialRetryTimer) return;
+        clearTimeout(syncCredentialRetryTimer);
+        syncCredentialRetryTimer = null;
+    }
+
+    function scheduleSyncCredentialRetry(reason = "unknown") {
+        if (syncCredentialsReady || syncCredentialRetryTimer) return;
+        console.warn(`[cloudflare-auth] Scheduling sync credential retry in ${SYNC_CREDENTIAL_RETRY_MS / 1000}s (reason: ${reason}).`);
+        syncCredentialRetryTimer = setTimeout(() => {
+            syncCredentialRetryTimer = null;
+            void applySyncCredentialsOrDisable();
+        }, SYNC_CREDENTIAL_RETRY_MS);
+        syncCredentialRetryTimer.unref?.();
+    }
+
     async function applySyncCredentialsOrDisable() {
+        if (syncCredentialsReady || syncCredentialAttemptInFlight) return;
+        syncCredentialAttemptInFlight = true;
         // Reminders are stored locally, so they fire even if the sync service is unreachable.
         collabFeatures?.startOfflineReminders();
-        const credentials = await fetchSyncCredentials();
-        if (credentials.ok) {
-            process.env.SNAPSHOT_TOKEN = credentials.snapshotToken;
-            process.env.OUTBOUND_TOKEN = credentials.outboundToken;
-            if (credentials.cfAccessClientId && credentials.cfAccessClientSecret) {
-                process.env.CF_ACCESS_CLIENT_ID = credentials.cfAccessClientId;
-                process.env.CF_ACCESS_CLIENT_SECRET = credentials.cfAccessClientSecret;
-                console.log("[cloudflare-auth] CF Access service token credentials applied - entity-snapshot sync enabled.");
-            } else {
-                console.warn("[cloudflare-auth] No CF Access service token credentials in response - entity-snapshot sync will likely fail until the Worker has them configured.");
-            }
-            startOutboundSync(credentials.outboundToken);
-            // Roles first, so the first screen already knows who this person is.
-            await userRolesSync?.sync();
-            userRolesSync?.start({ immediate: false });
-            // Fetch any pending UI update before the window opens (capped at 8 seconds) so people
-            // start on the newest UI; keep checking in the background afterwards.
-            if (uiUpdater) {
-                await Promise.race([checkForUiUpdate(), new Promise((resolve) => setTimeout(resolve, 8000))]);
-                if (uiUpdateTimer) clearInterval(uiUpdateTimer);
-                uiUpdateTimer = setInterval(() => { void checkForUiUpdate(); }, 15 * 60 * 1000);
-                uiUpdateTimer.unref?.();
-            }
-            // Presence is NOT started here: this runs before the main window exists, so a
-            // startup that stalls below would report someone as online with no window open.
-            // The window announces presence itself once the user is signed in (presence:announce).
-            errorReporter?.start();
-            supervisorSync?.start();
-            collabFeatures?.applyCredentials(credentials);
-            console.log("[cloudflare-auth] Sync credentials obtained - outbound/entity sync enabled.");
-            try {
-                const snapshot = await fetchRemoteSnapshot(
-                    "https://enquote-sync.croeschberger.workers.dev",
-                    credentials.snapshotToken
-                );
-                await quoteRepository.importData(snapshot);
-                markOwnWrite();
-                console.log(`[cloudflare-auth] Imported ${snapshot.quotes.length} shared quote record(s).`);
-            } catch (error) {
-                console.error("[cloudflare-auth] Could not import the initial shared quote snapshot:", error.message);
-            }
-            await pollEntitySnapshot();
-            realtimeSync?.stop();
-            realtimeSync = startRealtimeSync({
-                workerUrl: "https://enquote-sync.croeschberger.workers.dev",
-                sharedSecret: credentials.snapshotToken,
-                accessHeaders: {
-                    "CF-Access-Client-Id": credentials.cfAccessClientId || "",
-                    "CF-Access-Client-Secret": credentials.cfAccessClientSecret || ""
-                },
-                onQuotesUpdated: () => refreshFromCloudflare(),
-                onOutboundStatus: (data) => outboundSync?.handleRealtimeStatus(data),
-                onSupervisorUpdated: () => supervisorSync?.reconcile(),
-                onConnectionChange: setRealtimeConnected,
-                handlers: {
-                    ...(collabFeatures?.realtimeHandlers || {}),
-                    // Base44 edits arrive in bursts; one snapshot pull covers the whole burst.
-                    entities_updated: () => {
-                        const schedulePull = (delay) => {
-                            if (entitiesUpdatedTimer) clearTimeout(entitiesUpdatedTimer);
-                            entitiesUpdatedTimer = setTimeout(async () => {
-                                entitiesUpdatedTimer = null;
-                                const result = await pollEntitySnapshot();
-                                // A poll already in flight may have started before this change.
-                                if (result?.error?.includes("already in progress")) schedulePull(5000);
-                            }, delay);
-                            entitiesUpdatedTimer.unref?.();
-                        };
-                        schedulePull(2000);
-                    }
+        try {
+            const credentials = await fetchSyncCredentials();
+            if (credentials.ok) {
+                process.env.SNAPSHOT_TOKEN = credentials.snapshotToken;
+                process.env.OUTBOUND_TOKEN = credentials.outboundToken;
+                if (credentials.cfAccessClientId && credentials.cfAccessClientSecret) {
+                    process.env.CF_ACCESS_CLIENT_ID = credentials.cfAccessClientId;
+                    process.env.CF_ACCESS_CLIENT_SECRET = credentials.cfAccessClientSecret;
+                    console.log("[cloudflare-auth] CF Access service token credentials applied - entity-snapshot sync enabled.");
+                } else {
+                    console.warn("[cloudflare-auth] No CF Access service token credentials in response - entity-snapshot sync will likely fail until the Worker has them configured.");
                 }
-            });
-        } else {
-            console.warn(`[cloudflare-auth] Could not obtain sync credentials (reason: ${credentials.reason}) - sync disabled this session.`);
+                startOutboundSync(credentials.outboundToken);
+                // Roles first, so the first screen already knows who this person is.
+                await userRolesSync?.sync();
+                userRolesSync?.start({ immediate: false });
+                // Fetch any pending UI update before the window opens (capped at 8 seconds) so people
+                // start on the newest UI; keep checking in the background afterwards.
+                if (uiUpdater) {
+                    await Promise.race([checkForUiUpdate(), new Promise((resolve) => setTimeout(resolve, 8000))]);
+                    if (uiUpdateTimer) clearInterval(uiUpdateTimer);
+                    uiUpdateTimer = setInterval(() => { void checkForUiUpdate(); }, 15 * 60 * 1000);
+                    uiUpdateTimer.unref?.();
+                }
+                // Presence is NOT started here: this runs before the main window exists, so a
+                // startup that stalls below would report someone as online with no window open.
+                // The window announces presence itself once the user is signed in (presence:announce).
+                errorReporter?.start();
+                supervisorSync?.start();
+                collabFeatures?.applyCredentials(credentials);
+                console.log("[cloudflare-auth] Sync credentials obtained - outbound/entity sync enabled.");
+                try {
+                    const snapshot = await fetchRemoteSnapshot(
+                        "https://enquote-sync.croeschberger.workers.dev",
+                        credentials.snapshotToken
+                    );
+                    await quoteRepository.importData(snapshot);
+                    markOwnWrite();
+                    console.log(`[cloudflare-auth] Imported ${snapshot.quotes.length} shared quote record(s).`);
+                } catch (error) {
+                    console.error("[cloudflare-auth] Could not import the initial shared quote snapshot:", error.message);
+                }
+                await pollEntitySnapshot();
+                realtimeSync?.stop();
+                realtimeSync = startRealtimeSync({
+                    workerUrl: "https://enquote-sync.croeschberger.workers.dev",
+                    sharedSecret: credentials.snapshotToken,
+                    accessHeaders: {
+                        "CF-Access-Client-Id": credentials.cfAccessClientId || "",
+                        "CF-Access-Client-Secret": credentials.cfAccessClientSecret || ""
+                    },
+                    onQuotesUpdated: () => refreshFromCloudflare(),
+                    onOutboundStatus: (data) => outboundSync?.handleRealtimeStatus(data),
+                    onSupervisorUpdated: () => supervisorSync?.reconcile(),
+                    onConnectionChange: setRealtimeConnected,
+                    handlers: {
+                        ...(collabFeatures?.realtimeHandlers || {}),
+                        // Base44 edits arrive in bursts; one snapshot pull covers the whole burst.
+                        entities_updated: () => {
+                            const schedulePull = (delay) => {
+                                if (entitiesUpdatedTimer) clearTimeout(entitiesUpdatedTimer);
+                                entitiesUpdatedTimer = setTimeout(async () => {
+                                    entitiesUpdatedTimer = null;
+                                    const result = await pollEntitySnapshot();
+                                    // A poll already in flight may have started before this change.
+                                    if (result?.error?.includes("already in progress")) schedulePull(5000);
+                                }, delay);
+                                entitiesUpdatedTimer.unref?.();
+                            };
+                            schedulePull(2000);
+                        }
+                    }
+                });
+                syncCredentialsReady = true;
+                clearSyncCredentialRetry();
+            } else {
+                console.warn(`[cloudflare-auth] Could not obtain sync credentials (reason: ${credentials.reason}) - retrying in background.`);
+                scheduleSyncCredentialRetry(credentials.reason || "unknown");
+            }
+        } catch (error) {
+            console.warn(`[cloudflare-auth] Sync credential check failed (${error.message || "unknown error"}) - retrying in background.`);
+            scheduleSyncCredentialRetry(error.message || "unknown");
+        } finally {
+            syncCredentialAttemptInFlight = false;
         }
     }
 
@@ -2838,6 +2873,9 @@ on("before-quit", () => {
     realtimeSync?.stop();
     remoteSyncPoller?.stop();
     entitySnapshotPoller?.stop();
+    outboundSync?.stop();
+    if (syncCredentialRetryTimer) clearTimeout(syncCredentialRetryTimer);
+    syncCredentialRetryTimer = null;
     if (uiUpdateTimer) clearInterval(uiUpdateTimer);
     if (entitiesUpdatedTimer) clearTimeout(entitiesUpdatedTimer);
     supervisorSync?.stop();

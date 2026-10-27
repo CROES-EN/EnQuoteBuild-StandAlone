@@ -1,6 +1,5 @@
 import {useEffect, useMemo, useRef, useState} from "react";
 import {getQuoteById, getQuotes} from "@/api/dataClient";
-import {generateCustomerQuoteDocument} from "@/components/quotes/QuotePDFGenerator";
 import {useAuth} from "@/lib/AuthContext";
 import {matchSalesforceQuotes} from "@/features/quotes/salesforceQuoteMatch";
 import {cleanFilenamePart, quoteHomeownerName} from "../../shared/customerQuoteFilename.js";
@@ -136,6 +135,7 @@ export function useSalesforceAutoQuote({visible, loading}) {
         throw new Error("The quote's case or site changed. Reopen the case to scan again.");
       }
       await verify();
+      const {generateCustomerQuoteDocument} = await import("@/components/quotes/QuotePDFGenerator");
       const {pdf, scopeSummary} = await generateCustomerQuoteDocument(quote);
       const bytes = new Uint8Array(await pdf.arrayBuffer());
       await verify();

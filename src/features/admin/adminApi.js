@@ -18,7 +18,9 @@ export function friendlyError(code) {
     self_demotion: "You cannot remove your own admin access.",
     roles_unavailable: "Roles are temporarily unavailable. Try again shortly.",
     not_connected: "EnQuote is not connected to the sync service yet.",
-    unreachable: "Could not reach the sync service."
+    unreachable: "Could not reach the sync service.",
+    email_not_allowed: "This email is not allowed by the company's EnQuote access policy.",
+    invalid_role: "Choose a valid EnQuote role."
   };
   return map[code] || String(code || "Something went wrong.");
 }

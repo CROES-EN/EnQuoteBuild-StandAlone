@@ -51,6 +51,30 @@ These settings are not shared team data or synced across devices.
   Reviews, Boneyard and Site Flags:** their search/filter/view selections.
 - **Tasks:** selected tab and Show Completed.
 
+In **Supervisor → Hourly Wait Time Summary**, choose **Compare Two Days** to
+select two independent Mountain Time dates (for example Monday and Friday).
+Only those dates are displayed; intervening days are excluded. Both selections
+are remembered per user. The **Quotes Requested** tile uses the same imported
+request rows and exclusions as Auto-Drafter's **Quote Requests** category:
+one entry per case, excluding cases with an existing quote or a manual removal.
+
+Desktop **Users → Create User** assigns an EnQuote role by company email through
+the admin access service. It does not send an invitation or create a password;
+company-login access is still required. Desktop role editing does not change
+profile details. Hosted Base44 installations retain their invitation controls.
+Failed saves keep the create form populated for retry.
+
+**Resource Planner → FST Roster** shows how precisely each FST's home and ship-to
+address was located: *Located* (street match), *Pinned* (set by hand), *ZIP only*
+(drive times are approximate), *Not found*, or *Not checked*. **Check locations**
+looks up every unchecked active address and reports any lookups that failed;
+**Needs pin** filters to ZIP-only and not-found addresses. In the edit dialog,
+**Set pin on map** lets you click or drag the pin onto the exact home or storage
+unit, or paste coordinates / a Google Maps link. Pins are used for drive-time
+ranking until the address text changes (for example when an FST moves); the new
+address is then located again on save. Save waits for in-progress lookups, and
+failed lookups or saves are shown instead of being skipped silently.
+
 Explicit quote-status links still override the remembered status. The old
 unscoped Quotes filter key is not migrated because it may belong to another user.
 Dialogs, unsaved business forms, bulk selections and live data are not cached.
@@ -84,6 +108,10 @@ that appear while the drawer is open are shown in a compact strip inside the dra
 above Salesforce, instead of floating behind it; they return to the normal corner position
 when the drawer is tucked away.
 Unchanged layout checks do not reapply native Salesforce bounds.
+New desktop builds use the measured renderer viewport to convert drawer coordinates
+to native window coordinates, including when the configured zoom is stale.
+When Salesforce is tucked away, its cloud launcher sits below normal dialogs and
+sheets instead of covering their controls. It remains above its own drawer when open.
 Case scanning reuses DOM traversal, text and computed-style results within each scan
 to reduce background work while typing; each later scan still reads fresh case details.
 These native performance changes require a full desktop release, not a UI-only update.

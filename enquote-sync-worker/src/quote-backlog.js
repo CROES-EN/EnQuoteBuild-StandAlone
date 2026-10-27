@@ -1,7 +1,11 @@
 import {buildQuoteBacklog, backlogDate} from "../../shared/quoteBacklog.js";
-import {getSnapshot} from "./repository.js";
+import {getSnapshot, getSnapshotMeta} from "./repository.js";
 import {authenticateUser} from "./user-token.js";
 import {json} from "./util.js";
+
+// The cron refreshes today's backlog every 5 minutes. Dashboards poll every minute; rebuilding
+// the backlog reads every quote, so viewers reuse a recent capture unless a quote changed since.
+export const LIVE_BACKLOG_REUSE_MS = 5 * 60 * 1000;
 
 export async function captureQuoteBacklog(env, nowMs) {
   const startedAt = nowMs ?? Date.now();
@@ -27,9 +31,24 @@ export async function handleQuoteBacklog(request, env) {
   }
   const today = backlogDate();
   if (date === today) {
+    const recent = await recentLiveBacklog(env, date);
+    if (recent) return json({ok: true, snapshot: recent, live: true});
     const snapshot = await captureQuoteBacklog(env);
     if (snapshot.date === date) return json({ok: true, snapshot, live: true});
   }
   const row = await env.DB.prepare("SELECT payload FROM quote_backlog_daily WHERE date = ?").bind(date).first();
   return json({ok: true, snapshot: row ? JSON.parse(row.payload) : null, live: false});
+}
+
+async function recentLiveBacklog(env, date, nowMs = Date.now()) {
+  const row = await env.DB.prepare("SELECT captured_at, payload FROM quote_backlog_daily WHERE date = ?").bind(date).first();
+  const capturedMs = Date.parse(row?.captured_at || "");
+  if (!Number.isFinite(capturedMs) || nowMs - capturedMs < 0 || nowMs - capturedMs >= LIVE_BACKLOG_REUSE_MS) return null;
+  const lastSavedMs = Date.parse(await getSnapshotMeta(env.DB) || "");
+  if (Number.isFinite(lastSavedMs) && lastSavedMs >= capturedMs) return null;
+  try {
+    return JSON.parse(row.payload);
+  } catch {
+    return null;
+  }
 }

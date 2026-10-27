@@ -10,7 +10,8 @@
  * Example file structure:
  * 
  *   import HomePage from './pages/HomePage';
- *   import Dashboard from './pages/Dashboard';
+ *   import {lazyPage} from './lib/lazyPage';
+import Dashboard from './pages/Dashboard';
  *   import Settings from './pages/Settings';
  *   
  *   export const PAGES = {
@@ -47,22 +48,24 @@
  *
  * The mainPage value must match a key in the PAGES object exactly.
  */
-import CreateQuote from './pages/CreateQuote';
+import {lazyPage} from './lib/lazyPage';
 import Dashboard from './pages/Dashboard';
-import EditQuote from './pages/EditQuote';
-import EmailNotifications from './pages/EmailNotifications';
-import FollowUpSettings from './pages/FollowUpSettings';
-import MaterialOrders from './pages/MaterialOrders';
-import PDFTemplateSettings from './pages/PDFTemplateSettings';
-import Products from './pages/Products';
-import QuoteDeletionRequests from './pages/QuoteDeletionRequests';
-import QuoteDetails from './pages/QuoteDetails';
-import Quotes from './pages/Quotes';
-import RevenueAnalytics from './pages/RevenueAnalytics';
-import SLAReporting from './pages/SLAReporting';
-import Users from './pages/Users';
-import QuoteOverview from './pages/QuoteOverview';
 import __Layout from './Layout.jsx';
+
+const CreateQuote = lazyPage(() => import('./pages/CreateQuote'));
+const EditQuote = lazyPage(() => import('./pages/EditQuote'));
+const EmailNotifications = lazyPage(() => import('./pages/EmailNotifications'));
+const FollowUpSettings = lazyPage(() => import('./pages/FollowUpSettings'));
+const MaterialOrders = lazyPage(() => import('./pages/MaterialOrders'));
+const PDFTemplateSettings = lazyPage(() => import('./pages/PDFTemplateSettings'));
+const Products = lazyPage(() => import('./pages/Products'));
+const QuoteDeletionRequests = lazyPage(() => import('./pages/QuoteDeletionRequests'));
+const QuoteDetails = lazyPage(() => import('./pages/QuoteDetails'));
+const Quotes = lazyPage(() => import('./pages/Quotes'));
+const RevenueAnalytics = lazyPage(() => import('./pages/RevenueAnalytics'));
+const SLAReporting = lazyPage(() => import('./pages/SLAReporting'));
+const Users = lazyPage(() => import('./pages/Users'));
+const QuoteOverview = lazyPage(() => import('./pages/QuoteOverview'));
 
 
 export const PAGES = {

@@ -169,11 +169,19 @@ function createSalesforceWorkspace({WebContentsView, session, onStateChanged = (
         rectangle.width < 0 || rectangle.height < 0) throw new Error("Invalid Salesforce panel bounds.");
     const zoom = window.webContents.getZoomFactor();
     const [contentWidth, contentHeight] = window.getContentSize();
-    const right = Math.max(0, contentWidth - Math.round(64 * zoom));
-    const x = Math.max(0, Math.min(right, Math.round(rectangle.x * zoom)));
-    const y = Math.max(0, Math.min(contentHeight, Math.round(rectangle.y * zoom)));
-    const width = Math.min(Math.round(rectangle.width * zoom), right - x);
-    const height = Math.min(Math.round(rectangle.height * zoom), contentHeight - y);
+    const hasViewport = rectangle.viewportWidth !== undefined || rectangle.viewportHeight !== undefined;
+    if (hasViewport && (![rectangle.viewportWidth, rectangle.viewportHeight].every(value => Number.isFinite(value) && value > 0))) {
+      throw new Error("Invalid Salesforce viewport size.");
+    }
+    // Measure the actual CSS viewport instead of assuming it matches the configured zoom.
+    // Older UI bundles send only the rectangle and retain their existing zoom conversion.
+    const scaleX = hasViewport ? contentWidth / rectangle.viewportWidth : zoom;
+    const scaleY = hasViewport ? contentHeight / rectangle.viewportHeight : zoom;
+    const right = Math.max(0, contentWidth - Math.round(64 * scaleX));
+    const x = Math.max(0, Math.min(right, Math.round(rectangle.x * scaleX)));
+    const y = Math.max(0, Math.min(contentHeight, Math.round(rectangle.y * scaleY)));
+    const width = Math.min(Math.round(rectangle.width * scaleX), right - x);
+    const height = Math.min(Math.round(rectangle.height * scaleY), contentHeight - y);
     const bounds = {x, y, width, height};
     const current = view.getBounds();
     if (Object.keys(bounds).some(key => bounds[key] !== current[key])) view.setBounds(bounds);

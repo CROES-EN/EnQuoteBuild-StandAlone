@@ -8,7 +8,9 @@ const KEY = ["care-request-routing"];
 export function useRequestCareEligibility() {
   const client = useQueryClient();
   const query = useQuery({
-    queryKey: KEY, refetchInterval: 60000,
+    // Imports and remote updates refresh this immediately (onDataUpdated / page mount); the
+    // timer is only a safety net, so it runs rarely to avoid re-indexing a large report.
+    queryKey: KEY, refetchInterval: 5 * 60 * 1000,
     queryFn: async () => {
       const table = await getReportTable("care_subscriptions");
       if (!table) return null;

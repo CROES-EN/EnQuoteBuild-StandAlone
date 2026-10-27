@@ -30,12 +30,12 @@ async function run() {
     ? await require("./salesforce-drawer.cjs").installSalesforceDrawerFixture() : null;
 
   const win = new BrowserWindow({
-    show: process.argv.includes("--settings-only"),
+    show: process.argv.includes("--settings-only") || process.argv.includes("--resource-planner-only"),
     width: 1400,
     height: 900,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"), contextIsolation: false, sandbox: false, nodeIntegration: false,
-      backgroundThrottling: !process.argv.includes("--settings-only") && !process.argv.includes("--console-only") && !process.argv.includes("--arcade-only") && !process.argv.includes("--retro-only"),
+      backgroundThrottling: !process.argv.includes("--settings-only") && !process.argv.includes("--resource-planner-only") && !process.argv.includes("--console-only") && !process.argv.includes("--arcade-only") && !process.argv.includes("--retro-only"),
       additionalArguments: process.argv.filter(argument => ["--console-only", "--settings-only"].includes(argument))
     }
   });
@@ -52,7 +52,7 @@ async function run() {
   await sleep(PAGE_SETTLE_MS);
 
   const failures = [];
-  const pages = process.argv.includes("--view-state-only") || process.argv.includes("--settings-only") || process.argv.includes("--backlog-rma-only") || process.argv.includes("--chat-composer-only") || process.argv.includes("--quote-links-only") || process.argv.includes("--case-work-only") || process.argv.includes("--stability-only") || process.argv.includes("--sop-sections-only") || process.argv.includes("--retro-only") || process.argv.includes("--arcade-only") || process.argv.includes("--console-only") || process.argv.includes("--theme-contrast-only") || process.argv.includes("--sop-links-only") ? [] : ["Dashboard", ...pageNames().filter((name) => name !== "Dashboard")];
+  const pages = process.argv.includes("--view-state-only") || process.argv.includes("--resource-planner-only") || process.argv.includes("--settings-only") || process.argv.includes("--backlog-rma-only") || process.argv.includes("--chat-composer-only") || process.argv.includes("--quote-links-only") || process.argv.includes("--case-work-only") || process.argv.includes("--stability-only") || process.argv.includes("--sop-sections-only") || process.argv.includes("--retro-only") || process.argv.includes("--arcade-only") || process.argv.includes("--console-only") || process.argv.includes("--theme-contrast-only") || process.argv.includes("--sop-links-only") ? [] : ["Dashboard", ...pageNames().filter((name) => name !== "Dashboard")];
   for (const page of pages) {
     consoleErrors.length = 0;
     await win.webContents.executeJavaScript(`window.__smokeErrors.length = 0; location.hash = "#/${page}"; true`);
@@ -88,6 +88,10 @@ async function run() {
   if (!failures.length && process.argv.includes("--view-state-only")) {
     await require("./view-state.cjs").runViewState(win);
     if (consoleErrors.length) throw new Error(`View-state console errors: ${[...new Set(consoleErrors)].join(" | ")}`);
+  }
+  if (!failures.length && process.argv.includes("--resource-planner-only")) {
+    await require("./resource-planner.cjs").runResourcePlanner(win);
+    if (consoleErrors.length) throw new Error(`Resource Planner console errors: ${[...new Set(consoleErrors)].join(" | ")}`);
   }
   if (!failures.length && process.argv.includes("--settings-only")) {
     await require("./settings.cjs").runSettings(win);

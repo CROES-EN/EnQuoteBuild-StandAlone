@@ -6,6 +6,7 @@ export const HOURLY_PRESETS = {
   LAST_14: "last14",
   LAST_30: "last30",
   SINGLE_DAY: "singleDay",
+  COMPARE_DAYS: "compareDays",
   ALL: "all",
   CUSTOM: "custom"
 };
@@ -14,7 +15,8 @@ export const DEFAULT_HOURLY_PERIOD = {
   preset: HOURLY_PRESETS.LAST_7,
   customStart: "",
   customEnd: "",
-  selectedDay: ""
+  selectedDay: "",
+  comparisonDay: ""
 };
 
 const KEYS = {
@@ -35,7 +37,16 @@ export function isValidReportingPeriod(scope, value) {
       && isDate(value.start) && isDate(value.end) && value.start <= value.end;
   }
   return Object.values(HOURLY_PRESETS).includes(value.preset)
-    && ["customStart", "customEnd", "selectedDay"].every(key => value[key] === "" || isDate(value[key]));
+    && ["customStart", "customEnd", "selectedDay"].every(key => value[key] === "" || isDate(value[key]))
+    && (value.comparisonDay === undefined || value.comparisonDay === "" || isDate(value.comparisonDay));
+}
+
+export function hourlyComparisonDates(allDates, selectedDay, comparisonDay) {
+  if (!allDates.length) return [];
+  const first = allDates.includes(selectedDay) ? selectedDay : allDates[allDates.length - 1];
+  const second = allDates.includes(comparisonDay) && comparisonDay !== first
+    ? comparisonDay : allDates.filter(date => date !== first).at(-1);
+  return [first, second].filter(Boolean).sort();
 }
 
 function storageKey(scope) {

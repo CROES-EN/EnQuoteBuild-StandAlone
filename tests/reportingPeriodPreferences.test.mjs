@@ -2,9 +2,19 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   DEFAULT_HOURLY_PERIOD,
+  hourlyComparisonDates,
   readReportingPeriod,
   saveReportingPeriod
 } from "../src/features/supervisorDashboard/reportingPeriodPreferences.js";
+
+test("two-day comparisons select Monday and Friday without including the weekend", () => {
+  const dates = ["2026-10-23", "2026-10-24", "2026-10-25", "2026-10-26"];
+  assert.deepEqual(hourlyComparisonDates(dates, "2026-10-26", "2026-10-23"), ["2026-10-23", "2026-10-26"]);
+  assert.deepEqual(hourlyComparisonDates(dates, "", ""), ["2026-10-25", "2026-10-26"]);
+  assert.deepEqual(hourlyComparisonDates(dates, "2026-10-26", "2026-10-26"), ["2026-10-25", "2026-10-26"]);
+  assert.deepEqual(hourlyComparisonDates(["2026-10-26"], "", ""), ["2026-10-26"]);
+  assert.deepEqual(hourlyComparisonDates([], "", ""), []);
+});
 
 test("reporting periods survive remounts, remain independent, and are scoped to users", () => {
   const data = new Map();
@@ -30,9 +40,12 @@ test("reporting periods survive remounts, remain independent, and are scoped to 
     const custom = {...hourly, preset: "custom", customStart: "2026-10-01", customEnd: "2026-10-03"};
     saveReportingPeriod("hourly", custom);
     assert.deepEqual(readReportingPeriod("hourly"), custom);
+    const comparison = {...custom, preset: "compareDays", selectedDay: "2026-10-26", comparisonDay: "2026-10-23"};
+    saveReportingPeriod("hourly", comparison);
+    assert.deepEqual(readReportingPeriod("hourly"), comparison);
     saveReportingPeriod("overview", {preset: "last_30_days", start: "2026-09-07", end: "2026-10-06"});
     assert.equal(readReportingPeriod("overview").preset, "last_30_days");
-    assert.deepEqual(readReportingPeriod("hourly"), custom);
+    assert.deepEqual(readReportingPeriod("hourly"), comparison);
   } finally {
     delete globalThis.window;
   }

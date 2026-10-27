@@ -5,7 +5,7 @@ import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/c
 import {Input} from "@/components/ui/input";
 import {Label} from "@/components/ui/label";
 import {CalendarRange, Clock} from "lucide-react";
-import {HOURLY_PRESETS as PRESETS} from "@/features/supervisorDashboard/reportingPeriodPreferences";
+import {HOURLY_PRESETS as PRESETS, hourlyComparisonDates} from "@/features/supervisorDashboard/reportingPeriodPreferences";
 import {useReportingPeriodPreference} from "@/features/supervisorDashboard/useReportingPeriodPreference";
 
 /**
@@ -47,6 +47,7 @@ const PRESET_OPTIONS = [
   { value: PRESETS.LAST_14, label: "Last 14 Days" },
   { value: PRESETS.LAST_30, label: "Last 30 Days" },
   { value: PRESETS.SINGLE_DAY, label: "Single Day" },
+  { value: PRESETS.COMPARE_DAYS, label: "Compare Two Days" },
   { value: PRESETS.ALL, label: "All Available History" },
   { value: PRESETS.CUSTOM, label: "Custom Range" }
 ];
@@ -184,11 +185,12 @@ function buildGrid(rows) {
 
 export default function HourlyWaitTimeChart({ rows = [] }) {
   const [period, setPeriod] = useReportingPeriodPreference("hourly");
-  const {preset, customStart, customEnd, selectedDay} = period;
+  const {preset, customStart, customEnd, selectedDay, comparisonDay = ""} = period;
   const setPreset = preset => setPeriod(previous => ({...previous, preset}));
   const setCustomStart = customStart => setPeriod(previous => ({...previous, customStart}));
   const setCustomEnd = customEnd => setPeriod(previous => ({...previous, customEnd}));
   const setSelectedDay = selectedDay => setPeriod(previous => ({...previous, selectedDay}));
+  const setComparisonDay = comparisonDay => setPeriod(previous => ({...previous, comparisonDay}));
 
   const allDates = useMemo(() => {
     const dates = new Set();
@@ -200,18 +202,21 @@ export default function HourlyWaitTimeChart({ rows = [] }) {
   }, [rows]);
 
   const effectiveDay = allDates.includes(selectedDay) ? selectedDay : (allDates[allDates.length - 1] || "");
+  const compareDates = hourlyComparisonDates(allDates, effectiveDay, comparisonDay);
+  const effectiveComparisonDay = compareDates.find(date => date !== effectiveDay) || "";
 
   const selectedDates = useMemo(() => {
     if (!allDates.length) return [];
     if (preset === PRESETS.ALL) return allDates;
     if (preset === PRESETS.SINGLE_DAY) return [effectiveDay];
+    if (preset === PRESETS.COMPARE_DAYS) return hourlyComparisonDates(allDates, effectiveDay, comparisonDay);
     if (preset === PRESETS.CUSTOM) {
       if (!customStart || !customEnd) return allDates;
       return allDates.filter((d) => d >= customStart && d <= customEnd);
     }
     const n = preset === PRESETS.LAST_7 ? 7 : preset === PRESETS.LAST_14 ? 14 : 30;
     return allDates.slice(Math.max(0, allDates.length - n));
-  }, [allDates, preset, customStart, customEnd, effectiveDay]);
+  }, [allDates, preset, customStart, customEnd, effectiveDay, comparisonDay]);
 
   const filteredRows = useMemo(() => {
     if (selectedDates.length === allDates.length) return rows;
@@ -223,7 +228,7 @@ export default function HourlyWaitTimeChart({ rows = [] }) {
   const hasAnyData = grid.dates.length > 0;
 
   const rangeLabel = grid.dates.length
-    ? (grid.dates.length === 1 ? grid.dates[0] : `${grid.dates[0]} to ${grid.dates[grid.dates.length - 1]}`)
+    ? (grid.dates.length === 1 ? grid.dates[0] : `${grid.dates[0]} ${preset === PRESETS.COMPARE_DAYS ? "vs" : "to"} ${grid.dates[grid.dates.length - 1]}`)
     : "No dates available";
 
   return (
@@ -248,7 +253,7 @@ export default function HourlyWaitTimeChart({ rows = [] }) {
                 </SelectContent>
               </Select>
             </div>
-            {preset === PRESETS.SINGLE_DAY && (
+            {(preset === PRESETS.SINGLE_DAY || preset === PRESETS.COMPARE_DAYS) && (
               <div className="flex flex-col gap-1">
                 <Label htmlFor="hourly-wait-time-day" className="text-xs text-muted-foreground">Day (Mountain Time)</Label>
                 <Select value={effectiveDay} onValueChange={setSelectedDay} disabled={!allDates.length}>
@@ -257,6 +262,21 @@ export default function HourlyWaitTimeChart({ rows = [] }) {
                   </SelectTrigger>
                   <SelectContent>
                     {allDates.slice().reverse().map((date) => (
+                      <SelectItem key={date} value={date}>{date}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {preset === PRESETS.COMPARE_DAYS && (
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="hourly-wait-time-comparison-day" className="text-xs text-muted-foreground">Compare with (Mountain Time)</Label>
+                <Select value={effectiveComparisonDay} onValueChange={setComparisonDay} disabled={allDates.length < 2}>
+                  <SelectTrigger id="hourly-wait-time-comparison-day" className="w-44">
+                    <SelectValue placeholder="Another date is needed" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allDates.slice().reverse().filter(date => date !== effectiveDay).map(date => (
                       <SelectItem key={date} value={date}>{date}</SelectItem>
                     ))}
                   </SelectContent>

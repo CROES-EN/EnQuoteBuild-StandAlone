@@ -13,7 +13,7 @@ const roles = [
   { value: "admin", label: "Admin", description: "Full access to all features" }
 ];
 
-export default function UserForm({ user, onSave, onCancel, isLoading }) {
+export default function UserForm({ user, onSave, onCancel, isLoading, editProfile = true }) {
   const [formData, setFormData] = useState({
     app_role: "submitter",
     department: "",
@@ -43,7 +43,9 @@ export default function UserForm({ user, onSave, onCancel, isLoading }) {
     e.preventDefault();
     const { first_name, last_name, ...rest } = formData;
     const display_name = [first_name, last_name].filter(Boolean).join(" ");
-    onSave({ ...rest, display_name });
+    onSave(editProfile ? {...rest, display_name} : {
+      app_role: formData.app_role, additional_roles: formData.additional_roles
+    });
   };
 
   const selectedRole = roles.find(r => r.value === formData.app_role);
@@ -77,7 +79,7 @@ export default function UserForm({ user, onSave, onCancel, isLoading }) {
       )}
 
       <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
+        {editProfile && <div className="grid grid-cols-2 gap-3">
           <div>
             <Label htmlFor="first_name">First Name</Label>
             <Input
@@ -98,7 +100,7 @@ export default function UserForm({ user, onSave, onCancel, isLoading }) {
               className="mt-1.5"
             />
           </div>
-        </div>
+        </div>}
 
         <div>
           <Label htmlFor="app_role">Role *</Label>
@@ -133,7 +135,7 @@ export default function UserForm({ user, onSave, onCancel, isLoading }) {
           {showRolePicker && <Select onValueChange={addRole}><SelectTrigger className="mt-2"><SelectValue placeholder="Choose a role to add" /></SelectTrigger><SelectContent>{roles.filter(role => !assignedRoles.includes(role.value)).map(role => <SelectItem key={role.value} value={role.value}>{role.label} — {role.description}</SelectItem>)}</SelectContent></Select>}
         </div>
 
-        <div>
+        {editProfile && <div>
           <Label htmlFor="department">Department</Label>
           <Input
             id="department"
@@ -142,7 +144,7 @@ export default function UserForm({ user, onSave, onCancel, isLoading }) {
             placeholder="e.g., Sales, Operations, Finance"
             className="mt-1.5"
           />
-        </div>
+        </div>}
       </div>
 
       <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">

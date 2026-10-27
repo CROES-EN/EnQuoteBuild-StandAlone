@@ -29,6 +29,7 @@
         "dompurify": "^3.4.16",
         "electron-updater": "^6.8.9",
         "exceljs": "^4.4.0",
+        "leaflet": "^1.9.4",
         "mammoth": "^1.13.0",
         "ws": "^8.22.0",
         "zod": "^3.24.2"

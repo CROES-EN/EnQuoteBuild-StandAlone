@@ -1,3 +1,4 @@
+import {Suspense} from "react";
 import {HashRouter, Navigate, Route, Routes} from "react-router-dom";
 
 import {Toaster} from "@/components/ui/toaster";
@@ -10,26 +11,11 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import FindBar from "@/components/FindBar";
 
 import PageNotFound from "./lib/PageNotFound";
+import {lazyPage} from "./lib/lazyPage";
 
-import SVCancelTrackerPage from "./pages/SVCancelTracker";
-import RejectedQuoteReviewPage from "./pages/RejectedQuoteReview";
-import SupervisorDashboardPage from "./pages/SupervisorDashboard";
-import BoneyardPage from "./pages/Boneyard";
-import ResourcePlannerPage from "./pages/ResourcePlanner";
-import SiteFlagManagerPage from "./pages/SiteFlagManager";
-import PVPanelRMAsPage from "./pages/PVPanelRMAs";
-import InactiveRevenueDashboardPage from "./pages/InactiveRevenueDashboard";
-import InactiveCollectionsPage from "./pages/InactiveCollections";
-import WorkloadPage from "./pages/Workload";
-import EnphaseCarePage from "./pages/EnphaseCare";
-import {AutoDrafter as AutoDrafterPage} from "./pages/AutoDrafter";
-import TasksPage from "./pages/Tasks";
-import SOPLibraryPage from "./pages/SOPLibrary";
 import MessagesPage from "./pages/Messages";
-import SettingsPage from "./pages/Settings";
 import ChatDock from "@/components/messages/ChatDock";
 import AppLinkSharing from "@/components/messages/AppLinkSharing";
-import Base44_DTO from "@/features/Base44_DTO/Base44_DTO";
 import SecretRetroShortcut from "@/features/Base44_DTO/Shortcut";
 
 import AuthProvider, {useAuth} from "@/lib/AuthContext";
@@ -39,13 +25,37 @@ import {AccessPreviewProvider} from "@/features/admin/AccessPreviewContext";
 import {isReadonlyViewing} from "@/features/admin/readonlyViewing";
 import ViewingBanner from "@/features/admin/ViewingBanner";
 
+const SVCancelTrackerPage = lazyPage(() => import("./pages/SVCancelTracker"));
+const RejectedQuoteReviewPage = lazyPage(() => import("./pages/RejectedQuoteReview"));
+const SupervisorDashboardPage = lazyPage(() => import("./pages/SupervisorDashboard"));
+const BoneyardPage = lazyPage(() => import("./pages/Boneyard"));
+const ResourcePlannerPage = lazyPage(() => import("./pages/ResourcePlanner"));
+const SiteFlagManagerPage = lazyPage(() => import("./pages/SiteFlagManager"));
+const PVPanelRMAsPage = lazyPage(() => import("./pages/PVPanelRMAs"));
+const InactiveRevenueDashboardPage = lazyPage(() => import("./pages/InactiveRevenueDashboard"));
+const InactiveCollectionsPage = lazyPage(() => import("./pages/InactiveCollections"));
+const WorkloadPage = lazyPage(() => import("./pages/Workload"));
+const EnphaseCarePage = lazyPage(() => import("./pages/EnphaseCare"));
+const TasksPage = lazyPage(() => import("./pages/Tasks"));
+const SOPLibraryPage = lazyPage(() => import("./pages/SOPLibrary"));
+const SettingsPage = lazyPage(() => import("./pages/Settings"));
+const AutoDrafterPage = lazyPage(() => import("./pages/AutoDrafter"), "AutoDrafter");
+const Base44_DTO = lazyPage(() => import("@/features/Base44_DTO/Base44_DTO"));
+
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
 const MainPage = mainPageKey ? Pages[mainPageKey] : <></>;
 
-const LayoutWrapper = ({ children, currentPageName }) => Layout ?
-  <Layout currentPageName={currentPageName}>{children}</Layout>
-  : <>{children}</>;
+const PageFallback = () => (
+  <div className="flex min-h-[40vh] items-center justify-center" role="status" aria-label="Loading page">
+    <div className="h-8 w-8 animate-spin rounded-full border-4 border-border border-t-slate-800" />
+  </div>
+);
+
+const LayoutWrapper = ({ children, currentPageName }) => {
+  const page = <Suspense fallback={<PageFallback />}>{children}</Suspense>;
+  return Layout ? <Layout currentPageName={currentPageName}>{page}</Layout> : page;
+};
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();

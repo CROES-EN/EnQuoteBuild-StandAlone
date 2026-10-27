@@ -75,10 +75,10 @@ export default function UserCard({ user, onEdit, onResetPassword, index = 0, cur
                 <Pencil className="w-4 h-4 mr-2" />
                 Edit User
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onResetPassword(user)}>
+              {onResetPassword && <DropdownMenuItem onClick={() => onResetPassword(user)}>
                 <KeyRound className="w-4 h-4 mr-2" />
                 Reset Password
-              </DropdownMenuItem>
+              </DropdownMenuItem>}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

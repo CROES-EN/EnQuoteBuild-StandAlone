@@ -32,6 +32,7 @@ import {Checkbox} from "@/components/ui/checkbox";
 import {getAllQuoteActivities, getQuotes} from "@/api/dataClient";
 import {listGeneratedDrafts} from "@/features/autoDrafter/autoDrafterDraftsStore";
 import {withAutoDrafterActivity} from "@/features/autoDrafter/autoDrafterActivity";
+import {selectAwaitingQuoteRequests} from "@/features/autoDrafter/quoteRequestSelection";
 import {buildQuoteLifecycleReport} from "@/features/quoteDashboard/quoteLifecycle";
 import QuotePeriodActivityTile from "@/components/supervisor/QuotePeriodActivityTile";
 import QuoteRequestHygieneTile from "@/components/supervisor/QuoteRequestHygieneTile";
@@ -131,11 +132,6 @@ const MODE_LABELS = {
   [AGGREGATION_MODES.DAILY_AVERAGE]: "Daily Average",
   [AGGREGATION_MODES.LATEST_DAY]: "Latest Day"
 };
-
-// The exact column header used in the imported SFDC-Quotes workbook for O&M Status - must match
-// verbatim (including the ampersand and spacing) since spreadsheet headers are read as-is.
-const SFDC_OM_STATUS_COLUMN = "O&M Status";
-const QUOTE_REQUESTED_VALUE = "quote requested";
 
 // Priority 1-7 per the O&M reporting spec's KPI ROW list, adapted to what this data model can
 // actually compute today - "Opening Quote Backlog" (priority 8) is folded into the combined
@@ -302,7 +298,7 @@ function LiveCountCard({ label, icon: Icon, iconClass, count, sourceLabel, onVie
 }
 
 /**
- * Small dialog listing the SFDC-Quotes rows currently counted by the "Quotes Requested" tile -
+ * Small dialog listing the Auto-Drafter rows currently counted by the "Quotes Requested" tile -
  * a lightweight, self-contained alternative to DrillDownDrawer (which expects daily-metric
  * records shaped by date/fieldKey, not arbitrary imported spreadsheet rows with many columns).
  * Blank values display as "None" rather than a dash, matching the rest of the Report Data views.
@@ -321,15 +317,19 @@ function compareDialogValues(av, bv, sortDir) {
 }
 
 const QUOTES_REQUESTED_COLUMNS = [
-  { key: "caseNumber", label: "Case Number", sortValue: (row) => row["Case Number"] || "" },
-  { key: "caseOwner", label: "Case Owner", sortValue: (row) => row["Case Owner"] || "" },
-  { key: "subject", label: "Subject", sortValue: (row) => row["Subject"] || "" },
-  { key: "dateOpened", label: "Date/Time Opened", sortValue: (row) => row["Date/Time Opened"] || "" }
+  { key: "caseNumber", label: "Case Number" },
+  { key: "caseOwner", label: "Case Owner" },
+  { key: "subject", label: "Subject" },
+  { key: "dateOpened", label: "Date/Time Opened" }
 ];
 
-function QuotesRequestedDialog({ open, onOpenChange, rows }) {
+function QuotesRequestedDialog({ open, onOpenChange, rows, sourceColumns = [] }) {
   const [sortKey, setSortKey] = useState(null);
   const [sortDir, setSortDir] = useState("asc");
+  const columns = QUOTES_REQUESTED_COLUMNS.map(column => ({
+    ...column, header: sourceColumns.find(header => header.toLowerCase().includes(column.label.toLowerCase())) || column.label
+  }));
+  const caseIdColumn = sourceColumns.find(header => header.toLowerCase() === "case id");
 
   function handleHeaderClick(column) {
     if (sortKey === column.key) {
@@ -340,25 +340,25 @@ function QuotesRequestedDialog({ open, onOpenChange, rows }) {
     }
   }
 
-  const activeColumn = QUOTES_REQUESTED_COLUMNS.find((c) => c.key === sortKey);
+  const activeColumn = columns.find((c) => c.key === sortKey);
   const sortedRows = activeColumn
-    ? [...rows].sort((a, b) => compareDialogValues(activeColumn.sortValue(a), activeColumn.sortValue(b), sortDir))
+    ? [...rows].sort((a, b) => compareDialogValues(String(a[activeColumn.header] || ""), String(b[activeColumn.header] || ""), sortDir))
     : rows;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[80vh] max-w-3xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Quotes Requested - SFDC-Quotes</DialogTitle>
+          <DialogTitle>Quotes Requested - Auto-Drafter</DialogTitle>
         </DialogHeader>
         <p className="mb-2 text-xs text-muted-foreground">
-          {rows.length} row{rows.length === 1 ? "" : "s"} currently marked "Quote Requested" in the last SFDC-Quotes import.
-          Full case details are available on the Report Data tab. Select any column header to sort.
+          {rows.length} case{rows.length === 1 ? "" : "s"} awaiting a quote, matching Auto-Drafter&apos;s Quote Requests view.
+          Cases with an existing quote or a manual removal are excluded. Select any column header to sort.
         </p>
         <Table>
           <TableHeader>
             <TableRow>
-              {QUOTES_REQUESTED_COLUMNS.map((column) => (
+              {columns.map((column) => (
                 <TableHead key={column.key}>
                   <button type="button" onClick={() => handleHeaderClick(column)} className="inline-flex items-center gap-1 font-medium hover:text-foreground">
                     {column.label}
@@ -371,10 +371,10 @@ function QuotesRequestedDialog({ open, onOpenChange, rows }) {
           <TableBody>
             {sortedRows.map((row, i) => (
               <TableRow key={i}>
-                <TableCell><CaseNumberLink caseNumber={row["Case Number"]} caseId={row["Case ID"]} fallback={BLANK_DISPLAY} /></TableCell>
-                <TableCell>{row["Case Owner"] || BLANK_DISPLAY}</TableCell>
-                <TableCell className="max-w-xs truncate" title={String(row["Subject"] ?? "")}>{row["Subject"] || BLANK_DISPLAY}</TableCell>
-                <TableCell>{row["Date/Time Opened"] || BLANK_DISPLAY}</TableCell>
+                <TableCell><CaseNumberLink caseNumber={row[columns[0].header]} caseId={row[caseIdColumn]} fallback={BLANK_DISPLAY} /></TableCell>
+                <TableCell>{row[columns[1].header] || BLANK_DISPLAY}</TableCell>
+                <TableCell className="max-w-xs truncate" title={String(row[columns[2].header] ?? "")}>{row[columns[2].header] || BLANK_DISPLAY}</TableCell>
+                <TableCell>{row[columns[3].header] || BLANK_DISPLAY}</TableCell>
               </TableRow>
             ))}
             {sortedRows.length === 0 && (
@@ -1179,7 +1179,7 @@ export default function DashboardOverview({
     [reportTables, caseWorkTeam]);
   const paymentReport = useMemo(() => buildPaidQuoteReport(allQuotes, activeRange, kpiMode), [allQuotes, activeRange, kpiMode]);
 
-  const sfdcQuotesTable = reportTables?.sfdc_quotes ?? null;
+  const quoteRequestTable = reportTables?.quoteRequestCases ?? null;
   const niceCalls = useMemo(() => niceCallContributingRecords(reportTables?.incorta_input?.rows || [], activeRange), [reportTables, activeRange]);
   function openEodbRecords(label, records, outcome, expected) {
     const dates = new Set(records.map(record => record.date));
@@ -1252,11 +1252,8 @@ export default function DashboardOverview({
 
 
   const quotesRequestedRows = useMemo(() => {
-    if (!sfdcQuotesTable?.rows) return [];
-    return sfdcQuotesTable.rows.filter(
-      row => String(row[SFDC_OM_STATUS_COLUMN] ?? "").trim().toLowerCase() === QUOTE_REQUESTED_VALUE
-    );
-  }, [sfdcQuotesTable]);
+    return selectAwaitingQuoteRequests(quoteRequestTable, allQuotes, autoDrafterQuery.data || []);
+  }, [quoteRequestTable, allQuotes, autoDrafterQuery.data]);
   // "Quote Backlog" per user's confirmed definition: any quote that currently has an active
   // Alert (per quoteSLA.js's own computeQuoteAlert - the same logic already shown on individual
   // quote cards via SLAAlertBadge). Both yellow and red alerts count together as one combined
@@ -1561,19 +1558,22 @@ export default function DashboardOverview({
         />
       )
     });
-    if (sfdcQuotesTable) {
+    if (quoteRequestTable) {
       tiles.push({
         id: "quotes_requested",
         label: "Quotes Requested",
-        category: "SFDC-Quotes import",
+        category: "Auto-Drafter Quote Requests",
         render: () => (
           <LiveCountCard
             label="Quotes Requested"
             icon={FileText}
             iconClass="bg-cyan-50 text-cyan-600"
-            count={quotesRequestedRows.length}
-            sourceLabel="SFDC-Quotes import"
-            onViewRecords={() => setQuotesRequestedDialogOpen(true)}
+            count={quotesLoading || autoDrafterQuery.isLoading || quotesQuery.error || autoDrafterQuery.error ? null : quotesRequestedRows.length}
+            sourceLabel={quotesQuery.error || autoDrafterQuery.error
+              ? "Could not load Quote Requests. Refresh to retry."
+              : quotesLoading || autoDrafterQuery.isLoading ? "Loading Quote Requests..." : "Auto-Drafter Quote Requests"}
+            onViewRecords={!quotesLoading && !autoDrafterQuery.isLoading && !quotesQuery.error && !autoDrafterQuery.error
+              ? () => setQuotesRequestedDialogOpen(true) : undefined}
           />
         )
       });
@@ -1931,7 +1931,7 @@ export default function DashboardOverview({
         date: kpiMode === AGGREGATION_MODES.LATEST_DAY ? source[source.length - 1]?.date : null
       })};
     });
-  }, [backlogQuery, backlogShownDate, backlogMissing, caseWorkReport, paymentReport, reportTablesQuery.isLoading, reportTablesQuery.error, reportTablesQuery.refetch, primaryResults, secondaryResults, compareEnabled, previousRange, rangedRecords, quoteBacklogAlertRows, sfdcQuotesTable, quotesRequestedRows, caseBacklog, interactionStats, staffingTeamTotals, activeRange, rangedEmailDailyRecords, emailBacklogTotals, emailCaseRecords, openEmailCases, quoteActivityReport, quotesLoading, quotesQuery.isError, quotesQuery.error, quotesQuery.refetch, activityQuery.isLoading, activityQuery.isError, activityQuery.error, activityQuery.refetch, niceCalls, reportTables, eodbTotalInteractions, eodbAbandoned, rangedEodbTotalCallVolume, rangedEodbAbandonedCalls, rangedEodbDailyWaitTime, rangedEodbAvgTalkTime, eodbAbandonmentRate, eodbAvgWaitSeconds, eodbAvgTalkSeconds, kpiMode, rangedStaffingRecords, eodbHandled, eodbHandledRecords]);
+  }, [backlogQuery, backlogShownDate, backlogMissing, caseWorkReport, paymentReport, reportTablesQuery.isLoading, reportTablesQuery.error, reportTablesQuery.refetch, primaryResults, secondaryResults, compareEnabled, previousRange, rangedRecords, quoteBacklogAlertRows, quoteRequestTable, quotesRequestedRows, autoDrafterQuery.isLoading, autoDrafterQuery.error, caseBacklog, interactionStats, staffingTeamTotals, activeRange, rangedEmailDailyRecords, emailBacklogTotals, emailCaseRecords, openEmailCases, quoteActivityReport, quotesLoading, quotesQuery.isError, quotesQuery.error, quotesQuery.refetch, activityQuery.isLoading, activityQuery.isError, activityQuery.error, activityQuery.refetch, niceCalls, reportTables, eodbTotalInteractions, eodbAbandoned, rangedEodbTotalCallVolume, rangedEodbAbandonedCalls, rangedEodbDailyWaitTime, rangedEodbAvgTalkTime, eodbAbandonmentRate, eodbAvgWaitSeconds, eodbAvgTalkSeconds, kpiMode, rangedStaffingRecords, eodbHandled, eodbHandledRecords]);
 
   const tileFreshness = useMemo(() => {
     const now = new Date();
@@ -1950,7 +1950,7 @@ export default function DashboardOverview({
       if (id.startsWith("case_work_")) return imported(["case_history"], "Case history");
       if (id.startsWith("invoice_payments_") || /^quotes_.*_period$/.test(id) || id === "quote_backlog") return {kind: "live"};
       if (id === "quote_request_hygiene") return imported(["quoteRequestCases"], "Quote request report");
-      if (id === "quotes_requested") return imported(["sfdc_quotes"], "SFDC-Quotes");
+      if (id === "quotes_requested") return imported(["quoteRequestCases"], "Auto-Drafter Quote Requests");
       if (id === "eodb_total_interactions") return imported(["eodb_total_call_volume"], "EODB call volume");
       if (id === "eodb_handled") return imported(["eodb_total_call_volume", "eodb_abandoned_calls"], "EODB calls");
       if (id === "eodb_abandoned") return imported(["eodb_abandoned_calls"], "EODB abandoned calls");
@@ -2099,6 +2099,7 @@ export default function DashboardOverview({
         open={quotesRequestedDialogOpen}
         onOpenChange={setQuotesRequestedDialogOpen}
         rows={quotesRequestedRows}
+        sourceColumns={quoteRequestTable?.columns}
       />
       <QuoteBacklogAlertDialog
         open={quoteBacklogDialogOpen}
