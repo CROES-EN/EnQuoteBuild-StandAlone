@@ -110,7 +110,7 @@ export default function DailyMetricsForm({ open, onOpenChange, editingRecord, on
             {editingRecord ? `Edit metrics — ${editingRecord.date}` : "Add daily metrics"}
           </DialogTitle>
           <DialogDescription>
-            Fields left blank won't overwrite any value already saved for this day from an import.
+            Fields left blank won&apos;t overwrite any value already saved for this day from an import.
           </DialogDescription>
         </DialogHeader>
 

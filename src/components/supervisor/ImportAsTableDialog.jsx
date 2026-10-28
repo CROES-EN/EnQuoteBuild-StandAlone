@@ -636,7 +636,7 @@ export default function ImportAsTableDialog({ open, onOpenChange, reportType, re
             {error && (
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Couldn't read file</AlertTitle>
+                <AlertTitle>Couldn&apos;t read file</AlertTitle>
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}

@@ -21,7 +21,7 @@ import {
 const formatCurrency = (v) => `$${(v || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const formatDate = (d) => d ? new Date(d).toLocaleDateString() : "—";
 
-export default function QuoteReviewPanel({ quote, currentUser, onClose }) {
+export default function QuoteReviewPanel({ quote, currentUser }) {
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState(false);
   const [lineItemsWidth, setLineItemsWidth] = useState(null);
@@ -316,7 +316,7 @@ export default function QuoteReviewPanel({ quote, currentUser, onClose }) {
       {otherReviews.length > 0 && (
         <Card className="border-border bg-secondary">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-muted-foreground">Other Reviewers' Notes</CardTitle>
+            <CardTitle className="text-sm font-semibold text-muted-foreground">Other Reviewers&apos; Notes</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {otherReviews.map(r => (

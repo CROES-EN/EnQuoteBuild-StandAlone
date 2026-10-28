@@ -288,16 +288,6 @@ function watchLocalDataFile() {
 // the renderer has told us the outcome.
 const REPORT_FILE_EXTENSIONS = new Set([".xlsx", ".xls", ".csv"]);
 
-// Incorta "Export to HTML" dashboard dumps can be hundreds of MB (confirmed against real
-// exports) - unlike .xlsx/.csv, these are never auto-parsed unattended (picking the "right"
-// section among many out of a multi-hundred-MB file with no user present is too ambiguous to
-// trust - see readHtmlSectionRows/reportParsing.js) and their bytes are never read into memory
-// or shipped over IPC here at all. A dropped HTML export is simply relocated straight to Needs
-// Review below so it gets clear, visible feedback instead of silently sitting there forever -
-// import it manually via the Import Report dialog, which handles arbitrarily large HTML files
-// fine since it reads them directly in the renderer, never through this main process/IPC.
-const HTML_REPORT_EXTENSIONS = new Set([".html", ".htm"]);
-
 // getReportsInboxPaths()/ensureReportsInboxFolders() removed - the old "O&M Reports Inbox"
 // (System A) has been fully retired. Its Processed/Needs Review folders are redundant now that
 // the separate EODB/Email Auto-Import watcher (System C) routes recognized files into
@@ -426,10 +416,6 @@ function isCandidateReportFile(filename) {
     return REPORT_FILE_EXTENSIONS.has(path.extname(filename).toLowerCase());
 }
 
-function isHtmlDashboardExport(filename) {
-    if (!filename) return false;
-    return HTML_REPORT_EXTENSIONS.has(path.extname(filename).toLowerCase());
-}
 
 // Waits for a file's size to stop changing before treating it as "done being written" - a
 // plain spreadsheet save/copy can fire several fs.watch events while the write is still in
@@ -1013,7 +999,7 @@ function createWindow() {
     });
 }
 
-let then = whenReady().then(async () => {
+whenReady().then(async () => {
     if (!hasSingleInstanceLock) return;
     console.log(`[updater] Starting EnQuote ${getVersion()} from ${process.execPath}`);
     // Windows only shows toast notifications for an app id that matches the installer's Start
@@ -1803,7 +1789,6 @@ let then = whenReady().then(async () => {
         try {
             const remoteConfig = readRemoteSyncConfig();
             const targetBase = remoteConfig?.url ? remoteConfig.url.replace(/\/+$/, "") : "http://localhost:3001";
-            const secret = remoteConfig?.secret || process.env.ENQUOTE_LOCAL_SYNC_WEBHOOK_SECRET || "";
 
             const data = await quoteRepository.exportData();
             const outboundQueue = data.outboundQueue || [];

@@ -36,7 +36,7 @@ export default function CareDataHygieneReport({ table }) {
   if (!table) {
     return (
       <div className="rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-muted-foreground">
-        No Care Subscriptions data imported yet. Use "Import This Report" to load the Care Subscription Dashboard export.
+        No Care Subscriptions data imported yet. Use &quot;Import This Report&quot; to load the Care Subscription Dashboard export.
       </div>
     );
   }
@@ -115,7 +115,7 @@ export default function CareDataHygieneReport({ table }) {
             )}
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
-            "Current" means the most recent record (by Created Dt) for that Site ID. Sites with
+            &quot;Current&quot; means the most recent record (by Created Dt) for that Site ID. Sites with
             more than one real record ({summary.renewalSiteCount} of them) have a renewal
             history - every prior record is preserved, not discarded, and can be reviewed on the
             main Care Subscriptions list.
@@ -186,7 +186,7 @@ export default function CareDataHygieneReport({ table }) {
           <p className="mb-2 text-xs text-muted-foreground">
             These are real (non-excluded) Care subscriptions with no Enlighten Site Id on file -
             typically SunPower-monitored systems, which do not always sync a Site ID the same
-            way Enphase-native systems do. Match these to a site manually using the customer's
+            way Enphase-native systems do. Match these to a site manually using the customer&apos;s
             address rather than by Site ID.
           </p>
           <Table>

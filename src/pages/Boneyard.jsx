@@ -232,7 +232,7 @@ function BoneyardContent() {
  <DialogDescription>
  This will move <strong><SiteIdLink siteId={restoreTarget?.site_id} /></strong> back into active production
  {restoreTarget?.pre_hold_status && (
- <> with status <strong>"{restoreTarget.pre_hold_status.replace(/_/g, " ")}"</strong></>
+ <> with status <strong>&quot;{restoreTarget.pre_hold_status.replace(/_/g, " ")}&quot;</strong></>
  )}, and re-include it in SLA &amp; revenue reporting.
  </DialogDescription>
  </DialogHeader>

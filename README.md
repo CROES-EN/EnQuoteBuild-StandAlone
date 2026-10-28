@@ -1,5 +1,15 @@
 # enquote-sync — Final Version (all fixes applied)
 
+## Release validation
+
+Before a desktop release, run `npm run lint`, `npm run typecheck`, then build
+with `npm run build` and validate the renderer with `npm run smoke`.
+Lint checks application, Electron, Worker, scripts and tests; generated builds,
+dependency caches, backup directories and nested development repositories are
+excluded. The React configuration uses Vite's automatic JSX runtime.
+The **Release EnQuote Windows update** VS Code task requires a clean working
+tree (including the index); commit the intended source changes before running it.
+
 ## macOS installer update recovery
 
 The current macOS workflow builds without a Developer ID certificate, so Apple's

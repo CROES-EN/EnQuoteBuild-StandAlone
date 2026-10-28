@@ -222,7 +222,7 @@ function ReportInstructions({ definition, fields, stats, onImportClick, onCustom
                 ))}
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                Every column above is optional to map - "Not in this file" is always allowed - but at least one
+                Every column above is optional to map - &quot;Not in this file&quot; is always allowed - but at least one
                 metric column, plus a date column (or a single date you choose for the whole file), must be
                 mapped for an import to save anything.
               </p>
@@ -236,7 +236,7 @@ function ReportInstructions({ definition, fields, stats, onImportClick, onCustom
 
             <InfoRow label="Accepted date formats">
               Any native Excel date, or a plain text date such as YYYY-MM-DD or MM/DD/YYYY. If the file has no
-              date column at all, you'll be asked to pick one date to apply to every row before importing.
+              date column at all, you&apos;ll be asked to pick one date to apply to every row before importing.
             </InfoRow>
 
             <InfoRow label="Import strategy / duplicate behavior">
@@ -257,7 +257,7 @@ function ReportInstructions({ definition, fields, stats, onImportClick, onCustom
                 <ul className="space-y-0.5">
                   {definition.exampleMappings.map(m => (
                     <li key={m.source} className="text-sm text-muted-foreground">
-                      <span className="font-mono text-xs text-muted-foreground">"{m.source}"</span> → {m.target}
+                      <span className="font-mono text-xs text-muted-foreground">&quot;{m.source}&quot;</span> → {m.target}
                     </li>
                   ))}
                 </ul>
@@ -283,7 +283,7 @@ function ReportInstructions({ definition, fields, stats, onImportClick, onCustom
             </InfoRow>
 
             <InfoRow label="Current record count">
-              {stats.recordCount} day{stats.recordCount === 1 ? "" : "s"} of data currently carry a "{definition.reportTypeId}" import tag
+              {stats.recordCount} day{stats.recordCount === 1 ? "" : "s"} of data currently carry a &quot;{definition.reportTypeId}&quot; import tag
               {stats.totalRowsImported > 0 && ` (${stats.totalRowsImported} source row${stats.totalRowsImported === 1 ? "" : "s"} imported in total)`}.
             </InfoRow>
           </>

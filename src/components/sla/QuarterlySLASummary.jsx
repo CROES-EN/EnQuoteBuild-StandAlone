@@ -6,10 +6,6 @@ function getQuarterKey(date) {
   return `${getYear(date)} Q${getQuarter(date)}`;
 }
 
-function avg(arr) {
-  if (!arr.length) return null;
-  return arr.reduce((s, v) => s + v, 0) / arr.length;
-}
 
 function formatHours(h) {
   if (h === null) return "—";

@@ -14,6 +14,40 @@ async function withUserData(run) {
   }
 }
 
+test("retires a legacy data file inside the current user data directory", async () => {
+  await withUserData(async (directory) => {
+    const legacyPath = path.join(directory, "enquote-demo-data-v1.json");
+    const currentPath = path.join(directory, "enquote-data-v1.json");
+    const legacy = { version: 1, quotes: [{ id: "legacy-quote" }], users: [] };
+    const current = { version: 1, quotes: [{ id: "current-quote" }], users: [] };
+    await fs.writeFile(legacyPath, JSON.stringify(legacy), "utf8");
+    await fs.writeFile(currentPath, JSON.stringify(current), "utf8");
+
+    const repository = repositoryFor(directory);
+    assert.deepEqual((await repository.list()).map(({ id }) => id).sort(), ["current-quote", "legacy-quote"]);
+    assert.deepEqual(JSON.parse(await fs.readFile(`${legacyPath}.RETIRED-DO-NOT-USE`, "utf8")), legacy);
+    await assert.rejects(fs.access(legacyPath), { code: "ENOENT" });
+
+    const reopened = repositoryFor(directory);
+    assert.equal((await reopened.list()).length, 2);
+  });
+});
+
+test("does not overwrite unreadable current data during legacy migration", async () => {
+  await withUserData(async (directory) => {
+    const legacyPath = path.join(directory, "enquote-demo-data-v1.json");
+    const currentPath = path.join(directory, "enquote-data-v1.json");
+    const legacy = JSON.stringify({ version: 1, quotes: [{ id: "legacy-quote" }] });
+    const current = "{ invalid current data";
+    await fs.writeFile(legacyPath, legacy, "utf8");
+    await fs.writeFile(currentPath, current, "utf8");
+
+    repositoryFor(directory);
+    assert.equal(await fs.readFile(currentPath, "utf8"), current);
+    assert.equal(await fs.readFile(legacyPath, "utf8"), legacy);
+  });
+});
+
 test("backs up and migrates a version-mismatched local file without losing local data", async () => {
   await withUserData(async (directory) => {
     const dataPath = path.join(directory, "enquote-data-v1.json");

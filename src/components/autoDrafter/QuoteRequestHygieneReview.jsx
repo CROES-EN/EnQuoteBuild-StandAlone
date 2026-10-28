@@ -1,4 +1,4 @@
-import React, {useDeferredValue, useMemo, useState} from "react";
+import {useDeferredValue, useMemo, useState} from "react";
 import {Download} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";

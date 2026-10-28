@@ -100,7 +100,7 @@ export default function MetricsHistoryTable({ records, onEdit, onChanged }) {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete metrics for {pendingDelete?.date}?</AlertDialogTitle>
             <AlertDialogDescription>
-              This removes every metric recorded for this day (calls, AHT, emails, quotes, staffing). This can't be undone.
+              This removes every metric recorded for this day (calls, AHT, emails, quotes, staffing). This can&apos;t be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

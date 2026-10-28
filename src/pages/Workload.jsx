@@ -118,8 +118,8 @@ function WorkloadContent() {
           <h1 className="text-2xl font-bold text-foreground">Workload</h1>
           <p className="text-muted-foreground mt-1">
             Open Salesforce cases from the team report, showing your own cases by default - use
-            "All Cases" to see the whole team. "Open" is always calculated live from each case's
-            last modified date, so it's never a stale, frozen number.
+            &quot;All Cases&quot; to see the whole team. &quot;Open&quot; is always calculated live from each case&apos;s
+            last modified date, so it&apos;s never a stale, frozen number.
           </p>
         </div>
       </div>
@@ -179,7 +179,7 @@ function WorkloadContent() {
       <AlertDialog open={clearConfirmOpen} onOpenChange={setClearConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Clear "{REPORT_LABEL}" data?</AlertDialogTitle>
+            <AlertDialogTitle>Clear &quot;{REPORT_LABEL}&quot; data?</AlertDialogTitle>
             <AlertDialogDescription>
               This permanently deletes every case currently stored here, so a fresh import can
               start clean. This cannot be undone - you will need to re-import your report file

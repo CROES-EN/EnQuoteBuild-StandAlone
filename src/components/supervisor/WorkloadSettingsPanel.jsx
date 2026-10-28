@@ -296,7 +296,7 @@ export default function WorkloadSettingsPanel({ open, onOpenChange, onSaved }) {
               Rename any tile, change its icon/color, and choose which O&M Status values feed
               into it. A status can only belong to one tile at a time. Rows whose status is
               mapped to a tile get highlighted and float to the top of the default sort.
-              Checking a status auto-fills the tile's label with that status's name until you
+              Checking a status auto-fills the tile&apos;s label with that status&apos;s name until you
               type your own - once you type a custom label, it stays exactly as you typed it.
             </p>
             <div className="space-y-3">
@@ -354,7 +354,7 @@ export default function WorkloadSettingsPanel({ open, onOpenChange, onSaved }) {
               ))}
               {tiles.length === 0 && (
                 <p className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
-                  No tiles configured - click "Add Tile" to create one.
+                  No tiles configured - click &quot;Add Tile&quot; to create one.
                 </p>
               )}
             </div>
@@ -365,7 +365,7 @@ export default function WorkloadSettingsPanel({ open, onOpenChange, onSaved }) {
             <h3 className="text-sm font-semibold text-foreground">Columns</h3>
             <p className="text-xs text-muted-foreground">
               Show/hide columns, and reorder them by dragging the handle - or use the arrows if
-              you'd rather click. "Open" is always shown first, ahead of this list.
+              you&apos;d rather click. &quot;Open&quot; is always shown first, ahead of this list.
             </p>
             <div className="divide-y divide-border rounded-lg border border-border">
               {columnOrder.map((col, index) => (
@@ -430,8 +430,8 @@ export default function WorkloadSettingsPanel({ open, onOpenChange, onSaved }) {
           <section className="space-y-2">
             <h3 className="text-sm font-semibold text-foreground">My Name (Case Owner)</h3>
             <p className="text-xs text-muted-foreground">
-              Workload now defaults to showing only cases whose "Case Owner" matches this name -
-              click "All Cases" on the Workload page any time to see the entire report instead.
+              Workload now defaults to showing only cases whose &quot;Case Owner&quot; matches this name -
+              click &quot;All Cases&quot; on the Workload page any time to see the entire report instead.
               Auto-filled from your signed-in name the first time you use Workload, but edit it
               here if your Salesforce export spells or formats your name differently (e.g. a
               different name than your EnQuote login).
@@ -448,9 +448,9 @@ export default function WorkloadSettingsPanel({ open, onOpenChange, onSaved }) {
           <section className="space-y-2">
             <h3 className="text-sm font-semibold text-foreground">Review Me List</h3>
             <p className="text-xs text-muted-foreground">
-              The "Review Me" button counts and filters to cases whose "Case Last Modified By"
-              matches one of these names - these are the people whose edits mean "go review
-              this," typically your management.
+              The &quot;Review Me&quot; button counts and filters to cases whose &quot;Case Last Modified By&quot;
+              matches one of these names - these are the people whose edits mean &quot;go review
+              this,&quot; typically your management.
             </p>
             <div className="flex flex-wrap gap-2">
               {managementNames.map((name) => (

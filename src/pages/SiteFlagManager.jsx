@@ -42,26 +42,6 @@ const FLAG_STYLES = {
   yellow: { bg: "bg-warning/10", text: "text-yellow-900", border: "border border-warning/20 border-l-4 border-l-warning", icon: AlertTriangle, label: "Level 1 Warning" }
 };
 
-function computeFlagLevel(truckrollCount, supportCount) {
-  // Truckroll rules: 2=yellow, 3=orange, 4+=red
-  let truckrollLevel = null;
-  if (truckrollCount >= 4) truckrollLevel = "red";else
-  if (truckrollCount >= 3) truckrollLevel = "orange";else
-  if (truckrollCount >= 2) truckrollLevel = "yellow";
-
-  // Support rules: 2+=yellow, 3+=orange, 4+/same-day=red
-  let supportLevel = null;
-  if (supportCount >= 4) supportLevel = "red";else
-  if (supportCount >= 3) supportLevel = "orange";else
-  if (supportCount >= 2) supportLevel = "yellow";
-
-  const levels = ["yellow", "orange", "red"];
-  const maxLevel = [truckrollLevel, supportLevel].
-  filter(Boolean).
-  sort((a, b) => levels.indexOf(b) - levels.indexOf(a))[0];
-
-  return maxLevel || null;
-}
 
 function FlagCard({ flag, onResolve, onDelete }) {
   const [showResolve, setShowResolve] = useState(false);
@@ -596,7 +576,7 @@ function SiteFlagManagerContent() {
           <Card className="p-10 text-center">
               <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-3" />
               <p className="font-semibold text-foreground">No flags found</p>
-              <p className="text-sm text-muted-foreground mt-1">Click "Sync Flags Now" to evaluate current data.</p>
+              <p className="text-sm text-muted-foreground mt-1">Click &quot;Sync Flags Now&quot; to evaluate current data.</p>
             </Card> :
 
           <div className="space-y-3">

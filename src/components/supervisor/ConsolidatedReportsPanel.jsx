@@ -20,7 +20,7 @@ import ReportDataTablesPanel from "@/components/supervisor/ReportDataTablesPanel
  * Both existing components, dialogs, and import pipelines are reused unchanged -
  * this file only changes navigation, never import/parsing/aggregation behavior.
  */
-export default function ConsolidatedReportsPanel({ records, onRequestImport }) {
+export default function ConsolidatedReportsPanel() {
   const [mode, setMode] = useState("tables");
 
   return (

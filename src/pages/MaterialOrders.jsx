@@ -44,18 +44,6 @@ import {SiteIdLink} from "@/components/links/ExternalIdLinks";
 
 // Qty x Unit Price = Total - matching MaterialOrderForm.jsx's pricing model.
 // Backwards compatible with orders saved before unit_price existed (falls back to
-// computing it from the old flat `cost` field divided by quantity).
-function getOrderLinePricing(order) {
-  const quantity = Number(order.quantity) || 1;
-  let unitPrice = order.unit_price;
-  if (unitPrice === undefined || unitPrice === null) {
-    unitPrice = order.cost !== undefined && order.cost !== null ? Number(order.cost) / quantity : null;
-  }
-  const total = order.total !== undefined && order.total !== null
-    ? Number(order.total)
-    : (unitPrice !== null ? unitPrice * quantity : null);
-  return { quantity, unitPrice, total };
-}
 
 const statusFilters = [
  { value: "all", label: "All" },
@@ -68,7 +56,7 @@ const statusFilters = [
 ];
 
 function MaterialOrdersContent() {
- const { isAdmin, user } = useUserRole();
+ const { isAdmin } = useUserRole();
  const queryClient = useQueryClient();
  const [search, setSearch] = usePageViewState("material-orders", "search", "");
  const [statusFilter, setStatusFilter] = usePageViewState("material-orders", "status", "all");

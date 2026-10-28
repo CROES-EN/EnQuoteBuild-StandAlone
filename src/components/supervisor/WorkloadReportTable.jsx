@@ -202,7 +202,7 @@ function QuoteMatchesDialog({ matches, onOpenChange }) {
  * filter icon, closes on an outside click or Escape, matching standard popover conventions
  * elsewhere in this app (e.g. the existing Select/Dialog components already used here).
  */
-function ColumnFilterPopover({ column, distinctValues, selectedValues, onApply, onClear, onClose, anchorRef }) {
+function ColumnFilterPopover({ distinctValues, selectedValues, onApply, onClear, onClose, anchorRef }) {
   const [draft, setDraft] = useState(() => new Set(selectedValues ?? distinctValues));
   const [search, setSearch] = useState("");
   const popoverRef = useRef(null);
@@ -1030,7 +1030,7 @@ export default function WorkloadReportTable({ table, onReload, isReloading }) {
   if (!table) {
     return (
       <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-        No data imported yet. Use "Import Report" to load your Workload export.
+        No data imported yet. Use &quot;Import Report&quot; to load your Workload export.
       </div>
     );
   }

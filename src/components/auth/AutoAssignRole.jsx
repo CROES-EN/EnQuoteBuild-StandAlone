@@ -147,7 +147,7 @@ export default function AutoAssignRole({ children }) {
  </div>
  <h2 className="text-2xl font-bold text-foreground mb-2">Sign In Required</h2>
  <p className="text-muted-foreground mb-6">
- Your Base44 session has expired or you're not signed in. Sign in to continue.
+ Your Base44 session has expired or you&apos;re not signed in. Sign in to continue.
  </p>
  <Button onClick={navigateToLogin} className="bg-indigo-600 hover:bg-indigo-700">
  <LogIn className="w-4 h-4 mr-2" />

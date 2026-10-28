@@ -1,4 +1,3 @@
-import React from "react";
 
 const UNAVAILABLE_NAV = ["Invite", "Film", "Blog", "Favorites", "Forum", "Groups", "Events", "Videos", "Music", "Comedy", "Classifieds"];
 

@@ -143,7 +143,7 @@ function QuoteCommentThread({ review }) {
 }
 
 // Inline re-categorization widget for a single review
-function RecatRow({ review, canEdit, quote }) {
+function RecatRow({ review, canEdit }) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [selected, setSelected] = useState(review.rejection_driver || "");
@@ -267,7 +267,6 @@ function RecatRow({ review, canEdit, quote }) {
 }
 
 export default function FeedbackThemes({ reviews, quotes = [], canEdit = false }) {
-  const queryClient = useQueryClient();
   const [expandedTheme, setExpandedTheme] = useState(null);
   const [showBoneyard, setShowBoneyard] = useState(false);
 

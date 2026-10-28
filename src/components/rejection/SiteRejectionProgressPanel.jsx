@@ -341,7 +341,6 @@ export default function SiteRejectionProgressPanel({ siteId, allReviews = [], on
             }
 
             if (event.type === "progress") {
-              const isGood = ["approved", "quote_sent_to_ho", "ho_approved_invoice_required", "invoiced", "invoice_paid", "scheduled"].includes(event.status);
               return (
                 <div key={i} className="relative">
                   <div className="absolute -left-6 top-2 w-4 h-4 rounded-full bg-green-500 border-2 border-white flex items-center justify-center">

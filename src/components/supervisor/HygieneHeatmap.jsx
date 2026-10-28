@@ -1,4 +1,4 @@
-import React, {useMemo} from "react";
+import {useMemo} from "react";
 import {buildHygieneHeatmap} from "@/features/supervisorDashboard/supervisorInsights";
 
 /** Comment author x flag category matrix; darker cells mean more flagged cases. */

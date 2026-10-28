@@ -188,11 +188,11 @@ export default function SalesforceImportButton({
               Salesforce Report URL
             </DialogTitle>
             <DialogDescription>
-              Paste the URL of your own Salesforce report (copy it directly from your browser's
+              Paste the URL of your own Salesforce report (copy it directly from your browser&apos;s
               address bar while viewing the report). This opens in a separate window where you
               log in (and complete 2FA if prompted) exactly as you do today - EnQuote just
               watches for the CSV you export and imports it automatically. Your Salesforce
-              session is remembered across app restarts, so you shouldn't need to log in every
+              session is remembered across app restarts, so you shouldn&apos;t need to log in every
               single time.
             </DialogDescription>
           </DialogHeader>

@@ -56,7 +56,9 @@ async function handleReconcile(env) {
   try {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     await env.DB.prepare("DELETE FROM enqueue_request_log WHERE received_at < ?").bind(sevenDaysAgo).run();
-  } catch {}
+  } catch (error) {
+    console.warn("[reconcile] Could not clean old enqueue logs:", error.message);
+  }
 
   return results;
 }

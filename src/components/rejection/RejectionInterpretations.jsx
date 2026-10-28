@@ -99,7 +99,9 @@ export default function RejectionInterpretations({ allQuotes = [], allReviews = 
  const { data } = JSON.parse(cached);
  return data || null;
  }
- } catch {}
+ } catch (error) {
+ console.warn("[rejection-analysis] Could not read cached analysis:", error);
+ }
  return null;
  });
  const [loading, setLoading] = useState(false);
@@ -110,7 +112,9 @@ export default function RejectionInterpretations({ allQuotes = [], allReviews = 
  const { timestamp } = JSON.parse(cached);
  return timestamp ? new Date(timestamp) : null;
  }
- } catch {}
+ } catch (error) {
+ console.warn("[rejection-analysis] Could not read cached timestamp:", error);
+ }
  return null;
  });
  const [error, setError] = useState(null);
@@ -177,7 +181,9 @@ export default function RejectionInterpretations({ allQuotes = [], allReviews = 
  setLastRun(now);
  try {
  localStorage.setItem(STORAGE_KEY, JSON.stringify({ data: result, timestamp: now.toISOString() }));
- } catch {}
+ } catch (error) {
+ console.warn("[rejection-analysis] Could not cache analysis:", error);
+ }
  } catch (err) {
  console.error(err);
  setError(err?.message || "Analysis failed. Please try again.");
@@ -254,7 +260,7 @@ export default function RejectionInterpretations({ allQuotes = [], allReviews = 
  {/* Executive Summary */}
  <Card className="border-border">
  <CardContent className="p-5">
- <p className="text-sm text-foreground leading-relaxed italic">"{analysis.summary}"</p>
+ <p className="text-sm text-foreground leading-relaxed italic">&quot;{analysis.summary}&quot;</p>
  <p className="text-xs text-muted-foreground mt-2">— Based on {analysis.total_analyzed} rejected quotes</p>
  </CardContent>
  </Card>
@@ -305,7 +311,7 @@ export default function RejectionInterpretations({ allQuotes = [], allReviews = 
  {!loading && !analysis && (
  <div className="text-center py-16 text-muted-foreground">
  <Brain className="w-10 h-10 mx-auto mb-3 text-slate-200" />
- <p className="text-muted-foreground font-medium">Click "Run Analysis" to get AI-powered insights</p>
+ <p className="text-muted-foreground font-medium">Click &quot;Run Analysis&quot; to get AI-powered insights</p>
  <p className="text-sm mt-1">Uses Claude to scan all rejection data with Enphase domain knowledge.</p>
  </div>
  )}

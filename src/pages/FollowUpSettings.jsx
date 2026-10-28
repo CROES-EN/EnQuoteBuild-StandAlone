@@ -162,7 +162,7 @@ function FollowUpSettingsContent() {
  ) : (
  <>
  <AlertCircle className="w-4 h-4" />
- <span>Send reminder after {config.days_threshold} days in "{config.status}" status</span>
+ <span>Send reminder after {config.days_threshold} days in &quot;{config.status}&quot; status</span>
  </>
  )}
  </div>

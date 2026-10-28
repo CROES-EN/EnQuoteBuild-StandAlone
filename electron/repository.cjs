@@ -529,7 +529,9 @@ function repositoryFor(userDataPath) {
       try {
         const newRaw = require("node:fs").readFileSync(dataPath, "utf8").replace(/^\uFEFF/, "");
         newData = JSON.parse(newRaw);
-      } catch { }
+      } catch (error) {
+        if (error.code !== "ENOENT") throw error;
+      }
       const byId = new Map();
       (oldData.quotes || []).forEach((q) => byId.set(q.id, q));
       (newData.quotes || []).forEach((q) => byId.set(q.id, q));
@@ -538,7 +540,7 @@ function repositoryFor(userDataPath) {
         newData.users = oldData.users || [];
       }
       require("node:fs").writeFileSync(dataPath, JSON.stringify(newData, null, 2), "utf8");
-      require("node:fs").renameSync(oldPath, `C:\Users\croeschberger\AppData\Roaming\base44-app\enquote-demo-data-v1.json.RETIRED-DO-NOT-USE`);
+      require("node:fs").renameSync(oldPath, `${oldPath}.RETIRED-DO-NOT-USE`);
       console.warn(`[migration] Merged ${newData.quotes.length} quote(s) and ${newData.users.length} user(s); legacy file renamed aside.`);
     } catch (migrationError) {
       if (migrationError.code !== "ENOENT") {
@@ -1027,16 +1029,6 @@ function repositoryFor(userDataPath) {
       // to merged.appNotifications after the generic collection merge below, since these
       // are never something Base44 itself sends (purely derived from what changed here).
       const newNotifications = [];
-      const formatNotificationDateTime = (isoString) => {
-        const d = new Date(isoString);
-        const mm = String(d.getMonth() + 1).padStart(2, "0");
-        const dd = String(d.getDate()).padStart(2, "0");
-        let hours = d.getHours();
-        const minutes = String(d.getMinutes()).padStart(2, "0");
-        const ampm = hours >= 12 ? "PM" : "AM";
-        hours = hours % 12 || 12;
-        return `${mm}/${dd} ${hours}:${minutes} ${ampm}`;
-      };
       let notificationSeqCounter = 0;
       const nextNotificationSeq = () => {
         notificationSeqCounter = (notificationSeqCounter + 1) % 1000;

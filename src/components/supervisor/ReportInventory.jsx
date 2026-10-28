@@ -211,7 +211,7 @@ export default function ReportInventory() {
             Reference only - nothing on this tab imports, edits, or connects to any of these systems. It tells you
             which report is authoritative for each metric and where to find it. Spreadsheets marked{" "}
             <span className="font-medium text-amber-700">view/import only</span> should never be edited in place -
-            import a copy into the Daily Metrics tab, don't save changes back to the shared file.
+            import a copy into the Daily Metrics tab, don&apos;t save changes back to the shared file.
           </p>
         </CardContent>
       </Card>

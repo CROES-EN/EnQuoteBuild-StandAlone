@@ -568,7 +568,7 @@ export default function SOPLibraryPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this SOP page?</AlertDialogTitle>
             <AlertDialogDescription>
-              "{confirmDelete?.title}" will be removed for everyone. It can be restored from "Recently deleted".
+              &quot;{confirmDelete?.title}&quot; will be removed for everyone. It can be restored from &quot;Recently deleted&quot;.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -581,7 +581,7 @@ export default function SOPLibraryPage() {
       <AlertDialog open={Boolean(sectionDelete)} onOpenChange={(open) => { if (!open) setSectionDelete(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete section "{sectionDelete?.title}"?</AlertDialogTitle>
+            <AlertDialogTitle>Delete section &quot;{sectionDelete?.title}&quot;?</AlertDialogTitle>
             <AlertDialogDescription>
               This section has {sectionDelete ? sectionPageCount(sectionDelete.id) : 0} page(s). Move them to another section, or delete the pages too.
             </AlertDialogDescription>

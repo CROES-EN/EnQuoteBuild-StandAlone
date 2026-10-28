@@ -88,7 +88,7 @@ function EditQuoteContent() {
  subject: `Quote Updated (v${newVersionNumber}): ${newQuote.site_id || newQuote.quote_number}`,
  body: `A new version of a quote has been submitted for approval.\n\nSite ID: ${newQuote.site_id}\nVersion: ${newVersionNumber}\nTotal: $${newQuote.total.toFixed(2)}\n\nPlease review and approve/reject in the system.`
  }).then(() => ({ email: dist.recipient_email, success: true }))
- .catch(err => ({ email: dist.recipient_email, success: false }))
+ .catch(() => ({ email: dist.recipient_email, success: false }))
  ),
  ...(newQuote.created_by ? [
  base44.integrations.Core.SendEmail({
@@ -96,7 +96,7 @@ function EditQuoteContent() {
  subject: `Quote Updated (v${newVersionNumber}): ${newQuote.site_id || newQuote.quote_number}`,
  body: `A new version of your quote has been submitted for approval.\n\nSite ID: ${newQuote.site_id}\nVersion: ${newVersionNumber}\nTotal: $${newQuote.total.toFixed(2)}\n\nYou will be notified once it's reviewed.`
  }).then(() => ({ email: newQuote.created_by, success: true }))
- .catch(err => ({ email: newQuote.created_by, success: false }))
+ .catch(() => ({ email: newQuote.created_by, success: false }))
  ] : [])
  ]);
  
@@ -109,7 +109,7 @@ function EditQuoteContent() {
  } else {
  toast.success(`Version ${newVersionNumber} created and notifications sent`);
  }
- } catch (error) {
+ } catch {
  toast.error('Failed to send email notifications');
  }
  
@@ -233,7 +233,7 @@ function EditQuoteContent() {
  <div className="flex items-start gap-3">
  <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
  <div className="flex-1">
- <p className="font-semibold text-amber-800 mb-1">Your changes weren't saved</p>
+ <p className="font-semibold text-amber-800 mb-1">Your changes weren&apos;t saved</p>
  <p className="text-amber-700 text-sm">{conflictError}</p>
  <Button
  size="sm"

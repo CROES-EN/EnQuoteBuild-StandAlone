@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from "react";
+import {useEffect, useState} from "react";
 
 // Small, fixed-position notice for installer updates (electron-updater, relayed through
 // main.cjs -> preload.cjs). Updates download quietly in the background; once one is ready this

@@ -50,7 +50,7 @@ export default function RemoteSyncSecretDialog({ open, syncUrl, onSaved }) {
         <DialogHeader>
           <DialogTitle>Connect to shared data</DialogTitle>
           <DialogDescription>
-            Enter the shared sync secret to see live team data. You'll only need to do
+            Enter the shared sync secret to see live team data. You&apos;ll only need to do
             this once on this computer.
           </DialogDescription>
         </DialogHeader>
@@ -64,7 +64,7 @@ export default function RemoteSyncSecretDialog({ open, syncUrl, onSaved }) {
         />
 
         <p className="text-xs text-muted-foreground">
-          Don't have this code? Reach out to Carsten Roeschberger.
+          Don&apos;t have this code? Reach out to Carsten Roeschberger.
         </p>
 
         {error && <p className="text-xs text-rose-600">{error}</p>}

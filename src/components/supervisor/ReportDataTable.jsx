@@ -120,7 +120,7 @@ function SummaryFieldConfigurator({ columns, fields, onSave, onReset }) {
     <div className="rounded-lg border border-border bg-secondary p-3">
       <p className="mb-3 text-xs text-muted-foreground">
         Choose up to {SUMMARY_SLOT_COUNT} columns to show on each compact row, and an optional
-        display label for each (e.g. show the "Contact Name" column labeled as "Homeowner"). The
+        display label for each (e.g. show the &quot;Contact Name&quot; column labeled as &quot;Homeowner&quot;). The
         first slot is also used as the popup title when viewing full details.
       </p>
       <div className="space-y-2">
@@ -270,7 +270,7 @@ export default function ReportDataTable({ reportType, table, defaultSummaryField
   if (!table) {
     return (
       <div className="rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-muted-foreground">
-        No data imported yet for this report. Use "Import This Report" to load it.
+        No data imported yet for this report. Use &quot;Import This Report&quot; to load it.
       </div>
     );
   }
@@ -326,7 +326,7 @@ export default function ReportDataTable({ reportType, table, defaultSummaryField
           <div className="mb-2 flex items-center justify-between gap-3">
             <p className="text-xs text-muted-foreground">
               Uncheck a column to exclude it from search and sorting - the full row (every
-              column) is always shown in "View Details" regardless of this setting.
+              column) is always shown in &quot;View Details&quot; regardless of this setting.
             </p>
             <Button variant="ghost" size="sm" className="shrink-0" onClick={handleResetColumns}>
               Show all

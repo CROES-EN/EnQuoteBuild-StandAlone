@@ -168,12 +168,12 @@ export default function CareSubscriptionsTabPanel() {
       <AlertDialog open={clearConfirmOpen} onOpenChange={setClearConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Clear "{REPORT_LABEL}" data?</AlertDialogTitle>
+            <AlertDialogTitle>Clear &quot;{REPORT_LABEL}&quot; data?</AlertDialogTitle>
             <AlertDialogDescription>
               This permanently deletes every row currently stored for this report, so a fresh
               import can start clean. This cannot be undone - you will need to re-import the
               report file to bring the data back. This will also clear the data shown under
-              Report Data's "Care Subscriptions" entry, since both views share the same
+              Report Data&apos;s &quot;Care Subscriptions&quot; entry, since both views share the same
               underlying stored table.
             </AlertDialogDescription>
           </AlertDialogHeader>

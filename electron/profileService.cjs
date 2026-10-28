@@ -41,7 +41,11 @@ function createProfileService({ client, storageDir, logger = console, onChanged 
     try {
       const bytes = fs.readFileSync(avatarPath(id));
       let type = "application/octet-stream";
-      try { type = JSON.parse(fs.readFileSync(metaPath(id), "utf8"))?.type || type; } catch {}
+      try {
+        type = JSON.parse(fs.readFileSync(metaPath(id), "utf8"))?.type || type;
+      } catch (error) {
+        logger.warn?.("[profiles] Could not read cached avatar metadata:", error.message);
+      }
       return { ok: true, bytes: new Uint8Array(bytes), type };
     } catch {
       const downloaded = await client.download(`/api/profiles/avatar/${id}`);

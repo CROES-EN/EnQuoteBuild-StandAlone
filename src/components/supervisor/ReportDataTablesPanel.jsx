@@ -430,7 +430,7 @@ export default function ReportDataTablesPanel() {
       <AlertDialog open={Boolean(clearConfirmTarget)} onOpenChange={(open) => { if (!open) setClearConfirmTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Clear "{clearConfirmTarget?.label}" data?</AlertDialogTitle>
+            <AlertDialogTitle>Clear &quot;{clearConfirmTarget?.label}&quot; data?</AlertDialogTitle>
             <AlertDialogDescription>
               This permanently deletes every row currently stored for this report, so a fresh
               import can start clean. This cannot be undone - you will need to re-import the

@@ -105,7 +105,7 @@ export default function LogFollowUpDialog({ quote, open, onOpenChange, onLogged 
         <DialogHeader>
           <DialogTitle>Log Follow-Up</DialogTitle>
           <DialogDescription>
-            Record that you've followed up on this quote. This updates the last-touched date and adds an entry to the history.
+            Record that you&apos;ve followed up on this quote. This updates the last-touched date and adds an entry to the history.
           </DialogDescription>
         </DialogHeader>
         <Textarea

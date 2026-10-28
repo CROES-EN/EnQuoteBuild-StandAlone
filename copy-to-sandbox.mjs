@@ -140,7 +140,7 @@ async function main() {
     const response = await sourceClient.functions.invoke("getAllProducts", {});
     products = response?.data?.products || [];
     console.log(`  Retrieved ${products.length} product(s) from production.`);
-  } catch (err) {
+  } catch {
     console.log("  No getAllProducts function found or accessible -- skipping products.");
   }
 

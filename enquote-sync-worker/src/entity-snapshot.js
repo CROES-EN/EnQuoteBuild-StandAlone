@@ -17,7 +17,7 @@ export async function handleEntitySnapshot(request, env) {
   // Every write moves synced_at forward (and identical re-sends write nothing), so the newest
   // synced_at identifies the snapshot. Apps that already hold it get a body-less 304.
   const version = await env.DB.prepare("SELECT MAX(synced_at) AS version FROM base44_entity_state").first();
-  const etag = `W/"${String(version?.version || "empty").replace(/[^0-9A-Za-z:.\-]/g, "")}"`;
+  const etag = `W/"${String(version?.version || "empty").replace(/[^0-9A-Za-z:.-]/g, "")}"`;
   if (request.headers.get("If-None-Match") === etag) {
     return new Response(null, { status: 304, headers: { ETag: etag } });
   }

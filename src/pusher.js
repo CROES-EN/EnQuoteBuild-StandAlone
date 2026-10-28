@@ -30,7 +30,9 @@ async function requestJson(url, { method = "GET", headers = {}, body = null } = 
   }
   const res = await fetch(url, init);
   let parsed = null;
-  try { parsed = await res.json(); } catch {}
+  try { parsed = await res.json(); } catch (error) {
+    if (res.status !== 204) console.warn("[pusher] Could not parse Base44 response:", res.status, error.message);
+  }
   return { ok: res.ok, status: res.status, body: parsed };
 }
 

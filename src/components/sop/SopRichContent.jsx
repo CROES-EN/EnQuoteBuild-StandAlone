@@ -1,4 +1,4 @@
-import React, {useMemo} from "react";
+import {useMemo} from "react";
 import DOMPurify from "dompurify";
 import {cn} from "@/lib/utils";
 

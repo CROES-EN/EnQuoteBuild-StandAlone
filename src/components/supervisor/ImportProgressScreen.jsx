@@ -105,7 +105,7 @@ export default function ImportProgressScreen({
 
             <p className="text-xs text-muted-foreground">
               {totalRows} source row{totalRows === 1 ? "" : "s"} processed from this file.
-              "Updated" means a record already existed for that date and the columns you mapped
+              &quot;Updated&quot; means a record already existed for that date and the columns you mapped
               this time were merged into it - fields not mapped in this import were left
               untouched.
             </p>

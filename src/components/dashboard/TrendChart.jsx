@@ -2,7 +2,7 @@
 import {CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis} from "recharts";
 import {format, parseISO, startOfDay} from "date-fns";
 
-export default function TrendChart({ quotes, dateRange }) {
+export default function TrendChart({ quotes }) {
   // Group quotes by date
   const groupedByDate = quotes.reduce((acc, quote) => {
     if (typeof quote.created_date !== "string" || !quote.created_date) {

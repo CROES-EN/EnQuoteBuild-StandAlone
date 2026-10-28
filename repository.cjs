@@ -8,6 +8,7 @@ const DATA_VERSION = 1;
 const DEFAULT_SYNC_TTL_MS = 5 * 60 * 1000;
 const DEFAULT_TEMP_PASSWORD = "Enquote1";
 const fileName = "enquote-demo-data-v1.json";
+const seedQuotes = [];
 const productSeed = [
   { id: "demo-product-001", name: "Disconnect Enclosure Repair", description: "Synthetic service item for demonstration quotes.", type: "service", sku: "DEMO-SVC-001", unit_price: 480, unit: "each", category: "Services", is_active: true },
   { id: "demo-product-002", name: "Outdoor Conduit Kit", description: "Synthetic conduit and fittings demonstration kit.", type: "product", sku: "DEMO-MAT-002", unit_price: 185, unit: "each", category: "Conduit & Raceway", is_active: true },

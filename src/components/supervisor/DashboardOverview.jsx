@@ -652,21 +652,6 @@ function BacklogCard({ label, icon: Icon, iconClass, backlog, showComparison, di
   );
 }
 
-/**
- * Formats a large accumulated seconds total (e.g. a team-wide sum across many agents and
- * many days) as "11,626 Hours" / "33 Minutes" on two lines - unlike formatSecondsAsClock's
- * H:MM:SS format, which is built for single-call/single-day durations and becomes unreadable
- * once hours run into the thousands (e.g. "11626:33"). Minutes are derived from the rounded
- * total, so seconds are never separately displayed or lost silently - just rounded to the
- * nearest whole minute, which is more than precise enough at this scale.
- */
-function formatSecondsAsHoursMinutes(totalSeconds) {
-  if (totalSeconds === null || totalSeconds === undefined || !Number.isFinite(totalSeconds)) return "N/A";
-  const totalMinutes = Math.round(totalSeconds / 60);
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  return `${hours.toLocaleString()} H\n${minutes} Min`;
-}
 
 /**
  * A simple stat tile for Boise O&M team totals (Executive Overview) - visually consistent
@@ -1344,15 +1329,6 @@ export default function DashboardOverview({
   const rangedEodbAbandonedCalls = useMemo(
     () => displayModeRecords(getEodbWidgetRecordsFromStoredRows(reportTables?.eodb_abandoned_calls?.rows || []), activeRange, kpiMode),
     [reportTables, activeRange, kpiMode]
-  );
-  const rangedEodbAbandonmentRate = useMemo(
-    // FIX (real bug, confirmed live: a multi-day Reporting Period showed 431% instead of
-    // the correct ~16-20% average) - Abandonment Rate's stored values are plain decimal
-    // numbers with no "%" suffix, so the parser could never reliably auto-detect this as a
-    // percent-type widget on its own. Passing `true` explicitly tells it definitively,
-    // since THIS specific report type is the only one of the 5 EODB widgets that is a rate.
-    () => filterRecordsInRange(getEodbWidgetRecordsFromStoredRows(reportTables?.eodb_abandonment_rate?.rows || [], true), activeRange),
-    [reportTables, activeRange]
   );
   const rangedEodbDailyWaitTime = useMemo(
     () => displayModeRecords(getEodbWidgetRecordsFromStoredRows(reportTables?.eodb_daily_wait_time?.rows || []), activeRange, kpiMode),

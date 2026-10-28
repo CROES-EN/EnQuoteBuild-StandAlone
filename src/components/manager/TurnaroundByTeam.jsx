@@ -63,8 +63,8 @@ export default function TurnaroundByTeam({ quotes }) {
         </BarChart>
       </ResponsiveContainer>
       <p className="text-xs text-muted-foreground mt-2">
-        Longer "Draft → Submit" times may indicate hesitation or gaps in quote building skills.
-        Longer "Submit → Decision" times may indicate review bottlenecks.
+        Longer &quot;Draft → Submit&quot; times may indicate hesitation or gaps in quote building skills.
+        Longer &quot;Submit → Decision&quot; times may indicate review bottlenecks.
       </p>
     </div>
   );

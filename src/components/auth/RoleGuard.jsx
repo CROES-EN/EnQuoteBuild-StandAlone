@@ -111,7 +111,7 @@ function SignInRequired({ navigateToLogin }) {
  </div>
  <h2 className="text-2xl font-bold text-foreground mb-2">Sign In Required</h2>
  <p className="text-muted-foreground mb-6">
- Your Base44 session has expired or you're not signed in. Sign in to access Quotes and other
+ Your Base44 session has expired or you&apos;re not signed in. Sign in to access Quotes and other
  data stored in Base44.
  </p>
  <Button onClick={navigateToLogin} className="bg-indigo-600 hover:bg-indigo-700">
@@ -132,7 +132,7 @@ function RoleNotAssigned({ onRetry, isRetrying }) {
         </div>
         <h2 className="text-2xl font-bold text-foreground mb-2">Role Not Assigned</h2>
         <p className="text-muted-foreground mb-4">
-          Your account hasn't been assigned a role yet. Please contact an administrator to assign you a
+          Your account hasn&apos;t been assigned a role yet. Please contact an administrator to assign you a
           role (Submitter, Approver, or Admin).
         </p>
         <p className="text-xs text-muted-foreground mb-4">
@@ -155,7 +155,7 @@ function AccessDenied({ role }) {
  <ShieldAlert className="w-8 h-8 text-rose-600" />
  </div>
  <h2 className="text-2xl font-bold text-foreground mb-2">Access Denied</h2>
- <p className="text-muted-foreground">You don't have permission to access this page.</p>
+ <p className="text-muted-foreground">You don&apos;t have permission to access this page.</p>
  <p className="text-sm text-muted-foreground mt-2">Your role: {role}</p>
  </Card>
  </div>

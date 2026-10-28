@@ -34,7 +34,7 @@ export async function generateQuotePDF(quote, versionHistory = []) {
     if (templates.length > 0) {
       template = { ...template, ...templates[0] };
     }
-  } catch (error) {
+  } catch {
     console.warn("Could not load PDF template settings, using defaults");
   }
 
@@ -406,7 +406,7 @@ export async function generateCustomerQuoteDocument(quote) {
     if (templates.length > 0) {
       template = { ...template, ...templates[0] };
     }
-  } catch (error) {
+  } catch {
     console.warn("Could not load PDF template settings, using defaults");
   }
 
@@ -421,7 +421,7 @@ export async function generateCustomerQuoteDocument(quote) {
     const targetHeight = (props.height * targetWidth) / props.width;
     doc.addImage(logoUrl, "PNG", 20, yPos - 4, targetWidth, targetHeight);
     yPos += targetHeight + 6;
-  } catch (e) {
+  } catch {
     doc.setFontSize(20);
     doc.setFont(undefined, 'bold');
     doc.setTextColor("#FF6B35");

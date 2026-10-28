@@ -166,7 +166,7 @@ export default function BulkMaterialOrderReviewSheet({ open, onOpenChange, quote
 
         <p className="text-sm text-muted-foreground mt-2">
           Every line item from this quote is included below by default. Remove any row that
-          shouldn't be ordered, and adjust quantity/unit price/SKU as needed, before submitting.
+          shouldn&apos;t be ordered, and adjust quantity/unit price/SKU as needed, before submitting.
         </p>
 
         <div className="mt-4">
@@ -177,12 +177,12 @@ export default function BulkMaterialOrderReviewSheet({ open, onOpenChange, quote
             return matched ? (
               <p className="mt-1 mb-1.5 flex items-center gap-1.5 text-xs text-emerald-700">
                 <UserCheck className="w-3.5 h-3.5 shrink-0" />
-                Matched FST Requester "{quote.quote_requester}" to {matched.name} - address pre-filled below.
+                Matched FST Requester &quot;{quote.quote_requester}&quot; to {matched.name} - address pre-filled below.
               </p>
             ) : (
               <p className="mt-1 mb-1.5 flex items-center gap-1.5 text-xs text-amber-700">
                 <UserX className="w-3.5 h-3.5 shrink-0" />
-                No FST in the roster matches "{quote.quote_requester}" (may be a homeowner or other name) - enter the shipping address manually below.
+                No FST in the roster matches &quot;{quote.quote_requester}&quot; (may be a homeowner or other name) - enter the shipping address manually below.
               </p>
             );
           })()}
@@ -286,7 +286,7 @@ export default function BulkMaterialOrderReviewSheet({ open, onOpenChange, quote
         >
           {isReconciled ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
           <span>
-            Draft order total: <strong>${draftTotal.toFixed(2)}</strong> - Quote's Line Items Subtotal:{" "}
+            Draft order total: <strong>${draftTotal.toFixed(2)}</strong> - Quote&apos;s Line Items Subtotal:{" "}
             <strong>${itemsSubtotal.toFixed(2)}</strong>
             {isReconciled ? " - matches." : " - review before submitting (expected if you removed/edited a row)."}
           </span>

@@ -88,9 +88,6 @@ import {canonicalSharedQuotePath, resolveSharedQuote, SharedQuoteAmbiguityError}
 // Only these users can grant/revoke pre-approval
 const PRE_APPROVAL_USERS = ["smosley@enphaseenergy.com", "REDACTED-USER1@example.invalid"];
 
-// Users who can edit and re-approve quotes that are in "quote_sent_to_ho" status
-const HO_EDIT_USERS = ["smosley@enphaseenergy.com", "vseganos@enphaseenergy.com", "REDACTED-USER1@example.invalid"];
-
 // In local/offline mode the Base44 SDK is replaced by a stub that has no
 // `entities` and whose `auth.me()` resolves to undefined. Calling into it
 // threw out of the click handlers, unmounting the app back to the login
@@ -277,7 +274,6 @@ function QuoteDetailsContent() {
  };
 
  const canPreApprove = PRE_APPROVAL_USERS.includes(user?.email?.toLowerCase());
- const canEditHOQuote = HO_EDIT_USERS.includes(user?.email?.toLowerCase());
 
  const handleTogglePreApproval = async (checked) => {
  const me = await safeMe();
@@ -454,7 +450,7 @@ function QuoteDetailsContent() {
  } else {
  toast.success('Quote approved and notifications sent');
  }
- } catch (error) {
+ } catch {
  toast.error('Failed to send approval notifications');
  }
  setShowApproveDialog(false);
@@ -493,7 +489,7 @@ function QuoteDetailsContent() {
  subject: `Quote Rejected: ${quote.site_id || quote.quote_number}`,
  body: `A quote has been rejected.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}\n\nReason: ${rejectionReason}`
  }).then(() => ({ email: dist.recipient_email, success: true }))
- .catch(err => ({ email: dist.recipient_email, success: false }))
+ .catch(() => ({ email: dist.recipient_email, success: false }))
  ),
  ...(quote.created_by ? [
  sendEmailSafe({
@@ -501,7 +497,7 @@ function QuoteDetailsContent() {
  subject: `Your Quote Was Rejected: ${quote.site_id || quote.quote_number}`,
  body: `Your quote has been rejected.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}\n\nReason: ${rejectionReason}`
  }).then(() => ({ email: quote.created_by, success: true }))
- .catch(err => ({ email: quote.created_by, success: false }))
+ .catch(() => ({ email: quote.created_by, success: false }))
  ] : [])
  ]);
  
@@ -514,7 +510,7 @@ function QuoteDetailsContent() {
  } else {
  toast.success('Notifications sent successfully');
  }
- } catch (error) {
+ } catch {
  toast.error('Failed to send email notifications');
  }
  
@@ -554,7 +550,7 @@ function QuoteDetailsContent() {
  subject: `Quote Sent to HO: ${quote.site_id || quote.quote_number}`,
  body: `A quote has been sent to HO.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}`
  }).then(() => ({ email: dist.recipient_email, success: true }))
- .catch(err => ({ email: dist.recipient_email, success: false }))
+ .catch(() => ({ email: dist.recipient_email, success: false }))
  ),
  ...(quote.created_by ? [
  sendEmailSafe({
@@ -562,7 +558,7 @@ function QuoteDetailsContent() {
  subject: `Your Quote Sent to HO: ${quote.site_id || quote.quote_number}`,
  body: `Your quote has been sent to HO.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}`
  }).then(() => ({ email: quote.created_by, success: true }))
- .catch(err => ({ email: quote.created_by, success: false }))
+ .catch(() => ({ email: quote.created_by, success: false }))
  ] : [])
  ]);
  
@@ -575,7 +571,7 @@ function QuoteDetailsContent() {
  } else {
  toast.success('Notifications sent successfully');
  }
- } catch (error) {
+ } catch {
  toast.error('Failed to send email notifications');
  }
  };
@@ -613,7 +609,7 @@ function QuoteDetailsContent() {
  subject: `HO Approved, Invoice Required: ${quote.site_id || quote.quote_number}`,
  body: `HO has approved the quote and an invoice is required.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}`
  }).then(() => ({ email: dist.recipient_email, success: true }))
- .catch(err => ({ email: dist.recipient_email, success: false }))
+ .catch(() => ({ email: dist.recipient_email, success: false }))
  ),
  ...(quote.created_by ? [
  sendEmailSafe({
@@ -621,7 +617,7 @@ function QuoteDetailsContent() {
  subject: `Your Quote HO Approved: ${quote.site_id || quote.quote_number}`,
  body: `HO has approved your quote and an invoice is required.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}`
  }).then(() => ({ email: quote.created_by, success: true }))
- .catch(err => ({ email: quote.created_by, success: false }))
+ .catch(() => ({ email: quote.created_by, success: false }))
  ] : [])
  ]);
  
@@ -634,7 +630,7 @@ function QuoteDetailsContent() {
  } else {
  toast.success('Notifications sent successfully');
  }
- } catch (error) {
+ } catch {
  toast.error('Failed to send email notifications');
  }
  };
@@ -698,7 +694,7 @@ function QuoteDetailsContent() {
  subject: `Quote Invoiced: ${quote.site_id || quote.quote_number}`,
  body: `A quote has been marked as invoiced.\n\nSite ID: ${quote.site_id}\nInvoice Number: ${nextInvoiceNumber}\nTotal: $${quote.total.toFixed(2)}`
  }).then(() => ({ email: dist.recipient_email, success: true }))
- .catch(err => ({ email: dist.recipient_email, success: false }))
+ .catch(() => ({ email: dist.recipient_email, success: false }))
  ),
  ...(quote.created_by ? [
  sendEmailSafe({
@@ -706,7 +702,7 @@ function QuoteDetailsContent() {
  subject: `Your Quote Invoiced: ${quote.site_id || quote.quote_number}`,
  body: `Your quote has been marked as invoiced.\n\nSite ID: ${quote.site_id}\nInvoice Number: ${nextInvoiceNumber}\nTotal: $${quote.total.toFixed(2)}`
  }).then(() => ({ email: quote.created_by, success: true }))
- .catch(err => ({ email: quote.created_by, success: false }))
+ .catch(() => ({ email: quote.created_by, success: false }))
  ] : [])
  ]);
  
@@ -719,7 +715,7 @@ function QuoteDetailsContent() {
  } else {
  toast.success('Notifications sent successfully');
  }
- } catch (error) {
+ } catch {
  toast.error('Failed to send email notifications');
  }
  };
@@ -757,7 +753,7 @@ function QuoteDetailsContent() {
  subject: `HO Rejected Quote: ${quote.site_id || quote.quote_number}`,
  body: `HO has rejected a quote.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}\n\nReason: ${hoRejectionReason}`
  }).then(() => ({ email: dist.recipient_email, success: true }))
- .catch(err => ({ email: dist.recipient_email, success: false }))
+ .catch(() => ({ email: dist.recipient_email, success: false }))
  ),
  ...(quote.created_by ? [
  sendEmailSafe({
@@ -765,7 +761,7 @@ function QuoteDetailsContent() {
  subject: `HO Rejected Your Quote: ${quote.site_id || quote.quote_number}`,
  body: `HO has rejected your quote.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}\n\nReason: ${hoRejectionReason}`
  }).then(() => ({ email: quote.created_by, success: true }))
- .catch(err => ({ email: quote.created_by, success: false }))
+ .catch(() => ({ email: quote.created_by, success: false }))
  ] : [])
  ]);
  
@@ -778,7 +774,7 @@ function QuoteDetailsContent() {
  } else {
  toast.success('Notifications sent successfully');
  }
- } catch (error) {
+ } catch {
  toast.error('Failed to send email notifications');
  }
  
@@ -947,7 +943,7 @@ function QuoteDetailsContent() {
  subject: `Invoice Paid: ${quote.site_id || quote.quote_number}`,
  body: `An invoice has been marked as paid.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}`
  }).then(() => ({ email: dist.recipient_email, success: true }))
- .catch(err => ({ email: dist.recipient_email, success: false }))
+ .catch(() => ({ email: dist.recipient_email, success: false }))
  ),
  ...(quote.created_by ? [
  sendEmailSafe({
@@ -955,7 +951,7 @@ function QuoteDetailsContent() {
  subject: `Your Invoice Paid: ${quote.site_id || quote.quote_number}`,
  body: `Your invoice has been marked as paid.\n\nSite ID: ${quote.site_id}\nTotal: $${quote.total.toFixed(2)}`
  }).then(() => ({ email: quote.created_by, success: true }))
- .catch(err => ({ email: quote.created_by, success: false }))
+ .catch(() => ({ email: quote.created_by, success: false }))
  ] : [])
  ]);
  
@@ -968,7 +964,7 @@ function QuoteDetailsContent() {
  } else {
  toast.success('Notifications sent successfully');
  }
- } catch (error) {
+ } catch {
  toast.error('Failed to send email notifications');
  }
  setShowPaidDialog(false);
@@ -2038,7 +2034,6 @@ function QuoteDetailsContent() {
  combinedTaxRate,
  taxableAfterDiscount,
  taxAmount,
- afterDiscount,
  total: calculatedTotal
  } = calculateQuoteTotals(quote);
  const hasDiscount = discountAmount > 0;
@@ -2367,7 +2362,7 @@ function QuoteDetailsContent() {
  <DialogHeader>
  <DialogTitle>Log Follow-Up</DialogTitle>
  <DialogDescription>
- Record that you've followed up on this quote. This updates the last-touched date and adds an entry to the history.
+ Record that you&apos;ve followed up on this quote. This updates the last-touched date and adds an entry to the history.
  </DialogDescription>
  </DialogHeader>
  <Textarea

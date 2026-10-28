@@ -184,6 +184,8 @@ function createOneNoteImport({sops, chooseFile, getEmail = () => "", exportImpl 
         onProgress({sessionId, completed: imported, total: session.pages.length, title: page.title});
         if (!page.file) {
           const uploaded = await sops.uploadFile({
+            // Windows filenames cannot contain control characters.
+            // eslint-disable-next-line no-control-regex
             name: `${page.title.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_").slice(0, 180)} - OneNote.pdf`,
             type: "application/pdf", bytes: new Uint8Array(await fs.readFile(page.pdfPath))
           });

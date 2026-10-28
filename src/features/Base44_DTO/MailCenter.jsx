@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useState} from "react";
+import {useCallback, useEffect, useMemo, useState} from "react";
 import {Archive, Inbox, Mail, MailOpen, RefreshCw, Send, ShieldAlert, Star, Trash2} from "lucide-react";
 import {useAuth} from "@/lib/AuthContext";
 import {Button} from "@/components/ui/button";

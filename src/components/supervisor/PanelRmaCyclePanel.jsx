@@ -1,4 +1,3 @@
-import React from "react";
 import {Link} from "react-router-dom";
 import {Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis} from "recharts";
 import {Button} from "@/components/ui/button";

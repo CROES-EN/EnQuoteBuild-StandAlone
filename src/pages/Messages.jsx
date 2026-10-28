@@ -25,7 +25,6 @@ import {Card, CardContent} from "@/components/ui/card";
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
 import {cn} from "@/lib/utils";
-import {createPageUrl} from "@/utils";
 import {chatApi, hasCollabBridge, registerActiveChatView, subscribe} from "@/features/collab/collabApi";
 import QuotePicker, {quoteAttachment} from "@/components/collab/QuotePicker";
 import ChatAppearancePopover from "@/components/messages/ChatAppearancePopover";
@@ -529,7 +528,7 @@ export default function MessagesPage({conversationId, compact = false, visible =
                 <Button size="sm" variant="outline" onClick={() => { setListState({loading: true, error: null}); void refreshConversations(); }}>Try again</Button>
               </div>
             ) : conversations.length === 0 ? (
-              <p className="p-6 text-center text-sm text-slate-500">No conversations yet. Start one with "New conversation".</p>
+              <p className="p-6 text-center text-sm text-slate-500">No conversations yet. Start one with &quot;New conversation&quot;.</p>
             ) : (
               <ul className="space-y-1">
                 {conversations.map((conversation) => (

@@ -103,7 +103,7 @@ function lineTotal(item) {
   return Math.round((parseFloat(item.quantity) || 1) * (Number(item.unit_price) || 0) * 100) / 100;
 }
 
-export default function QuoteDraftButton({ quote, products, onApply }) {
+export default function QuoteDraftButton({ onApply }) {
   const [open, setOpen] = useState(false);
   const [rawOutput, setRawOutput] = useState("");
   const [preview, setPreview] = useState(null);
@@ -275,7 +275,7 @@ export default function QuoteDraftButton({ quote, products, onApply }) {
                   ))}
                 </ul>
                 <p className="text-xs pt-1">
-                  If this is a special case that genuinely needs a quote, click "Draft Anyway" below to proceed.
+                  If this is a special case that genuinely needs a quote, click &quot;Draft Anyway&quot; below to proceed.
                 </p>
               </div>
             </div>
@@ -302,7 +302,7 @@ export default function QuoteDraftButton({ quote, products, onApply }) {
                     This does not look like Quote Request Agent (Step 1) output.
                   </p>
                   <p>
-                    Expected fields like "Site ID:", "Case Number:", or "Recommended Scope of Work"
+                    Expected fields like &quot;Site ID:&quot;, &quot;Case Number:&quot;, or &quot;Recommended Scope of Work&quot;
                     were not found. Paste the text printed by the Quote Request Agent (Step 1) chat,
                     which is what FSTs post in Salesforce.
                   </p>

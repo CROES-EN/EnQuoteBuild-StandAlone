@@ -566,7 +566,7 @@ async function handlePresenceAnnounce(req, res) {
   let payload;
   try {
     payload = JSON.parse(rawBuf.toString('utf8'));
-  } catch (error) {
+  } catch {
     res.writeHead(400, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: false, error: 'Request body was not valid JSON.' }));
     return;
@@ -618,7 +618,7 @@ async function handlePresenceRemove(req, res) {
   let payload;
   try {
     payload = JSON.parse(rawBuf.toString('utf8'));
-  } catch (error) {
+  } catch {
     res.writeHead(400, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: false, error: 'Request body was not valid JSON.' }));
     return;
@@ -866,7 +866,7 @@ async function handleDiagnosticReport(req, res) {
   let report;
   try {
     report = JSON.parse(rawBuf.toString('utf8'));
-  } catch (error) {
+  } catch {
     res.writeHead(400, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: false, error: 'Report body was not valid JSON.' }));
     return;

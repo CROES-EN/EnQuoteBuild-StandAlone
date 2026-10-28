@@ -139,7 +139,7 @@ export default function SpreadsheetGridTable({ reportType = "incorta_input", tab
   if (!table) {
     return (
       <div className="rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-muted-foreground">
-        No data imported yet for this report. Use "Import This Report" to load it.
+        No data imported yet for this report. Use &quot;Import This Report&quot; to load it.
       </div>
     );
   }

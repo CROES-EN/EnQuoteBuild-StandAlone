@@ -1,6 +1,5 @@
 import {usePageViewState} from "@/hooks/usePageViewState";
 import { exportLocalData, getQuotes, listLocalCollection } from "@/api/dataClient";
-import { calculateDashboardMetrics } from "@/utils/dashboardMetrics";
 
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
@@ -21,7 +20,6 @@ import { createPageUrl } from "@/utils";
 function DashboardContent() {
   const [statusFilter, setStatusFilter] = usePageViewState("dashboard", "status", "all");
   const [coordinatorFilter, setCoordinatorFilter] = usePageViewState("dashboard", "coordinator", "all");
-  const isLocalDemo = ["mock", "local", "salesforce-mock"].includes(import.meta.env.VITE_DATA_SOURCE);
 
   // Mirrors the equivalent "Download data backup" button already on the hosted Base44 web
   // version - reuses the EXACT SAME export mechanism already proven working in

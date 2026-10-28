@@ -279,7 +279,7 @@ export default function DailySnapshotReport({
             placeholder="One bullet per line…"
           />
           <p className="mt-2 text-xs text-muted-foreground">
-            Auto-drafted from today's deltas, escalations, and backlog swings - edit freely before exporting. Don't
+            Auto-drafted from today&apos;s deltas, escalations, and backlog swings - edit freely before exporting. Don&apos;t
             overstate trends from a single day.
           </p>
         </CardContent>

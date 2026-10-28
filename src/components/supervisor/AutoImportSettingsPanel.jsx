@@ -162,7 +162,7 @@ export default function AutoImportSettingsPanel() {
           <CardTitle className="text-base">Auto-Import</CardTitle>
           <p className="text-xs text-muted-foreground">
             Automatically detect and import known report files (EODB Dashboard, Pronto Metrics Dashboard)
-            dropped into a folder you choose - no manual "Import" click needed. Off by default; this
+            dropped into a folder you choose - no manual &quot;Import&quot; click needed. Off by default; this
             setting is specific to your own signed-in account.
           </p>
         </CardHeader>
@@ -198,8 +198,8 @@ export default function AutoImportSettingsPanel() {
               Create Calls &amp; Emails folders?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Would you like to create "Calls" and "Emails" subfolders here to store these files after
-              they're auto-imported? EODB Dashboard files go into Calls, and Pronto Metrics Dashboard
+              Would you like to create &quot;Calls&quot; and &quot;Emails&quot; subfolders here to store these files after
+              they&apos;re auto-imported? EODB Dashboard files go into Calls, and Pronto Metrics Dashboard
               files go into Emails.
             </AlertDialogDescription>
           </AlertDialogHeader>

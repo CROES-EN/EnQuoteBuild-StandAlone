@@ -60,7 +60,6 @@ import {useAppPreferences} from "@/hooks/useAppPreferences";
 import SalesforceLauncher from "@/components/links/SalesforceLauncher";
 import {isWorkerDataSource} from "@/api/dataClient";
 
-const isDemoMode = ["mock", "local", "salesforce-mock"].includes(import.meta.env.VITE_DATA_SOURCE);
 const appVersion = appPackage?.version || "0.0.0";
 const DATA_LAST_UPDATED_STORAGE_KEY = "enquote_data_last_updated";
 
@@ -123,7 +122,7 @@ function formatLastUpdated(date) {
 }
 
 export default function Layout({ children, currentPageName }) {
-  const { isAdmin, roles, user } = useUserRole();
+  const { isAdmin, user } = useUserRole();
   const { isAuthenticated, isLocalAuthActive, logout } = useAuth();
 
   const navItems = navigationItems;

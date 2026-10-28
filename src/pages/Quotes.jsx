@@ -142,7 +142,6 @@ function QuotesContent() {
     enabled: !!user?.email,
   });
 
-  const mentionedQuoteIds = new Set(myMentions.map((m) => m.quote_id));
   const mentionMap = new Map();
   myMentions.forEach((m) => {
     const rank = { yellow: 1, orange: 2, red: 3 };

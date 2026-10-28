@@ -357,10 +357,6 @@ export default function CoordinatorBreakdown({ quotes }) {
   const stats = useMemo(() => computeCoordStats(quotes), [quotes]);
   const coordinators = stats.map(s => s.coord);
 
-  const selectedStats = selectedCoord === "all"
-    ? null
-    : stats.find(s => s.coord === selectedCoord);
-
   // Bar chart: revenue by coordinator
   const revenueBarData = stats.slice(0, 10).map((s, i) => ({
     name: s.coord.split("@")[0],

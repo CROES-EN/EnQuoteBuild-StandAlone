@@ -1,4 +1,3 @@
-import React from "react";
 import {Card} from "@/components/ui/card";
 import {format} from "date-fns";
 import {Calendar, FileText, MessageSquarePlus, Pencil, Receipt, ShieldCheck, Sparkles, User} from "lucide-react";

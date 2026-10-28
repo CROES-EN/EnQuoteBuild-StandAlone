@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { webLogin, webRegister } from "@/lib/webAuth";
 
 // Login / Register page shown when no valid web token is found.

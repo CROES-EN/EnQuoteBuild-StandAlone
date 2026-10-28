@@ -11,6 +11,7 @@ const testDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "enquote-smoke-"));
 env.ENQUOTE_SMOKE_DATA_DIR = testDataDir;
 
 let result;
+let cleanupFailure;
 try {
   result = spawnSync(electron, [path.join(__dirname, "smoke", "main.cjs"), ...process.argv.slice(2)], {
     stdio: "inherit",
@@ -21,9 +22,10 @@ try {
   try {
     fs.rmSync(testDataDir, {recursive: true, force: true, maxRetries: 5, retryDelay: 100});
   } catch (cleanupError) {
-    if (!result?.error) throw cleanupError;
+    cleanupFailure = cleanupError;
     console.warn(`Could not clean smoke-test data after process failure: ${cleanupError.message}`);
   }
 }
 if (result.error) throw result.error;
+if (cleanupFailure) throw cleanupFailure;
 process.exit(result.status ?? 1);

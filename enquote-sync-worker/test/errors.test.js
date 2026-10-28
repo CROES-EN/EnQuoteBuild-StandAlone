@@ -12,7 +12,7 @@ function createDb() {
   const rows = new Map();
   return {
     rows,
-    prepare(sql) {
+    prepare(_sql) {
       let params = [];
       return {
         bind(...values) { params = values; return this; },

@@ -29,7 +29,9 @@ async function handleEnqueue(request, env) {
       await env.DB.prepare(
         "INSERT INTO enqueue_request_log (received_at, path, method, user_agent, cf_ip, cf_ray, cf_country, auth_prefix, entity_type, action, local_id, body_size) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
       ).bind(new Date().toISOString(), url.pathname, request.method, userAgent, cfIp, cfRay, cfCountry, authPrefix, null, null, null, bodySize).run();
-    } catch {}
+    } catch (error) {
+      console.warn("[outbound] Could not log invalid enqueue request:", error.message);
+    }
     return json({ error: "invalid_body" }, 400);
   }
 
@@ -45,7 +47,9 @@ async function handleEnqueue(request, env) {
     await env.DB.prepare(
       "INSERT INTO enqueue_request_log (received_at, path, method, user_agent, cf_ip, cf_ray, cf_country, auth_prefix, entity_type, action, local_id, body_size) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     ).bind(new Date().toISOString(), url.pathname, request.method, userAgent, cfIp, cfRay, cfCountry, authPrefix, entityType, action, localId, bodySize).run();
-  } catch {}
+  } catch (error) {
+    console.warn("[outbound] Could not log enqueue request:", error.message);
+  }
 
   if (!entityType) return json({ error: "missing_entity_type" }, 400);
   if (!localId) return json({ error: "missing_local_id" }, 400);

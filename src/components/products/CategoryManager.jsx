@@ -124,7 +124,7 @@ export default function CategoryManager({ products, onRename, onDelete, onClose 
             <DialogDescription asChild>
               <div className="space-y-3">
                 <p>
-                  Are you sure you want to delete <strong>"{confirmDelete}"</strong>?
+                  Are you sure you want to delete <strong>&quot;{confirmDelete}&quot;</strong>?
                 </p>
                 {confirmDelete && categoryCounts[confirmDelete] > 0 && (
                   <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">

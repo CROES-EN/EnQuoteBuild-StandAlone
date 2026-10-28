@@ -10,7 +10,7 @@
  * functions below.
  */
 
-const { BrowserWindow, session, net, screen } = require("electron");
+const { BrowserWindow, session, screen } = require("electron");
 
 const AUTH_PARTITION = "persist:enquote-cloudflare-auth";
 
@@ -61,32 +61,6 @@ function isAllowedNavigationHost(hostname) {
  * Never throws - every failure mode (network error, malformed response, missing/invalid
  * email) resolves to a clear { authenticated: false, reason } instead.
  */
-// Domains that may hold a CF_Authorization cookie for this app - confirmed directly
-// from real cookie inspection tonight (both the Worker hostname and enphase-enquote.com
-// each independently receive their own CF_Authorization cookie).
-const COOKIE_DOMAINS = [
-  new URL(WORKER_BASE_URL).hostname,
-  "enphase-enquote.com"
-];
-
-/**
- * Reads the CF_Authorization JWT directly out of the persistent session's cookie jar -
- * NOT relying on the browser to send it correctly on a subsequent request (confirmed by
- * Cloudflare: the CF_Binding cookie's SameSite=None does not reliably transfer to a
- * fresh BrowserWindow's initial navigation, which is the actual root cause of tonight's
- * repeat-verification failures).
- */
-async function getAccessJwt(partitionSession) {
-  for (const domain of COOKIE_DOMAINS) {
-    const cookies = await partitionSession.cookies.get({ name: "CF_Authorization", domain });
-    if (cookies.length > 0) return cookies[0].value;
-  }
-  // Fallback: scan every cookie in the partition for any CF_Authorization value.
-  const allCookies = await partitionSession.cookies.get({});
-  const match = allCookies.find((c) => c.name === "CF_Authorization" && c.value);
-  return match ? match.value : null;
-}
-
 /**
  * FIX (per Cloudflare's confirmed root-cause diagnosis): reads the CF_Authorization JWT
  * directly from the cookie jar and sends it as an EXPLICIT "Authorization: Bearer <jwt>"
@@ -135,7 +109,7 @@ async function verifyCloudflareSession() {
     let body;
     try {
       body = JSON.parse(bodyText);
-    } catch (parseError) {
+    } catch {
       // A non-JSON body (e.g. Access's own login page HTML) means the user is not
       // currently authenticated in this partition - not a real error, just "not yet".
       return { authenticated: false, reason: "not_authenticated" };
@@ -185,9 +159,6 @@ function openCloudflareAuthWindow() {
     const partitionSession = session.fromPartition(AUTH_PARTITION);
     let settled = false;
     let retryTimer = null;
-    let retryCount = 0;
-    const MAX_RETRIES = 20; // ~20 * 1500ms = 30s bounded window after each navigation
-    const RETRY_INTERVAL_MS = 1500;
 
     const finish = (result) => {
       if (settled) return;

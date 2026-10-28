@@ -57,7 +57,7 @@ function SupervisorDashboardContent() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState(null);
   const [selectedDate, setSelectedDate] = usePageViewState("supervisor", "date", null);
-  const [completedStatuses, setCompletedStatuses] = usePageViewState("supervisor", "completed-statuses", DEFAULT_COMPLETED_STATUSES);
+  const [completedStatuses] = usePageViewState("supervisor", "completed-statuses", DEFAULT_COMPLETED_STATUSES);
   const [lastImportedFile, setLastImportedFileState] = useState(() => getLastImportedFile());
   // Keyed by date so the Daily Snapshot Report tab's Executive Summary edits survive Radix Tabs
   // unmounting that panel when the user switches to a different tab and back (that field has no
@@ -88,10 +88,6 @@ function SupervisorDashboardContent() {
   function refresh() {
     queryClient.invalidateQueries({ queryKey: QUERY_KEY });
     setLastImportedFileState(getLastImportedFile());
-  }
-  function openAddForm() {
-    setEditingRecord(null);
-    setFormOpen(true);
   }
   function openImportForReport(reportTypeId) {
     setImportInitialSource(reportTypeId);
@@ -152,7 +148,7 @@ function SupervisorDashboardContent() {
           <CardContent className="p-4 flex items-start gap-3">
             <Info className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
             <p className="text-sm text-amber-800">
-              Running outside the desktop app - this data is stored in this browser only and won't be shared with
+              Running outside the desktop app - this data is stored in this browser only and won&apos;t be shared with
               other devices. Use the EnQuote desktop app so imports are saved to the shared local data file.
             </p>
           </CardContent>
@@ -162,7 +158,7 @@ function SupervisorDashboardContent() {
         <CardContent className="p-4 flex items-start gap-3">
           <HardDrive className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
           <p className="text-sm text-muted-foreground">
-            This dashboard's daily metrics and imported report tables live in their own local store on this PC.
+            This dashboard&apos;s daily metrics and imported report tables live in their own local store on this PC.
             EnQuote quote data (created/worked/drafted/completed quote counts on the Executive Overview) is read-only here and is
             never modified by anything on this page.
           </p>

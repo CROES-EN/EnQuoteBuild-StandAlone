@@ -141,7 +141,7 @@ function QuoteOverviewContent() {
  </div>
  ) : (
  <div className="space-y-6">
- {statusGroups.map(({ value, label, color }) => {
+ {statusGroups.map(({ value, color }) => {
  const group = searchedQuotes.filter(q => q.status === value);
  if (group.length === 0) return null;
  return (

@@ -14,14 +14,6 @@ function toNumberOrNull(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function blankForm() {
-  return {
-    case_backlog_start: "",
-    new_cases_received: "",
-    cases_completed: "",
-    case_backlog_end: ""
-  };
-}
 
 function recordToForm(record) {
   return {

@@ -1,4 +1,3 @@
-import React from "react";
 import {Bar, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis} from "recharts";
 import {Button} from "@/components/ui/button";
 import {Card, CardContent} from "@/components/ui/card";

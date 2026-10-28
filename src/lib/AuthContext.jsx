@@ -1,4 +1,4 @@
-import React, {createContext, useCallback, useContext, useEffect, useMemo, useState} from 'react';
+import {createContext, useCallback, useContext, useEffect, useMemo, useState} from 'react';
 import {recordError} from '@/features/developerConsole/errorLog';
 import {base44} from '@/api/base44Client';
 import {appParams} from '@/lib/app-params';

@@ -83,7 +83,7 @@ export default function SopFilePreview({file}) {
   } else if (state.text !== null) {
     body = <pre className="max-h-[75vh] overflow-auto whitespace-pre-wrap px-4 py-3 text-sm text-foreground">{state.text}</pre>;
   } else {
-    body = <p className="px-3 py-6 text-sm text-muted-foreground">This file can't be previewed. Use "Save copy" to open it.</p>;
+    body = <p className="px-3 py-6 text-sm text-muted-foreground">This file can&apos;t be previewed. Use &quot;Save copy&quot; to open it.</p>;
   }
 
   return (

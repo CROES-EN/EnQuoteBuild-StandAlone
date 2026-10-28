@@ -65,7 +65,7 @@ export default function GeneratedDraftPreviewDialog({ open, onOpenChange, draft,
         <DialogHeader>
           <DialogTitle>Generated Draft Preview{caseLabel ? ` — ${caseLabel}` : ""}</DialogTitle>
           <DialogDescription>
-            This is a preview only, generated locally from this case's data. Nothing has been saved yet.
+            This is a preview only, generated locally from this case&apos;s data. Nothing has been saved yet.
           </DialogDescription>
         </DialogHeader>
 

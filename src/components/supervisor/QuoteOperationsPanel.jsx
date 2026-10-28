@@ -128,8 +128,8 @@ export default function QuoteOperationsPanel({
           Quote Operations
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Drafted, Completed, and Backlog are computed live from EnQuote's own quote data for{" "}
-          {selectedDate || "the selected date"} - they're never manually entered and can't go stale.
+          Drafted, Completed, and Backlog are computed live from EnQuote&apos;s own quote data for{" "}
+          {selectedDate || "the selected date"} - they&apos;re never manually entered and can&apos;t go stale.
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -145,9 +145,9 @@ export default function QuoteOperationsPanel({
         </div>
 
         <div className="rounded-lg border border-border p-4">
-          <p className="mb-2 text-sm font-semibold text-foreground">"Completed" status definition</p>
+          <p className="mb-2 text-sm font-semibold text-foreground">&quot;Completed&quot; status definition</p>
           <p className="mb-3 text-xs text-muted-foreground">
-            The business hasn't formally ratified a single "Completed" status - the exact set checked below is what's
+            The business hasn&apos;t formally ratified a single &quot;Completed&quot; status - the exact set checked below is what&apos;s
             counted above and always shown on the Daily Snapshot Report.
           </p>
           <div className="flex flex-wrap gap-4">

@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useLayoutEffect, useRef, useState} from "react";
+import {useCallback, useEffect, useLayoutEffect, useRef, useState} from "react";
 import {AlertCircle, AlertTriangle, CheckCircle2, ChevronsRight, Cloud, FileText, FolderOpen, Info, Loader2, Mail, Maximize2, Minimize2, RefreshCw, X} from "lucide-react";
 import {toast, useSonner} from "sonner";
 import {useAppPreferences} from "@/hooks/useAppPreferences";

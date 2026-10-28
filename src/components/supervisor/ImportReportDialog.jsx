@@ -381,7 +381,7 @@ export default function ImportReportDialog({ open, onOpenChange, onImported, ini
             {error && (
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Couldn't read file</AlertTitle>
+                <AlertTitle>Couldn&apos;t read file</AlertTitle>
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
@@ -418,7 +418,7 @@ export default function ImportReportDialog({ open, onOpenChange, onImported, ini
             {error && (
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Couldn't read selection</AlertTitle>
+                <AlertTitle>Couldn&apos;t read selection</AlertTitle>
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}

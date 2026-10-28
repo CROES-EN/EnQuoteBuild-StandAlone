@@ -360,11 +360,11 @@ export default function TasksPage() {
             <Card><CardContent className="p-10 text-center">
               <ClipboardList className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
               <p className="font-medium">No tasks yet</p>
-              <p className="mt-1 text-sm text-muted-foreground">Add a call-back from any quote with "Add call reminder", or create one here.</p>
+              <p className="mt-1 text-sm text-muted-foreground">Add a call-back from any quote with &quot;Add call reminder&quot;, or create one here.</p>
             </CardContent></Card>
           ) : (
             <>
-              {openCount === 0 && <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">You're all caught up.</p>}
+              {openCount === 0 && <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">You&apos;re all caught up.</p>}
               <TaskSection title="Overdue" tasks={groups.overdue} tone="text-red-600" {...rowProps} />
               <TaskSection title="Today" tasks={groups.today} {...rowProps} />
               <TaskSection title="Upcoming" tasks={groups.upcoming} {...rowProps} />

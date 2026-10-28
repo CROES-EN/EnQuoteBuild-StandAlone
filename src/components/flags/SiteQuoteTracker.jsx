@@ -208,7 +208,7 @@ function SiteRow({ site }) {
 
 export default function SiteQuoteTracker() {
   const [search, setSearch] = useState("");
-  const [minScore, setMinScore] = useState(2);
+  const [minScore] = useState(2);
 
   const { data: quotes = [], isLoading } = useQuery({
     queryKey: ["site-quote-tracker-quotes"],

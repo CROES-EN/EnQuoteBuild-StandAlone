@@ -104,7 +104,7 @@ export const AutoDrafter = () => {
         target={panelRmaTarget} onClose={() => setPanelRmaTarget(null)} />;
     const [table, setTable] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [reloading, setReloading] = useState(false);
+    const [, setReloading] = useState(false);
     const [importDialogOpen, setImportDialogOpen] = useState(false);
     const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
     const [clearing, setClearing] = useState(false);
@@ -837,7 +837,7 @@ export const AutoDrafter = () => {
                         <Sparkles className="w-12 h-12 text-slate-300 mx-auto mb-4"/>
                         <h3 className="text-lg font-semibold text-foreground mb-2">No data imported yet</h3>
                         <p className="text-muted-foreground">
-                            Use "Salesforce" for one-click import, or "Import File" to upload a CSV/Excel export
+                            Use &quot;Salesforce&quot; for one-click import, or &quot;Import File&quot; to upload a CSV/Excel export
                             manually.
                         </p>
                     </Card>
@@ -897,7 +897,7 @@ export const AutoDrafter = () => {
                 <AlertDialog open={clearConfirmOpen} onOpenChange={setClearConfirmOpen}>
                     <AlertDialogContent>
                         <AlertDialogHeader>
-                            <AlertDialogTitle>Clear "{REPORT_LABEL}" data?</AlertDialogTitle>
+                            <AlertDialogTitle>Clear &quot;{REPORT_LABEL}&quot; data?</AlertDialogTitle>
                             <AlertDialogDescription>
                                 This permanently deletes every imported case currently shown here, so a fresh
                                 import can start clean. This cannot be undone - you will need to re-import the
@@ -953,9 +953,9 @@ export const AutoDrafter = () => {
                         <AlertDialogHeader>
                             <AlertDialogTitle>Clear all generated drafts?</AlertDialogTitle>
                             <AlertDialogDescription>
-                                This permanently deletes every saved "AI Generated Quote - Needs Review" draft
+                                This permanently deletes every saved &quot;AI Generated Quote - Needs Review&quot; draft
                                 shown here, so cases return to their raw, not-yet-drafted state. This cannot be
-                                undone - you will need to click "Generate Draft" again for each case. Drafts
+                                undone - you will need to click &quot;Generate Draft&quot; again for each case. Drafts
                                 already sent to Quotes are real Quote records and are NOT affected by this.
                                 Removed cases stay removed.
                             </AlertDialogDescription>

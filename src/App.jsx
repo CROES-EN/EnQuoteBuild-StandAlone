@@ -1,4 +1,4 @@
-import React, {Suspense} from "react";
+import {Suspense} from "react";
 import {HashRouter, Navigate, Route, Routes} from "react-router-dom";
 import WebLoginPage from "@/components/WebLoginPage";
 import {Toaster} from "@/components/ui/toaster";

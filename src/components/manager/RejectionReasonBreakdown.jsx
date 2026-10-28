@@ -29,7 +29,7 @@ function bucketText(text) {
 
 const CustomTooltip = ({ active, payload }) => {
   if (!active || !payload?.length) return null;
-  const { name, value, payload: d } = payload[0];
+  const { value, payload: d } = payload[0];
   return (
     <div className="bg-card border border-border rounded-lg shadow-lg p-3 text-xs">
       <p className="font-semibold text-foreground mb-0.5">{d.bucket}</p>

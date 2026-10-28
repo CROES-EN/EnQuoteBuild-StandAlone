@@ -388,7 +388,7 @@ function ProductsContent() {
  <DialogHeader>
  <DialogTitle>Delete Item</DialogTitle>
  <DialogDescription>
- Are you sure you want to delete "{deletingProduct?.name}"? This action cannot be undone.
+ Are you sure you want to delete &quot;{deletingProduct?.name}&quot;? This action cannot be undone.
  </DialogDescription>
  </DialogHeader>
  <DialogFooter>
