@@ -33,3 +33,10 @@ _private/
 /enquote-release-v102/
 /Grant-EnQuoteRole.ps1
 
+# Local EnQuote development/worktree repositories
+/enquote-full-sync-v3/
+/enquote-snapshot-fix/
+/enquote-web-adapter/
+/enquote-web-auth/
+/enquote-sync-worker/enquote-ai-handoff/
+/enquote-sync-worker/enquote-snapshot-fix-v2/
