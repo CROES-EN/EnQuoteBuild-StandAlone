@@ -29,8 +29,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { repositoryFor } = require("./repository.cjs");
 const { importEntitySnapshot } = require("./entitySnapshotSync.cjs");
-const { applyVerifiedQuoteCreator, applyVerifiedQuoteUpdate, requireVerifiedEmail, recordedUpdater, parseRecordTimestamp } = require("./quoteAttribution.cjs");
-const {hasNotificationChange, notificationEventId, restoreNotificationAttribution} = require("./notificationEvents.cjs");
+const { applyVerifiedQuoteCreator, applyVerifiedQuoteUpdate, requireVerifiedEmail } = require("./quoteAttribution.cjs");
+const {restoreNotificationAttribution} = require("./notificationEvents.cjs");
 const { createPresenceSync } = require("./presenceSync.cjs");
 const { createFstRosterSync } = require("./fstRosterSync.cjs");
 const { createLargeTableStore } = require("./largeTableStore.cjs");
@@ -2171,31 +2171,6 @@ let then = whenReady().then(async () => {
     // update the existing record in place instead of creating duplicates.
     const ENTITY_SNAPSHOT_POLL_INTERVAL_MS = 90 * 1000; // was 30s - increased to reduce background load on a large data file
 
-    // FIX (confirmed root cause, via a live query against the Cloudflare Worker's own
-    // D1 database schema): the Worker's entity-snapshot payload has NO "updated_date"
-    // field on Quote records at all. Without this fix, payload.updated_date was ALWAYS
-    // undefined -> incomingUpdatedAt was ALWAYS 0 -> since every existing local quote
-    // has a real non-zero updated_date, EVERY incoming Base44 status change for an
-    // already-existing local quote was silently skipped, every single time - a
-    // confirmed one-way sync blackout (verified via a real CSV export comparison: 3
-    // quotes stuck 1-4 days behind Base44's actual status). status_history IS reliably
-    // present with real changed_at timestamps on both sides (confirmed in the Worker's
-    // schema), so that's used as the freshness signal instead. Tries updated_date FIRST
-    // (forward-compatible, in case the Worker's schema ever adds it), falling back to
-    // status_history only when updated_date is genuinely absent - matching the real,
-    // currently-confirmed data shape.
-    function getLatestStatusChangeTime(record) {
-        if (record?.updated_date) {
-            const direct = parseRecordTimestamp(record.updated_date);
-            if (!Number.isNaN(direct)) return direct;
-        }
-        const history = Array.isArray(record?.status_history) ? record.status_history : [];
-        const times = history
-            .map((entry) => parseRecordTimestamp(entry?.changed_at))
-            .filter((t) => !Number.isNaN(t));
-        return times.length ? Math.max(...times) : 0;
-    }
-
     let entitySnapshotPollRunning = false;
     // The Worker answers 304 (no body, no table read) while this ETag is still current, so the
     // background poll skips both the download and the local import. The ETag is only kept after
@@ -2291,187 +2266,15 @@ let then = whenReady().then(async () => {
 
             const importSummary = await importEntitySnapshot(quoteRepository, response.entities);
             if (importSummary.importedRecordCount > 0) {
-                acceptEtag();
                 markOwnWrite();
                 console.log(`[entity-sync] Bulk-imported ${importSummary.importedRecordCount} Base44 entity record(s).`);
                 appWindows().forEach((window) => window.webContents.send("app:data-updated", {
                     at: new Date().toISOString(),
                     changedQuoteNumbers: []
                 }));
-                return { ok: true, ...importSummary };
-            }
-
-            // Base44 sends PascalCase entity names, but the local repository's
-            // generic collection system uses different (often abbreviated)
-            // camelCase names - confirmed directly against repository.cjs's real
-            // collectionNames array. This map translates entityType -> actual local
-            // collection name for entities that ARE synced.
-            //
-            // "Product" is deliberately NOT in this map - it has its own dedicated
-            // listProducts/createProduct/updateProduct methods, handled separately
-            // below (not part of the generic collection system at all).
-            //
-            // EmailDistribution, FST, and Invitation are intentionally NOT included -
-            // confirmed with the team these are either unused in Base44 currently
-            // (EmailDistribution, FST) or represent invitations TO Base44 itself,
-            // not app data that needs syncing (Invitation).
-            const ENTITY_COLLECTION_MAP = {
-                MaterialOrder: "materialOrders",
-                QuoteAlert: "quoteAlerts",
-                StatusAlertDismissal: "statusAlertDismissals",
-                QuoteReview: "reviews",
-                QuoteActivity: "activities",
-                QuoteDeletionRequest: "deletionRequests",
-                FollowUpConfig: "followUpConfigs",
-                FollowUpLog: "followUps",
-                PDFTemplate: "pdfTemplates",
-                PVManufacturer: "pvManufacturers",
-                PVPanelRMA: "rmas",
-                SiteFlag: "siteFlags",
-                SVCancelTracker: "svCancels",
-                SupportInteraction: "supportInteractions",
-                PriceReview: "priceReviews",
-            };
-
-            let updatedCount = 0;
-            for (const entity of response.entities) {
-                const payload = { ...entity.record, base44_id: entity.localId };
-
-                // Quote: dedicated quoteRepository.list/create/update methods - same
-                // pattern as Product above. expectedVersion is deliberately omitted from
-                // update() - confirmed optional in repository.cjs, and omitting it skips
-                // the version-conflict check entirely, which is correct here since Base44
-                // is the authoritative source for a Base44-originated quote change.
-                if (entity.entityType === "Quote") {
-                    try {
-                        const existingQuotes = await quoteRepository.list();
-                        // FIX: added quote_number as a fallback match key (confirmed from real
-                        // duplicate records: base44_id/id matching was somehow missing an existing
-                        // record every cycle, but quote_number stayed stable and identical across
-                        // every duplicate) - this closes the duplication loophole regardless of why
-                        // the primary match was failing.
-                        const match = (existingQuotes || []).find((rec) =>
-                            rec?.base44_id === entity.localId ||
-                            rec?.id === entity.localId ||
-                            (payload.quote_number && rec?.quote_number === payload.quote_number)
-                        );
-                        if (match) {
-                            // Only proceed with an update+notification if the incoming record is
-                            // actually NEWER than what we already have - entity-snapshot returns
-                            // EVERY record currently in base44_entity_state on every poll (not just
-                            // ones that changed since last time), so without this check, the same
-                            // unchanged record would re-create a notification every 30s forever,
-                            // even after the user clears it.
-                            const incomingUpdatedAt = getLatestStatusChangeTime(payload);
-                            const existingUpdatedAt = getLatestStatusChangeTime(match);
-                            if (incomingUpdatedAt <= existingUpdatedAt) {
-                                continue;
-                            }
-                            const updated = await quoteRepository.update(match.id, payload);
-                            try {
-                                const finalQuote = updated?.id ? updated : { ...match, ...payload };
-                                const quoteNumber = finalQuote.quote_number;
-                                if (quoteNumber && hasNotificationChange(match, finalQuote)) {
-                                    const existingNotifications = await quoteRepository.listCollection("appNotifications");
-                                    const notification = {
-                                        eventId: notificationEventId("quote_updated", finalQuote),
-                                        id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-                                        seq: Date.now() * 1000 + (existingNotifications.length % 1000),
-                                        type: "quote_updated",
-                                        quoteId: finalQuote.id || match.id,
-                                        quoteNumber,
-                                        changedBy: recordedUpdater(finalQuote),
-                                        occurredAt: finalQuote.updated_date || new Date().toISOString(),
-                                        read: false,
-                                    };
-                                    await quoteRepository.createCollectionRecord("appNotifications", notification);
-                                }
-                            } catch (notifError) {
-                                console.log(`[entity-sync] Failed to create notification for Quote ${entity.localId}: ${notifError.message}`);
-                            }
-                            } else {
-                                if (!payload.site_id || !payload.quote_number) {
-                                    console.log(`[entity-sync] Skipping create - payload is missing site_id/quote_number for Quote ${entity.localId}, will retry next cycle.`);
-                                } else {
-                                    await quoteRepository.create(payload);
-                                }
-                            }
-                        updatedCount += 1;
-                    } catch (recordError) {
-                        console.log(`[entity-sync] Failed to store Quote record ${entity.localId}: ${recordError.message}`);
-                    }
-                    continue;
-                }
-
-                // Product: dedicated methods, not the generic collection system.
-                if (entity.entityType === "Product") {
-                    try {
-                        const existingProducts = await quoteRepository.listProducts();
-                        const match = (existingProducts || []).find((rec) => rec?.base44_id === entity.localId);
-                        if (match) {
-                            await quoteRepository.updateProduct(match.id, payload);
-                        } else {
-                            await quoteRepository.createProduct(payload);
-                        }
-                        updatedCount += 1;
-                    } catch (recordError) {
-                        console.log(`[entity-sync] Failed to store Product record ${entity.localId}: ${recordError.message}`);
-                    }
-                    continue;
-                }
-
-                // Intentionally-skipped entity types - no error, no log spam.
-                if (entity.entityType === "EmailDistribution" || entity.entityType === "FST" || entity.entityType === "Invitation") {
-                    continue;
-                }
-
-                const collectionName = ENTITY_COLLECTION_MAP[entity.entityType];
-                if (!collectionName) {
-                    console.log(`[entity-sync] No local collection mapping for entity type: ${entity.entityType} (skipped)`);
-                    continue;
-                }
-
-                let existing = [];
-                try {
-                    existing = await quoteRepository.listCollection(collectionName);
-                } catch {
-                    existing = [];
-                }
-                const match = (existing || []).find((rec) => rec?.base44_id === entity.localId);
-                try {
-                    if (match) {
-                        // CONSISTENCY FIX: uses the same getLatestStatusChangeTime() helper already
-                        // fixed for Quotes above, instead of the old payload.updated_date-only check -
-                        // so every synced entity type (MaterialOrder, SiteFlag, etc.) benefits from the
-                        // same status_history fallback if its own updated_date is ever missing too.
-                        const incomingUpdatedAt = getLatestStatusChangeTime(payload);
-                        const existingUpdatedAt = getLatestStatusChangeTime(match);
-                        if (incomingUpdatedAt > existingUpdatedAt) {
-                            await quoteRepository.updateCollectionRecord(collectionName, match.id, payload);
-                            updatedCount += 1;
-                        }
-                    } else {
-                        await quoteRepository.createCollectionRecord(collectionName, payload);
-                        updatedCount += 1;
-                    }
-                } catch (recordError) {
-                    console.log(`[entity-sync] Failed to store ${collectionName} record ${entity.localId}: ${recordError.message}`);
-                }
-            }
-
-            if (updatedCount > 0) {
-                markOwnWrite();
-                console.log(`[entity-sync] Synced ${updatedCount} Base44 entity record(s).`);
             }
             acceptEtag();
-            return {
-                ok: true,
-                importedRecordCount: updatedCount,
-                quoteSnapshotCount: 0,
-                quoteAddedCount: 0,
-                quoteUpdatedCount: 0,
-                quoteDeletedCount: 0
-            };
+            return { ok: true, ...importSummary };
         } catch (error) {
             console.log(`[entity-sync] Poll failed (will retry next cycle): ${error.message}`);
             return { ok: false, error: error.message };

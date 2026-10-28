@@ -66,6 +66,7 @@ import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/c
 import {Switch} from "@/components/ui/switch";
 import {Checkbox} from "@/components/ui/checkbox";
 import StatusBadge from "@/components/quotes/StatusBadge";
+import HomeownerTrackingLinkButton from "@/components/quotes/HomeownerTrackingLinkButton";
 import InvoiceNumberDialog from "@/components/quotes/InvoiceNumberDialog";
 import {buildInvoiceNumberEdit, showsInvoiceNumber} from "@/features/quotes/invoiceNumber";
 import {motion} from "framer-motion";
@@ -1340,6 +1341,7 @@ function QuoteDetailsContent() {
  <Download className="w-4 h-4 mr-2" />
  Download Customer Copy
  </Button>
+ <HomeownerTrackingLinkButton quote={quote} />
  </div>
  </div>
 

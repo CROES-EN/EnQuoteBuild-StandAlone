@@ -6,6 +6,13 @@ import SopRichContent from "./SopRichContent";
 
 export const DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
+export function sopFileType(file) {
+  if (file.type) return file.type;
+  const extension = file.name.toLowerCase().split(".").pop();
+  return { docx: DOCX_TYPE, txt: "text/plain", pdf: "application/pdf",
+    png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp" }[extension] || "";
+}
+
 export const ACCEPTED_FILE_TYPES = [
   "application/pdf",
   "image/png",

@@ -46,7 +46,7 @@ function DashboardContent() {
     }
   }
 
-  const { data: allQuotes = [], isLoading } = useQuery({
+  const { data: allQuotes = [], isLoading, error, refetch } = useQuery({
     queryKey: ["quotes", "dashboard"],
     queryFn: async () => {
       const quotes = await getQuotes();
@@ -98,6 +98,16 @@ function DashboardContent() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div role="alert" className="m-8 space-y-4 rounded-lg border border-destructive p-6">
+        <h1 className="text-xl font-semibold">Dashboard data could not load</h1>
+        <p>{error.message}</p>
+        <Button onClick={() => void refetch()}>Try again</Button>
       </div>
     );
   }

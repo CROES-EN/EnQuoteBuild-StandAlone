@@ -13,9 +13,10 @@ export function createSupervisorD1(migrations = ["0002_supervisor_records.sql"])
       bind(...values) { params = values; return statement; },
       async run() { return runSync(); },
       async all() { return allSync(); },
+      async first() { return db.prepare(sql).get(...params) || null; },
       runSync,
       allSync,
-      isSelect: /^\s*select/i.test(sql)
+      isSelect: /^\s*select/i.test(sql) || /\bRETURNING\b/i.test(sql)
     };
     function allSync() {
       return { results: db.prepare(sql).all(...params) };

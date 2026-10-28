@@ -26,7 +26,8 @@ import ImportValidateDialog from "@/components/products/ImportValidateDialog";
 import PriceReviewDialog from "@/components/products/PriceReviewDialog";
 import CatalogReviewDialog from "@/components/products/CatalogReviewDialog";
 import RoleGuard, {useUserRole} from "@/components/auth/RoleGuard";
-import {createProduct, deleteProduct, getProducts, updateProduct} from "@/api/dataClient";
+import {createProduct, deleteProduct, getProducts, isBase44DataSource, listLocalCollection, updateLocalRecord, updateProduct} from "@/api/dataClient";
+import {toast} from "sonner";
 
 
 function ProductsContent() {
@@ -53,16 +54,30 @@ function ProductsContent() {
 
  const { data: priceReviews = [] } = useQuery({
  queryKey: ["pending-price-reviews"],
- queryFn: () => base44.entities.PriceReview.filter({ status: "pending" }),
+ queryFn: async () => isBase44DataSource
+   ? base44.entities.PriceReview.filter({ status: "pending" })
+   : (await listLocalCollection("priceReviews")).filter(review => review.status === "pending"),
  });
 
  const reviewMutation = useMutation({
- mutationFn: (decision) => base44.functions.invoke("resolvePriceReview", { reviewId: selectedReview.id, decision }),
+ mutationFn: async (decision) => {
+   if (isBase44DataSource) return base44.functions.invoke("resolvePriceReview", { reviewId: selectedReview.id, decision });
+   if (!["confirm", "dismiss"].includes(decision) || !selectedReview) throw new Error("Choose a valid price review decision.");
+   if (decision === "confirm") {
+     if (!Number.isFinite(selectedReview.retailer_price) || selectedReview.retailer_price < 0) throw new Error("This review has an invalid retailer price.");
+     await updateProduct(selectedReview.product_id, { unit_price: selectedReview.retailer_price });
+   }
+   return updateLocalRecord("priceReviews", selectedReview.id, {
+     status: decision === "confirm" ? "confirmed" : "dismissed",
+     reviewed_by: user.email, reviewed_date: new Date().toISOString()
+   });
+ },
  onSuccess: () => {
  queryClient.invalidateQueries({ queryKey: ["products"] });
  queryClient.invalidateQueries({ queryKey: ["pending-price-reviews"] });
  setSelectedReview(null);
- }
+ },
+ onError: error => toast.error(error.message || "Could not save this price review.")
  });
 
  const createMutation = useMutation({

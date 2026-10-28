@@ -1,17 +1,22 @@
-import { handleWebhook } from "./webhook.js";
-import { handleSnapshot } from "./snapshot.js";
-import { handleSnapshotMeta } from "./snapshot-meta.js";
+import { handleWebhook } from "./webhook-all-entities.js";
+import { handleSnapshot, handleSnapshotMeta } from "./snapshot-all-entities.js";
+import { handleWebSnapshot } from "./web-snapshot.js";
 import { handleRealtimeSocket, QuoteSyncRoom } from "./realtime.js";
 import { handleInboundBase44 } from "./inbound.js";
 import { handleEntitySnapshot } from "./entity-snapshot.js";
-import { handleAuthSession, handleSyncCredentials } from "./auth-session.js";
+import { handleAuthSession, handleSyncCredentials, handleLogin, handleRegister, handleLogout } from "./auth-session.js";
+import { authorizeBrowserRequest } from "./browser-api.js";
+import { handleEntityWrite } from "./entity-write.js";
 import { handlePresenceHeartbeat, handlePresenceList, handlePresenceRemove } from "./presence.js";
 import { handleFstList, handleFstUpsert } from "./fsts.js";
 import { handleUsers } from "./users.js";
 import { handleTasksDelete, handleTasksList, handleTasksUpsert } from "./tasks.js";
+import { handlePreferencesList, handlePreferencesUpsert } from "./preferences.js";
+import { handleTrackRoute, handleTrackingLinkCreate, handleTrackingLinkGet, handleTrackingLinkRevoke } from "./tracking.js";
 import {
   handleRefundRequestIngest,
   handleRefundRequestCsvIngest,
+  handleRefundRequestBrowserCsv,
   handleRefundRequestSubmit,
   handleRefundRequestNativeSubmit,
   handleRefundRequestsList,
@@ -40,6 +45,7 @@ import {
   handleProfileAvatarDownload,
   handleProfileAvatarRemove,
   handleProfileAvatarUpload,
+  handleProfileUpdate,
   handleProfilesList
 } from "./profiles.js";
 import { handleGifsSearch, handleGifsTrending } from "./gifs.js";
@@ -79,12 +85,38 @@ import { markOutboundStatus } from "./repository.js";
 import { json } from "./util.js";
 import {captureQuoteBacklog, handleQuoteBacklog} from "./quote-backlog.js";
 
-export default {
+
+const worker = {
   async scheduled(_event, env) {
     await captureQuoteBacklog(env);
   },
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname === "/track" || url.pathname.startsWith("/track/")) {
+      // Cloudflare Access bypasses this path for homeowners, so nothing else may be served under it.
+      return (await handleTrackRoute(request, env)) || new Response("Not found", {
+        status: 404,
+        headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" }
+      });
+    }
+    if (url.pathname === "/api/tracking-links" && request.method === "GET") return handleTrackingLinkGet(request, env);
+    if (url.pathname === "/api/tracking-links/create" && request.method === "POST") return handleTrackingLinkCreate(request, env);
+    if (url.pathname === "/api/tracking-links/revoke" && request.method === "POST") return handleTrackingLinkRevoke(request, env);
+    if (url.pathname === "/api/web-entities" && request.method === "POST") return handleEntityWrite(request, env);
+    if (url.pathname.startsWith("/api/browser/")) {
+      const authorized = await authorizeBrowserRequest(request, env);
+      if (authorized.error) return authorized.error;
+      const response = await worker.fetch(authorized.request, env);
+      const headers = new Headers(response.headers);
+      headers.set("Cache-Control", "private, no-store");
+      headers.set("X-Content-Type-Options", "nosniff");
+      return new Response(response.body, { status: response.status, headers });
+    }
+    if (url.pathname === "/auth/logout" && request.method === "POST") return handleLogout(request);
+    if (url.pathname === "/auth/login" && request.method === "POST") return handleLogin(request, env);
+    if (url.pathname === "/auth/register" && request.method === "POST") return handleRegister(request, env);
+    if (url.pathname === "/api/web-snapshot" && request.method === "GET") return handleWebSnapshot(request, env);
+    if (url.pathname === "/api/refund-requests/import-csv" && request.method === "POST") return handleRefundRequestBrowserCsv(request, env);
     if (url.pathname === "/api/quote-backlog" && request.method === "GET") return handleQuoteBacklog(request, env);
     if (url.pathname === "/api/retro-games" && ["GET", "POST"].includes(request.method)) return handleRetroGames(request, env);
     if (url.pathname === "/api/retro-scores" && ["GET", "POST"].includes(request.method)) return handleRetroScores(request, env);
@@ -95,7 +127,6 @@ export default {
     if (url.pathname === "/api/retro-mail/delete" && request.method === "POST") return handleRetroMail(request, env);
     if (url.pathname === "/ws" && request.method === "GET") return handleRealtimeSocket(request, env);
     if (url.pathname === "/api/base44/webhook" && request.method === "POST") return handleWebhook(request, env);
-    if (url.pathname === "/api/base44/webhook/snapshot" && request.method === "GET") return handleSnapshot(request, env);
     if (url.pathname === "/api/base44/webhook/snapshot" && request.method === "GET") return handleSnapshot(request, env);
     if (url.pathname === "/api/base44/webhook/snapshot-meta" && request.method === "GET") return handleSnapshotMeta(request, env);
     if (url.pathname === "/api/outbound/enqueue" && request.method === "POST") return handleEnqueue(request, env);
@@ -123,6 +154,8 @@ export default {
     if (url.pathname === "/api/tasks" && request.method === "GET") return handleTasksList(request, env);
     if (url.pathname === "/api/tasks/upsert" && request.method === "POST") return handleTasksUpsert(request, env);
     if (url.pathname === "/api/tasks/delete" && request.method === "POST") return handleTasksDelete(request, env);
+    if (url.pathname === "/api/preferences" && request.method === "GET") return handlePreferencesList(request, env);
+    if (url.pathname === "/api/preferences/upsert" && request.method === "POST") return handlePreferencesUpsert(request, env);
     if (url.pathname === "/api/refund-requests" && request.method === "GET") return handleRefundRequestsList(request, env);
     if (url.pathname === "/api/refund-requests/submit" && request.method === "POST") return handleRefundRequestSubmit(request, env);
     if (url.pathname === "/api/refund-requests/submit-native" && request.method === "POST") return handleRefundRequestNativeSubmit(request, env);
@@ -157,6 +190,7 @@ export default {
     if (url.pathname === "/api/chat/read" && request.method === "POST") return handleChatRead(request, env);
     if (url.pathname === "/api/chat/inbox" && request.method === "GET") return handleChatInbox(request, env);
     if (url.pathname === "/api/profiles" && request.method === "GET") return handleProfilesList(request, env);
+    if (url.pathname === "/api/profiles/update" && request.method === "POST") return handleProfileUpdate(request, env);
     if (url.pathname === "/api/profiles/avatar" && request.method === "POST") return handleProfileAvatarUpload(request, env);
     if (url.pathname === "/api/profiles/avatar/remove" && request.method === "POST") return handleProfileAvatarRemove(request, env);
     if (url.pathname.startsWith("/api/profiles/avatar/") && request.method === "GET") {
@@ -191,4 +225,5 @@ export default {
   },
 };
 
+export default worker;
 export { QuoteSyncRoom };

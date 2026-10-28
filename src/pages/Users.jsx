@@ -24,7 +24,7 @@ import * as adminApi from "@/features/admin/adminApi";
 import UserCard from "@/components/users/UserCard";
 import UserForm from "@/components/users/UserForm";
 import RoleGuard, {useUserRole} from "@/components/auth/RoleGuard";
-import {getUsers, updateLocalRecord} from "@/api/dataClient";
+import {getUsers, isBase44DataSource, updateLocalRecord} from "@/api/dataClient";
 
 const roleFilters = [
  { value: "all", label: "All Users" },
@@ -84,7 +84,7 @@ function UsersContent() {
  deny_pages: target.deny_pages || []
  });
  const localProfileChanges = Object.fromEntries(Object.entries(profileData).filter(([, value]) => value !== undefined));
- if (Object.keys(localProfileChanges).length && userId !== currentUser?.id) {
+ if (Object.keys(localProfileChanges).length && (!isBase44DataSource || userId !== currentUser?.id)) {
  await updateLocalRecord("users", userId, localProfileChanges);
  } else if (Object.keys(localProfileChanges).length && userId === currentUser?.id) {
  await base44.auth.updateMe(localProfileChanges);

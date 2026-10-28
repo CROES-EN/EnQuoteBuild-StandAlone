@@ -98,7 +98,7 @@ import TileGrid from "@/components/supervisor/TileGrid";
 import CaseWorkTile, {CaseWorkSettings, readCaseWorkTeam} from "@/components/supervisor/CaseWorkTiles";
 import {buildCaseWorkReport, caseWorkDisplay, parseHistoryDate} from "@/features/supervisorDashboard/caseWorkMetrics";
 import {buildPaidQuoteReport, getQuotePaidDate} from "@/features/supervisorDashboard/paidQuoteMetrics";
-import {onUserSessionChanged} from "@/lib/userScopedStorage";
+import {onPreferencesSynced, onUserSessionChanged} from "@/lib/userScopedStorage";
 import {
     applyPartialReorder,
     getHiddenTileIds,
@@ -1139,6 +1139,9 @@ export default function DashboardOverview({
   const [tilePrefsVersion, setTilePrefsVersion] = useState(0);
   const [caseWorkTeam, setCaseWorkTeam] = useState(readCaseWorkTeam);
   useEffect(() => onUserSessionChanged(() => setCaseWorkTeam(readCaseWorkTeam)), []);
+  useEffect(() => onPreferencesSynced((keys) => {
+    if (keys.includes("enquote_case_work_team_v1")) setCaseWorkTeam(readCaseWorkTeam);
+  }), []);
 
   const activeRange = useMemo(() => {
     if (sharedPeriod.value) return sharedPeriod.value.range;

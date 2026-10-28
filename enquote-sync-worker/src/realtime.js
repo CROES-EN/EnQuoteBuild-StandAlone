@@ -1,4 +1,5 @@
 import { json } from "./util.js";
+import { verifyRequestIdentity, checkBrowserOrigin } from "./auth-session.js";
 
 const ROOM_NAME = "enquote-quotes";
 // Must match the keepalive the desktop app sends (electron/realtimeSync.cjs).
@@ -64,7 +65,12 @@ export class QuoteSyncRoom {
 
 export async function handleRealtimeSocket(request, env) {
   if (!hasSnapshotToken(request, env)) {
-    return json({ error: "unauthorized" }, 401);
+    if (!checkBrowserOrigin(request)) return json({ error: "invalid_origin" }, 403);
+    const identity = await verifyRequestIdentity(request, env);
+    if (!identity.ok || !env.SNAPSHOT_TOKEN) return json({ error: "unauthorized" }, 401);
+    const headers = new Headers(request.headers);
+    headers.set("X-ENQuote-Shared-Secret", env.SNAPSHOT_TOKEN);
+    request = new Request(request, { headers });
   }
   if (!env.QUOTE_SYNC_ROOM) {
     return json({ error: "realtime_not_configured" }, 503);

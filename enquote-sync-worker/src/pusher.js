@@ -238,6 +238,7 @@ const GENERIC_ENTITY_NAMES = new Set([
   "SVCancelTracker",
   "SupportInteraction",
   "Invitation",
+  "StatusAlertDismissal",
 ]);
 
 // Generic create/update push for any of the entity names above. Base44's
@@ -247,8 +248,16 @@ const GENERIC_ENTITY_NAMES = new Set([
 // scenario like quotes have), and QuoteActivity/FollowUpLog in particular are
 // append-only logs that are only ever created, never updated.
 async function pushGenericEntity(env, entityName, item) {
+  if (item.action === "delete") {
+    if (!item.remoteId) throw new Error("Deletion requires a remote id.");
+    const response = await requestJson(`${entityUrl(env, entityName)}/${encodeURIComponent(item.remoteId)}`, {
+      method: "DELETE", headers: authHeaders(env)
+    });
+    if (!response.ok && response.status !== 404) throw new RetryableError(`${entityName} delete failed: ${response.status}`);
+    return { status: "pushed", remote_id: item.remoteId };
+  }
   const isUpdate = item.action === "update" && item.remoteId;
-  const url = isUpdate ? `${entityUrl(env, entityName)}/${item.remoteId}` : entityUrl(env, entityName);
+  const url = isUpdate ? `${entityUrl(env, entityName)}/${encodeURIComponent(item.remoteId)}` : entityUrl(env, entityName);
   const method = isUpdate ? "PUT" : "POST";
   const response = await requestJson(url, { method, headers: authHeaders(env), body: item.record });
   if (!response.ok) throw new RetryableError(`${entityName} ${item.action} failed: ${response.status}`);

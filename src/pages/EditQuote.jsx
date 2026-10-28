@@ -7,6 +7,7 @@ import {
     getQuoteById,
     getQuotes,
     isLocalDataSource,
+    isWorkerDataSource,
     updateQuote
 } from "@/api/dataClient";
 import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
@@ -71,7 +72,7 @@ function EditQuoteContent() {
  const newQuote = await saveQuoteEdit({quote, data, user, getQuotes, createQuote, updateQuote});
  const newVersionNumber = newQuote.version_number;
  
- if (isLocalDataSource) return newQuote;
+ if (isLocalDataSource || isWorkerDataSource) return newQuote;
 
  // Send notification emails
  try {

@@ -1,24 +1,22 @@
 import {base44DualAdapter} from "./adapters/base44DualAdapter";
 import {base44Adapter} from "./adapters/base44Adapter";
-
+import { workerAdapter } from "./adapters/workerAdapter";
 import {mockAdapter} from "./adapters/mockAdapter";
-
 import {localAdapter} from "./adapters/localAdapter";
-
 import {salesforceAdapter} from "./adapters/salesforceAdapter";
-
 import {salesforceMockAdapter} from "./adapters/salesforceMockAdapter";
-import {isReadonlyViewing} from "@/features/admin/readonlyViewing";
 import {hydrateInvoiceNumbers} from "@/features/quotes/invoiceNumber";
 
-const DATA_SOURCE =
-  isReadonlyViewing() ? "local" : (import.meta.env.VITE_DATA_SOURCE || "local");
+const configuredSource = import.meta.env.VITE_DATA_SOURCE || "local";
+const desktop = Boolean(globalThis.window?.enquoteLocal && !globalThis.window.enquoteLocal.isBrowser);
+const DATA_SOURCE = configuredSource === "local" && !desktop ? "worker" : configuredSource;
 
 const adapters = {
   base44: base44Adapter,
   "base44-dual": base44DualAdapter,
   mock: mockAdapter,
   local: localAdapter,
+  worker: workerAdapter,
   salesforce: salesforceAdapter,
   "salesforce-mock": salesforceMockAdapter
 };
@@ -61,6 +59,7 @@ export const isMockDataSource =
 
 export const isLocalDataSource =
   DATA_SOURCE === "local";
+export const isWorkerDataSource = DATA_SOURCE === "worker";
 
 export const isSalesforceDataSource =
   DATA_SOURCE === "salesforce";

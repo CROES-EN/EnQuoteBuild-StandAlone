@@ -229,3 +229,26 @@ test("saving during a running flush schedules an immediate follow-up instead of 
   await followed;
   assert.equal(reads, 2);
 });
+
+test("pushes queued shared-collection changes to the Worker and acknowledges each entry", async () => {
+  await withWorker({ ok: true, status: "pushed", remote_id: "b44-flag-1" }, async (workerUrl, getRequest) => {
+    const repository = makeRepository();
+    repository.listPendingOutboundQuotes = async () => [];
+    const acked = [];
+    repository.listPendingOutboundEntities = async () => [{
+      id: "entry-1", collection: "siteFlags", entity_type: "SiteFlag", action: "create",
+      local_id: "demo-siteFlags-1", remote_id: null, revision: 2,
+      record: { id: "demo-siteFlags-1", site_id: "S-1", level: 2, _rev: 4, base44_id: null }
+    }];
+    repository.markOutboundEntitiesSynced = async results => { acked.push(...results); return { updated: results.length }; };
+    await createOutboundSync({ repository, config: { workerUrl, outboundToken: "t" }, logger: { warn() {}, log() {} } }).flush();
+    const request = getRequest();
+    assert.equal(request.requestPath, "/api/inbound/base44");
+    assert.deepEqual(request.requestBody, {
+      entityType: "SiteFlag", action: "create", localId: "demo-siteFlags-1", remoteId: null,
+      record: { site_id: "S-1", level: 2 }
+    });
+    assert.deepEqual(acked, [{ entry_id: "entry-1", revision: 2, action: "create", collection: "siteFlags",
+      local_id: "demo-siteFlags-1", remote_id: "b44-flag-1", error: null }]);
+  });
+});

@@ -1,6 +1,7 @@
 ﻿import {useState} from "react";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
 import {base44} from "@/api/base44Client";
+import {isBase44DataSource, updateLocalRecord} from "@/api/dataClient";
 import {Card} from "@/components/ui/card";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
@@ -16,7 +17,10 @@ export default function EditMyName({ currentUser }) {
   const queryClient = useQueryClient();
 
   const saveMutation = useMutation({
-    mutationFn: () => base44.auth.updateMe({ full_name: [firstName, lastName].filter(Boolean).join(" ") }),
+    mutationFn: () => {
+      const changes = { full_name: [firstName, lastName].filter(Boolean).join(" ") };
+      return isBase44DataSource ? base44.auth.updateMe(changes) : updateLocalRecord("users", currentUser.id, changes);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["currentUser"] });
       setEditing(false);

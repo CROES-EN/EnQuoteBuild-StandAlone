@@ -13,7 +13,20 @@
     "enabled": true
   },
   "vars": {
-    "BASE44_API_URL": "https://enquote.base44.app"
+    "BASE44_API_URL": "https://enquote.base44.app",
+    // Homeowner tracking links are always issued on the branded custom domain.
+    "PUBLIC_TRACKING_URL": "https://enphase-enquote.com"
+  },
+  // Serve the built Vite UI alongside the Worker API.
+  // - directory: points to the Vite build output (../dist relative to this file)
+  // - run_worker_first: API/auth/ws routes go to the Worker first; everything else
+  //   is served from static assets
+  // - not_found_handling: SPA mode — non-matching paths get index.html
+  "assets": {
+    "directory": "../dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*", "/auth/*", "/ws", "/track", "/track/*"],
+    "not_found_handling": "single-page-application"
   },
   "d1_databases": [
     {

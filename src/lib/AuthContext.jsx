@@ -2,10 +2,14 @@ import React, {createContext, useCallback, useContext, useEffect, useMemo, useSt
 import {recordError} from '@/features/developerConsole/errorLog';
 import {base44} from '@/api/base44Client';
 import {appParams} from '@/lib/app-params';
-import {getUsers} from '@/api/dataClient';
+import {getUsers, isWorkerDataSource} from '@/api/dataClient';
 import {userDisplayName} from '@/utils/userDisplayName';
 import {isReadonlyViewing} from "@/features/admin/readonlyViewing";
 import ReadonlyAuthProvider from "@/features/admin/ReadonlyAuthProvider";
+import { getWebToken, clearWebSession, validateWebToken, webLogout } from "@/lib/webAuth";
+import { browserApi } from "@/api/workerClient";
+import { invalidateWorkerSnapshot } from "@/api/adapters/workerAdapter";
+import { queryClientInstance } from "@/lib/query-client";
 
 const AuthContext = createContext();
 const isLocalDemo = ["mock", "local", "salesforce-mock"].includes(import.meta.env.VITE_DATA_SOURCE);
@@ -148,6 +152,16 @@ const AuthProvider = ({children}) => {
   // rebuild the user record - but ONLY updates `user`, nothing else about the session.
   const refreshLocalUser = useCallback(async () => {
     if (!user?.email) return;
+    if (isWorkerDataSource) {
+      try {
+        const policy = await browserApi("/api/access/policy");
+        if (!policy.me?.email) throw new Error("Shared account is unavailable.");
+        setUser({ ...policy.me, role: policy.me.app_role, name: userDisplayName(policy.me) || policy.me.email });
+      } catch (error) {
+        console.error("[Web Auth] Profile refresh failed:", error);
+      }
+      return;
+    }
     let record = null;
     try {
       const users = await Promise.race([
@@ -334,10 +348,30 @@ const AuthProvider = ({children}) => {
         if (appParams.token) {
           await checkUserAuth();
         } else {
-          setIsLoadingAuth(false);
-          setIsAuthenticated(false);
-        }
-        setIsLoadingPublicSettings(false);
+          const webToken = getWebToken();
+          if (webToken) {
+            try {
+              const webAuth = await validateWebToken();
+              if (webAuth.authenticated) {
+                await activateUser(webAuth.email);
+                setIsLoadingAuth(false);
+              } else {
+                clearWebSession();
+                setAuthError({ type: "auth_required", message: "Authentication required" });
+                setIsLoadingAuth(false);
+                setIsAuthenticated(false);
+              }
+            } catch {
+              setAuthError({ type: "auth_required", message: "Authentication required" });
+              setIsLoadingAuth(false);
+              setIsAuthenticated(false);
+            }
+          } else {
+            setAuthError({ type: "auth_required", message: "Authentication required" });
+            setIsLoadingAuth(false);
+            setIsAuthenticated(false);
+          }
+        }        setIsLoadingPublicSettings(false);
       } catch (appError) {
         handleAppStateError(appError);
         setIsLoadingPublicSettings(false);
@@ -401,6 +435,31 @@ const AuthProvider = ({children}) => {
   };
 
   const checkAppState = useCallback(async () => {
+    if (isWorkerDataSource) {
+      try {
+        const session = await validateWebToken();
+        if (!session.authenticated) {
+          if (session.reason === "network_error") throw new Error("Could not reach EnQuote. Check your connection and retry.");
+          clearWebSession();
+          setAuthError({ type: "auth_required", message: "Sign in to EnQuote." });
+          setIsAuthenticated(false);
+          return;
+        }
+        const policy = await browserApi("/api/access/policy");
+        if (!policy.me?.email) throw new Error("Your shared account or role is unavailable. Contact your administrator.");
+        setUser({ ...policy.me, role: policy.me.app_role, name: userDisplayName(policy.me) || policy.me.email });
+        setIsAuthenticated(true);
+        setAuthError(null);
+        setPersistedLocalSessionEmail(session.email);
+        setAppPublicSettings({ id: "worker", public_settings: {} });
+      } catch (error) {
+        setAuthError({ type: "unknown", message: error.message });
+      } finally {
+        setIsLoadingAuth(false);
+        setIsLoadingPublicSettings(false);
+      }
+      return;
+    }
     if (!isLocalDemo) {
       await checkRemoteAppState();
     } else {
@@ -418,6 +477,16 @@ const AuthProvider = ({children}) => {
   }, []);
 
   const logout = useCallback(async (shouldRedirect = true) => {
+    if (isWorkerDataSource) {
+      await webLogout();
+      invalidateWorkerSnapshot();
+      setUser(null);
+      setIsAuthenticated(false);
+      setAuthError({ type: "auth_required", message: "Sign in to EnQuote." });
+      queryClientInstance.clear();
+      window.dispatchEvent(new Event("enquote:session-ended"));
+      return;
+    }
     // Removes this user from the "Who's Online" presence list, captured BEFORE user
     // state is cleared below (user?.email would be null after setUser(null)).
     // Fire-and-forget, same reasoning as activateUser's announce call above.
@@ -455,7 +524,19 @@ const AuthProvider = ({children}) => {
   }, [user, isLocalAuthActive]);
 
   useEffect(() => {
-    const unsubscribe = getEnquoteLocal()?.admin?.onSignOut?.(() => { void logout(false); });
+    const unsubscribe = getEnquoteLocal()?.admin?.onSignOut?.(() => {
+      if (isWorkerDataSource) {
+        clearWebSession();
+        invalidateWorkerSnapshot();
+        queryClientInstance.clear();
+        setUser(null);
+        setIsAuthenticated(false);
+        setAuthError({ type: "auth_required", message: "Your session expired. Sign in again." });
+        window.dispatchEvent(new Event("enquote:session-ended"));
+        return;
+      }
+      void logout(false);
+    });
     return () => { if (typeof unsubscribe === "function") unsubscribe(); };
   }, [logout]);
 
@@ -475,6 +556,10 @@ const AuthProvider = ({children}) => {
   }, [activateUser]);
 
   const navigateToLogin = useCallback(() => {
+    if (isWorkerDataSource) {
+      setAuthError({ type: "auth_required", message: "Sign in to EnQuote." });
+      return;
+    }
     // Use the SDK's redirectToLogin method
     base44.auth.redirectToLogin(window.location.href);
   }, []);

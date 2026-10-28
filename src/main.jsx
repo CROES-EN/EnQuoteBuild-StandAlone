@@ -1,9 +1,13 @@
-﻿import React from 'react'
+import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from '@/App.jsx'
 import '@/index.css'
 import '@/theme-overrides.css'
+import { isWorkerDataSource } from '@/api/dataClient'
+import { installBrowserBridge } from '@/api/browserBridge'
+import { installPreferenceSync } from '@/lib/preferenceSync'
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <App />
-)
+if (isWorkerDataSource) installBrowserBridge();
+installPreferenceSync();
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />)

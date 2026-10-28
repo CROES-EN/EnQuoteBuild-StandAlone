@@ -5,7 +5,10 @@ import { broadcastMessage } from "./realtime.js";
 // per record, ordered by the client-supplied
 // `updatedAt` stamp (the record's own updated_date). Deletes leave a tombstone so they
 // propagate to machines that still hold the record.
-const COLLECTIONS = new Set(["supervisorDailyMetrics", "supervisorReportTables", "rmas", "pvManufacturers"]);
+const COLLECTIONS = new Set([
+  "supervisorDailyMetrics", "supervisorReportTables", "rmas", "pvManufacturers",
+  "autoDrafterGeneratedDrafts", "autoDrafterLearnedSwaps", "autoDrafterCustomProducts", "quoteRequestHygieneDaily"
+]);
 
 // D1 caps a single row at 2 MB, and large report tables (e.g. Workload) exceed 1 MB, so each
 // record's JSON is split across several chunk rows.

@@ -17,6 +17,7 @@ import {
   selectQuotesNeedingAttention,
   writeQuoteAttentionPrefs
 } from "@/features/tasks/quoteAttention";
+import {onPreferencesSynced} from "@/lib/userScopedStorage";
 
 function QuoteAttentionSettings({ open, onOpenChange, prefs, onSave }) {
   const [draft, setDraft] = useState(prefs);
@@ -72,6 +73,9 @@ export default function QuoteAttentionSection({ userEmail, now }) {
   const [prefs, setPrefs] = useState(() => readQuoteAttentionPrefs());
   const [settingsOpen, setSettingsOpen] = useState(false);
   useEffect(() => { setPrefs(readQuoteAttentionPrefs()); }, [userEmail]);
+  useEffect(() => onPreferencesSynced((keys) => {
+    if (keys.includes("enquote_tasks_quote_attention_v1")) setPrefs(readQuoteAttentionPrefs());
+  }), []);
 
   const enabled = prefs.statuses.length > 0;
   const { data: quotes = [], isLoading } = useQuery({

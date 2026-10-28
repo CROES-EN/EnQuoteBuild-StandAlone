@@ -55,8 +55,10 @@ import {applySidebarOrder, readSidebarOrder, writeSidebarOrder} from "@/lib/side
 import {userDisplayName} from "@/utils/userDisplayName";
 import {navigationItems} from "@/lib/navigationItems";
 import {filterSidebarItems} from "@/lib/appPreferences";
+import {onPreferencesSynced} from "@/lib/userScopedStorage";
 import {useAppPreferences} from "@/hooks/useAppPreferences";
 import SalesforceLauncher from "@/components/links/SalesforceLauncher";
+import {isWorkerDataSource} from "@/api/dataClient";
 
 const isDemoMode = ["mock", "local", "salesforce-mock"].includes(import.meta.env.VITE_DATA_SOURCE);
 const appVersion = appPackage?.version || "0.0.0";
@@ -136,6 +138,12 @@ export default function Layout({ children, currentPageName }) {
   useEffect(() => {
     setSidebarOrder(readSidebarOrder());
   }, [user?.email]);
+  useEffect(() => onPreferencesSynced((keys) => {
+    if (keys.includes("enquote_sidebar_order_v2")) setSidebarOrder(readSidebarOrder());
+    if (keys.includes("enquote_dismissed_announcement_id")) {
+      try { setDismissedAnnouncementId(localStorage.getItem("enquote_dismissed_announcement_id") || ""); } catch { /* ignore */ }
+    }
+  }), []);
   const orderedNavItems = applySidebarOrder(navItems, sidebarOrder);
   const readonlyViewing = isReadonlyViewing();
   const visibleNavItems = filterSidebarItems(
@@ -224,6 +232,10 @@ export default function Layout({ children, currentPageName }) {
     });
     return unsubscribe;
   }, [queryClient, recordDataRefresh]);
+
+  useEffect(() => globalThis.window?.enquoteLocal?.app?.onSyncError?.(error => {
+    toast.error(`Shared data could not refresh: ${error.message}`, { id: "shared-sync-error" });
+  }), []);
 
   // O&M Daily Operations Snapshot: zero-click auto-import from the watched "O&M Reports Inbox"
   // local folder (see electron/main.cjs's watchReportsInbox()). Registered here - not inside the
@@ -381,6 +393,10 @@ export default function Layout({ children, currentPageName }) {
       return next;
     });
   }
+  useEffect(() => onPreferencesSynced((keys) => {
+    if (!keys.includes("enquote_sidebar_collapsed")) return;
+    try { setSidebarCollapsed(localStorage.getItem("enquote_sidebar_collapsed") === "1"); } catch { /* ignore */ }
+  }), []);
 
   const [zoomFactor, setZoomFactorState] = useState(1);
   useEffect(() => {
@@ -617,7 +633,7 @@ export default function Layout({ children, currentPageName }) {
           </nav>
           {/* Footer */}
           <div className="p-4 border-t border-sidebar-border space-y-3">
-            {isLocalAuthActive && user?.email && (
+            {(isLocalAuthActive || isWorkerDataSource) && user?.email && (
               <div
                 title={sidebarCollapsed ? `${(userDisplayName(user) || user.email)} - Switch account` : undefined}
                 className={cn(

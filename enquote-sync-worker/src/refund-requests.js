@@ -4,6 +4,7 @@ import { authenticateUser } from "./user-token.js";
 import { broadcastMessage } from "./realtime.js";
 import { json } from "./util.js";
 import nativeForm from "../../shared/refundForm.cjs";
+import refundFeature from "../../shared/refundFeature.json" with { type: "json" };
 
 const PROCESSOR_ROLES = new Set(["invoicer"]);
 const LEADERSHIP_ROLES = new Set(["approver"]);
@@ -648,6 +649,18 @@ export async function handleRefundRequestIngest(request, env) {
 export async function handleRefundRequestCsvIngest(request, env) {
   if (!env.REFUND_INGEST_TOKEN) return json({ ok: false, error: "ingestion_not_configured" }, 503);
   if (!authorizedIngest(request, env)) return json({ ok: false, error: "unauthorized" }, 401);
+  return importCsvSubmissions(request, env, "power-automate");
+}
+
+export async function handleRefundRequestBrowserCsv(request, env, feature = refundFeature) {
+  if (!feature.enabled) return json({ ok: false, error: "refund_file_transfer_not_enabled" }, 503);
+  const access = await authorizeReader(request, env);
+  if (access.error) return access.error;
+  if (!hasRole(access.user, PROCESSOR_ROLES)) return json({ ok: false, error: "workbook_sync_role_required" }, 403);
+  return importCsvSubmissions(request, env, `browser-csv:${normalizeEmail(access.auth.email)}`);
+}
+
+async function importCsvSubmissions(request, env, actor) {
   const declaredLength = Number(request.headers.get("Content-Length") || 0);
   if (declaredLength > MAX_CSV_BYTES) return json({ ok: false, error: "csv_too_large" }, 413);
   const csv = await request.text();
@@ -665,7 +678,7 @@ export async function handleRefundRequestCsvIngest(request, env) {
   let duplicates = 0;
   try {
     for (const record of records) {
-      const saved = await storeSubmission(env, record, "power-automate");
+      const saved = await storeSubmission(env, record, actor);
       if (saved.created) created += 1;
       else duplicates += 1;
     }

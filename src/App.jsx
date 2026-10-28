@@ -1,6 +1,6 @@
-import {Suspense} from "react";
+import React, {Suspense} from "react";
 import {HashRouter, Navigate, Route, Routes} from "react-router-dom";
-
+import WebLoginPage from "@/components/WebLoginPage";
 import {Toaster} from "@/components/ui/toaster";
 import {Toaster as SonnerToaster} from "@/components/ui/sonner";
 import {QueryClientProvider} from "@tanstack/react-query";
@@ -58,7 +58,7 @@ const LayoutWrapper = ({ children, currentPageName }) => {
 };
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError, checkAppState } = useAuth();
 
   // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
@@ -74,10 +74,17 @@ const AuthenticatedApp = () => {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
     } else if (authError.type === 'auth_required') {
-      // Redirect to login automatically
-      navigateToLogin();
-      return null;
+      return <WebLoginPage />;
     }
+    return (
+      <div className="flex min-h-screen items-center justify-center p-8">
+        <div role="alert" className="max-w-lg space-y-4 rounded-lg border p-6">
+          <h1 className="text-xl font-semibold">EnQuote could not connect</h1>
+          <p>{authError.message}</p>
+          <button className="rounded border px-4 py-2" onClick={() => void checkAppState()}>Try again</button>
+        </div>
+      </div>
+    );
   }
 
 

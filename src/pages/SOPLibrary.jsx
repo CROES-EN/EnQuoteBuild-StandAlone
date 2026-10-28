@@ -468,7 +468,9 @@ export default function SOPLibraryPage() {
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 pr-14">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground"><BookOpen className="h-6 w-6 text-primary" />SOP Library</h1>
-          <p className="text-sm text-muted-foreground">Sections, parent pages and subpages. Changes sync when the desktop app is online and keep working from cached data offline.</p>
+          <p className="text-sm text-muted-foreground">{globalThis.window?.enquoteLocal?.isBrowser
+            ? "Sections, parent pages and subpages. Changes are shared with your team while online."
+            : "Sections, parent pages and subpages. Changes sync when the desktop app is online and keep working from cached data offline."}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <SopOneNoteImport sections={sections} selectedSectionId={selectedSectionId} onImported={(sectionId, parentPageId) => { if (parentPageId) select(parentPageId); else selectSection(sectionId); }} />

@@ -106,6 +106,7 @@ export const tasksApi = {
 };
 
 export const refundRequestsApi = {
+  importCsv: csv => refundRequestCall("refundRequests.importCsv", csv),
   list: async () => list(await refundRequestCall("refundRequests.list"), "requests"),
   submit: async (request) => (await refundRequestCall("refundRequests.submit", request))?.request,
   update: async (requestId, expectedStatus, expectedUpdatedAt, changes) =>

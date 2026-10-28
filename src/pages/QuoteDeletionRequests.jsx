@@ -1,5 +1,4 @@
 ﻿import {useState} from "react";
-import {base44} from "@/api/base44Client";
 import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 import {Card} from "@/components/ui/card";
 import {Button} from "@/components/ui/button";
@@ -16,7 +15,7 @@ import {
 import {format} from "date-fns";
 import {Archive, ArchiveRestore, Clock, Eye, XCircle} from "lucide-react";
 import {toast} from "sonner";
-import {getQuoteById, getQuotes, listLocalCollection, updateLocalRecord, updateQuote} from "@/api/dataClient";
+import {getCurrentUser, getQuoteById, getQuotes, listLocalCollection, updateLocalRecord, updateQuote} from "@/api/dataClient";
 import RoleGuard from "@/components/auth/RoleGuard";
 import {Link} from "react-router-dom";
 import {createPageUrl} from "@/utils";
@@ -105,7 +104,7 @@ function QuoteDeletionRequestsContent() {
  });
 
  const handleApprove = async () => {
- const user = await base44.auth.me();
+ const user = await getCurrentUser();
  await archiveQuoteMutation.mutateAsync({ request: selectedRequest, user });
 
  await updateRequestMutation.mutateAsync({
@@ -125,13 +124,13 @@ function QuoteDeletionRequestsContent() {
  };
 
  const handleReactivate = async (request, quote) => {
- const user = await base44.auth.me();
+ const user = await getCurrentUser();
  await restoreQuoteMutation.mutateAsync({ request, quote, user });
  toast.success("Quote reactivated");
  };
 
  const handleReject = async () => {
- const user = await base44.auth.me();
+ const user = await getCurrentUser();
  
  await updateRequestMutation.mutateAsync({
  id: selectedRequest.id,

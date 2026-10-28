@@ -1,6 +1,6 @@
 ﻿import {useState} from "react";
 import {base44} from "@/api/base44Client";
-import {useMutation, useQuery} from "@tanstack/react-query";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 import {Button} from "@/components/ui/button";
 import {Card} from "@/components/ui/card";
 import {Input} from "@/components/ui/input";
@@ -10,9 +10,10 @@ import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from "@/
 import {Clock, Send, User} from "lucide-react";
 import {format} from "date-fns";
 import {toast} from "sonner";
-import {createFollowUp, getFollowUps, isLocalDataSource} from "@/api/dataClient";
+import {createFollowUp, getFollowUps, isLocalDataSource, isWorkerDataSource} from "@/api/dataClient";
 
 export default function FollowUpHistory({ quoteId }) {
+  const queryClient = useQueryClient();
   const [showManualDialog, setShowManualDialog] = useState(false);
   const [manualFormData, setManualFormData] = useState({
     email_subject: "",
@@ -27,9 +28,13 @@ export default function FollowUpHistory({ quoteId }) {
   });
 
   const sendManualMutation = useMutation({
-    mutationFn: (data) => isLocalDataSource ? createFollowUp({ ...data, quote_id: quoteId, sent_date: new Date().toISOString(), delivery_status: "demo_recorded" }) : base44.functions.invoke('sendManualFollowUp', data),
+    mutationFn: async (data) => {
+      if (isWorkerDataSource) throw new Error("Email delivery is not configured for the browser. No email was sent.");
+      return isLocalDataSource ? createFollowUp({ ...data, quote_id: quoteId, sent_date: new Date().toISOString(), delivery_status: "demo_recorded" }) : base44.functions.invoke('sendManualFollowUp', data);
+    },
     onSuccess: () => {
-      toast.success("Follow-up sent successfully");
+      toast.success(isLocalDataSource ? "Follow-up recorded only. No email was sent." : "Follow-up sent successfully");
+      queryClient.invalidateQueries({ queryKey: ["followUpLogs", quoteId] });
       setShowManualDialog(false);
       setManualFormData({
         email_subject: "",

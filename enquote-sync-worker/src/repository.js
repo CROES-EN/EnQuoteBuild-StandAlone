@@ -3,12 +3,9 @@
 export async function applyInboundEvent(db, event) {
   const receivedAt = new Date().toISOString();
 
-  const inserted = await db
-    .prepare("INSERT OR IGNORE INTO webhook_events (event_id, received_at) VALUES (?, ?)")
-    .bind(event.id, receivedAt)
-    .run();
-
-  if (inserted.meta.changes === 0) return { duplicate: true };
+  const existing = await db.prepare("SELECT event_id FROM webhook_events WHERE event_id = ?")
+    .bind(event.id).first();
+  if (existing) return { duplicate: true };
 
   const quotes = event.quotes || (event.quote ? [event.quote] : []);
   let changed = 0;
@@ -40,6 +37,8 @@ export async function applyInboundEvent(db, event) {
     changed += Number(written?.meta?.changes ?? 1) > 0 ? 1 : 0;
   }
 
+  await db.prepare("INSERT OR IGNORE INTO webhook_events (event_id, received_at) VALUES (?, ?)")
+    .bind(event.id, receivedAt).run();
   return { duplicate: false, changed };
 }
 

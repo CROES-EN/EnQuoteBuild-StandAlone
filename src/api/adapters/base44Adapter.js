@@ -23,7 +23,8 @@ const ENTITY_ALIASES = {
   emailDistributions: "EmailDistribution",
   statusAlertDismissals: "StatusAlertDismissal",
   priceReviews: "PriceReview",
-  svcCancelTracker: "SVCancelTracker"
+  svcCancelTracker: "SVCancelTracker",
+  followUpConfigs: "FollowUpConfig"
 };
 
 function resolveEntity(collectionName) {

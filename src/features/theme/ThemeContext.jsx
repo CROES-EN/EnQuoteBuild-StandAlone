@@ -6,7 +6,7 @@ import {
   getSavedThemeId,
   saveThemeId
 } from "@/features/theme/themeStore";
-import {onUserSessionChanged} from "@/lib/userScopedStorage";
+import {onPreferencesSynced, onUserSessionChanged} from "@/lib/userScopedStorage";
 import {buildCustomTheme} from "@/features/theme/customThemeBuilder";
 
 const ThemeContext = createContext(null);
@@ -69,11 +69,15 @@ export function ThemeProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onUserSessionChanged(() => {
+    const reload = () => {
       setThemeId(getSavedThemeId());
       setCustomVersion((version) => version + 1);
+    };
+    const unsubscribe = onUserSessionChanged(reload);
+    const offSynced = onPreferencesSynced((keys) => {
+      if (keys.some((key) => key.includes("theme"))) reload();
     });
-    return unsubscribe;
+    return () => { unsubscribe(); offSynced(); };
   }, []);
 
   const refreshCustomTheme = useCallback(() => setCustomVersion((version) => version + 1), []);

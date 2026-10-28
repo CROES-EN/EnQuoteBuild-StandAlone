@@ -11,6 +11,16 @@ CREATE TABLE IF NOT EXISTS quotes (
 CREATE INDEX IF NOT EXISTS idx_quotes_quote_number   ON quotes(quote_number);
 CREATE INDEX IF NOT EXISTS idx_quotes_local_quote_id ON quotes(local_quote_id);
 
+CREATE TABLE IF NOT EXISTS base44_entity_state (
+  entity_type TEXT NOT NULL,
+  local_id TEXT NOT NULL,
+  action TEXT NOT NULL,
+  record_json TEXT NOT NULL,
+  origin TEXT NOT NULL DEFAULT 'base44',
+  synced_at TEXT NOT NULL,
+  PRIMARY KEY (entity_type, local_id)
+);
+
 CREATE TABLE IF NOT EXISTS webhook_events (
   event_id    TEXT PRIMARY KEY,
   received_at TEXT NOT NULL

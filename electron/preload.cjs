@@ -203,6 +203,16 @@ contextBridge.exposeInMainWorld("enquoteLocal", {
     onChanged: (callback) => subscribe("tasks:changed", callback),
     onDue: (callback) => subscribe("tasks:due", callback)
   },
+  preferences: {
+    list: (since) => invoke("preferences:list", since),
+    save: (entries) => invoke("preferences:save", entries),
+    onChanged: (callback) => subscribe("preferences:changed", callback)
+  },
+  trackingLinks: {
+    get: (quoteId) => invoke("trackingLinks:get", quoteId),
+    create: (quoteId) => invoke("trackingLinks:create", quoteId),
+    revoke: (quoteId) => invoke("trackingLinks:revoke", quoteId)
+  },
   refundRequests: {
     trackerStatus: () => invoke("refundRequests:trackerStatus"),
     connectTracker: () => invoke("refundRequests:connectTracker"),

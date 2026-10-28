@@ -1,6 +1,6 @@
 ﻿import {useState} from "react";
 import {base44} from "@/api/base44Client";
-import {createQuote, getCurrentUser, getProducts, getQuotes, isLocalDataSource} from "@/api/dataClient";
+import {createQuote, getCurrentUser, getProducts, getQuotes, isLocalDataSource, isWorkerDataSource} from "@/api/dataClient";
 import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 import {Link, useNavigate} from "react-router-dom";
 import {createPageUrl} from "@/utils";
@@ -76,7 +76,7 @@ function CreateQuoteContent() {
  }]
  });
  
- if (isLocalDataSource) return newQuote;
+ if (isLocalDataSource || isWorkerDataSource) return newQuote;
 
  // Send notification emails
  try {

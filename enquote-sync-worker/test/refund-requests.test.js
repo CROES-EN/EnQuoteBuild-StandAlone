@@ -4,6 +4,7 @@ import {createCollabD1} from "../test-helpers/d1Shim.js";
 import {
   handleRefundRequestIngest,
   handleRefundRequestCsvIngest,
+  handleRefundRequestBrowserCsv,
   handleRefundRequestSubmit,
   handleRefundRequestNativeSubmit,
   handleRefundRequestWorkbookSync,
@@ -11,6 +12,7 @@ import {
   handleRefundRequestUpdate
 } from "../src/refund-requests.js";
 import {signUserToken} from "../src/user-token.js";
+import {refundRequestsCsv} from "../../src/features/refundRequests/refundRequestTransfer.js";
 
 const SECRET = "refund-test-user-token-secret";
 const OUTBOUND_TOKEN = "refund-test-outbound-token";
@@ -74,6 +76,36 @@ function submission(externalResponseId = "resp-101", overrides = {}) {
     ...overrides
   };
 }
+
+test("browser CSV transfer is processor-only, safely exports spreadsheet text, and never overwrites existing requests", async () => {
+  const env = makeEnv();
+  const record = submission("browser-transfer", {customerName: '=HYPERLINK("https://example.test")', additionalNotes: "Quoted \"text\",\nsecond line"});
+  const csv = refundRequestsCsv([record]);
+  assert.match(csv, /'=/);
+  const upload = async (email, text = csv) => {
+    const auth = await userRequest("/api/refund-requests/import-csv", email);
+    return handleRefundRequestBrowserCsv(new Request(auth.url, {
+      method: "POST", headers: {...Object.fromEntries(auth.headers), "Content-Type": "text/csv"}, body: text
+    }), env, {enabled: true});
+  };
+  assert.equal((await handleRefundRequestBrowserCsv(new Request("https://worker.example/api/refund-requests/import-csv"), env)).status, 503);
+  assert.equal((await upload("reader@example.com")).status, 403);
+  assert.equal((await upload("leader@example.com")).status, 403);
+  const first = await upload("processor@example.com");
+  assert.equal(first.status, 200);
+  assert.equal((await first.json()).created, 1);
+  const duplicate = await upload("processor@example.com", refundRequestsCsv([{...record, additionalNotes: "Do not replace original"}]));
+  assert.equal((await duplicate.json()).duplicates, 1);
+  const listed = await (await handleRefundRequestsList(await userRequest("/api/refund-requests", "processor@example.com"), env)).json();
+  assert.equal(listed.requests[0].additionalNotes, record.additionalNotes);
+  assert.equal(listed.requests[0].customerName.startsWith("'="), true);
+  const audit = await env.DB.prepare("SELECT actor FROM refund_request_audit LIMIT 1").first();
+  assert.equal(audit.actor, "browser-csv:processor@example.com");
+  assert.equal((await upload("processor@example.com", "x".repeat(1_000_001))).status, 413);
+  const invalid = await upload("processor@example.com", refundRequestsCsv([submission("invalid", {requestorEmail: "bad"})]));
+  assert.equal(invalid.status, 400);
+  assert.deepEqual((await invalid.json()).rows, [2]);
+});
 
 async function ingest(env, body = submission(), authorization = `Bearer ${INGEST_TOKEN}`) {
   return handleRefundRequestIngest(new Request("https://worker.example/api/refund-requests/ingest", {

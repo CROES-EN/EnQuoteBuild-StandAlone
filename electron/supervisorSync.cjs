@@ -1,7 +1,10 @@
 const fs = require("node:fs");
 const { createPollGate } = require("./syncCadence.cjs");
 
-const COLLECTIONS = ["supervisorDailyMetrics", "supervisorReportTables", "rmas", "pvManufacturers"];
+const COLLECTIONS = [
+  "supervisorDailyMetrics", "supervisorReportTables", "rmas", "pvManufacturers",
+  "autoDrafterGeneratedDrafts", "autoDrafterLearnedSwaps", "autoDrafterCustomProducts", "quoteRequestHygieneDaily"
+];
 const DEFAULT_INTERVAL_MS = 60 * 1000;
 // While realtime pushes are flowing, the timer only reaches the Worker on the slow cadence.
 const CONNECTED_INTERVAL_MS = 10 * 60 * 1000;

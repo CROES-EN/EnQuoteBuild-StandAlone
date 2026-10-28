@@ -19,7 +19,7 @@ import {
   AlertDialogTitle
 } from "@/components/ui/alert-dialog";
 import {sopsApi} from "@/features/collab/collabApi";
-import {ACCEPTED_FILE_TYPES, DOCX_TYPE, formatBytes} from "./SopFilePreview";
+import {ACCEPTED_FILE_TYPES, formatBytes, sopFileType} from "./SopFilePreview";
 import {descendantPages, flattenPages, isParentPage, movePageBranch} from "./sopSections";
 
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
@@ -35,16 +35,6 @@ const QUILL_MODULES = {
     ["clean"]
   ]
 };
-
-// Windows sometimes reports an empty type for .docx/.txt files, so fall back to the extension.
-function fileType(file) {
-  if (file.type) return file.type;
-  const name = file.name.toLowerCase();
-  if (name.endsWith(".docx")) return DOCX_TYPE;
-  if (name.endsWith(".txt")) return "text/plain";
-  if (name.endsWith(".pdf")) return "application/pdf";
-  return "";
-}
 
 export function isSafeUrl(value) {
   try {
@@ -148,7 +138,7 @@ export default function SopEditor({doc, categories, sections, pages, onSaved, on
     const files = Array.from(fileList || []);
     if (fileInput.current) fileInput.current.value = "";
     for (const file of files) {
-      const type = fileType(file);
+      const type = sopFileType(file);
       if (!ACCEPTED_FILE_TYPES.includes(type)) {
         toast.error(`${file.name}: use PDF, Word (.docx), images, or text files.`);
         continue;

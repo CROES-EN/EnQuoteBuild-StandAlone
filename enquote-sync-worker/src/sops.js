@@ -27,12 +27,13 @@ function validateId(id) {
   return typeof id === "string" && id && id.length <= 100 ? null : "invalid_id";
 }
 
-async function writeDoc(env, { id, stamp, email, deleted, data }) {
+async function writeDoc(env, { id, stamp, email, deleted, data, baseUpdatedAt }) {
   const syncedAt = new Date().toISOString();
   const statements = [
     env.DB.prepare(`
       INSERT INTO sop_docs (id, updated_at, synced_at, deleted, updated_by, data)
-      VALUES (?, ?, ?, ?, ?, ?)
+      SELECT ?, ?, ?, ?, ?, ?
+      WHERE ? IS NULL OR EXISTS (SELECT 1 FROM sop_docs WHERE id = ? AND updated_at = ?)
       ON CONFLICT(id) DO UPDATE SET
         updated_at = excluded.updated_at,
         synced_at = excluded.synced_at,
@@ -40,11 +41,14 @@ async function writeDoc(env, { id, stamp, email, deleted, data }) {
         updated_by = excluded.updated_by,
         data = excluded.data
       WHERE excluded.updated_at > sop_docs.updated_at
-    `).bind(id, stamp, syncedAt, deleted ? 1 : 0, email, data),
+        AND (? IS NULL OR sop_docs.updated_at = ?)
+    `).bind(id, stamp, syncedAt, deleted ? 1 : 0, email, data,
+      baseUpdatedAt ?? null, id, baseUpdatedAt ?? null, baseUpdatedAt ?? null, baseUpdatedAt ?? null),
     env.DB.prepare(`
       INSERT OR IGNORE INTO sop_versions (doc_id, version, updated_by, deleted, data)
-      VALUES (?, ?, ?, ?, ?)
-    `).bind(id, stamp, email, deleted ? 1 : 0, data),
+      SELECT id, updated_at, updated_by, deleted, data FROM sop_docs
+      WHERE id = ? AND updated_at = ? AND updated_by = ?
+    `).bind(id, stamp, email),
     env.DB.prepare(`
       DELETE FROM sop_versions
       WHERE doc_id = ? AND version NOT IN (
@@ -80,13 +84,14 @@ export async function handleSopsUpsert(request, env) {
   const user = await authenticateUser(request, env);
   if (user.error) return user.error;
   const body = await readBody(request);
-  const { id, updatedAt, record } = body || {};
+  const { id, updatedAt, record, baseUpdatedAt } = body || {};
   const keyError = validateId(id) || validateStamp(updatedAt) ||
+    (baseUpdatedAt != null ? validateStamp(baseUpdatedAt) : null) ||
     (record && typeof record === "object" && !Array.isArray(record) ? null : "invalid_record");
   if (keyError) return json({ ok: false, error: keyError }, 400);
   const text = JSON.stringify(record);
   if (text.length > 1_000_000) return json({ ok: false, error: "record_too_large" }, 413);
-  const applied = await writeDoc(env, { id, stamp: updatedAt, email: user.email, deleted: false, data: text });
+  const applied = await writeDoc(env, { id, stamp: updatedAt, email: user.email, deleted: false, data: text, baseUpdatedAt });
   if (applied) await notify(env, id);
   return json({ ok: true, applied });
 }

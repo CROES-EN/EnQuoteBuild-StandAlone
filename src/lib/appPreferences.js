@@ -1,4 +1,4 @@
-import {scopedKey} from "./userScopedStorage";
+import {scopedKey} from "./userScopedStorage.js";
 
 export const APP_PREFERENCES_KEY = "enquote_app_preferences_v1";
 export const APP_PREFERENCES_CHANGED = "enquote_app_preferences_changed";

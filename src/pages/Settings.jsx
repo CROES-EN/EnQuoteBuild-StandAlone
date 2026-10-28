@@ -29,7 +29,7 @@ export default function Settings() {
     <div className="max-w-4xl mx-auto p-6 space-y-6">
       <header>
         <h1 className="text-2xl font-bold text-foreground">Settings</h1>
-        <p className="text-muted-foreground">Personal preferences saved for your EnQuote account on this device.</p>
+        <p className="text-muted-foreground">Personal preferences saved to your EnQuote account and synced between the desktop app and the browser.</p>
       </header>
       <Card className="p-6 space-y-4">
         <h2 className="text-lg font-semibold">Salesforce</h2>

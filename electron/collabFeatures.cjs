@@ -201,6 +201,11 @@ function setupCollabFeatures({
   handle("tasks:save", (record) => ({ ok: true, task: tasks.save(record) }));
   handle("tasks:delete", (id) => ({ ok: tasks.remove(String(id || "")) }));
   handle("tasks:syncNow", () => tasks.sync());
+  handle("preferences:list", (since) => client.get("/api/preferences", { since: typeof since === "string" ? since : "" }));
+  handle("preferences:save", (entries) => client.post("/api/preferences/upsert", { entries: Array.isArray(entries) ? entries : [] }));
+  handle("trackingLinks:get", (quoteId) => client.get("/api/tracking-links", { quoteId: String(quoteId || "") }));
+  handle("trackingLinks:create", (quoteId) => client.post("/api/tracking-links/create", { quoteId: String(quoteId || "") }));
+  handle("trackingLinks:revoke", (quoteId) => client.post("/api/tracking-links/revoke", { quoteId: String(quoteId || "") }));
 
   handle("refundRequests:list", () => client.get("/api/refund-requests"));
   handle("refundRequests:submit", (payload) => client.post("/api/refund-requests/submit", payload || {}));
@@ -310,6 +315,9 @@ function setupCollabFeatures({
       return undefined;
     },
     refund_requests_updated: () => sendToRenderer("refundRequests:changed", {}),
+    preferences_updated: (message) => {
+      if (inboxKey && message.key === inboxKey) sendToRenderer("preferences:changed", {});
+    },
     sops_updated: () => sops.sync(),
     inbox_updated: (message) => {
       if (inboxKey && Array.isArray(message.keys) && message.keys.includes(inboxKey)) {

@@ -2,6 +2,126 @@
 
 Always-on EnQuote ↔ Base44 sync layer on Cloudflare Workers.
 
+## Shared browser and desktop runtime
+
+The browser uses the same React screens as Electron, with `workerAdapter` for
+entity reads/writes and an HTTP-backed `window.enquoteLocal` compatibility bridge
+for tasks, SOPs, chat, profiles, administration, and shared reports. A plain browser
+configured as `local` now selects the Worker instead of an empty desktop repository.
+Electron continues to use its native preload bridge and local persistence.
+
+- From the repository root, `npm run build:web` explicitly selects the browser
+  runtime. Deploy that build with this Worker's static asset binding; do not upload
+  a desktop UI bundle accidentally.
+- `/auth/session` validates company Access identity or a signed EnQuote session.
+  Browser login sets a Secure, HttpOnly, SameSite=Strict cookie. The browser does not
+  need the Base44 API key, outbound token, or snapshot token.
+- Password provisioning requires a verified company Access identity matching the
+  requested email. Knowing an allowed email is not enough. Password login is
+  rate-limited per account/IP.
+- `/auth/sync-credentials` remains a legacy desktop bootstrap endpoint and requires
+  verified company Access identity, not a password-session cookie. Access users can
+  still obtain legacy shared credentials through this endpoint; this is not a
+  device-attested desktop-only boundary.
+- `/api/web-snapshot` provides the shared entity snapshot and lightweight
+  `?meta=1` version checks. `/api/web-entities` performs authenticated writes.
+  Browser quote revisions are response-only and are not imported as Electron's
+  numeric local revision counters.
+- `/api/browser/*` forwards only allowlisted operations after verifying browser
+  identity and effective role. Service authorization is added inside the Worker.
+  Shared RMA/manufacturer/report collections use supervisor storage, matching
+  Electron, rather than a second browser-only copy.
+- `/api/outbound/enqueue` is Base44-to-D1 ingestion only, despite older descriptions
+  below. It never pushes changes back to Base44. Desktop outbound writes use
+  `/api/inbound/base44`; browser entity writes use `/api/web-entities`.
+- Browser WebSockets use the verified session and the same Durable Object room as
+  desktop. Visible tabs retain a 30-second polling fallback. Report records are
+  fetched with bounded concurrency and cached by version; large tables can be
+  retrieved individually.
+
+### Rollout and acceptance
+
+Before deploying, inspect the existing production schema. Apply additive migration
+`migrations/0016_browser_sessions.sql` for entity storage, password provisioning,
+and login throttling, then `migrations/0002_add_entity_state_index.sql` for entity
+indexes if absent. Existing installations also require the prior collaboration,
+profile/admin, supervisor, and feature migrations used by their desktop version.
+Do not reset or replace existing D1 data. Newly created databases should first
+apply `schema.sql`.
+
+The extended supervisor collections require a desktop application release, not
+only a renderer hotfix. Build and validate both clients before production rollout.
+Browser file uploads/downloads replace supported native file workflows. The browser
+can import OneNote PDF/Word/text/image exports as shared SOP pages, preview them,
+and download the original files. Native .one conversion remains desktop-only.
+Refund file transfer offers processor-authorized CSV import/export instead of
+local workbook automation. Uploads add new validated requests only; existing
+records are not overwritten or deleted. Exported cells are protected against
+spreadsheet formula execution. The existing disabled refund feature gate is
+preserved for both clients and for the new CSV import endpoint; this workflow
+must not be activated before the integration is approved. Local workbook
+automation and remote desktop commands remain desktop-only.
+Manual browser follow-up email delivery is
+not yet configured and must not report a successful send. Device-specific theme
+and navigation preferences are not synchronized.
+
+Local regression tests and builds are not proof of deployed parity. Acceptance
+requires the same account in both deployed clients: create, edit, and delete a
+quote in each direction without restarting; verify no deleted quote returns;
+then verify reports/RMAs, tasks, SOP conflict handling, messages, profiles, and
+admin role changes. Also verify expired sessions, failed requests, and logout.
+
+Production rollout (2026-10-28): D1 was exported, migrations 0002 (entity state
+indexes), 0015 and 0016 were applied (0015 made idempotent because
+`quote_backlog_daily` already existed unrecorded), and the browser build was
+deployed with `wrangler deploy --assets <web build dir>` as version
+`c1f618cd-a629-490e-a925-08ab3756630e`. The previous version was
+`7d951ab2-8e65-4e11-be68-e77d9a6fe79e`. To roll back, run
+`npx wrangler rollback 7d951ab2-8e65-4e11-be68-e77d9a6fe79e`. The migrations are
+additive and do not need to be reverted. Production `base44_entity_state` also has
+legacy `updated_date`/`deleted_at` columns; deletions are represented by
+`action = 'delete'`, which the snapshot uses.
+
+Settings sync (2026-10-28): migration 0017 (`user_preferences`) was applied and
+version `6b9efcb3-85cd-4dc8-b12e-5d6156ddc17a` was deployed with
+`GET /api/preferences` and `POST /api/preferences/upsert`. Clients sync only the
+allowlisted per-user customization keys in `src/lib/preferenceSync.js` (newest
+`updatedAt` wins; pre-existing desktop values win the first sync). Desktop
+upload requires a desktop release that includes the new preload/IPC handlers.
+To roll back only this feature, run
+`npx wrangler rollback c1f618cd-a629-490e-a925-08ab3756630e`; the table can stay.
+
+Data parity (2026-10-28): version `d54f4ac8-69c6-45f9-9d43-e4a573a24fa5` stops
+the shared snapshot from treating legacy lowercase `entity_type='quote'` rows
+(written by the old `/api/outbound/enqueue` path) as extra quotes, and bumps the
+snapshot cache key to `snapshot:all-v6`. `/api/inbound/base44` now also records
+desktop shared-collection pushes (SiteFlag, PVPanelRMA, QuoteReview, ...) in
+`base44_entity_state` under their Base44 id and broadcasts `entities_updated`.
+The matching desktop release uploads collection creates/edits/deletes through
+`outboundEntityQueue` and applies server deletion tombstones. Roll back with
+`npx wrangler rollback 6b9efcb3-85cd-4dc8-b12e-5d6156ddc17a`.
+
+Homeowner tracking links (2026-10-28): version `80f8e25f-9acd-4264-9038-af194fcbdb4a`
+with migration `0018_tracking_links.sql`. Staff create, read and revoke one link per
+quote via `POST /api/tracking-links/create`, `GET /api/tracking-links?quoteId=`
+and `POST /api/tracking-links/revoke` (also through the browser gateway). The
+public page is `GET /track/<token>`; the homeowner must enter the quote's site ID
+(`POST /track/<token>/verify`, 5 failures per 15 minutes per link, then 429),
+which sets a 30-day `__Host-enquote_track` cookie for `GET /track/<token>/status`.
+Only the friendly stage, dated timeline, quote number and next step are returned.
+Tokens are HMAC-signed with `TRACKING_LINK_SECRET` (falls back to
+`USER_TOKEN_SECRET`); only the link id is stored. `PUBLIC_TRACKING_URL`
+(`https://enphase-enquote.com` in `wrangler.jsonc`, version
+`b9f8c599-0e1f-497c-a99b-cf04049c146d`, which also returns 404 for every other
+`/track` path so the bypass never exposes the app shell) sets the hostname used in issued links. **Cloudflare Access must bypass `/track/*`**
+on `enphase-enquote.com`
+(Zero Trust → Access → Applications → add a Bypass/Everyone policy for that path),
+otherwise homeowners see the Access login. Roll back with
+`npx wrangler rollback d54f4ac8-69c6-45f9-9d43-e4a573a24fa5`; the table can stay.
+
+Build browser assets with `--mode web` into a separate directory and pass it with
+`--assets`, so the desktop `dist` output is never overwritten.
+
 ## What changed from the old setup
 
 | Old (local host) | New (this Worker) |

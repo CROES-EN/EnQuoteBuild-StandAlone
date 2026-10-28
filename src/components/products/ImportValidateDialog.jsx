@@ -10,7 +10,7 @@ import {
     DialogTitle
 } from "@/components/ui/dialog";
 import {AlertTriangle, CheckCircle2, Upload} from "lucide-react";
-import {createProduct, getProducts, isLocalDataSource, updateProduct} from "@/api/dataClient";
+import {createProduct, getProducts, isLocalDataSource, isWorkerDataSource, updateProduct} from "@/api/dataClient";
 
 const schema = { type: "object", properties: { name: { type: "string" }, description: { type: "string" }, type: { type: "string" }, category: { type: "string" }, unit_price: { type: "number" }, unit: { type: "string" }, product_link: { type: "string" }, is_active: { type: "string" }, id: { type: "string" } } };
 const editable = ["name", "description", "type", "category", "unit_price", "unit", "product_link", "is_active"];
@@ -35,7 +35,7 @@ export default function ImportValidateDialog({ open, onOpenChange, products, onI
   const validateFile = async (file) => {
     setLoading(true); setError(""); setResult(null);
     try {
-      if (isLocalDataSource) {
+      if (isLocalDataSource || isWorkerDataSource) {
         const rows = parseLocalRows(await file.text(), file.name);
         const normalized = (Array.isArray(rows) ? rows : rows.rows || []).map((row, index) => ({
           ...row,
@@ -76,7 +76,7 @@ export default function ImportValidateDialog({ open, onOpenChange, products, onI
     const ready = result.rows.filter(row => row.name && row.unit_price > 0);
     const updates = ready.filter(row => row.action === "update").map(row => ({ id: row.id, ...Object.fromEntries(editable.map(key => [key, row[key]])) }));
     const creates = ready.filter(row => row.action === "create").map(row => Object.fromEntries(editable.map(key => [key, row[key]])));
-    if (isLocalDataSource) {
+    if (isLocalDataSource || isWorkerDataSource) {
       await Promise.all(updates.map(({ id, ...changes }) => updateProduct(id, changes)));
       await Promise.all(creates.map(createProduct));
     } else {

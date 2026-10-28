@@ -2,6 +2,7 @@
 import {base44} from "@/api/base44Client";
 import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 import {useAuth} from "@/lib/AuthContext";
+import {isWorkerDataSource} from "@/api/dataClient";
 import {isReadonlyViewing} from "@/features/admin/readonlyViewing";
 import {Card} from "@/components/ui/card";
 import {Button} from "@/components/ui/button";
@@ -50,7 +51,7 @@ export default function AutoAssignRole({ children }) {
  }
  return result;
  },
- enabled: !isLocalDemo && !isReadonlyViewing(),
+ enabled: !isLocalDemo && !isWorkerDataSource && !isReadonlyViewing(),
  retry: false
  });
 
@@ -113,7 +114,7 @@ export default function AutoAssignRole({ children }) {
  }, [user, invitation, userLoading, invitationLoading]);
 
  if (isReadonlyViewing()) return children;
- if (isLocalDemo) {
+ if (isLocalDemo || isWorkerDataSource) {
  if (isLoadingAuth) {
  return (
  <div className="min-h-screen bg-background flex items-center justify-center relative">

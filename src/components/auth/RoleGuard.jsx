@@ -1,6 +1,7 @@
 import {base44} from "@/api/base44Client";
 import {useQuery} from "@tanstack/react-query";
 import {useAuth} from "@/lib/AuthContext";
+import {isWorkerDataSource} from "@/api/dataClient";
 import {isReadonlyViewing} from "@/features/admin/readonlyViewing";
 import {canAccessPage, pageFromPathname, toRoleList} from "@/lib/rolePageAccess";
 import {useAccessPolicy} from "@/features/admin/adminApi";
@@ -45,7 +46,7 @@ function AppVersionBadge() {
 }
 
 function useCurrentUserQuery() {
- const localIdentity = isLocalDemo || isReadonlyViewing();
+ const localIdentity = isLocalDemo || isWorkerDataSource || isReadonlyViewing();
  const { isAuthenticated, user: authUser, navigateToLogin, refreshLocalUser } = useAuth();
  const hasLoadedOnceRef = useRef(false);
 

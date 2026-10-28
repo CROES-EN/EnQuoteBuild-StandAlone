@@ -31,6 +31,7 @@ async function importEntitySnapshot(repository, entities) {
   }
 
   const snapshot = { version: 1, quotes: [], products: [] };
+  const deletions = [];
   let importedRecordCount = 0;
   let quoteDeletedCount = 0;
 
@@ -39,6 +40,12 @@ async function importEntitySnapshot(repository, entities) {
       await repository.applyRemoteQuoteDeletion(entity.localId);
       importedRecordCount += 1;
       quoteDeletedCount += 1;
+      continue;
+    }
+    if (entity?.action === "delete") {
+      // Tombstones carry an empty record; turning them into records would blank the local copy.
+      const collection = entity.entityType === "Product" ? "products" : ENTITY_COLLECTION_MAP[entity.entityType];
+      if (collection && entity.localId) deletions.push({ collection, id: String(entity.localId) });
       continue;
     }
     if (!entity?.localId || !entity.record || typeof entity.record !== "object") continue;
@@ -63,6 +70,11 @@ async function importEntitySnapshot(repository, entities) {
     }
 
     importedRecordCount += 1;
+  }
+
+  if (deletions.length && repository.applyRemoteEntityDeletions) {
+    const { removed = 0 } = await repository.applyRemoteEntityDeletions(deletions) || {};
+    importedRecordCount += removed;
   }
 
   let existingQuotes = [];

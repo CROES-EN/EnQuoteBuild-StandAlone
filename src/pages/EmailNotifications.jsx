@@ -1,5 +1,5 @@
 ﻿import {useState} from "react";
-import {base44} from "@/api/base44Client";
+import {listLocalCollection, createLocalRecord, updateLocalRecord, deleteLocalRecord} from "@/api/dataClient";
 import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 import {Card} from "@/components/ui/card";
 import {Button} from "@/components/ui/button";
@@ -66,7 +66,7 @@ function EmailNotificationsContent() {
 
  const { data: distributions = [], isLoading } = useQuery({
  queryKey: ["emailDistributions"],
- queryFn: () => base44.entities.EmailDistribution.list(),
+ queryFn: () => listLocalCollection("emailDistributions"),
  });
 
  const { data: users = [] } = useQuery({
@@ -75,7 +75,7 @@ function EmailNotificationsContent() {
  });
 
  const createMutation = useMutation({
- mutationFn: (data) => base44.entities.EmailDistribution.create(data),
+ mutationFn: (data) => createLocalRecord("emailDistributions", data),
  onSuccess: () => {
  queryClient.invalidateQueries({ queryKey: ["emailDistributions"] });
  setShowAddSheet(false);
@@ -85,14 +85,14 @@ function EmailNotificationsContent() {
  });
 
  const updateMutation = useMutation({
- mutationFn: ({ id, data }) => base44.entities.EmailDistribution.update(id, data),
+ mutationFn: ({ id, data }) => updateLocalRecord("emailDistributions", id, data),
  onSuccess: () => {
  queryClient.invalidateQueries({ queryKey: ["emailDistributions"] });
  }
  });
 
  const deleteMutation = useMutation({
- mutationFn: (id) => base44.entities.EmailDistribution.delete(id),
+ mutationFn: (id) => deleteLocalRecord("emailDistributions", id),
  onSuccess: () => {
  queryClient.invalidateQueries({ queryKey: ["emailDistributions"] });
  }

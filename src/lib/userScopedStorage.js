@@ -80,3 +80,21 @@ export function onUserSessionChanged(callback) {
   globalThis.window?.addEventListener(SESSION_CHANGED_EVENT, callback);
   return () => globalThis.window?.removeEventListener(SESSION_CHANGED_EVENT, callback);
 }
+
+const PREFERENCES_SYNCED_EVENT = "enquote_preferences_synced";
+
+/** Fired after settings saved on another device (desktop or browser) were applied locally. */
+export function notifyPreferencesSynced(keys) {
+  try {
+    globalThis.window?.dispatchEvent(new CustomEvent(PREFERENCES_SYNCED_EVENT, { detail: { keys } }));
+  } catch {
+    // Notification only.
+  }
+}
+
+/** Subscribes to settings arriving from another device; returns an unsubscribe function. */
+export function onPreferencesSynced(callback) {
+  const handler = (event) => callback(event.detail?.keys || []);
+  globalThis.window?.addEventListener(PREFERENCES_SYNCED_EVENT, handler);
+  return () => globalThis.window?.removeEventListener(PREFERENCES_SYNCED_EVENT, handler);
+}

@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useState} from "react";
+import React, {useEffect, useMemo, useRef, useState} from "react";
 import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 import {AlertCircle, RefreshCw} from "lucide-react";
 import {toast} from "sonner";
@@ -12,6 +12,7 @@ import {Input} from "@/components/ui/input";
 import {Textarea} from "@/components/ui/textarea";
 import {Label} from "@/components/ui/label";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
+import {refundRequestsCsv} from "@/features/refundRequests/refundRequestTransfer";
 
 const QUERY_KEY = ["refund-requests"];
 const POLL_INTERVAL_MS = 30_000;
@@ -313,7 +314,9 @@ export default function RefundRequests() {
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [selectedId, setSelectedId] = useState(null);
   const [automaticSyncError, setAutomaticSyncError] = useState("");
-  const desktopBridgeAvailable = Boolean(globalThis.window?.enquoteLocal?.refundRequests?.syncWorkbook);
+  const browser = Boolean(globalThis.window?.enquoteLocal?.isBrowser);
+  const uploadInput = useRef(null);
+  const desktopBridgeAvailable = !browser && Boolean(globalThis.window?.enquoteLocal?.refundRequests?.syncWorkbook);
   const requestsQuery = useQuery({
     queryKey: QUERY_KEY,
     queryFn: refundRequestsApi.list,
@@ -354,6 +357,27 @@ export default function RefundRequests() {
       await queryClient.invalidateQueries({ queryKey: ["refund-workbook-sync-status"] });
     }
   });
+  const importCsvMutation = useMutation({
+    mutationFn: async file => {
+      if (file.size > 1_000_000) throw new Error("Choose a CSV of 1 MB or smaller, with at most 100 requests.");
+      return refundRequestsApi.importCsv(await file.text());
+    },
+    onSuccess: async result => {
+      toast.success(`Imported ${result.created} new requests. ${result.duplicates} existing requests were left unchanged.`);
+      await queryClient.invalidateQueries({queryKey: QUERY_KEY});
+    },
+    onError: error => toast.error(error.details?.rows?.length
+      ? `Fix incomplete or invalid CSV rows: ${error.details.rows.join(", ")}. No rows were imported.`
+      : error.message || "Could not import refund CSV.")
+  });
+  const downloadCsv = () => {
+    const url = URL.createObjectURL(new Blob([refundRequestsCsv(requestsQuery.data || [])], {type: "text/csv;charset=utf-8"}));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `enquote-refund-requests-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  };
   const resolveConflictMutation = useMutation({
     mutationFn: refundRequestsApi.resolveWorkbookConflict,
     onSuccess: async () => {
@@ -455,7 +479,7 @@ export default function RefundRequests() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Refund Requests{requests.length ? ` (${requests.length})` : ""}</h2>
-          <p className="text-sm text-muted-foreground">Requests and the connected Excel tracker refresh every 30 seconds while this tab is active.</p>
+          <p className="text-sm text-muted-foreground">{browser ? "Shared requests refresh every 30 seconds while this tab is active." : "Requests and the connected Excel tracker refresh every 30 seconds while this tab is active."}</p>
         </div>
         <Button variant="outline" onClick={() => requestsQuery.refetch()} disabled={requestsQuery.isFetching}>
           <RefreshCw className={`mr-2 h-4 w-4 ${requestsQuery.isFetching ? "animate-spin" : ""}`} />
@@ -470,7 +494,26 @@ export default function RefundRequests() {
         </div>
       )}
 
-      {canProcess && (
+      {canProcess && browser && (
+        <Card>
+          <CardContent className="space-y-3 p-4">
+            <h3 className="font-semibold">Refund tracker file transfer</h3>
+            <p className="text-sm text-muted-foreground">Download the shared tracker as an Excel-compatible CSV. To import new requests, save your worksheet as CSV and upload it here (up to 100 requests, 1 MB). Existing requests are never overwritten or deleted by upload; edit them in EnQuote. Desktop OneDrive automation remains available in the app.</p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={downloadCsv} disabled={requestsQuery.isLoading || Boolean(requestsQuery.error)}>Download tracker CSV</Button>
+              <Button onClick={() => uploadInput.current?.click()} disabled={importCsvMutation.isPending}>
+                {importCsvMutation.isPending ? "Importing..." : "Upload new requests CSV"}
+              </Button>
+              <input ref={uploadInput} type="file" accept=".csv,text/csv" className="hidden" aria-label="Upload refund tracker CSV" onChange={event => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                if (file) importCsvMutation.mutate(file);
+              }} />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      {canProcess && !browser && (
         <Card>
           <CardContent className="space-y-3 p-4">
             {automaticSyncError && <p role="alert" className="text-sm text-destructive">{automaticSyncError}</p>}

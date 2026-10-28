@@ -77,6 +77,15 @@ function createOutboundSync({ repository, config, logger = console, onAfterWrite
       quoteNumber: entry.quote_number || null
     };
   }
+  function buildEntityMessage(entry) {
+    const message = { entityType: entry.entity_type, action: entry.action, localId: entry.local_id, remoteId: entry.remote_id || null };
+    if (entry.action === "delete") return message;
+    const record = { ...entry.record };
+    for (const key of ["_rev", "_synced_at", "base44_id", "base44_synced_at"]) delete record[key];
+    if (entry.action === "update") record.id = entry.remote_id;
+    else delete record.id;
+    return { ...message, record };
+  }
   function buildDismissalMessage(entry) { return { entityType: "dismissal", localId: entry.local_id, quoteId: entry.quote_id }; }
   function buildMentionMessage(entry, localRecord) {
     return { entityType: "mention", localId: entry.local_id, quoteId: entry.quote_id, siteId: localRecord?.site_id || "",
@@ -216,6 +225,24 @@ function createOutboundSync({ repository, config, logger = console, onAfterWrite
         await repository.markOutboundMentionsSynced(mentionResults);
         const mentionFailed = mentionResults.filter((r) => r.error);
         if (mentionFailed.length) logger.warn(`[outbound-sync] ${mentionFailed.length} mention(s) failed; they remain queued.`, mentionFailed);
+      }
+
+      const pendingEntities = (await repository.listPendingOutboundEntities?.()) || [];
+      if (pendingEntities.length) {
+        const entityResults = [];
+        for (const entry of pendingEntities) {
+          const base = { entry_id: entry.id, revision: entry.revision || 0, action: entry.action,
+            collection: entry.collection, local_id: entry.local_id };
+          try {
+            const result = await sendOne(buildEntityMessage(entry), inboundUrl());
+            entityResults.push({ ...base, remote_id: result.remote_id || null, error: result.error || (result.queued ? "Queued by the Worker" : null) });
+          } catch (error) {
+            entityResults.push({ ...base, error: error.message });
+          }
+        }
+        await repository.markOutboundEntitiesSynced(entityResults);
+        const entityFailed = entityResults.filter((r) => r.error);
+        if (entityFailed.length) logger.warn(`[outbound-sync] ${entityFailed.length} shared record change(s) failed; they remain queued.`, entityFailed);
       }
 
       onAfterWrite?.();

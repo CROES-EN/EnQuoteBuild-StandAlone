@@ -2,6 +2,42 @@ import { broadcastMessage } from "./realtime.js";
 import { authenticateUser } from "./user-token.js";
 import { json } from "./util.js";
 import {AVATAR_TYPES, MAX_AVATAR_BYTES, gifAvatarError} from "../../shared/avatarRules.js";
+import { effectiveUserFor, isAdminUser, loadEffectiveUsers } from "./access.js";
+import { USERS_CACHE_KEY, toPublicUser } from "./base44-users.js";
+
+export async function handleProfileUpdate(request, env) {
+  const auth = await authenticateUser(request, env);
+  if (auth.error) return auth.error;
+  let body;
+  try { body = await request.json(); } catch { return json({ ok: false, error: "invalid_body" }, 400); }
+  const { users } = await loadEffectiveUsers(env);
+  const target = users.find(user => user.id === body?.id);
+  if (!target || target.id.startsWith("override-")) return json({ ok: false, error: "profile_not_found" }, 404);
+  if (target.email !== auth.email && !isAdminUser(await effectiveUserFor(env, auth.email))) {
+    return json({ ok: false, error: "forbidden" }, 403);
+  }
+  const fields = body?.changes;
+  const allowed = new Set(["full_name", "display_name", "department"]);
+  if (!fields || typeof fields !== "object" || Array.isArray(fields) || !Object.keys(fields).length ||
+      Object.entries(fields).some(([key, value]) => !allowed.has(key) || typeof value !== "string" || value.length > 200)) {
+    return json({ ok: false, error: "invalid_profile_fields" }, 400);
+  }
+  const url = `${String(env.BASE44_API_URL).replace(/\/+$/, "")}/api/apps/${env.BASE44_APP_ID}/entities/User/${encodeURIComponent(target.id)}`;
+  const response = await fetch(url, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", "X-App-Id": String(env.BASE44_APP_ID), api_key: env.BASE44_API_KEY },
+    body: JSON.stringify(fields)
+  });
+  if (!response.ok) {
+    console.error("[profiles] Base44 update failed:", response.status);
+    return json({ ok: false, error: "profile_update_failed" }, 502);
+  }
+  const saved = await response.json();
+  if (saved?.id !== target.id) return json({ ok: false, error: "invalid_profile_response" }, 502);
+  await env.CACHE.delete(USERS_CACHE_KEY);
+  await notifyProfiles(env);
+  return json({ ok: true, record: toPublicUser({ ...target, ...fields, ...saved }) });
+}
 
 async function sha256Hex(bytes) {
   const digest = await crypto.subtle.digest("SHA-256", bytes);

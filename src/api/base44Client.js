@@ -1,12 +1,12 @@
 ﻿import {createClient} from "@base44/sdk";
 import {appParams} from "@/lib/app-params";
+const token = appParams.token || undefined;
 
 const isBase44Runtime =
   ["base44", "base44-dual"].includes(import.meta.env.VITE_DATA_SOURCE);
 
 const {
   appId,
-  token,
   functionsVersion,
   appBaseUrl,
   serverUrl
@@ -52,9 +52,8 @@ const base44Client =
         auth: noopObject,
         appLogs: emptyAppLogs,
         functions: {
-          invoke: noop
+          invoke: async () => { throw new Error("This operation requires a configured server integration. No action was performed."); }
         }
       };
 
 export const base44 = base44Client;
-

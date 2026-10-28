@@ -8,6 +8,7 @@ import {Label} from "@/components/ui/label";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import {sopsApi, subscribe} from "@/features/collab/collabApi";
 import {formatBytes} from "./SopFilePreview";
+import SopExportImport from "./SopExportImport";
 
 export default function SopOneNoteImport({sections, selectedSectionId, onImported}) {
   const [previews, setPreviews] = useState(null);
@@ -99,6 +100,8 @@ export default function SopOneNoteImport({sections, selectedSectionId, onImporte
       if (mounted.current) setImporting(false);
     }
   };
+
+  if (globalThis.window?.enquoteLocal?.isBrowser) return <SopExportImport sections={sections} selectedSectionId={selectedSectionId} onImported={onImported} />;
 
   const multiple = previews?.length > 1;
   const totalPages = previews?.reduce((sum, preview) => sum + preview.pages.length, 0) || 0;

@@ -75,6 +75,103 @@ const normalizeEmail = email => String(email || "").trim().toLowerCase();
 // ---------------------------------------------------------------------------
 const MAX_OUTBOUND_QUEUE = 1000;
 
+// Shared collections whose desktop edits must reach the Worker (and from there Base44 and
+// every browser). quoteAlerts/statusAlertDismissals are created through their own mention/
+// dismissal queues, so only their later edits and deletions use this generic queue.
+const SYNCED_COLLECTION_ENTITIES = {
+  materialOrders: "MaterialOrder",
+  reviews: "QuoteReview",
+  activities: "QuoteActivity",
+  deletionRequests: "QuoteDeletionRequest",
+  followUpConfigs: "FollowUpConfig",
+  followUps: "FollowUpLog",
+  pdfTemplates: "PDFTemplate",
+  pvManufacturers: "PVManufacturer",
+  rmas: "PVPanelRMA",
+  siteFlags: "SiteFlag",
+  svCancels: "SVCancelTracker",
+  supportInteractions: "SupportInteraction",
+  priceReviews: "PriceReview",
+  quoteAlerts: "QuoteAlert",
+  statusAlertDismissals: "StatusAlertDismissal"
+};
+const CREATES_SYNCED_ELSEWHERE = new Set(["quoteAlerts", "statusAlertDismissals"]);
+const MAX_ENTITY_SYNC_ATTEMPTS = 20;
+const ENTITY_COMPARE_IGNORED = new Set(["_rev", "_synced_at", "base44_id", "base44_synced_at", "updated_date", "created_date", "id"]);
+
+function remoteEntityId(record) {
+  if (record?.base44_id) return String(record.base44_id);
+  const id = String(record?.id || "");
+  return id && !id.startsWith("demo-") ? id : null;
+}
+
+function entityContentDiffers(a, b) {
+  const keys = new Set([...Object.keys(a || {}), ...Object.keys(b || {})]);
+  for (const key of keys) {
+    if (ENTITY_COMPARE_IGNORED.has(key)) continue;
+    if (a?.[key] == null && b?.[key] == null) continue;
+    if (JSON.stringify(a?.[key]) !== JSON.stringify(b?.[key])) return true;
+  }
+  return false;
+}
+
+// One pending entry per record; the record body is read at flush time so the newest local
+// state is what gets pushed. Deletions carry the remote id because the record is gone.
+function queueEntityChange(data, name, record, action) {
+  if (!SYNCED_COLLECTION_ENTITIES[name] || !record?.id) return;
+  const remoteId = remoteEntityId(record);
+  if (CREATES_SYNCED_ELSEWHERE.has(name) && !remoteId) return;
+  data.outboundEntityQueue = Array.isArray(data.outboundEntityQueue) ? data.outboundEntityQueue : [];
+  const queue = data.outboundEntityQueue;
+  const localId = String(record.id);
+  const existing = queue.find(entry => entry.status === "pending" && entry.collection === name && entry.local_id === localId);
+  if (action === "delete") {
+    if (!remoteId) {
+      if (existing) queue.splice(queue.indexOf(existing), 1);
+      return;
+    }
+    if (existing) Object.assign(existing, { action: "delete", remote_id: remoteId, attempts: 0, last_error: null, revision: (existing.revision || 0) + 1 });
+    else queue.push(newEntityQueueEntry(name, localId, "delete", remoteId));
+    return;
+  }
+  if (existing) existing.revision = (existing.revision || 0) + 1;
+  else queue.push(newEntityQueueEntry(name, localId, remoteId ? "update" : "create", remoteId));
+}
+
+function newEntityQueueEntry(collection, localId, action, remoteId) {
+  return {
+    id: makeId("entity-sync"),
+    collection,
+    entity_type: SYNCED_COLLECTION_ENTITIES[collection],
+    action,
+    local_id: localId,
+    remote_id: remoteId || null,
+    revision: 0,
+    status: "pending",
+    attempts: 0,
+    enqueued_at: new Date().toISOString(),
+    last_error: null
+  };
+}
+
+// Records created on the desktop before this queue existed never reached the Worker; they
+// are recognisable by a local demo- id with no confirmed Base44 id.
+function backfillEntityQueue(data) {
+  let added = 0;
+  for (const name of Object.keys(SYNCED_COLLECTION_ENTITIES)) {
+    if (CREATES_SYNCED_ELSEWHERE.has(name)) continue;
+    for (const record of data[name] || []) {
+      if (!String(record?.id || "").startsWith("demo-") || record.base44_id) continue;
+      const queued = (data.outboundEntityQueue || []).some(entry =>
+        entry.collection === name && entry.local_id === String(record.id) && entry.status !== "synced");
+      if (queued) continue;
+      queueEntityChange(data, name, record, "create");
+      added += 1;
+    }
+  }
+  return added;
+}
+
 // Ids minted locally always use the makeId() shape ("<prefix>-<ms>-<rand>").
 // Anything else came from Base44 and must not be pushed back up.
 const isLocallyCreatedId = id => /^demo-quote-\d{10,}-[a-z0-9]{4,}$/.test(String(id || ""));
@@ -280,7 +377,7 @@ function sanitizeRecord(value) {
 // open with an older revision correctly fails its optimistic-concurrency check on save
 // instead of silently overwriting data this import just brought in. See update() below.
 function mergeRecordsById(existingList, incomingList, options = {}) {
-  const { bumpRevField = null, onWinnerIsUpdate = null, retainExisting = null } = options;
+  const { bumpRevField = null, onWinnerIsUpdate = null, retainExisting = null, onLocalWins = null } = options;
   const existing = Array.isArray(existingList) ? existingList : [];
   const incoming = Array.isArray(incomingList) ? incomingList : [];
   if (incoming.length === 0) return existing;
@@ -338,6 +435,7 @@ function mergeRecordsById(existingList, incomingList, options = {}) {
         winnerIsIncoming = true;
       }
       winner = winnerIsIncoming ? record : current;
+      if (!winnerIsIncoming && onLocalWins && entityContentDiffers(current, record)) onLocalWins(current, record);
     }
 
     // CRITICAL: if this match came via the base44_id index, the merged result must keep the
@@ -567,6 +665,7 @@ function repositoryFor(userDataPath) {
     parsed.deletedQuoteIds = Array.isArray(parsed.deletedQuoteIds) ? parsed.deletedQuoteIds : [];
     parsed.outboundDismissalQueue = Array.isArray(parsed.outboundDismissalQueue) ? parsed.outboundDismissalQueue : [];
     parsed.outboundMentionQueue = Array.isArray(parsed.outboundMentionQueue) ? parsed.outboundMentionQueue : [];
+    parsed.outboundEntityQueue = Array.isArray(parsed.outboundEntityQueue) ? parsed.outboundEntityQueue : [];
     collectionNames.forEach(name => {
       parsed[name] = Array.isArray(parsed[name]) ? parsed[name] : structuredClone(collectionDefaults[name]);
     });
@@ -989,7 +1088,9 @@ function repositoryFor(userDataPath) {
         })
       };
       collectionNames.forEach(name => {
-        merged[name] = mergeRecordsById(current[name], normalized[name]);
+        merged[name] = mergeRecordsById(current[name], normalized[name], SYNCED_COLLECTION_ENTITIES[name]
+          ? { onLocalWins: local => queueEntityChange(current, name, local, "update") }
+          : {});
       });
 
       // Appends this import's genuinely-new notifications on top of whatever the generic
@@ -1052,6 +1153,9 @@ function repositoryFor(userDataPath) {
         userCredentials: z.record(z.unknown()).optional(),
         outboundQueue: z.array(z.record(z.unknown())).optional(),
         outboundDeleteQueue: z.array(z.record(z.unknown())).optional(),
+        outboundDismissalQueue: z.array(z.record(z.unknown())).optional(),
+        outboundMentionQueue: z.array(z.record(z.unknown())).optional(),
+        outboundEntityQueue: z.array(z.record(z.unknown())).optional(),
         deletedQuoteIds: z.array(z.string()).optional(),
         meta: z.object({
           sync_ttl_ms: z.number().optional(),
@@ -1073,6 +1177,7 @@ function repositoryFor(userDataPath) {
         deletedQuoteIds: current.deletedQuoteIds || [],
         outboundDismissalQueue: current.outboundDismissalQueue || [],
         outboundMentionQueue: current.outboundMentionQueue || [],
+        outboundEntityQueue: current.outboundEntityQueue || [],
         meta: {
           // Local-only one-time migration state - dropping it made every later read() re-run
           // the password migration and rewrite the whole data file.
@@ -1281,6 +1386,7 @@ function repositoryFor(userDataPath) {
           id: record.id || makeId(`demo-${name}`)
         };
         data[name].push(item);
+        queueEntityChange(data, name, item, "create");
         // Dismissals made locally must reach Base44 too -- previously only Quote changes
         // were ever pushed outbound, so a dismissal made on desktop never reached Base44
         // (or any other install) at all. This queues it exactly like a quote create,
@@ -1410,6 +1516,112 @@ function repositoryFor(userDataPath) {
       await write(data);
       return { updated };
     },
+    // Generic shared-collection queue (desktop -> Worker -> Base44 + browsers). Each pending
+    // entry is returned with the CURRENT local record so the newest edit is what gets pushed.
+    async listPendingOutboundEntities() {
+      return serializedWrite(async () => {
+        const data = await read();
+        data.outboundEntityQueue = Array.isArray(data.outboundEntityQueue) ? data.outboundEntityQueue : [];
+        if (backfillEntityQueue(data) > 0) {
+          await rotateBackups();
+          await writeInner(data);
+        }
+        const pending = [];
+        for (const entry of data.outboundEntityQueue) {
+          if (entry.status !== "pending") continue;
+          if (entry.action === "delete") {
+            pending.push({ ...entry });
+            continue;
+          }
+          const record = (data[entry.collection] || []).find(item => String(item.id) === entry.local_id);
+          if (!record) continue;
+          const remoteId = remoteEntityId(record);
+          pending.push({ ...entry, action: remoteId ? "update" : "create", remote_id: remoteId, record });
+        }
+        return pending;
+      });
+    },
+    async markOutboundEntitiesSynced(results) {
+      const parsed = z.array(z.object({
+        entry_id: z.string().min(1),
+        revision: z.number().int().optional(),
+        action: z.string().optional(),
+        collection: z.string().optional(),
+        local_id: z.string().optional(),
+        remote_id: z.string().nullable().optional(),
+        error: z.string().nullable().optional()
+      })).parse(results || []);
+      if (!parsed.length) return { updated: 0 };
+      return serializedWrite(async () => {
+        const data = await read();
+        const queue = Array.isArray(data.outboundEntityQueue) ? data.outboundEntityQueue : [];
+        let updated = 0;
+        for (const result of parsed) {
+          const entry = queue.find(item => item.id === result.entry_id);
+          const record = entry && (data[entry.collection] || []).find(item => String(item.id) === entry.local_id);
+          if (!entry) {
+            // The record was deleted locally while its first upload was in flight.
+            const gone = result.action === "create" && result.remote_id && SYNCED_COLLECTION_ENTITIES[result.collection] &&
+              !(data[result.collection] || []).some(item => String(item.id) === result.local_id);
+            if (gone) queue.push(newEntityQueueEntry(result.collection, result.local_id, "delete", result.remote_id));
+            continue;
+          }
+          if (result.error) {
+            entry.attempts = (entry.attempts || 0) + 1;
+            entry.last_error = result.error;
+            if (entry.attempts >= MAX_ENTITY_SYNC_ATTEMPTS) entry.status = "failed";
+            continue;
+          }
+          if (result.remote_id && entry.action !== "delete" && record && !record.base44_id && String(record.id) !== result.remote_id) {
+            record.base44_id = result.remote_id;
+          }
+          // A newer local edit/delete arrived while this push was in flight; keep it pending.
+          if ((entry.revision || 0) !== (result.revision ?? entry.revision ?? 0)) {
+            if (entry.action === "delete" && !entry.remote_id && result.remote_id) entry.remote_id = result.remote_id;
+            continue;
+          }
+          entry.status = "synced";
+          updated += 1;
+          if (entry.action !== "delete" && result.remote_id && !record) {
+            // Deleted locally while its first upload was in flight: remove the shared copy too.
+            queue.push(newEntityQueueEntry(entry.collection, entry.local_id, "delete", result.remote_id));
+          }
+        }
+        data.outboundEntityQueue = queue.filter(item => item.status !== "synced");
+        await rotateBackups();
+        await writeInner(data);
+        return { updated };
+      });
+    },
+    // Deletions recorded in the shared store (by a browser, Base44, or another desktop).
+    async applyRemoteEntityDeletions(deletions) {
+      const byCollection = new Map();
+      for (const { collection, id } of deletions || []) {
+        if (!collection || !id || (collection !== "products" && !collectionNames.includes(collection))) continue;
+        if (!byCollection.has(collection)) byCollection.set(collection, new Set());
+        byCollection.get(collection).add(String(id));
+      }
+      if (!byCollection.size) return { removed: 0 };
+      return serializedWrite(async () => {
+        const data = await read();
+        let removed = 0;
+        for (const [collection, ids] of byCollection) {
+          const before = (data[collection] || []).length;
+          data[collection] = (data[collection] || []).filter(item =>
+            !ids.has(String(item.id)) && !ids.has(String(item.base44_id || "")));
+          removed += before - data[collection].length;
+        }
+        if (Array.isArray(data.outboundEntityQueue)) {
+          data.outboundEntityQueue = data.outboundEntityQueue.filter(entry =>
+            !(byCollection.get(entry.collection)?.has(entry.local_id) || byCollection.get(entry.collection)?.has(String(entry.remote_id || ""))));
+        }
+        if (removed) {
+          await rotateBackups();
+          await writeInner(data);
+        }
+        return { removed };
+      });
+    },
     async updateCollectionRecord(name, id, changes, options) {
       if (!collectionNames.includes(name)) throw new Error(`Unsupported local collection: ${name}`);
       return serializedWrite(async () => {
@@ -1430,6 +1642,7 @@ function repositoryFor(userDataPath) {
           ...z.record(z.unknown()).parse(changes),
           id
         };
+        queueEntityChange(data, name, data[name][index], "update");
         await rotateBackups();
         await writeInner(data);
         return data[name][index];
@@ -1439,9 +1652,11 @@ function repositoryFor(userDataPath) {
       if (!collectionNames.includes(name)) throw new Error(`Unsupported local collection: ${name}`);
       return serializedWrite(async () => {
         const data = await read();
+        const removed = data[name].find(item => item.id === id);
         const next = data[name].filter(item => item.id !== id);
         if (next.length === data[name].length) throw new Error(`${name} record not found.`);
         data[name] = next;
+        queueEntityChange(data, name, removed, "delete");
         await rotateBackups();
         await writeInner(data);
         return { id };

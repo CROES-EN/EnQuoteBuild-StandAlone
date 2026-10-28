@@ -123,7 +123,7 @@ function EnphaseCareContent() {
                 Refund Requests is not enabled in this running EnQuote session. If you are using
                 <code className="mx-1 rounded bg-muted px-1 py-0.5">npm run desktop:dev</code>,
                 close the app completely and restart it so Electron loads the current preload.
-                This feature is available in the EnQuote desktop app, not a browser preview.
+                Browser sessions also require the shared sync service to be configured and available.
               </CardContent>
             </Card>
           )}

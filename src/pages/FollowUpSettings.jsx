@@ -1,5 +1,5 @@
 ﻿import {useState} from "react";
-import {base44} from "@/api/base44Client";
+import {listLocalCollection, createLocalRecord, updateLocalRecord, deleteLocalRecord} from "@/api/dataClient";
 import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 import {Button} from "@/components/ui/button";
 import {Card} from "@/components/ui/card";
@@ -30,11 +30,11 @@ function FollowUpSettingsContent() {
 
  const { data: configs = [], isLoading } = useQuery({
  queryKey: ["followUpConfigs"],
- queryFn: () => base44.entities.FollowUpConfig.list()
+ queryFn: () => listLocalCollection("followUpConfigs")
  });
 
  const createMutation = useMutation({
- mutationFn: (data) => base44.entities.FollowUpConfig.create(data),
+ mutationFn: (data) => createLocalRecord("followUpConfigs", data),
  onSuccess: () => {
  queryClient.invalidateQueries({ queryKey: ["followUpConfigs"] });
  toast.success("Follow-up rule created");
@@ -43,7 +43,7 @@ function FollowUpSettingsContent() {
  });
 
  const updateMutation = useMutation({
- mutationFn: ({ id, data }) => base44.entities.FollowUpConfig.update(id, data),
+ mutationFn: ({ id, data }) => updateLocalRecord("followUpConfigs", id, data),
  onSuccess: () => {
  queryClient.invalidateQueries({ queryKey: ["followUpConfigs"] });
  toast.success("Follow-up rule updated");
@@ -52,7 +52,7 @@ function FollowUpSettingsContent() {
  });
 
  const deleteMutation = useMutation({
- mutationFn: (id) => base44.entities.FollowUpConfig.delete(id),
+ mutationFn: (id) => deleteLocalRecord("followUpConfigs", id),
  onSuccess: () => {
  queryClient.invalidateQueries({ queryKey: ["followUpConfigs"] });
  toast.success("Follow-up rule deleted");
